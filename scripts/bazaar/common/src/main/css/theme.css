@@ -3573,3 +3573,34 @@ PosGoalText { padding: 0 1mm 0 2mm; }
     tintColor: "66000000";
 }
 /* ---- end POLISH ROUND D ---- */
+/* ---- SHOPPER ROUND B: tracking steps, rewards units, badge hints ---- */
+ShopTrackWords { background-color: transparent; padding: 0.5mm 0 2.4mm 0; margin: 0; }
+ShopTrackStepDone { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopTrackStepNow { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopTrackStepTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopTrackDetail { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
+ShopTrackEta { color: var(--brand); font-family: "native:MainBold"; font-size: 2.2mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
+ShopTrackLink { background-color: transparent; padding: 0; margin: 0; }
+ShopRewardsTierB { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; padding: 0; margin: 0; }
+ShopRewardsNextB { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.8mm 0 0 0; margin: 0; }
+ShopRewardsSpent { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+ShopRewardsBalance { background-color: var(--surface); border-radius: 2mm; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 2.4mm 0 1mm 0; }
+ShopRewardsBalanceLabel { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.8mm 0 0 0; margin: 0; }
+ShopRewardsBalancePts { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopBadgeCount { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 1.9mm; text-align: center; padding: 0.3mm 0 0 0; margin: 0; }
+ShopStoreMonogram { color: #ffffff; background-color: #4f46e5; border: 0.6mm solid #ffffff; border-radius: var(--radius-small); font-family: "native:MainBold"; font-size: 3.6mm; text-align: center; padding: 0; margin: 0 0 1.6mm 2mm; }
+@media (prefers-color-scheme: dark) {
+    ShopTrackStepDone { color: var(--text-dark); }
+    ShopTrackStepNow { color: var(--text-dark); }
+    ShopTrackStepTodo { color: var(--text-muted-dark); }
+    ShopTrackDetail { color: var(--text-muted-dark); }
+    ShopTrackEta { color: var(--brand-dark); }
+    ShopRewardsTierB { color: var(--brand-dark); }
+    ShopRewardsNextB { color: var(--text-dark); }
+    ShopRewardsSpent { color: var(--text-muted-dark); }
+    ShopRewardsBalance { background-color: var(--surface-dark); }
+    ShopRewardsBalanceLabel { color: var(--text-dark); }
+    ShopRewardsBalancePts { color: var(--text-dark); }
+    ShopBadgeCount { color: var(--brand-dark); }
+}
+/* ---- end SHOPPER ROUND B ---- */

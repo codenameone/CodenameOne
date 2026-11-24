@@ -294,8 +294,20 @@ final class HomePane extends ShopPane {
         top.add(ProductArt.label(s.id() + "-hero", s.name(), ProductArt.NO_GLYPH,
                 s.heroPhotoId(), w, h, "ShopStoreCardArt"));
         int side = CN.convertToPixels(10);
-        Label logo = ProductArt.label(s.id(), s.name(), "storefront", s.logoPhotoId(), side, side,
-                "ShopStoreCardLogo");
+        Label logo;
+        if (s.logoPhotoId() == null || s.logoPhotoId().length() == 0) {
+            // No logo uploaded: the store's initials on its own accent, as a
+            // shop app shows a brand without one, rather than generic art.
+            logo = new Label(Ui.initials(s.name()), "ShopStoreMonogram");
+            logo.setShouldLocalize(false);
+            logo.getAllStyles().setBgColor(s.accentColor() == 0 ? 0x4f46e5 : s.accentColor());
+            logo.getAllStyles().setBgTransparency(255);
+            logo.setPreferredW(side);
+            logo.setPreferredH(side);
+        } else {
+            logo = ProductArt.label(s.id(), s.name(), "storefront", s.logoPhotoId(), side, side,
+                    "ShopStoreCardLogo");
+        }
         top.add(BorderLayout.south(FlowLayout.encloseIn(logo)));
         card.add(BorderLayout.NORTH, top);
         Container words = new Container(BoxLayout.y());

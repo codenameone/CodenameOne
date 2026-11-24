@@ -749,6 +749,51 @@ public class DemoStores {
                 null);
     }
 
+    /// The third store, a small one: only the demo shopper's walkthrough adds
+    /// it ([ShopperDemo#seed]), so its order is the one that earns the
+    /// Explorer badge. Not part of [#seed], so the merchant tours and the
+    /// backend tests see the two stores they always did.
+    public static final String FENNEL_FIG = "fennelfig";
+
+    private static final String[][] FENNEL_FIG_PRODUCTS = {
+        {"Glass Pantry Jar", "Storage", "Fennel & Fig", "glass, pantry, gift", "1800", "",
+            "Borosilicate glass with a bamboo lid; holds a kilo of flour."},
+        {"Enamel Milk Pan", "Cookware", "Fennel & Fig", "enamel, stovetop, bestseller", "3400",
+            "C", "A one-litre pan with a pouring lip for milk, sauces and porridge."},
+        {"Steel Spice Tins", "Storage", "Fennel & Fig", "steel, spices, gift", "2600", "",
+            "Six magnetic tins with window lids for the spices you reach for most."},
+        {"Linen Tea Towel", "Linens", "Fennel & Fig", "linen, gift", "1400", "C",
+            "Stonewashed linen that dries a glass without a streak."},
+        {"Cast Iron Skillet", "Cookware", "Fennel & Fig", "iron, stovetop, oven", "4800", "",
+            "A 26 cm skillet, seasoned and ready for its first egg."},
+        {"Olive Wood Spoon", "Utensils", "Fennel & Fig", "wood, gift", "1200", "",
+            "Hand-carved from a single piece of olive wood."},
+        {"Copper Measuring Cups", "Utensils", "Fennel & Fig", "copper", "2900", "",
+            "A nesting set of four, quarter cup to a whole one."},
+        {"Herb Keeper", "Storage", "Fennel & Fig", "glass, fresh", "2200", "",
+            "Keeps parsley and coriander fresh for two weeks in the fridge."},
+    };
+
+    /// Seeds [#FENNEL_FIG] once, owned by `owner`.
+    public void fennelFig(String owner) throws IOException {
+        if (exists(FENNEL_FIG)) {
+            return;
+        }
+        Store store = store(FENNEL_FIG, "Fennel & Fig", "Kitchen goods that last",
+                "Cookware, storage and linens chosen to be used every day and handed down. "
+                + "Everything ships from our shop in Portland.", 0x3f7d4e, owner,
+                "18 Alder St, Portland, OR", 45.5202, -122.6742);
+        List<Location> places = new ArrayList<Location>();
+        places.add(location(store, "Alder St shop", "RETAIL", "18 Alder St, Portland, OR", true,
+                0));
+        locations.saveAll(places);
+        staff.insert(member(store, owner, StoreAccess.OWNER, "", "", "Morgan Owner"));
+        catalog(store, places, FENNEL_FIG_PRODUCTS, "FF", false);
+        hero(store, "butter-dish.jpg");
+        // Shipping and tax, or nothing at checkout can be bought.
+        pricing.seed(store.getId());
+    }
+
     private Store store(String handle, String name, String tagline, String description,
             int accent, String owner, String address, double lat, double lng) throws IOException {
         Store store = new Store();

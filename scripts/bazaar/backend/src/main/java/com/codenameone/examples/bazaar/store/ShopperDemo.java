@@ -40,6 +40,8 @@ import com.codenameone.examples.bazaar.fulfil.Fulfillments;
 import com.codenameone.examples.bazaar.loyalty.Loyalty;
 import com.codenameone.examples.bazaar.marketing.Shoppers;
 import com.codenameone.examples.bazaar.order.Orders;
+import com.codenameone.examples.bazaar.domain.CustomerAddress;
+import com.codenameone.examples.bazaar.repository.CustomerAddressRepository;
 import com.codenameone.examples.bazaar.repository.FulfillmentRepository;
 import com.codenameone.examples.bazaar.repository.LocationRepository;
 import com.codenameone.examples.bazaar.repository.OrderLineRepository;
@@ -113,13 +115,16 @@ public class ShopperDemo {
     private final Fulfillments fulfil;
     private final Loyalty loyalty;
     private final Shoppers shoppers;
+    private final DemoStores demoStores;
+    private final CustomerAddressRepository addresses;
     private final long started = System.currentTimeMillis();
     private boolean seeded;
 
     public ShopperDemo(Config config, StoreRepository stores, LocationRepository locations,
             VariantRepository variants, StoreOrderRepository orders, OrderLineRepository lines,
             FulfillmentRepository fulfillments, WishlistRepository wishlists,
-            Orders orderService, Fulfillments fulfil, Loyalty loyalty, Shoppers shoppers) {
+            Orders orderService, Fulfillments fulfil, Loyalty loyalty, Shoppers shoppers,
+            DemoStores demoStores, CustomerAddressRepository addresses) {
         this.config = config;
         this.stores = stores;
         this.locations = locations;
@@ -132,6 +137,8 @@ public class ShopperDemo {
         this.fulfil = fulfil;
         this.loyalty = loyalty;
         this.shoppers = shoppers;
+        this.demoStores = demoStores;
+        this.addresses = addresses;
     }
 
     /// Whether this runs on this server.
@@ -178,7 +185,41 @@ public class ShopperDemo {
             }
         }
         wishlist(username);
+        addresses(username);
+        // The third store, which the history leaves out: the walkthrough's
+        // order there is the one that earns the Explorer badge.
+        demoStores.fennelFig(DemoAccounts.MERCHANT);
         return true;
+    }
+
+    /// Home and work, home the default, as a shopper with six orders has.
+    private void addresses(String username) throws IOException {
+        if (!addresses.findByUsername(username).isEmpty()) {
+            return;
+        }
+        String[][] rows = {
+            {"Riley Shopper", "1 Market St", "Apt 12", "San Francisco", "CA", "94105",
+                "37.7941", "-122.3951"},
+            {"Riley Shopper", "500 Howard St", "Floor 4", "San Francisco", "CA", "94105",
+                "37.7877", "-122.3967"}
+        };
+        for (int iter = 0; iter < rows.length; iter++) {
+            CustomerAddress a = new CustomerAddress();
+            a.setId(Ids.next());
+            a.setUsername(username);
+            a.setName(rows[iter][0]);
+            a.setLine1(rows[iter][1]);
+            a.setLine2(rows[iter][2]);
+            a.setCity(rows[iter][3]);
+            a.setRegion(rows[iter][4]);
+            a.setPostal(rows[iter][5]);
+            a.setCountry("US");
+            a.setPhone("+14155550123");
+            a.setLat(Double.parseDouble(rows[iter][6]));
+            a.setLng(Double.parseDouble(rows[iter][7]));
+            a.setIsDefault(iter == 0);
+            addresses.insert(a);
+        }
     }
 
     /// One step for every open order the shopper placed at or after `since`;

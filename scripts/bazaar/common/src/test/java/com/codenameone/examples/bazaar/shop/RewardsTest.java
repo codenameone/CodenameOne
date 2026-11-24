@@ -41,11 +41,11 @@ class RewardsTest {
         boolean[] first = Rewards.badges(1, 0, 1);
         assertTrue(first[Rewards.FIRST_ORDER]);
         assertFalse(first[Rewards.REGULAR]);
-        boolean[] later = Rewards.badges(5, 1, 2);
+        boolean[] later = Rewards.badges(5, 1, 3);
         assertTrue(later[Rewards.REGULAR]);
         assertTrue(later[Rewards.REVIEWER]);
         assertTrue(later[Rewards.EXPLORER]);
-        assertEquals(Rewards.REGULAR, Rewards.unlocked(Rewards.badges(4, 1, 2), later));
+        assertEquals(Rewards.REGULAR, Rewards.unlocked(Rewards.badges(4, 1, 3), later));
         assertEquals(-1, Rewards.unlocked(later, later));
         assertEquals(Rewards.FIRST_ORDER, Rewards.unlocked(null, first));
         RewardsDto dto = new RewardsDto(120, 300, "Silver", "Gold", 50, 50, 5, 3, 0, 2, 4, 0);
@@ -53,7 +53,7 @@ class RewardsTest {
         assertEquals(4, Rewards.badges(null).length);
         assertEquals(800, Rewards.badgeProgress(Rewards.REGULAR, 4, 0, 1));
         assertEquals(1000, Rewards.badgeProgress(Rewards.REGULAR, 9, 0, 1));
-        assertEquals(500, Rewards.badgeProgress(Rewards.EXPLORER, 0, 0, 1));
+        assertEquals(333, Rewards.badgeProgress(Rewards.EXPLORER, 0, 0, 1));
     }
 
     @Test

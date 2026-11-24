@@ -177,7 +177,8 @@ final class AccountPane extends ShopPane {
                 ShopState.forgetAddress(a);
                 reload();
             });
-            into.add(Ui.row(FontImage.MATERIAL_LOCATION_ON, a.name(), Addresses.summary(a), forget));
+            // Titled by the street: the name is the shopper's own on every row.
+            into.add(Ui.row(FontImage.MATERIAL_LOCATION_ON, a.line1(), Addresses.place(a), forget));
         }
     }
 

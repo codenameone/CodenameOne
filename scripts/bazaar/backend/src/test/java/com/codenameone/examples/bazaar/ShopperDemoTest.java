@@ -58,6 +58,10 @@ class ShopperDemoTest {
     private FulfillmentRepository fulfillmentRows;
     @Autowired
     private LiveHub hub;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.CustomerAddressRepository addressRows;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.StoreRepository storeRows;
 
     @Test
     void seedsAHistoryTheRewardsCountAndFollowsAnOrderToTheDoor() throws Exception {
@@ -73,6 +77,9 @@ class ShopperDemoTest {
         assertEquals(2, r.stores());
         assertTrue(r.delivered() >= 3, () -> "delivered " + r.delivered());
         assertEquals(5, r.wishlist());
+        assertEquals(2, addressRows.findByUsername(WHO).size(), "home and work are saved");
+        assertTrue(storeRows.findByHandle(DemoStores.FENNEL_FIG) != null,
+                "the third store, for the Explorer badge");
         assertEquals(0, rewards.rewards(null, "").orders(), "a guest has nothing");
 
         // The seeded orders are history: nothing moves them.

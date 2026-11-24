@@ -78,22 +78,36 @@ final class RewardsView {
         card.removeAll();
         int fill = Rewards.tierProgress(r.qualifying(), r.toNextTier());
         Container top = new Container(new BorderLayout());
-        Ring ring = new Ring(fill);
+        // The tier is earned by spend, so the ring (a share of it) and the lines
+        // under the tier are all in money; points are the balance to spend,
+        // and sit apart on their own row so the two never read as one unit.
+        Ring ring = new Ring(fill, null);
         top.add(BorderLayout.WEST, ring);
         Container words = new Container(BoxLayout.y());
         words.setUIID("ShopRewardsWords");
         words.add(Ui.plain(r.tierName() == null || r.tierName().length() == 0
-                ? Lang.tr("Member") : r.tierName(), "ShopRewardsTier"));
-        final Label pts = Ui.plain(points(0), "ShopRewardsPoints");
-        pts.setName("rewards-points");
-        words.add(pts);
-        String next = r.nextTierName() != null && r.nextTierName().length() > 0
-                && r.toNextTier() > 0
-                ? Lang.tr("{0} more to {1}", ShopState.money(r.toNextTier()), r.nextTierName())
-                : Lang.tr("Top tier: every perk is yours");
-        words.add(Ui.plain(next, "ShopRewardsNext"));
+                ? Lang.tr("Member") : r.tierName(), "ShopRewardsTierB"));
+        boolean hasNext = r.nextTierName() != null && r.nextTierName().length() > 0
+                && r.toNextTier() > 0;
+        words.add(Ui.text(hasNext
+                ? Lang.tr("Spend {0} more to reach {1}", Money.whole(r.toNextTier() + 99),
+                        r.nextTierName())
+                : Lang.tr("Top tier: every perk is yours"), "ShopRewardsNextB"));
+        words.add(Ui.plain(Lang.tr("{0} spent this year", Money.whole(r.qualifying())),
+                "ShopRewardsSpent"));
         top.add(BorderLayout.CENTER, words);
         card.add(top);
+        Container balance = new Container(new BorderLayout());
+        balance.setUIID("ShopRewardsBalance");
+        Label star = new Label("", "ShopPointsIcon");
+        FontImage.setMaterialIcon(star, FontImage.MATERIAL_STARS, 3.4f);
+        balance.add(BorderLayout.WEST, star);
+        balance.add(BorderLayout.CENTER, Ui.plain(Lang.tr("Points to spend"),
+                "ShopRewardsBalanceLabel"));
+        final Label pts = Ui.plain(points(0), "ShopRewardsBalancePts");
+        pts.setName("rewards-points");
+        balance.add(BorderLayout.EAST, pts);
+        card.add(balance);
 
         boolean[] have = Rewards.badges(r);
         int before = Preferences.get(SEEN_BADGES, -1);
@@ -115,8 +129,21 @@ final class RewardsView {
             icons[iter] = icon;
             b.add(com.codename1.ui.layouts.FlowLayout.encloseCenter(icon));
             b.add(Ui.label(Rewards.TITLES[iter], "ShopBadgeName"));
-            int p = Rewards.badgeProgress(iter, r.orders(), r.reviews(), r.stores());
-            b.add(Ui.label(have[iter] ? Lang.tr("Unlocked") : (p / 10) + "%", "ShopBadgeHint"));
+            if (have[iter]) {
+                b.add(Ui.label(Lang.tr("Unlocked"), "ShopBadgeHint"));
+            } else {
+                // Wraps rather than cutting the hint off in a narrow tile.
+                com.codename1.components.SpanLabel hint = Ui.text(
+                        Lang.tr(Rewards.SHORT_HINTS[iter]), "ShopBadgeHint");
+                hint.setTextBlockAlign(Component.CENTER);
+                b.add(hint);
+                String count = Rewards.badgeCount(iter, r.orders(), r.reviews(), r.stores());
+                if (count != null) {
+                    Label c = Ui.plain(count, "ShopBadgeCount");
+                    c.setName("badge-count-" + iter);
+                    b.add(c);
+                }
+            }
             badges.add(b);
         }
         card.add(badges);
@@ -234,10 +261,11 @@ final class RewardsView {
         words.setUIID("ShopDropWords");
         Label kicker = Ui.plain(Lang.tr("Today's drop"), "ShopDropKicker");
         words.add(kicker);
-        words.add(Ui.plain(p.title(), "ShopDropTitle"));
+        words.add(Ui.text(p.title(), "ShopDropTitle"));
         words.add(Ui.plain(ShopState.money(p.storeId(), p.minPriceCents()), "ShopDropPrice"));
-        Label fire = Ui.plain(streak == 1 ? Lang.tr("Day 1. Come back tomorrow for the next")
-                : Lang.tr("{0}-day streak", String.valueOf(streak)), "ShopDropStreak");
+        // One short line at every streak; the long day-one sentence was cut off.
+        Label fire = Ui.plain(Lang.tr("{0}-day streak", String.valueOf(streak)),
+                "ShopDropStreak");
         FontImage.setMaterialIcon(fire, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, 3f);
         words.add(fire);
         card.add(BorderLayout.CENTER, words);
@@ -250,10 +278,12 @@ final class RewardsView {
     /// 400 ms once it is on screen.
     static final class Ring extends Component {
         private final int fill;
+        private final String figure;
         private Motion motion;
 
-        Ring(int fill) {
+        Ring(int fill, String figure) {
             this.fill = fill;
+            this.figure = figure;
             setUIID("ShopRing");
             setName("tier-ring");
         }
@@ -311,7 +341,7 @@ final class RewardsView {
             g.fillArc(x, y, s, s, 90, -(int) (360L * at / 1000));
             g.setColor(getStyle().getBgColor());
             g.fillArc(x + thick, y + thick, s - thick * 2, s - thick * 2, 0, 360);
-            String pct = (at / 10) + "%";
+            String pct = figure != null ? figure : (at / 10) + "%";
             g.setColor(arc.getFgColor());
             g.setFont(arc.getFont());
             g.drawString(pct, x + (s - arc.getFont().stringWidth(pct)) / 2,

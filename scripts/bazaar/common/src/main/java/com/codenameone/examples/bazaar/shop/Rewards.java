@@ -32,15 +32,48 @@ public final class Rewards {
 
     /// Orders that make a regular.
     public static final int REGULAR_ORDERS = 5;
-    /// Stores an explorer has bought from. The demo has two stores; a third
-    /// would make this 3.
-    public static final int EXPLORER_STORES = 2;
+    /// Stores an explorer has bought from: the demo has three, and the demo
+    /// shopper's history covers two of them.
+    public static final int EXPLORER_STORES = 3;
 
     public static final String[] TITLES = {"First order", "Reviewer", "Regular", "Explorer"};
     public static final String[] HINTS = {"Place your first order", "Review something you bought",
-        "Place five orders", "Shop from two stores"};
+        "Place five orders", "Shop from three stores"};
+
+    /// What a locked badge's tile says to do, short enough for a quarter of
+    /// a phone's width.
+    public static final String[] SHORT_HINTS = {"Place an order", "Write a review",
+        "Place 5 orders", "Try 3 stores"};
 
     private Rewards() {
+    }
+
+    /// How many a badge needs.
+    public static int badgeNeed(int badge) {
+        switch (badge) {
+            case REGULAR:
+                return REGULAR_ORDERS;
+            case EXPLORER:
+                return EXPLORER_STORES;
+            default:
+                return 1;
+        }
+    }
+
+    /// How many of [#badgeNeed] the counts have, capped at the need.
+    public static int badgeHave(int badge, int orders, int reviews, int stores) {
+        int have = badge == REVIEWER ? reviews : badge == EXPLORER ? stores : orders;
+        return Math.max(0, Math.min(badgeNeed(badge), have));
+    }
+
+    /// A locked badge's progress as "2/5", or null for a badge that needs
+    /// only one of something (a count of "0/1" says nothing a hint does not).
+    public static String badgeCount(int badge, int orders, int reviews, int stores) {
+        int need = badgeNeed(badge);
+        if (need <= 1) {
+            return null;
+        }
+        return badgeHave(badge, orders, reviews, stores) + "/" + need;
     }
 
     /// Which badges `r` has earned, by index ([#FIRST_ORDER] ...).

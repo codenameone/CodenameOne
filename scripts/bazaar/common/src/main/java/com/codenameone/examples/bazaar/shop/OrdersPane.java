@@ -128,7 +128,7 @@ final class OrdersPane extends ShopPane {
             row.add(BorderLayout.CENTER, words);
             Container end = new Container(BoxLayout.y());
             end.add(Ui.plain(Money.format(o.totalCents(), o.currency(), "USD"), "SvRowValue"));
-            end.add(Ui.badge(Lang.tr(OrderSteps.label(o)), OrderView.badge(o)));
+            end.add(Ui.badge(Lang.tr(TrackStages.chip(o)), OrderView.badge(o)));
             row.add(BorderLayout.EAST, end);
             Container tappable = Ui.tap(row, "order-" + o.number(), e -> show(o.id()));
             RowMenus.attach(tappable, () -> new Command[] {

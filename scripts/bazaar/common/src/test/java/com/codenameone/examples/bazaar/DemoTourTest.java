@@ -95,6 +95,21 @@ public class DemoTourTest extends E2e {
     // ------------------------------------------------------------------ tours
 
     private void shopper() throws Exception {
+        // The run's light or dark look, for the captures and the video alike.
+        visualTheme();
+        // The first form was built before the look changed: restyle it.
+        pause(800);
+        onEdt(() -> {
+            com.codename1.ui.Form f = Display.getInstance().getCurrent();
+            if (f != null) {
+                f.refreshTheme();
+                f.revalidate();
+            }
+        });
+        go(Sections.SEARCH);
+        pause(600);
+        go(Sections.HOME);
+        pause(600);
         record("bazaar-shopper-" + device());
         caption("The shop opens for a guest: no sign-in wall", 3000);
         pause(3200);
@@ -106,6 +121,9 @@ public class DemoTourTest extends E2e {
         caption("Search every store at once", 2600);
         pause(2800);
         shotAs("shop-search");
+        // A product of the third store, so the order earns the Explorer badge.
+        fill("search", "skillet");
+        pause(2500);
         if (tapChild("product-grid", 0)) {
             caption("A product: its gallery, options and reviews", 3000);
             pause(3200);
@@ -113,6 +131,7 @@ public class DemoTourTest extends E2e {
             tapFirst("option-");
             pause(900);
             caption("Pick an option and add it to the cart", 2600);
+            mark("add-to-cart");
             tap("add-to-cart");
             pause(2400);
             scrollDown(1);
@@ -123,14 +142,33 @@ public class DemoTourTest extends E2e {
         go(Sections.CART);
         caption("One cart, grouped by store, with a running total", 3000);
         pause(3200);
+        mark("quantity");
+        tapFirst("line-more-");
+        pause(1800);
         shotAs("shop-cart");
         go(Sections.ACCOUNT);
         pause(1500);
         signInVisible(CUSTOMER, "home-shop");
+        // Signing in applies the account's saved theme; the run's mode wins.
+        visualTheme();
+        // Signed in, the heart saves: the same product, wishlisted.
+        go(Sections.SEARCH);
+        pause(1500);
+        if (tapChild("product-grid", 0)) {
+            pause(2500);
+            mark("wishlist");
+            tap("wishlist");
+            pause(1800);
+            safeBack();
+            pause(1200);
+        }
         caption("Signed in: orders, wishlist, addresses and loyalty", 3000);
         go(Sections.ACCOUNT);
         pause(3200);
         shotAs("shop-account");
+        scrollDown(3);
+        pause(1200);
+        shotAs("shop-account-more");
         go(Sections.CART);
         pause(1500);
         if (tap("checkout")) {
@@ -157,6 +195,7 @@ public class DemoTourTest extends E2e {
             scrollDown(4);
             pause(1200);
             shotAs("shop-checkout-payment");
+            mark("place-order");
             if (tap("place-order")) {
                 pause(4000);
                 caption("Order placed, with a link to follow it", 3000);
@@ -168,9 +207,19 @@ public class DemoTourTest extends E2e {
                 pause(3000);
                 shotAs("shop-order-tracking");
                 caption("Followed live, all the way to the door", 3000);
+                mark("tracking");
                 followToDelivered(this::shotAs, "shop-order");
+                mark("delivered-done");
             }
         }
+        // Back to the account: the third store's order unlocked Explorer.
+        // The order is a pushed form; the tabs are under it.
+        safeBack();
+        pause(1200);
+        go(Sections.ACCOUNT);
+        mark("badge-unlock");
+        pause(3200);
+        shotAs("shop-account-unlocked");
         go(Sections.ORDERS);
         caption("Every order, with its tracking timeline", 2800);
         pause(3000);
@@ -1580,6 +1629,7 @@ private void screens() throws Exception {
         o.setAudio(RecordingOptions.Audio.NONE);
         o.setMaxSeconds(420);
         recorder.start(o);
+        recordStart = System.currentTimeMillis();
     }
 
     private void caption(String text, long ms) {
@@ -1594,7 +1644,17 @@ private void screens() throws Exception {
 
     /// A capture for the guides, named for the device it was taken on.
     private void shotAs(String name) {
-        shot("bazaar-" + name + "-" + device());
+        shot("bazaar-" + name + "-" + device()
+                + (Boolean.getBoolean("bazaar.visual.dark") ? "-dark" : ""));
+    }
+
+    private long recordStart;
+
+    /// Logs how far into the recording a moment is, so its frames can be cut
+    /// out of the video by time.
+    private void mark(String what) {
+        log("[mark] " + what + " at " + (recordStart == 0 ? -1
+                : System.currentTimeMillis() - recordStart) + " ms");
     }
 
     /// A touch the viewer sees: the dot on the recording, then the press.

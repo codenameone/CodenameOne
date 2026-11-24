@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.shop;
 
 import com.codenameone.examples.bazaar.api.FulfillmentSummaryDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
+import com.codenameone.examples.bazaar.api.OrderEventDto;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -128,5 +129,176 @@ public final class TrackStages {
             return null;
         }
         return BANNERS[after];
+    }
+
+    /// When each stage was reached, in epoch ms, from the order's timeline:
+    /// 0 for a stage not reached. A stage whose own event is missing (a
+    /// seeded order, or a parcel that skipped a scan) takes the time of the
+    /// stage before it, so every completed step has a time and the times
+    /// never run backwards.
+    public static long[] times(OrderDto order) {
+        long[] out = new long[LABELS.length];
+        if (order == null) {
+            return out;
+        }
+        List<OrderEventDto> es = order.events();
+        for (int iter = 0; es != null && iter < es.size(); iter++) {
+            OrderEventDto e = es.get(iter);
+            int stage = eventStage(e.kind());
+            if (stage >= 0 && e.createdAt() > 0 && (out[stage] == 0 || e.createdAt() < out[stage])) {
+                out[stage] = e.createdAt();
+            }
+        }
+        List<FulfillmentSummaryDto> fs = order.fulfillments();
+        for (int iter = 0; fs != null && iter < fs.size(); iter++) {
+            long at = fs.get(iter).createdAt();
+            if (at > 0 && out[PACKED] == 0) {
+                out[PACKED] = at;
+            }
+        }
+        if (out[PLACED] == 0) {
+            out[PLACED] = order.createdAt();
+        }
+        return fill(out, reached(order));
+    }
+
+    /// [#times] once the events are sorted into stages: the stages past
+    /// `now` cleared, the gaps up to it filled forward, never backwards.
+    public static long[] fill(long[] at, int now) {
+        long[] out = new long[at.length];
+        long last = 0;
+        for (int iter = 0; iter < at.length && iter <= now; iter++) {
+            last = Math.max(last, at[iter]);
+            out[iter] = last;
+        }
+        return out;
+    }
+
+    /// The stage an order event marks, or -1.
+    public static int eventStage(String kind) {
+        if (kind == null) {
+            return -1;
+        }
+        switch (kind) {
+            case "PLACED":
+                return PLACED;
+            case "AUTHORIZED":
+            case "CAPTURED":
+            case "PAID":
+                return PAID;
+            case "FULFILMENT":
+            case "FULFILMENT_PACKED":
+                return PACKED;
+            case "LABEL":
+            case "FULFILMENT_SHIPPED":
+            case "FULFILMENT_IN_TRANSIT":
+                return SHIPPED;
+            case "FULFILMENT_OUT_FOR_DELIVERY":
+                return OUT_FOR_DELIVERY;
+            case "DELIVERED":
+            case "FULFILMENT_DELIVERED":
+                return DELIVERED;
+            default:
+                return -1;
+        }
+    }
+
+    /// The word on an order's status chip: the tracking stage, so the chip
+    /// and the tracker never disagree; Cancelled and Refunded win.
+    public static String chip(OrderDto order) {
+        if (order == null) {
+            return "";
+        }
+        if ("CANCELLED".equals(order.status())) {
+            return "Cancelled";
+        }
+        if ("REFUNDED".equals(order.financial())) {
+            return "Refunded";
+        }
+        return LABELS[Math.max(0, reached(order))];
+    }
+
+    /// The name a shopper sees for a carrier code: the demo's simulated
+    /// carrier is "Bazaar Express", a known code its proper name, anything
+    /// else as the server sent it.
+    public static String carrierName(String code) {
+        if (code == null || code.length() == 0) {
+            return "";
+        }
+        if ("simulated".equalsIgnoreCase(code) || "sim".equalsIgnoreCase(code)) {
+            return "Bazaar Express";
+        }
+        if ("fedex".equalsIgnoreCase(code)) {
+            return "FedEx";
+        }
+        // Folded by hand: toUpperCase is locale sensitive.
+        String[] upper = {"USPS", "UPS", "DHL"};
+        for (String u : upper) {
+            if (u.equalsIgnoreCase(code)) {
+                return u;
+            }
+        }
+        return code;
+    }
+
+    /// A tracking number in groups of four, the way a label prints it:
+    /// `SIM255202074779` reads `SIM 2552 0207 4779` -- the letters as their
+    /// own group, the digits in fours from the end so the last is whole.
+    public static String trackingNumber(String n) {
+        if (n == null) {
+            return "";
+        }
+        int at = 0;
+        while (at < n.length() && !Character.isDigit(n.charAt(at))) {
+            at++;
+        }
+        int digits = n.length() - at;
+        if (digits <= 4) {
+            return n;
+        }
+        StringBuilder out = new StringBuilder(n.length() + 6);
+        out.append(n.substring(0, at));
+        int first = digits % 4 == 0 ? 4 : digits % 4;
+        for (int iter = 0; iter < digits; iter++) {
+            if ((iter == 0 && at > 0) || (iter > 0 && (iter - first) % 4 == 0 && iter >= first)) {
+                out.append(' ');
+            }
+            out.append(n.charAt(at + iter));
+        }
+        return out.toString();
+    }
+
+    /// The delivery window for an order at stage `now` when the hour of the
+    /// day is `hourNow`: `{from hour, to hour, days away}` (0 today, 1
+    /// tomorrow); null once delivered or cancelled.
+    public static int[] window(int now, int hourNow) {
+        if (now < PLACED || now >= DELIVERED) {
+            return null;
+        }
+        if (now == OUT_FOR_DELIVERY) {
+            int from = Math.max(hourNow + 1, 10);
+            from += from % 2;
+            if (from > 18) {
+                return new int[] {9, 12, 1};
+            }
+            return new int[] {from, from + 2, 0};
+        }
+        // Not out yet: a day for each stage still ahead of the van.
+        return new int[] {10, 14, Math.min(2, OUT_FOR_DELIVERY - now)};
+    }
+
+    /// A span of hours: `4-6 pm` when both ends share am or pm, `11 am-1 pm`
+    /// when they do not.
+    public static String span(int from, int to) {
+        if (from < 12 == to < 12) {
+            return (from % 12 == 0 ? 12 : from % 12) + "-" + hour(to);
+        }
+        return hour(from) + "-" + hour(to);
+    }
+
+    /// An hour of the day as a shopper reads it: `4 pm`, `11 am`, `12 pm`.
+    public static String hour(int h) {
+        int x = h % 12 == 0 ? 12 : h % 12;
+        return x + (h < 12 ? " am" : " pm");
     }
 }

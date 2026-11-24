@@ -100,7 +100,9 @@ final class TrackerView {
 
         Container steps = new Container(BoxLayout.y());
         steps.setUIID("ShopTrackSteps");
-        for (int iter = 0; iter < TrackStages.LABELS.length; iter++) {
+        long[] times = TrackStages.times(order);
+        int last = TrackStages.LABELS.length - 1;
+        for (int iter = 0; iter <= last; iter++) {
             boolean done = iter <= now;
             boolean current = iter == now;
             Container row = new Container(new BorderLayout());
@@ -114,13 +116,30 @@ final class TrackerView {
                     3.4f);
             ticks[iter] = tick;
             rail.add(BorderLayout.NORTH, tick);
+            if (iter < last) {
+                // The connector down to the next dot: solid where the order
+                // has been, the track's colour where it has yet to go.
+                rail.add(BorderLayout.CENTER, new Connector(iter < now));
+            }
             row.add(BorderLayout.WEST, rail);
             Container words = new Container(BoxLayout.y());
-            words.add(Ui.plain(TrackStages.LABELS[iter], current ? "ShopScanTitleNow"
-                    : done ? "ShopScanTitle" : "ShopTrackTodo"));
-            String detail = detail(order, iter, now);
-            if (detail != null) {
-                words.add(Ui.plain(detail, "ShopScanDetail"));
+            words.setUIID("ShopTrackWords");
+            words.add(Ui.plain(Lang.tr(TrackStages.LABELS[iter]), current ? "ShopTrackStepNow"
+                    : done ? "ShopTrackStepDone" : "ShopTrackStepTodo"));
+            if (done && times[iter] > 0) {
+                words.add(Ui.plain(Ui.when(times[iter]), "ShopTrackDetail"));
+            }
+            String carrier = iter == TrackStages.SHIPPED && done ? carrier(order) : null;
+            if (carrier != null) {
+                words.add(Ui.plain(carrier, "ShopTrackDetail"));
+            }
+            if (iter == TrackStages.DELIVERED && !done) {
+                String eta = eta(now);
+                if (eta != null) {
+                    Label l = Ui.plain(eta, "ShopTrackEta");
+                    l.setName("track-eta");
+                    words.add(l);
+                }
             }
             row.add(BorderLayout.CENTER, words);
             steps.add(row);
@@ -141,29 +160,45 @@ final class TrackerView {
             case TrackStages.DELIVERED:
                 return Lang.tr("Left at your door. Enjoy!");
             default:
-                if (f != null && f.carrier() != null && f.carrier().length() > 0) {
-                    return f.trackingNumber() == null || f.trackingNumber().length() == 0
-                            ? f.carrier() : f.carrier() + Ui.DOT + f.trackingNumber();
+                String c = now == TrackStages.OUT_FOR_DELIVERY ? eta(now) : carrier(order);
+                if (c != null) {
+                    return c;
                 }
                 return Lang.tr(now == TrackStages.OUT_FOR_DELIVERY ? "Arriving today"
                         : "On its way");
         }
     }
 
-    private static String detail(OrderDto order, int stage, int now) {
-        if (stage == TrackStages.PLACED) {
-            return Ui.when(order.createdAt());
+    /// The parcel's carrier and number as a shopper reads them, or null.
+    private static String carrier(OrderDto order) {
+        FulfillmentSummaryDto f = parcel(order);
+        if (f == null) {
+            return null;
         }
-        if (stage == TrackStages.SHIPPED && now >= stage) {
-            FulfillmentSummaryDto f = parcel(order);
-            if (f != null && f.trackingNumber() != null && f.trackingNumber().length() > 0) {
-                return (f.carrier() == null ? "" : f.carrier() + Ui.DOT) + f.trackingNumber();
-            }
+        String name = TrackStages.carrierName(f.carrier());
+        String number = TrackStages.trackingNumber(f.trackingNumber());
+        if (number.length() == 0) {
+            return name.length() == 0 ? null : name;
         }
-        if (stage == now + 1) {
-            return Lang.tr("Up next");
+        return name.length() == 0 ? number : name + Ui.DOT + number;
+    }
+
+    /// "Arriving today, 4-6 pm" for an order at stage `now`, or null.
+    static String eta(int now) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTime(new java.util.Date());
+        int[] w = TrackStages.window(now, c.get(java.util.Calendar.HOUR_OF_DAY));
+        if (w == null) {
+            return null;
         }
-        return null;
+        String span = TrackStages.span(w[0], w[1]);
+        if (w[2] == 0) {
+            return Lang.tr("Arriving today, {0}", span);
+        }
+        if (w[2] == 1) {
+            return Lang.tr("Arriving tomorrow, {0}", span);
+        }
+        return Lang.tr("Arriving in {0} days", String.valueOf(w[2]));
     }
 
     private static FulfillmentSummaryDto parcel(OrderDto order) {
@@ -177,6 +212,32 @@ final class TrackerView {
             }
         }
         return null;
+    }
+
+    /// The vertical line between two step dots.
+    static final class Connector extends Component {
+        private final boolean done;
+
+        Connector(boolean done) {
+            this.done = done;
+            setUIID("ShopTrackLink");
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+            return new Dimension(CN.convertToPixels(3.4f), CN.convertToPixels(2));
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            Style st = UIManager.getInstance().getComponentStyle(done ? "ShopRouteDone"
+                    : "ShopRouteLine");
+            int w = Math.max(2, CN.convertToPixels(0.5f));
+            int gap = CN.convertToPixels(0.6f);
+            g.setColor(st.getFgColor());
+            g.fillRect(getX() + (getWidth() - w) / 2, getY() + gap, w,
+                    Math.max(0, getHeight() - gap * 2));
+        }
     }
 
     /// The route from the store to the door, drawn: a gentle arc, done up to

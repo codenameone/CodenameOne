@@ -44,6 +44,12 @@ public final class Money {
         return sign + amount + " " + code;
     }
 
+    /// `cents` in whole dollars, rounded down, for a figure that has to fit
+    /// in a ring: `$877`, `$1,250`.
+    public static String whole(long cents) {
+        return (cents < 0 ? "-$" : "$") + grouped(Math.abs(cents) / 100);
+    }
+
     /// `whole` with a comma between each group of three digits: `4,952`.
     static String grouped(long whole) {
         String digits = String.valueOf(whole);

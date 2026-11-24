@@ -74,7 +74,7 @@ final class OrderView {
         } else {
             head.add(BorderLayout.CENTER, Ui.plain(Ui.when(order.createdAt()), "SvMuted"));
         }
-        head.add(BorderLayout.EAST, Ui.badge(Lang.tr(OrderSteps.label(order)), badge(order)));
+        head.add(BorderLayout.EAST, Ui.badge(Lang.tr(TrackStages.chip(order)), badge(order)));
         page.add(head);
         if (titled) {
             page.add(Ui.plain(Ui.when(order.createdAt()), "SvMuted"));

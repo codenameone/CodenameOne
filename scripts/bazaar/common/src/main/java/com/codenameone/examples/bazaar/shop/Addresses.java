@@ -96,6 +96,18 @@ public final class Addresses {
         return out.toString();
     }
 
+    /// Everything after the street, for a row titled by the street:
+    /// "Apt 12, San Francisco, CA 94105".
+    public static String place(AddressDto a) {
+        StringBuilder out = new StringBuilder();
+        append(out, a.line2());
+        append(out, a.city());
+        String rp = ((a.region() == null ? "" : a.region()) + " "
+                + (a.postal() == null ? "" : a.postal())).trim();
+        append(out, rp);
+        return out.toString();
+    }
+
     public static boolean same(AddressDto a, AddressDto b) {
         return eq(a.name(), b.name()) && eq(a.line1(), b.line1()) && eq(a.line2(), b.line2())
                 && eq(a.city(), b.city()) && eq(a.postal(), b.postal())
