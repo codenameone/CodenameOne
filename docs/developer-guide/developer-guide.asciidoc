@@ -155,6 +155,8 @@ include::Backend-Mail.asciidoc[]
 
 include::Backend-Storage.asciidoc[]
 
+include::Backend-Maps.asciidoc[]
+
 include::Backend-Observability.asciidoc[]
 
 include::Backend-GraphQL.asciidoc[]
