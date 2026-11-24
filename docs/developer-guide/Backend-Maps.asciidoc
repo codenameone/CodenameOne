@@ -4,8 +4,8 @@
 A map screen talks to three services: one that serves the tiles, one that finds a
 route between two points, and one that turns an address into a coordinate and
 back. The keyless defaults described in <<maps>> are public community servers.
-They are fine for development, but each one has a usage policy that a shipping
-app outgrows quickly. The backend can answer all three itself, from
+They're fine for development, but each one has a usage policy that a shipping
+app soon outgrows. The backend can answer all three itself, from
 OpenStreetMap files on its own disk, with no external map server:
 
 * `MapTiles` serves vector or raster tiles out of a single
@@ -55,7 +55,7 @@ Planet-scale routing belongs on a dedicated OSRM or Valhalla server.
 
 === Wiring the handlers
 
-Add the handlers when you build the server. They are tried in the order you add
+Add the handlers when you build the server. They're tried in the order you add
 them, so put them before any catch-all:
 
 [source,java,role=cn1-no-try]
@@ -106,7 +106,7 @@ tile template come from the server.
 
 OpenStreetMap data is licensed under the
 https://opendatacommons.org/licenses/odbl/[Open Database License (ODbL)].
-Serving it from your own server does not change that: every map built from it
+Serving it from your own server doesn't change that: every map built from it
 must credit OpenStreetMap. The
 https://osmfoundation.org/wiki/Licence/Attribution_Guidelines[OSMF attribution guidelines]
 ask for:

@@ -65,7 +65,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 To route through a different provider entirely -- Google Directions, Mapbox Directions, GraphHopper, your own server -- implement `RouteService` and install it the same way. Every provider of that kind returns the route as an *encoded polyline*, which `Polyline.fromEncoded(geometry)` turns straight into something drawable (`PolylineCodec` also handles the `polyline6` variant used by Valhalla).
 
-=== Finding places: geocoding
+=== Geocoding
 
 Turning an address into a coordinate, and a coordinate back into an address, is
 the job of `com.codename1.maps.geocoding`. `NominatimGeocoder` speaks the
