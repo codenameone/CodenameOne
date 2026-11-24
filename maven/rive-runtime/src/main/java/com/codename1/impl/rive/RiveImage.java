@@ -132,7 +132,7 @@ public class RiveImage extends Image {
     /// A new image of the same file at `width` by `height` pixels, in its
     /// initial state: it shares nothing with this one.
     @Override
-    public com.codename1.ui.Image scaled(int width, int height) {
+    public Image scaled(int width, int height) {
         return new RiveImage(file, width, height);
     }
 

@@ -104,6 +104,16 @@ final class BuildHintsExternal {
                         + "push implicitly activates this). Indicates whether the android support v4 library should "
                         + "be included in the build"));
 
+        h.add(new Hint("crashProtection.enabled")
+                .group(HintGroup.GENERAL)
+                .type(HintType.BOOLEAN)
+                .platform("general")
+                .external()
+                .doc("true/false flag defaults to false. Read by the cloud builder: when true, a release "
+                        + "build uploads its symbol files so Crash Protection can symbolicate the crash "
+                        + "reports it collects. A platform is opted back out with "
+                        + "crashProtection.<platform>.enabled=false."));
+
         h.add(new Hint("block_server_registration")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
