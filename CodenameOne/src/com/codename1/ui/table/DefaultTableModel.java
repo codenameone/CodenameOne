@@ -43,7 +43,7 @@ import java.util.Collections;
 ///             return col != 0;
 ///         }
 ///     };
-/// Table table = new Table(model) {
+/// com.codename1.ui.table.Table table = new com.codename1.ui.table.Table(model) {
 /// @Override
 ///     protected Component createCell(Object value, int row, int column, boolean editable) { // (1)
 ///         Component cell;

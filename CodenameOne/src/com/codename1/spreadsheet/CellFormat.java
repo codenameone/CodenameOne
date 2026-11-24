@@ -22,6 +22,7 @@
  */
 package com.codename1.spreadsheet;
 
+import com.codename1.impl.xml.XmlOut;
 import java.util.ArrayList;
 
 /// A number format as spreadsheets write it -- `#,##0.00`, `0%`, `yyyy-mm-dd`,

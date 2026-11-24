@@ -106,10 +106,10 @@ public class VisionSnippets {
         // end::vision-code-scanner-options[]
     }
 
-    /** Names the charset of PDF417 payloads that are not UTF-8 (Android). */
+    /** Names the charset of PDF417 payloads that are not UTF-8. */
     public void barcodeCharset() {
         // tag::vision-barcode-charset[]
-        Display.getInstance().setProperty("android.barcodeCharset", "ISO-8859-2");
+        Display.getInstance().setProperty("barcodeCharset", "windows-1250");
         // end::vision-barcode-charset[]
     }
 

@@ -40,8 +40,6 @@ import com.codename1.ui.util.UITimer;
 import com.codename1.components.SpanLabel;
 import com.codename1.util.AsyncResource;
 
-import java.util.Arrays;
-
 /// A ready-made full-screen barcode and QR scanner.
 ///
 /// This is the one-call entry point that {@link BarcodeScanner} deliberately
@@ -163,28 +161,13 @@ public final class CodeScanner {
         private boolean finished;
         private UITimer focusTimer;
         private int focusTicks;
-        /// In strict mode, the read waiting for a second frame to agree.
-        private Barcode pending;
 
         Session(CodeScannerOptions options) {
             this.options = options;
             this.formats = options.getFormats();
             this.view = new VisionCameraView<Barcode[]>(
-                    new BarcodeScanner(detectorOptions(options)));
+                    new BarcodeScanner(options.getVisionOptions()));
             this.view.setFacing(options.getFacing());
-        }
-
-        /// The vision options the detector is built with: the caller's, plus
-        /// the accepted formats, so the platform detector looks for those
-        /// symbologies alone instead of every one it knows and filtering
-        /// afterwards. Formats set on the caller's own vision options win.
-        private static VisionOptions detectorOptions(CodeScannerOptions options) {
-            VisionOptions source = options.getVisionOptions();
-            VisionOptions out = source == null ? new VisionOptions() : source.snapshot();
-            if (out.getBarcodeFormats().length == 0) {
-                out.barcodeFormats(options.getFormats());
-            }
-            return out;
         }
 
         AsyncResource<Barcode> show() {
@@ -307,41 +290,15 @@ public final class CodeScanner {
             if (codes == null) {
                 return;
             }
-            Barcode first = null;
+            // Strict mode is the detector's: a code reaches here only once
+            // two frames agreed on it (VisionOptions.strictBarcodes).
             for (Barcode code : codes) {
-                if (code == null || code.getValue() == null
-                        || !BarcodeFormat.matches(code, formats)) {
-                    continue;
-                }
-                if (!options.isStrict()
-                        || (pending != null && sameRead(pending, code))) {
+                if (code != null && code.getValue() != null
+                        && BarcodeFormat.matches(code, formats)) {
                     finish(code, null);
                     return;
                 }
-                if (first == null) {
-                    first = code;
-                }
             }
-            // Strict mode: no code in this frame confirms the pending read.
-            // Every accepted code was checked against it first, so two codes
-            // in view whose order changes between frames still confirm; only
-            // a frame with no accepted code at all keeps the pending read.
-            if (first != null) {
-                pending = first;
-            }
-        }
-
-        /// Whether two reads carry the same payload. The raw bytes are
-        /// compared when both have them, since two different byte sequences
-        /// can decode to one string in a lossy charset.
-        private static boolean sameRead(Barcode a, Barcode b) {
-            if (!a.getValue().equals(b.getValue())
-                    || !String.valueOf(a.getFormat()).equals(String.valueOf(b.getFormat()))) {
-                return false;
-            }
-            byte[] ra = a.getRawBytes();
-            byte[] rb = b.getRawBytes();
-            return ra == null || rb == null || Arrays.equals(ra, rb);
         }
 
         @Override

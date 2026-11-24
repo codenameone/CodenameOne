@@ -477,8 +477,8 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         g.setColor(bgColor);
         g.fillRect(getX(), getY(), getWidth(), getHeight());
         paintContent(g, contentX(), contentY() - scrollY, contentWidth(), contentHeight());
-        if (touchSelection && hasSelection()) {
-            paintSelectionUI(g);
+        if (hasSelection()) {
+            touchChrome.paint(g, this);
         }
         if (loupeActive) {
             paintLoupe(g);
@@ -487,12 +487,36 @@ public class EditorView extends Component implements TextInputClient, TextInputC
 
     // ---- touch selection UI (long-press, draggable handles, context toolbar, magnifier loupe) ----
 
-    private boolean touchSelection;
+    private final TouchSelection touchChrome = new TouchSelection(new TouchSelection.Host() {
+        @Override
+        public int[] edgeRect(boolean start) {
+            return offsetLocal(start ? getSelectionStart() : getSelectionEnd());
+        }
+
+        @Override
+        public boolean canEdit() {
+            return editable;
+        }
+
+        @Override
+        public void toolbarAction(int action) {
+            if (action == TouchSelection.COPY) {
+                copySelection();
+            } else if (action == TouchSelection.CUT) {
+                cutSelection();
+            } else if (action == TouchSelection.PASTE) {
+                pasteClipboard();
+            } else {
+                selectAll();
+            }
+        }
+
+        @Override
+        public Font chromeFont() {
+            return getEditorFont();
+        }
+    });
     private int draggingHandle;
-    private int[] startHandleLocal;
-    private int[] endHandleLocal;
-    private int[][] toolbarButtons;
-    private java.util.List<String> toolbarLabels;
     private boolean loupeActive;
     private int loupeOffset;
     private Font loupeFontCache;
@@ -571,142 +595,28 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         return new int[]{lx, ly, lineHeightAt(line)};
     }
 
-    private void paintSelectionUI(Graphics g) {
-        int hr = handleRadius();
-        int[] s = offsetLocal(getSelectionStart());
-        int[] e = offsetLocal(getSelectionEnd());
-        int color = 0x1a73e8;
-        // start handle: stem + ball above the line top
-        g.setColor(color);
-        g.fillRect(getX() + s[0] - 1, getY() + s[1], 2, s[2]);
-        g.fillArc(getX() + s[0] - hr, getY() + s[1] - hr * 2, hr * 2, hr * 2, 0, 360);
-        startHandleLocal = new int[]{s[0], s[1] - hr};
-        // end handle: stem + ball below the line bottom
-        g.setColor(color);
-        g.fillRect(getX() + e[0] - 1, getY() + e[1], 2, e[2]);
-        g.fillArc(getX() + e[0] - hr, getY() + e[1] + e[2], hr * 2, hr * 2, 0, 360);
-        endHandleLocal = new int[]{e[0], e[1] + e[2] + hr};
-        paintToolbar(g, s);
-    }
-
-    private void paintToolbar(Graphics g, int[] anchor) {
-        Font f = getEditorFont();
-        java.util.List<String> labels = new java.util.ArrayList<String>();
-        labels.add("Copy");
-        if (editable) {
-            labels.add("Cut");
-            labels.add("Paste");
-        }
-        labels.add("Select All");
-        int pad = f.charWidth('m');
-        int bh = f.getHeight() + pad;
-        int[] w = new int[labels.size()];
-        int total = 0;
-        for (int i = 0; i < labels.size(); i++) {
-            w[i] = f.stringWidth(labels.get(i)) + pad * 2;
-            total += w[i];
-        }
-        int tx = anchor[0] - total / 2;
-        int ty = anchor[1] - bh - handleRadius() * 2;
-        if (tx < 0) {
-            tx = 0;
-        }
-        if (tx + total > getWidth()) {
-            tx = getWidth() - total;
-        }
-        if (ty < 0) {
-            ty = anchor[1] + anchor[2] + handleRadius() * 2;
-        }
-        g.setColor(0x222222);
-        g.fillRect(getX() + tx, getY() + ty, total, bh);
-        toolbarButtons = new int[labels.size()][4];
-        toolbarLabels = labels;
-        int cx = tx;
-        for (int i = 0; i < labels.size(); i++) {
-            toolbarButtons[i] = new int[]{cx, ty, w[i], bh};
-            g.setColor(0xf0f0f0);
-            g.setFont(f);
-            g.drawString(labels.get(i), getX() + cx + pad, getY() + ty + pad / 2);
-            cx += w[i];
-            if (i < labels.size() - 1) {
-                g.setColor(0x555555);
-                g.drawLine(getX() + cx, getY() + ty + 4, getX() + cx, getY() + ty + bh - 4);
-            }
-        }
-    }
-
     @Override
     public void longPointerPress(int x, int y) {
         int off = offsetAtPoint(x, y);
         selectWordAt(off);
-        touchSelection = hasSelection();
+        touchChrome.setShown(hasSelection());
         loupeActive = true;
         loupeOffset = off;
         repaint();
     }
 
-    private boolean nearLocal(int[] handleLocal, int x, int y) {
-        if (handleLocal == null) {
-            return false;
-        }
-        int lx = x - getAbsoluteX();
-        int ly = y - getAbsoluteY();
-        int r = handleRadius() * 3;
-        int dx = lx - handleLocal[0];
-        int dy = ly - handleLocal[1];
-        return dx * dx + dy * dy <= r * r;
-    }
-
     private boolean handleTouchSelectionPress(int x, int y) {
-        if (!touchSelection) {
-            return false;
-        }
-        int lx = x - getAbsoluteX();
-        int ly = y - getAbsoluteY();
-        if (toolbarButtons != null) {
-            for (int i = 0; i < toolbarButtons.length; i++) {
-                int[] r = toolbarButtons[i];
-                if (lx >= r[0] && lx <= r[0] + r[2] && ly >= r[1] && ly <= r[1] + r[3]) {
-                    doToolbarAction(toolbarLabels.get(i));
-                    return true;
-                }
-            }
-        }
-        if (nearLocal(startHandleLocal, x, y)) {
+        int hit = touchChrome.press(this, x, y);
+        if (hit == TouchSelection.START_HANDLE) {
             anchor = getSelectionEnd();
             caret = getSelectionStart();
             draggingHandle = 1;
-            return true;
-        }
-        if (nearLocal(endHandleLocal, x, y)) {
+        } else if (hit == TouchSelection.END_HANDLE) {
             anchor = getSelectionStart();
             caret = getSelectionEnd();
             draggingHandle = 2;
-            return true;
         }
-        // tap outside the selection UI dismisses it
-        touchSelection = false;
-        startHandleLocal = null;
-        endHandleLocal = null;
-        toolbarButtons = null;
-        return false;
-    }
-
-    private void doToolbarAction(String label) {
-        if ("Copy".equals(label)) {
-            copySelection();
-        } else if ("Cut".equals(label)) {
-            cutSelection();
-        } else if ("Paste".equals(label)) {
-            pasteClipboard();
-        } else if ("Select All".equals(label)) {
-            selectAll();
-            touchSelection = true;
-            repaint();
-            return;
-        }
-        touchSelection = false;
-        repaint();
+        return hit != TouchSelection.MISSED;
     }
 
     /// Paints the document content. `originY` is already offset by the scroll position, so line `n` is at
@@ -1102,7 +1012,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     ///
     /// - `extend`: true to extend the selection from the current anchor
     public void moveCaret(int newCaret, boolean extend) {
-        touchSelection = false;
+        touchChrome.setShown(false);
         newCaret = doc.clamp(newCaret);
         if (extend) {
             if (anchor < 0) {
@@ -1221,7 +1131,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         composingEnd = -1;
         composingBaseRemoved = null;
         composingBeforeState = null;
-        touchSelection = false;
+        touchChrome.setShown(false);
         invalidateLayout();
         resetBlink();
         scrollCaretVisible();
@@ -1719,7 +1629,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
         if (draggingHandle != 0) {
             caret = offsetAtPoint(x, y);
             draggingHandle = 0;
-            touchSelection = hasSelection();
+            touchChrome.setShown(hasSelection());
             pushInputState();
             repaint();
             return;
@@ -1866,7 +1776,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
             offset = previousWordOffset(offset);
             cp = wordCodePointAt(offset);
         }
-        return WordCharacters.contains(cp);
+        return WordCharacters.isWordCharacter(cp);
     }
 
     private int visualWord(boolean right) {

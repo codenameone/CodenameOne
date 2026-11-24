@@ -53,7 +53,7 @@ class ComponentsTableMultilineFigure implements GuideFigure {
                     {"Row 2", "A much longer value that wraps to multiple lines", "OK"},
                     {"Row 3", "Another long table cell that needs wrapping", "Pending"},
                 });
-        Table table = new Table(model) {
+        com.codename1.ui.table.Table table = new com.codename1.ui.table.Table(model) {
             @Override
             protected Component createCell(Object value, int row, int column, boolean editable) {
                 if (row > -1 && column == 1) {

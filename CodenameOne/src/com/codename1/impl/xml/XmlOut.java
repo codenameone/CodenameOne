@@ -20,18 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.spreadsheet;
+package com.codename1.impl.xml;
 
 import java.io.IOException;
 import java.io.OutputStream;
 
 /// Writes XML as UTF-8 bytes, straight into the entry of an archive.
-final class XmlOut {
+public final class XmlOut {
     private final OutputStream out;
     private final byte[] buffer = new byte[8192];
     private int size;
 
-    XmlOut(OutputStream out) {
+    public XmlOut(OutputStream out) {
         this.out = out;
     }
 
@@ -73,7 +73,7 @@ final class XmlOut {
     }
 
     /// Writes markup as it is.
-    XmlOut raw(String s) throws IOException {
+    public XmlOut raw(String s) throws IOException {
         int n = s.length();
         for (int i = 0; i < n; i++) {
             if (!isLowSurrogateOfPair(s, i)) {
@@ -83,14 +83,14 @@ final class XmlOut {
         return this;
     }
 
-    XmlOut raw(int value) throws IOException {
+    public XmlOut raw(int value) throws IOException {
         return raw(Integer.toString(value));
     }
 
     /// Writes text or an attribute value, with what XML reserves escaped. A character XML
     /// cannot hold at all -- most of the control characters -- is written `_x0008_`, the
     /// convention of the Excel format, when `excel` is set and is left out otherwise.
-    XmlOut text(String s, boolean excel) throws IOException {
+    public XmlOut text(String s, boolean excel) throws IOException {
         int n = s.length();
         for (int i = 0; i < n; i++) {
             char c = s.charAt(i);
@@ -137,7 +137,7 @@ final class XmlOut {
     }
 
     /// Whether text at a position reads as `_xHHHH_`.
-    static boolean isEscape(String s, int i) {
+    public static boolean isEscape(String s, int i) {
         if (i + 7 > s.length() || s.charAt(i) != '_' || s.charAt(i + 1) != 'x' || s.charAt(i + 6) != '_') {
             return false;
         }
@@ -151,7 +151,7 @@ final class XmlOut {
     }
 
     /// Writes ` name="value"`.
-    XmlOut attr(String name, String value) throws IOException {
+    public XmlOut attr(String name, String value) throws IOException {
         put(' ');
         raw(name);
         raw("=\"");
@@ -160,7 +160,7 @@ final class XmlOut {
         return this;
     }
 
-    XmlOut attr(String name, int value) throws IOException {
+    public XmlOut attr(String name, int value) throws IOException {
         put(' ');
         raw(name);
         raw("=\"");
@@ -169,7 +169,7 @@ final class XmlOut {
         return this;
     }
 
-    void flush() throws IOException {
+    public void flush() throws IOException {
         if (size > 0) {
             out.write(buffer, 0, size);
             size = 0;

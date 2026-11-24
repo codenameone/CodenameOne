@@ -183,7 +183,12 @@ final class AndroidBarcodeScanningAdapter extends AndroidVisionAdapter {
                 != com.google.mlkit.vision.barcode.common.Barcode.FORMAT_PDF417) {
             return raw;
         }
-        String charset = Display.getInstance().getProperty("android.barcodeCharset", null);
+        // barcodeCharset is the name every port reads; android.barcodeCharset
+        // is the original, Android-only spelling and still works.
+        String charset = Display.getInstance().getProperty("barcodeCharset", null);
+        if (charset == null || charset.length() == 0) {
+            charset = Display.getInstance().getProperty("android.barcodeCharset", null);
+        }
         if (raw != null && (charset == null || charset.length() == 0)) {
             return raw;
         }

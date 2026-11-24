@@ -28,7 +28,11 @@ package com.codename1.ui.editor;
 /// The core compiles against CLDC, whose Character API lacks Unicode categories.
 /// These ranges keep classification consistent across ports. This is not dictionary
 /// segmentation or the UAX 29 word boundary algorithm.
-final class WordCharacters {
+///
+/// Every editor uses this one definition of a word character -- word movement and double-tap
+/// selection in `EditorView` and the word processing `DocumentView`, and the tokens the
+/// spell checker checks -- so they agree on where a word ends on every port.
+public final class WordCharacters {
     private WordCharacters() {}
     private static final int[] RANGES = {
         0x30, 0x39, 0x41, 0x5a, 0x5f, 0x5f, 0x61, 0x7a, 0xaa, 0xaa, 0xb5, 0xb5,
@@ -221,11 +225,29 @@ final class WordCharacters {
         0x1e8d0, 0x1e8d6, 0x1e944, 0x1e94a, 0xe0100, 0xe01ef
     };
 
-    static boolean isMark(int codePoint) {
+    /// Whether a code point is a combining mark (Unicode category M).
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: the code point
+    ///
+    /// #### Returns
+    ///
+    /// true for a mark
+    public static boolean isMark(int codePoint) {
         return contains(MARKS, codePoint);
     }
 
-    static boolean contains(int codePoint) {
+    /// Whether a code point belongs to a word: a letter, a mark, a decimal digit or `_`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `codePoint`: the code point
+    ///
+    /// #### Returns
+    ///
+    /// true for a word character
+    public static boolean isWordCharacter(int codePoint) {
         return contains(RANGES, codePoint);
     }
 

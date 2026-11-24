@@ -22,6 +22,8 @@
  */
 package com.codename1.ai.vision;
 
+import java.util.Arrays;
+
 /// Decodes barcodes and QR codes out of a still image or a camera frame.
 ///
 /// Scanning a picture the user already has:
@@ -65,7 +67,26 @@ package com.codename1.ai.vision;
 ///
 /// Create one analyzer and reuse it for a sequence of images; it keeps the
 /// native detector alive between calls. Close it when you are finished.
+///
+/// A PDF417 is reported only once two frames have read it identically, since
+/// one printed with little error correction (level 0, as on many payment
+/// slips) misreads into plausible wrong payloads; see
+/// {@link VisionOptions#strictBarcodes(boolean)} to change that. This default
+/// applies to camera frames ({@link VisionImage#fromCameraFrame}, and every
+/// frame a {@link VisionCameraView} or {@link VisionPipeline} analyzes); a still
+/// image is reported as decoded.
 public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
+    /// In strict mode, the codes of the last frame that had any, waiting for a
+    /// later frame to confirm them.
+    private Barcode[] pending;
+    /// Frames since {@link #pending} was last refreshed by a frame holding a
+    /// code that needs confirming.
+    private int pendingAge;
+    /// How many frames without such a code a pending read survives: enough
+    /// for a few blurred frames, few enough that a code read once and then
+    /// brought back much later still needs two fresh reads.
+    private static final int PENDING_FRAMES = 15;
+
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions
     public BarcodeScanner() {
@@ -77,5 +98,98 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     ///        uses defaults
     public BarcodeScanner(VisionOptions options) {
         super(VisionFeature.BARCODE_SCANNING, options);
+    }
+
+    @Override
+    Object filter(Object value, VisionImage image) {
+        if (!(value instanceof Barcode[])) {
+            return value;
+        }
+        Barcode[] codes = (Barcode[]) value;
+        VisionOptions o = options();
+        // The PDF417 default is for a camera stream, where the next frame is
+        // a moment away. A still image is one read: it is reported as decoded
+        // and leaves the pending read alone. An explicit strictBarcodes(true)
+        // holds stills too, as documented there.
+        boolean stream = image != null && image.isCameraFrame();
+        if (!stream && !o.isStrictBarcodes()) {
+            return codes;
+        }
+        int kept = 0;
+        int strictCount = 0;
+        boolean[] keep = new boolean[codes.length];
+        for (int i = 0; i < codes.length; i++) {
+            Barcode c = codes[i];
+            if (c == null) {
+                continue;
+            }
+            if (!o.isStrictBarcode(c.getFormat())) {
+                keep[i] = true;
+            } else {
+                strictCount++;
+                keep[i] = c.getValue() != null && pending != null
+                        && confirmedBy(pending, c);
+            }
+            if (keep[i]) {
+                kept++;
+            }
+        }
+        // Only codes that need confirming are remembered, and only a frame
+        // that has one replaces them: a QR code decoding alone in between
+        // must not push out the PDF417 waiting for its second read. A frame
+        // with no such code keeps the pending read for the same reason, for
+        // PENDING_FRAMES frames. This runs on the EDT, where the analysis
+        // result is delivered, so it needs no lock.
+        if (strictCount == 0) {
+            if (pending != null) {
+                pendingAge++;
+                if (pendingAge > PENDING_FRAMES) {
+                    pending = null;
+                }
+            }
+        } else {
+            pendingAge = 0;
+            Barcode[] next = new Barcode[strictCount];
+            int n = 0;
+            for (Barcode c : codes) {
+                if (c != null && o.isStrictBarcode(c.getFormat())) {
+                    next[n++] = c;
+                }
+            }
+            pending = next;
+        }
+        if (kept == codes.length) {
+            return codes;
+        }
+        Barcode[] out = new Barcode[kept];
+        int n = 0;
+        for (int i = 0; i < codes.length; i++) {
+            if (keep[i]) {
+                out[n++] = codes[i];
+            }
+        }
+        return out;
+    }
+
+    private static boolean confirmedBy(Barcode[] previous, Barcode code) {
+        for (Barcode p : previous) {
+            if (p != null && sameRead(p, code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether two reads carry the same payload. The raw bytes are compared
+    /// when both have them, since two different byte sequences can decode to
+    /// one string in a lossy charset.
+    static boolean sameRead(Barcode a, Barcode b) {
+        if (a.getValue() == null || !a.getValue().equals(b.getValue())
+                || !String.valueOf(a.getFormat()).equals(String.valueOf(b.getFormat()))) {
+            return false;
+        }
+        byte[] ra = a.getRawBytes();
+        byte[] rb = b.getRawBytes();
+        return ra == null || rb == null || Arrays.equals(ra, rb);
     }
 }

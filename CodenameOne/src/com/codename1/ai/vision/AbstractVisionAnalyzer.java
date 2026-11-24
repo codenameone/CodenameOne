@@ -66,7 +66,24 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
         }
         AsyncResource<T> backend = impl.analyze(feature,
                 options.getBackend().getId(), image, options);
-        return new AnalysisResource<T>(backend);
+        return new AnalysisResource<T>(backend, this, image);
+    }
+
+    /// The options this analyzer was built with (its own snapshot).
+    final VisionOptions options() {
+        return options;
+    }
+
+    /// Lets an analyzer post-process a backend result before the caller sees
+    /// it. Runs once per processed image, in completion order. Typed as
+    /// `Object` so an override checks the type with `instanceof` rather than
+    /// through a compiler-generated cast, which ParparVM does not check.
+    ///
+    /// @param value what the backend answered
+    /// @param image the image it answered for
+    /// @return what the caller receives, of the same type
+    Object filter(Object value, VisionImage image) {
+        return value;
     }
 
     /// Idempotently releases the retained native backend.
@@ -88,7 +105,13 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
 
     private static final class AnalysisResource<T>
             extends AsyncResource<T> {
-        AnalysisResource(AsyncResource<T> backend) {
+        private final AbstractVisionAnalyzer<T> analyzer;
+        private final VisionImage image;
+
+        AnalysisResource(AsyncResource<T> backend, AbstractVisionAnalyzer<T> analyzer,
+                         VisionImage image) {
+            this.analyzer = analyzer;
+            this.image = image;
             backend.ready(new SuccessCallback<T>() {
                 @Override
                 public void onSucess(T value) {
@@ -107,9 +130,10 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
             return super.cancel(mayInterruptIfRunning);
         }
 
+        @SuppressWarnings("unchecked")
         private synchronized void publish(T value) {
             if (!isCancelled()) {
-                complete(value);
+                complete((T) analyzer.filter(value, image));
             }
         }
 

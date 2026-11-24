@@ -24,6 +24,8 @@
 package com.codename1.ui.editor;
 
 import com.codename1.ui.RichTextFormat;
+import com.codename1.wordprocessing.Document;
+import com.codename1.wordprocessing.RichTextDocuments;
 
 import java.util.List;
 
@@ -38,20 +40,28 @@ public final class RichTextSerializer {
         if (format == RichTextFormat.HTML) {
             return HtmlSerializer.serialize(doc, inline, blocks, links, imageSources);
         }
-        if (format == RichTextFormat.MARKDOWN) {
-            return serializeMarkup(doc, inline, blocks, links, imageSources, false);
+        if (format == RichTextFormat.MARKDOWN || format == RichTextFormat.RTF) {
+            // written by com.codename1.wordprocessing, the one Markdown and RTF writer
+            Document d = DocumentMapping.fromEditor(doc, inline, blocks, links, imageSources);
+            if (format == RichTextFormat.RTF) {
+                return RichTextDocuments.writeRtf(d);
+            }
+            // a document ends its last block with a newline; editor content does not
+            String md = RichTextDocuments.writeMarkdown(d);
+            int end = md.length();
+            while (end > 0 && md.charAt(end - 1) == '\n') {
+                end--;
+            }
+            return md.substring(0, end);
         }
         if (format == RichTextFormat.ASCIIDOC) {
-            return serializeMarkup(doc, inline, blocks, links, imageSources, true);
-        }
-        if (format == RichTextFormat.RTF) {
-            return serializeRtf(doc, inline);
+            return serializeAsciiDoc(doc, inline, blocks, links, imageSources);
         }
         return doc.getText().replace("\uFFFC", "");
     }
 
-    private static String serializeMarkup(EditorDocument doc, InlineStyles inline, RichBlocks blocks,
-            List<String> links, List<String> imageSources, boolean asciidoc) {
+    private static String serializeAsciiDoc(EditorDocument doc, InlineStyles inline, RichBlocks blocks,
+            List<String> links, List<String> imageSources) {
         StringBuilder out = new StringBuilder();
         boolean inPre = false;
         for (int line = 0; line < doc.getLineCount(); line++) {
@@ -61,36 +71,36 @@ public final class RichTextSerializer {
                 if (out.length() > 0 && out.charAt(out.length() - 1) != '\n') {
                     out.append('\n');
                 }
-                out.append(asciidoc ? "----\n" : "```\n");
+                out.append("----\n");
                 inPre = pre;
             }
             if (line > 0 && out.length() > 0 && out.charAt(out.length() - 1) != '\n') {
                 out.append('\n');
             }
             if (!pre) {
-                appendBlockPrefix(out, block, asciidoc);
+                appendBlockPrefix(out, block);
             }
-            appendInline(out, doc, inline, links, imageSources, line, asciidoc, pre);
+            appendInline(out, doc, inline, links, imageSources, line, pre);
         }
         if (inPre) {
             if (out.length() > 0 && out.charAt(out.length() - 1) != '\n') {
                 out.append('\n');
             }
-            out.append(asciidoc ? "----" : "```");
+            out.append("----");
         }
         return out.toString();
     }
 
-    private static void appendBlockPrefix(StringBuilder out, RichBlocks.BlockAttr block, boolean asciidoc) {
+    private static void appendBlockPrefix(StringBuilder out, RichBlocks.BlockAttr block) {
         for (int i = 0; i < block.indent; i++) {
             out.append("  ");
         }
         if (block.listType == RichBlocks.LIST_ORDERED) {
-            out.append(asciidoc ? ". " : "1. ");
+            out.append(". ");
         } else if (block.listType == RichBlocks.LIST_UNORDERED) {
-            out.append(asciidoc ? "* " : "- ");
+            out.append("* ");
         } else if (block.type >= RichBlocks.H1 && block.type <= RichBlocks.H1 + 5) {
-            char marker = asciidoc ? '=' : '#';
+            char marker = '=';
             int level = block.type - RichBlocks.H1 + 1;
             for (int i = 0; i < level; i++) {
                 out.append(marker);
@@ -102,7 +112,7 @@ public final class RichTextSerializer {
     }
 
     private static void appendInline(StringBuilder out, EditorDocument doc, InlineStyles inline,
-            List<String> links, List<String> imageSources, int line, boolean asciidoc, boolean literal) {
+            List<String> links, List<String> imageSources, int line, boolean literal) {
         int start = doc.getLineStart(line);
         String text = doc.getLineText(line);
         int column = 0;
@@ -111,9 +121,9 @@ public final class RichTextSerializer {
             String source = valueAt(imageSources, offset);
             String href = valueAt(links, offset);
             if (text.charAt(column) == '\uFFFC' && source != null) {
-                String image = asciidoc ? "image:" + source + "[]" : "![image](" + source + ")";
+                String image = "image:" + source + "[]";
                 if (href != null) {
-                    out.append(asciidoc ? href + "[" + image + "]" : "[" + image + "](" + href + ")");
+                    out.append(href + "[" + image + "]");
                 } else {
                     out.append(image);
                 }
@@ -130,25 +140,24 @@ public final class RichTextSerializer {
             String value = text.substring(column, end);
             if (!literal) {
                 if (style.isMonospace()) {
-                    value = (asciidoc ? "+" : "`") + escapeInlineCode(value, asciidoc)
-                            + (asciidoc ? "+" : "`");
+                    value = "+" + escapeInlineCode(value) + "+";
                 } else {
-                    value = escapeMarkup(value, asciidoc);
+                    value = escapeMarkup(value);
                 }
                 if (style.isStrike()) {
-                    value = asciidoc ? "[line-through]#" + value + "#" : "~~" + value + "~~";
+                    value = "[line-through]#" + value + "#";
                 }
-                if (style.isUnderline() && asciidoc) {
+                if (style.isUnderline()) {
                     value = "[underline]#" + value + "#";
                 }
                 if (style.isItalic()) {
-                    value = (asciidoc ? "_" : "*") + value + (asciidoc ? "_" : "*");
+                    value = "_" + value + "_";
                 }
                 if (style.isBold()) {
-                    value = (asciidoc ? "*" : "**") + value + (asciidoc ? "*" : "**");
+                    value = "*" + value + "*";
                 }
                 if (href != null) {
-                    value = asciidoc ? href + "[" + value + "]" : "[" + value + "](" + href + ")";
+                    value = href + "[" + value + "]";
                 }
             }
             out.append(value);
@@ -156,56 +165,8 @@ public final class RichTextSerializer {
         }
     }
 
-    private static String serializeRtf(EditorDocument doc, InlineStyles inline) {
-        StringBuilder out = new StringBuilder("{\\rtf1\\ansi ");
-        TextStyle active = TextStyle.DEFAULT;
-        for (int i = 0; i < doc.length(); i++) {
-            char c = doc.charAt(i);
-            if (c == '\n') {
-                out.append("\\par\n");
-                continue;
-            }
-            TextStyle style = inline.styleAt(i);
-            if (!style.equals(active)) {
-                appendRtfSwitch(out, "b", active.isBold(), style.isBold());
-                appendRtfSwitch(out, "i", active.isItalic(), style.isItalic());
-                appendRtfSwitch(out, "ul", active.isUnderline(), style.isUnderline());
-                appendRtfSwitch(out, "strike", active.isStrike(), style.isStrike());
-                active = style;
-            }
-            if (c == '\uFFFC') {
-                continue;
-            }
-            if (c == '\\' || c == '{' || c == '}') {
-                out.append('\\').append(c);
-            } else if (c > 127) {
-                // The RTF unicode keyword (backslash-u) takes a SIGNED 16-bit value; values
-                // above 32767 (surrogate halves, high BMP chars) must be emitted as N-65536
-                // or Word-family consumers reject the document
-                int code = c;
-                if (code > 32767) {
-                    code -= 65536;
-                }
-                out.append("\\u").append(code).append('?');
-            } else {
-                out.append(c);
-            }
-        }
-        return out.append('}').toString();
-    }
-
-    private static void appendRtfSwitch(StringBuilder out, String name, boolean oldValue, boolean newValue) {
-        if (oldValue != newValue) {
-            out.append('\\').append(name);
-            if (!newValue) {
-                out.append('0');
-            }
-            out.append(' ');
-        }
-    }
-
-    private static String escapeMarkup(String value, boolean asciidoc) {
-        String specials = asciidoc ? "\\*_[#+" : "\\`*_{}[]()#+-.!~>";
+    private static String escapeMarkup(String value) {
+        String specials = "\\*_[#+";
         StringBuilder out = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
@@ -217,8 +178,8 @@ public final class RichTextSerializer {
         return out.toString();
     }
 
-    private static String escapeInlineCode(String value, boolean asciidoc) {
-        char delimiter = asciidoc ? '+' : '`';
+    private static String escapeInlineCode(String value) {
+        char delimiter = '+';
         StringBuilder out = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);

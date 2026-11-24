@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /// The ports each local target reads.
 ///
@@ -42,6 +43,17 @@ class LocalBuildPortsTest {
 
     private static List<String> ports(String target) {
         return AppBuilder.portArtifacts(target);
+    }
+
+    /// The spell checking dictionaries are fetched only after the builder finds an
+    /// application that uses SpellChecker; listed here they would be downloaded by every
+    /// local build.
+    @Test
+    void noTargetListsTheSpellcheckDictionaries() {
+        for (String t : new String[] {"ios-source", "android-source", "local-android-device",
+                "mac-source", "windows-source", "local-linux-device", "local-steam", "javascript"}) {
+            assertFalse(ports(t).contains("codenameone-spellcheck-dictionaries"), t);
+        }
     }
 
     @Test

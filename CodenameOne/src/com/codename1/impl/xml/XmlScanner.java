@@ -20,30 +20,30 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.spreadsheet;
+package com.codename1.impl.xml;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
-/// Reads the XML of a spreadsheet part as a sequence of tags and text, without building a
+/// Reads the XML of an office document part as a sequence of tags and text, without building a
 /// tree: a sheet of a hundred thousand cells is a hundred thousand elements.
 ///
-/// It reads what spreadsheet programs write -- elements, attributes, text, CDATA, the five
+/// It reads what office programs write -- elements, attributes, text, CDATA, the five
 /// named entities and numeric ones -- and skips comments, processing instructions and a
 /// document type. Namespace prefixes are cut from element names, and from attribute names
 /// that are asked for without one.
-final class XmlScanner {
-    static final int EOF = 0;
-    static final int START = 1;
-    static final int END = 2;
-    static final int TEXT = 3;
+public final class XmlScanner {
+    public static final int EOF = 0;
+    public static final int START = 1;
+    public static final int END = 2;
+    public static final int TEXT = 3;
 
     /// The characters every part of one file together may unpack to.
-    static final long MAX_DOCUMENT = 256L * 1024 * 1024;
+    public static final long MAX_DOCUMENT = 256L * 1024 * 1024;
     /// The longest text or attribute value, far past the 32,767 characters a cell holds.
-    static final int MAX_TEXT = 4 * 1024 * 1024;
+    public static final int MAX_TEXT = 4 * 1024 * 1024;
     private final long[] budget;
     private int depth;
     private final Reader in;
@@ -53,23 +53,23 @@ final class XmlScanner {
     private boolean pendingEnd;
 
     /// The element's name without a prefix, for START and END.
-    String name;
+    public String name;
     /// The text, for TEXT.
-    String text = "";
+    public String text = "";
     private String[] attrNames = new String[8];
     private String[] attrValues = new String[8];
     private int attrCount;
     private final StringBuilder sb = new StringBuilder(); //NOPMD AvoidStringBufferField - one buffer for every token of one file
 
-    /// Reads a part as UTF-8, the encoding every spreadsheet program writes. The stream is
+    /// Reads a part as UTF-8, the encoding every office program writes. The stream is
     /// not closed: it is one entry of an archive that has more.
-    XmlScanner(InputStream stream) throws IOException {
+    public XmlScanner(InputStream stream) throws IOException {
         this(stream, new long[] {MAX_DOCUMENT});
     }
 
     /// Reads a part against what is left of the characters one file may unpack to: `budget`
     /// is shared by every part of the archive.
-    XmlScanner(InputStream stream, long[] budget) throws IOException {
+    public XmlScanner(InputStream stream, long[] budget) throws IOException {
         in = new InputStreamReader(stream, "UTF-8");
         this.budget = budget;
     }
@@ -86,10 +86,10 @@ final class XmlScanner {
             // says nothing about what reading it takes.
             budget[0] -= limit;
             if (budget[0] < 0) {
-                throw new IOException("The spreadsheet unpacks to more than " + MAX_DOCUMENT + " characters");
+                throw new IOException("The file unpacks to more than " + MAX_DOCUMENT + " characters");
             }
             if (sb.length() > MAX_TEXT) {
-                throw new IOException("The spreadsheet has a text of more than " + MAX_TEXT + " characters");
+                throw new IOException("The file has a text of more than " + MAX_TEXT + " characters");
             }
         }
         return buffer[pos++];
@@ -97,7 +97,7 @@ final class XmlScanner {
 
 
     /// The next event. An element with no content gives START and then END.
-    int next() throws IOException {
+    public int next() throws IOException {
         if (pendingEnd) {
             pendingEnd = false;
             depth--;
@@ -108,7 +108,7 @@ final class XmlScanner {
             if (c < 0) {
                 if (depth > 0) {
                     // half a part read as if it were whole is rows missing without a word
-                    throw new IOException("The spreadsheet ends in the middle of an element");
+                    throw new IOException("The file ends in the middle of an element");
                 }
                 return EOF;
             }
@@ -243,7 +243,7 @@ final class XmlScanner {
         }
     }
 
-    static void appendCodePoint(StringBuilder sb, int code) {
+    public static void appendCodePoint(StringBuilder sb, int code) {
         // what XML has no character for: half of a surrogate pair, and the control characters
         if (code < 0x20 && code != 9 && code != 10 && code != 13 || code >= 0xd800 && code <= 0xdfff
                 || code == 0xfffe || code == 0xffff) {
@@ -398,7 +398,7 @@ final class XmlScanner {
     /// The value of an attribute of the element that START was just answered for, null when
     /// it has none of that name. A name with a prefix has to match whole; one without matches
     /// whatever prefix the attribute has, the first such attribute winning.
-    String attr(String attribute) {
+    public String attr(String attribute) {
         boolean qualified = attribute.indexOf(':') >= 0;
         for (int i = 0; i < attrCount; i++) {
             String n = attrNames[i];
@@ -415,7 +415,7 @@ final class XmlScanner {
         return null;
     }
 
-    double doubleAttr(String attribute, double fallback) {
+    public double doubleAttr(String attribute, double fallback) {
         String v = attr(attribute);
         if (v == null) {
             return fallback;
@@ -427,7 +427,7 @@ final class XmlScanner {
         }
     }
 
-    int intAttr(String attribute, int fallback) {
+    public int intAttr(String attribute, int fallback) {
         String v = attr(attribute);
         if (v == null) {
             return fallback;
@@ -441,7 +441,7 @@ final class XmlScanner {
 
     /// A whole number attribute that becomes an index, a size or a count: a value that is no
     /// number, or outside `min` to `max`, is a damaged file, never a guess.
-    int count(String attribute, int fallback, int min, int max) {
+    public int count(String attribute, int fallback, int min, int max) {
         String v = attr(attribute);
         if (v == null) {
             return fallback;
@@ -471,13 +471,13 @@ final class XmlScanner {
         return (int) n;
     }
 
-    boolean boolAttr(String attribute) {
+    public boolean boolAttr(String attribute) {
         String v = attr(attribute);
         return "1".equals(v) || "true".equals(v);
     }
 
     /// Skips to the end of the element that START was just answered for.
-    void skipElement() throws IOException {
+    public void skipElement() throws IOException {
         int depth = 1;
         while (depth > 0) {
             int e = next();
@@ -494,7 +494,7 @@ final class XmlScanner {
 
     /// The text inside the element that START was just answered for, to its end tag; text of
     /// nested elements included.
-    String elementText() throws IOException {
+    public String elementText() throws IOException {
         StringBuilder out = null;
         String single = "";
         int depth = 1;

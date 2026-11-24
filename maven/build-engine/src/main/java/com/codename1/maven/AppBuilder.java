@@ -1690,6 +1690,12 @@ public class AppBuilder {
     /// The order of the tests is the order the dispatch always had, and it matters:
     /// `local-mac-device` has to be recognised before anything asks whether a target
     /// "contains ios".
+    /// The Hunspell dictionaries every local target can add to an application.
+
+    /// The spell checking dictionaries: NOT a port, and in no target's list. A build fetches
+    /// them on demand, only for an application the builder finds using SpellChecker.
+    public static final String SPELLCHECK_DICTIONARIES = "codenameone-spellcheck-dictionaries";
+
     enum LocalBuild {
         // Native ParparVM Windows cross-compile (clang-cl) and the windows-source
         // project generation. The cloud win32 build (windows-device) is NOT local.
@@ -1763,6 +1769,14 @@ public class AppBuilder {
         for (File jar : resolvePorts()) {
             builder.addPortJar(jar);
         }
+        // Not a port: data only an application that uses SpellChecker needs. The builder
+        // asks for it after it has scanned the application, so no other build fetches it.
+        builder.setOnDemandArtifacts(new Executor.OnDemandArtifacts() {
+            @Override
+            public File resolve(String artifactId) {
+                return host.getPortJar(artifactId, null);
+            }
+        });
     }
 
     /// The jars of [#portArtifacts(String)] for this build's target, in that order.

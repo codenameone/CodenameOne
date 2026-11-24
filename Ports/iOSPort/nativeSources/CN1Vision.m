@@ -218,6 +218,74 @@ static void cn1VisionAddFaceLandmark(NSMutableDictionary *landmarks,
     }
 }
 
+/*
+ * Turns the payload bytes of a PDF417 into text, by the same rules as the
+ * Android port's BarcodePayloadText (keep the two in step):
+ *
+ * - Valid UTF-8 that contains a multi-byte sequence is read as UTF-8, even
+ *   when the application named a charset. The single-byte charsets named here
+ *   (windows-1250, ISO-8859-2) accept almost any byte, so trying them first
+ *   would turn every accented letter of a UTF-8 payload into two wrong ones.
+ *   Croatian HUB-3 payment slips come in both encodings, from different
+ *   issuers, and one application has to read both.
+ * - Otherwise the charset the application named (the barcodeCharset Display
+ *   property), when it is one the OS knows and the bytes are valid in it.
+ * - Otherwise UTF-8 when valid (pure ASCII), else ISO-8859-1, the PDF417
+ *   default, which maps every byte.
+ *
+ * A leading UTF-8 byte order mark is dropped.
+ */
+static NSString *cn1BarcodePayloadText(NSData *bytes, NSString *charset) {
+    NSString *utf8 = [[NSString alloc] initWithData:bytes encoding:NSUTF8StringEncoding];
+    BOOL nonAscii = NO;
+    const unsigned char *p = (const unsigned char *)bytes.bytes;
+    for (NSUInteger i = 0; i < bytes.length; i++) {
+        if (p[i] > 0x7f) {
+            nonAscii = YES;
+            break;
+        }
+    }
+    if (charset.length > 0 && (utf8 == nil || !nonAscii)) {
+        CFStringEncoding cf = CFStringConvertIANACharSetNameToEncoding(
+                (__bridge CFStringRef)charset);
+        if (cf != kCFStringEncodingInvalidId) {
+            NSString *named = [[NSString alloc] initWithData:bytes
+                    encoding:CFStringConvertEncodingToNSStringEncoding(cf)];
+            if (named != nil) {
+                return named;
+            }
+        }
+    }
+    if (utf8 != nil) {
+        if (utf8.length > 0 && [utf8 characterAtIndex:0] == 0xFEFF) {
+            return [utf8 substringFromIndex:1];
+        }
+        return utf8;
+    }
+    return [[NSString alloc] initWithData:bytes encoding:NSISOLatin1StringEncoding];
+}
+
+/*
+ * Apple Vision answers a PDF417 payload with no ECI as ISO-8859-1 text: one
+ * character per byte, U+0000..U+00FF. Measured on Croatian HUB-3 slips, where
+ * a UTF-8 "S with caron" came back as "A ring" plus a no-break space and
+ * windows-1250 letters as their Latin-1 neighbours. Those characters are
+ * therefore the payload's bytes, and are recovered here so they can be
+ * decoded properly. Nil when the text holds a character above U+00FF, which
+ * means Vision decoded it itself (an ECI) and its text is kept as it is.
+ *
+ * Known limit: Vision gives no signal that it honoured an ECI, so a code that
+ * declares one and decodes to characters all at or below U+00FF is taken for
+ * raw bytes too. That is harmless without a named charset (Latin-1 bytes that
+ * are not UTF-8 read back as the same text) and, with one, changes only the
+ * few Latin-1 letters the named charset maps elsewhere. HUB-3 slips and the
+ * other codes measured carry no ECI.
+ */
+static NSData *cn1VisionLatin1Bytes(NSString *text) {
+    if (text == nil) return nil;
+    return [text dataUsingEncoding:NSISOLatin1StringEncoding allowLossyConversion:NO];
+}
+
 static NSString *cn1VisionJSON(NSDictionary *value) {
     NSError *error = nil;
     NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:&error];
@@ -349,7 +417,8 @@ static MLKCommonTextRecognizerOptions *cn1MLKitTextScriptOptions(
 static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
                                        int feature, int rotation,
                                        NSString *textScript,
-                                       NSArray<NSString *> *barcodeFormats) {
+                                       NSArray<NSString *> *barcodeFormats,
+                                       NSString *barcodeCharset) {
 #if defined(CN1_HAS_MLKIT_VISION)
     CN1Image *image = rawImage == NULL ? [CN1Image imageWithData:data]
             : [CN1Image imageWithCGImage:rawImage];
@@ -423,7 +492,18 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         for (MLKBarcode *barcode in result ?: @[]) {
             NSMutableDictionary *item = [NSMutableDictionary
                     dictionaryWithDictionary:cn1MLKitRect(barcode.frame, resultSize)];
-            item[@"value"] = barcode.rawValue ?: [NSNull null];
+            NSString *mlkValue = barcode.rawValue;
+            if (barcode.format == MLKBarcodeFormatPDF417 && barcode.rawData != nil
+                    && (mlkValue == nil || barcodeCharset.length > 0)) {
+                // As on Android: ML Kit answers nil for a payload that is not
+                // valid in the charset it assumes, and its own guess can be the
+                // wrong charset, so a PDF417 is decoded from its bytes. Without
+                // a named charset a non-nil value is kept, the same rule as
+                // AndroidBarcodeScanningAdapter.text: ML Kit's rawValue was not
+                // measured to garble, unlike Apple Vision's payloadStringValue.
+                mlkValue = cn1BarcodePayloadText(barcode.rawData, barcodeCharset);
+            }
+            item[@"value"] = mlkValue ?: [NSNull null];
             item[@"rawData"] = barcode.rawData == nil
                     ? [NSNull null]
                     : [barcode.rawData base64EncodedStringWithOptions:0];
@@ -753,7 +833,8 @@ static NSArray<NSString *> *cn1VisionLanguagesForScript(
 static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
                                   int feature, int rotation,
                                   NSString *textScript,
-                                  NSArray<NSString *> *barcodeFormats) {
+                                  NSArray<NSString *> *barcodeFormats,
+                                  NSString *barcodeCharset) {
     NSError *error = nil;
     VNImageRequestHandler *handler = rawImage == NULL
             ? [[VNImageRequestHandler alloc] initWithData:data
@@ -827,7 +908,20 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             NSMutableDictionary *item =
                     [NSMutableDictionary dictionaryWithDictionary:
                             cn1VisionRect(observation.boundingBox)];
-            item[@"value"] = observation.payloadStringValue ?: [NSNull null];
+            NSString *value = observation.payloadStringValue;
+            NSData *payload = nil;
+            if ([observation.symbology isEqualToString:VNBarcodeSymbologyPDF417]) {
+                payload = cn1VisionLatin1Bytes(value);
+                if (payload != nil) {
+                    value = cn1BarcodePayloadText(payload, barcodeCharset);
+                }
+            }
+            item[@"value"] = value ?: [NSNull null];
+            if (payload != nil) {
+                // The exact payload, as Barcode.getRawBytes() documents and as
+                // strict mode compares two reads by.
+                item[@"rawData"] = [payload base64EncodedStringWithOptions:0];
+            }
             item[@"format"] = cn1AppleBarcodeFormat(observation.symbology);
             item[@"corners"] = @[
                 @{@"x": @(observation.topLeft.x),
@@ -1149,12 +1243,12 @@ static CGImageRef cn1VisionCreateRawImage(NSData *data, int width, int height,
 }
 #endif
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_boolean_int_int_int_int_java_lang_String_java_lang_String_R_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_boolean_int_int_int_int_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
         JAVA_OBJECT encodedImage, JAVA_INT feature, JAVA_BOOLEAN mlKit,
         JAVA_INT rotation, JAVA_INT width, JAVA_INT height,
         JAVA_INT frameFormat, JAVA_OBJECT textScript,
-        JAVA_OBJECT barcodeFormats) {
+        JAVA_OBJECT barcodeFormats, JAVA_OBJECT barcodeCharset) {
 #if defined(INCLUDE_CN1_VISION) && !TARGET_OS_WATCH && !TARGET_OS_TV
     if (encodedImage == JAVA_NULL) {
         return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG
@@ -1177,9 +1271,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1VisionAnalyze___byte_1ARRAY_int_
             formats = [joined componentsSeparatedByString:@","];
         }
     }
+    NSString *charset = barcodeCharset == JAVA_NULL ? nil
+            : toNSString(CN1_THREAD_GET_STATE_PASS_ARG barcodeCharset);
     NSString *result = mlKit
-            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation, script, formats)
-            : cn1VisionPerform(data, rawImage, feature, rotation, script, formats);
+            ? cn1MLKitVisionPerform(data, rawImage, feature, rotation, script, formats, charset)
+            : cn1VisionPerform(data, rawImage, feature, rotation, script, formats, charset);
     if (rawImage != NULL) CGImageRelease(rawImage);
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG result);
 #else

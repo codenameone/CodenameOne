@@ -77,7 +77,7 @@ class ComponentsTableFigure implements GuideFigure {
         return col != 0;
         }
         };
-        Table table = new Table(model);
+        com.codename1.ui.table.Table table = new com.codename1.ui.table.Table(model);
         hi.add(BorderLayout.CENTER, table);
         hi.show();
         // end::the-components-of-codename-one-java-068[]
