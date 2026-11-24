@@ -413,7 +413,7 @@ no Android SDK on your machine. Each platform needs its signing identity first:
 
 * *iOS*: an Apple Developer account, a distribution certificate and an App
   Store provisioning profile. The Certificate Wizard creates and installs both
-  (see <<certificate-wizard>>, and <<signing-section-top-heading>> for doing it
+  (see <<certificate-wizard>>, and <<signing-section-top-heading, Signing>> for doing it
   by hand).
 * *Android*: a keystore that signs every release of the app for as long as it's
   on Google Play. Generate it once and keep it, and its passwords, backed up.
