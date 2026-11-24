@@ -141,8 +141,8 @@ final class AnalyticsPane extends MerchantPane {
         to.setName("period-to");
         to.setDate(new Date(period.to - Period.DAY));
         body.add(Ui.label("From", "SvLabel")).add(from).add(Ui.label("To", "SvLabel")).add(to);
-        Command ok = Command.create(Lang.tr("Apply"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Apply"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Custom range"), body, cancel, ok) == ok) {
             preset = null;
             period = Period.custom(from.getDate().getTime(), to.getDate().getTime());

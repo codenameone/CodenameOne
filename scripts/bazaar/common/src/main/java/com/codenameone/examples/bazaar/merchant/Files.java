@@ -120,9 +120,8 @@ public final class Files {
         }
         body.add(BorderLayout.NORTH, top);
         body.add(BorderLayout.CENTER, box);
-        com.codename1.ui.Command ok = com.codename1.ui.Command.create(Lang.tr("Import"), null, null);
-        com.codename1.ui.Command cancel = com.codename1.ui.Command.create(Lang.tr("Cancel"), null,
-                null);
+        com.codename1.ui.Command ok = new com.codename1.ui.Command(Lang.tr("Import"));
+        com.codename1.ui.Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr(title), body, cancel, ok) == ok && box.getText().trim().length() > 0) {
             read.read(box.getText());
         }

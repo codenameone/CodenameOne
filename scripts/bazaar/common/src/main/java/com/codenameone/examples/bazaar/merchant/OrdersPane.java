@@ -309,8 +309,8 @@ final class OrdersPane extends MerchantPane {
         action.setStrings(titles);
         action.setSelectedStringIndex(0);
         TextField tag = Ui.field(body, Lang.tr("Tag"), "orders-bulk-tag", "");
-        Command ok = Command.create(Lang.tr("Apply"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Apply"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Bulk actions"), body, cancel, ok) != ok) {
             return;
         }
@@ -341,7 +341,7 @@ final class OrdersPane extends MerchantPane {
         }
         Dialog.show(Lang.tr(OrderBulk.title(action)) + Ui.DOT + Lang.tr("{0} of {1} done",
                 String.valueOf(OrderBulk.succeeded(results)), String.valueOf(results.size())),
-                body, Command.create(Lang.tr("OK"), null, null));
+                body, new com.codename1.ui.Command(Lang.tr("OK")));
     }
 
     private void newDraft() {

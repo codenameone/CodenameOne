@@ -413,8 +413,8 @@ final class ProductEditor extends Container {
                 v.unitReference() > 0 ? v.unitReference() : 1);
         TextField perUnit = MUi.text(body, "Unit of that price", "variant-per-unit",
                 v.unitReferenceName());
-        Command ok = Command.create(Lang.tr("Done"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Done"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Variant"), body, cancel, ok) != ok) {
             return;
         }

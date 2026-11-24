@@ -254,8 +254,8 @@ final class CustomersPane extends MerchantPane {
         sortBy.setStrings(labels);
         sortBy.setSelectedStringIndex(sort);
         body.add(Ui.label("Sort by", "SvLabel")).add(sortBy);
-        Command ok = Command.create(Lang.tr("Apply"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Apply"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Filters"), body, cancel, ok) == ok) {
             String t = tagField.getText().trim();
             tag = t.length() == 0 ? null : t;
@@ -414,8 +414,8 @@ final class CustomersPane extends MerchantPane {
         TextField reason = MUi.text(body, "Reason", "credit-reason", "");
         TextField days = Ui.field(body, "Expires in days (blank: never)", "credit-expiry", "",
                 TextArea.NUMERIC);
-        Command ok = Command.create(Lang.tr("Adjust"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Adjust"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Adjust store credit"), body, cancel, ok) != ok) {
             return;
         }
@@ -460,8 +460,8 @@ final class CustomersPane extends MerchantPane {
         p.setStrings(labels);
         p.setSelectedStringIndex(0);
         body.add(p);
-        Command ok = Command.create(Lang.tr("Merge"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Merge"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Merge a duplicate"), body, cancel, ok) != ok) {
             return;
         }

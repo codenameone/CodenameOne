@@ -159,7 +159,7 @@ final class FulfilmentFlow extends Container {
         scanRow.add(BorderLayout.EAST, Scan.button("fu-serial-camera", scan, add));
         body.add(scanRow);
         body.add(all);
-        com.codename1.ui.Command ok = com.codename1.ui.Command.create(Lang.tr("Save"), null, null);
+        com.codename1.ui.Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
         com.codename1.ui.Command cancel = com.codename1.ui.Command.create(Lang.tr("Cancel"),
                 null, null);
         if (com.codename1.ui.Dialog.show(Lang.tr("Serial numbers"), body, cancel, ok) != ok) {

@@ -74,8 +74,8 @@ final class Suppliers extends Container {
         TextField phone = MUi.text(body, "Phone", "supplier-phone", s == null ? "" : s.phone());
         TextField address = MUi.text(body, "Address", "supplier-address", s == null ? "" : s.address());
         TextField note = MUi.text(body, "Note", "supplier-note", s == null ? "" : s.note());
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Supplier"), body, cancel, ok) != ok
                 || name.getText().trim().length() == 0) {
             return;

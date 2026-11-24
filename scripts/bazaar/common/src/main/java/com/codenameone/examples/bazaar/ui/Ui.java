@@ -352,6 +352,9 @@ public final class Ui {
             final String value = values[iter];
             RadioButton option = RadioButton.createToggle(labels[iter], group);
             option.setUIID("SvSegment");
+            // A narrow pane (the list beside a detail on a tablet) gets smaller
+            // type rather than a label cut to its middle letters.
+            shrink(option, 1.6f);
             option.setName(name + "-" + value);
             option.setSelected(value.equals(current));
             option.addActionListener(e -> chosen.chosen(value));

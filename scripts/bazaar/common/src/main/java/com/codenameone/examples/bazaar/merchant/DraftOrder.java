@@ -79,8 +79,8 @@ final class DraftOrder {
         body.add(MUi.buttons(Scan.button("draft-scan", code, addLine),
                 Ui.secondary(Lang.tr("Add item"), "draft-add", e -> addLine.run())));
         final TextField note = Ui.field(body, Lang.tr("Note"), "draft-note", "");
-        Command ok = Command.create(Lang.tr("Create draft"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Create draft"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Draft order"), body, cancel, ok) != ok) {
             return;
         }

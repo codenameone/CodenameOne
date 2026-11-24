@@ -104,8 +104,8 @@ public final class StoresForm {
         body.add(Ui.text(Lang.tr("Shoppers can no longer find or buy from this store."),
                 "SvMuted"));
         TextField reason = Ui.field(body, "Reason", "suspend-reason", "");
-        Command ok = Command.create(Lang.tr("Suspend"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Suspend"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Suspend store"), body, cancel, ok) == ok) {
             setStatus(s, SUSPENDED, reason.getText().trim(), reload);
         }

@@ -108,7 +108,7 @@ final class InventoryPane extends MerchantPane {
         if (search == null) {
             Container top = new Container(BoxLayout.y());
             top.add(Ui.choice("inventory-tab", new String[] {Lang.tr("Levels"), Lang.tr("Transfers"),
-                Lang.tr("Purchase orders"), Lang.tr("Suppliers")},
+                Lang.tr("Purchases"), Lang.tr("Suppliers")},
                     new String[] {LEVELS, TRANSFERS, ORDERS, SUPPLIERS}, tab, v -> {
                         tab = v;
                         showTab();
@@ -265,9 +265,9 @@ final class InventoryPane extends MerchantPane {
         Picker reason = MUi.picker(body, Lang.tr("Reason"), "adjust-reason", Words.ADJUST_REASONS,
                 "RESTOCK");
         TextField note = Ui.field(body, Lang.tr("Note"), "adjust-note", "");
-        Command ok = Command.create(Lang.tr("Adjust"), null, null);
-        Command history = Command.create(Lang.tr("History"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new Command(Lang.tr("Adjust"));
+        Command history = new Command(Lang.tr("History"));
+        Command cancel = new Command(Lang.tr("Cancel"));
         Command answer = Dialog.show(Lang.tr("Adjust stock"), body, cancel, history, ok);
         if (answer == history) {
             history(l);

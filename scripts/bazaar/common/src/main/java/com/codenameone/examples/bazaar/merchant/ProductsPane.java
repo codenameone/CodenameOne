@@ -297,8 +297,8 @@ final class ProductsPane extends MerchantPane {
         Container body = new Container(BoxLayout.y());
         TextField percent = Ui.field(body, Lang.tr("Change prices by percent (-20 for 20% off)"),
                 "bulk-percent", "10", TextField.DECIMAL);
-        Command ok = Command.create(Lang.tr("Apply"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Apply"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Adjust prices"), body, cancel, ok) != ok) {
             return;
         }

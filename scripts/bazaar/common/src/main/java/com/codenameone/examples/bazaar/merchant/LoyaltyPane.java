@@ -75,8 +75,7 @@ final class LoyaltyPane extends MerchantPane {
                 "loyalty-redeem-who", "");
         com.codename1.ui.TextField points = Ui.field(body, "Points", "loyalty-redeem-points",
                 "", com.codename1.ui.TextArea.NUMERIC);
-        com.codename1.ui.Command ok = com.codename1.ui.Command.create(Lang.tr("Redeem"), null,
-                null);
+        com.codename1.ui.Command ok = new com.codename1.ui.Command(Lang.tr("Redeem"));
         com.codename1.ui.Command cancel = com.codename1.ui.Command.create(Lang.tr("Cancel"),
                 null, null);
         if (com.codename1.ui.Dialog.show(Lang.tr("Redeem as store credit"), body, cancel, ok)

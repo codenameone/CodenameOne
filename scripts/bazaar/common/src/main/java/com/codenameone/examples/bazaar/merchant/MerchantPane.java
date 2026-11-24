@@ -74,6 +74,22 @@ abstract class MerchantPane extends Container {
             Dimension d = super.calcPreferredSize();
             return new Dimension(CN.getDisplayWidth(), d.getHeight());
         }
+
+        @Override
+        public void layoutContainer() {
+            super.layoutContainer();
+            // The bar gives this box what its own menu leaves, so centring in
+            // the box put the title left of the screen's centre. Move it to
+            // the screen's centre, short of the actions at the end.
+            Component t = ((BorderLayout) getLayout()).getCenter();
+            Component e = ((BorderLayout) getLayout()).getEast();
+            if (t == null) {
+                return;
+            }
+            int x = CN.getDisplayWidth() / 2 - getAbsoluteX() - t.getWidth() / 2;
+            int limit = (e == null ? getWidth() : e.getX()) - t.getWidth();
+            t.setX(Math.max(0, Math.min(x, limit)));
+        }
     };
 
     MerchantPane(String title, String name) {
@@ -278,6 +294,11 @@ abstract class MerchantPane extends Container {
         Container right = new Container(new BorderLayout());
         right.setUIID("MeSplitDetail");
         right.add(BorderLayout.CENTER, detail);
+        if (!stack.isEmpty()) {
+            // The back arrow and heading belong to the pane they go back in,
+            // not across the list beside it.
+            right.add(BorderLayout.NORTH, backRow());
+        }
         pair.add(BorderLayout.CENTER, right);
         body.add(BorderLayout.CENTER, pair);
         paintBar();
@@ -295,16 +316,23 @@ abstract class MerchantPane extends Container {
         }
     }
 
+    /// A back arrow and the heading of the detail on top of the stack.
+    private Container backRow() {
+        Container row = new Container(BoxLayout.x());
+        Button back = new Button("", "MeTool");
+        back.setName("merchant-back");
+        FontImage.setMaterialIcon(back, FontImage.MATERIAL_ARROW_BACK, 3.6f);
+        back.addActionListener(e -> pop());
+        row.add(back);
+        row.add(Ui.plain(Lang.tr((String) stack.get(stack.size() - 1)[0]), "MeTitle"));
+        return row;
+    }
+
     private void paintBar() {
         bar.removeAll();
         Container start = new Container(BoxLayout.x());
-        if ((wide || split) && !stack.isEmpty()) {
-            Button back = new Button("", "MeTool");
-            back.setName("merchant-back");
-            FontImage.setMaterialIcon(back, FontImage.MATERIAL_ARROW_BACK, 3.6f);
-            back.addActionListener(e -> pop());
-            start.add(back);
-            start.add(Ui.plain(Lang.tr((String) stack.get(stack.size() - 1)[0]), "MeTitle"));
+        if (wide && !(split && root != null) && !stack.isEmpty()) {
+            start.add(backRow());
         } else if (wide) {
             start.add(Ui.plain(Lang.tr(title), "MeTitle"));
         }

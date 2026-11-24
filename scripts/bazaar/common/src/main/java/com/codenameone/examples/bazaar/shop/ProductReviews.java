@@ -221,8 +221,8 @@ final class ProductReviews {
         text.setName("review-body");
         body.add(text);
         body.add(Ui.text(Lang.tr("Reviews appear once the store has read them."), "SvMuted"));
-        Command ok = Command.create(Lang.tr("Send"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Send"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Write a review"), body, cancel, ok) != ok) {
             return;
         }

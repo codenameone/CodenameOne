@@ -137,9 +137,9 @@ final class ShippingPane extends MerchantPane {
         TextField name = MUi.text(body, "Name", "zone-name", z == null ? "" : z.name());
         TextField countries = MUi.text(body, "Country codes, comma separated", "zone-countries",
                 z == null ? "" : z.countries());
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command delete = Command.create(Lang.tr("Delete"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command delete = new com.codename1.ui.Command(Lang.tr("Delete"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         Command answer = z == null ? Dialog.show(Lang.tr("Shipping zone"), body, cancel, ok)
                 : Dialog.show(Lang.tr("Shipping zone"), body, cancel, delete, ok);
         if (answer == delete) {
@@ -173,9 +173,9 @@ final class ShippingPane extends MerchantPane {
             boxes.add(box);
             body.add(box);
         }
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command delete = Command.create(Lang.tr("Delete"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command delete = new com.codename1.ui.Command(Lang.tr("Delete"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         Command answer = p == null ? Dialog.show(Lang.tr("Shipping profile"), body, cancel, ok)
                 : Dialog.show(Lang.tr("Shipping profile"), body, cancel, delete, ok);
         if (answer == delete) {
@@ -291,8 +291,8 @@ final class ShippingPane extends MerchantPane {
         }
         Picker where = strings(body, Lang.tr("Location the service runs"),
                 "routing-service-location", labels, at);
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Routing settings"), body, cancel, ok) != ok) {
             return;
         }
@@ -320,8 +320,8 @@ final class ShippingPane extends MerchantPane {
             boxes.add(box);
             body.add(box);
         }
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Routing rule"), body, cancel, ok) != ok) {
             return;
         }
@@ -353,7 +353,7 @@ final class ShippingPane extends MerchantPane {
                         "SvMuted"));
             }
             Dialog.show(Lang.tr("Fulfilment service orders"), body,
-                    Command.create(Lang.tr("Close"), null, null));
+                    new com.codename1.ui.Command(Lang.tr("Close")));
         }, Ui::fail));
     }
 
@@ -379,8 +379,8 @@ final class ShippingPane extends MerchantPane {
                 r == null ? 0 : r.etaDaysMin());
         TextField etaMax = MUi.number(body, "Slowest delivery, days", "rate-eta-max",
                 r == null ? 0 : r.etaDaysMax());
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Shipping rate"), body, cancel, ok) != ok
                 || name.getText().trim().length() == 0) {
             return;

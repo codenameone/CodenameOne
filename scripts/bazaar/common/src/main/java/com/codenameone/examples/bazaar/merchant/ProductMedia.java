@@ -125,8 +125,8 @@ final class ProductMedia {
         url.setUIID("SvField");
         url.setName("media-url");
         body.add(url);
-        Command add = Command.create(Lang.tr("Add"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command add = new com.codename1.ui.Command(Lang.tr("Add"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Video link (https)"), body, cancel, add) != add) {
             return;
         }

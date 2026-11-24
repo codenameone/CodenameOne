@@ -238,8 +238,8 @@ final class OrderDetail extends Container {
         body.add(Ui.plain(Lang.tr("Expires {0}", MUi.when(link.expiresAt())), "SvRowDetail"));
         body.add(Ui.plain(Lang.tr(link.emailed() ? "Emailed to the customer"
                 : "Not emailed; share the link yourself"), "SvRowDetail"));
-        Command copy = Command.create(Lang.tr("Copy link"), null, null);
-        Command close = Command.create(Lang.tr("OK"), null, null);
+        Command copy = new com.codename1.ui.Command(Lang.tr("Copy link"));
+        Command close = new com.codename1.ui.Command(Lang.tr("OK"));
         if (Dialog.show(Lang.tr("Pay link"), body, close, copy) == copy) {
             com.codename1.ui.Display.getInstance().copyToClipboard(link.url());
             Ui.say("Link copied");
@@ -385,8 +385,8 @@ final class OrderDetail extends Container {
         final TextField reason = Ui.field(body, Lang.tr("Reason"), "refund-reason", "");
         body.add(total);
         recalc.run();
-        Command ok = Command.create(Lang.tr("Refund"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Refund"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Refund order #{0}", String.valueOf(o.number())), body, cancel, ok)
                 != ok) {
             return;

@@ -105,8 +105,8 @@ final class DiscountsPane extends MerchantPane {
         com.codename1.ui.TextField count = Ui.field(body, "How many", "codes-count", "100",
                 com.codename1.ui.TextArea.NUMERIC);
         com.codename1.ui.TextField prefix = MUi.text(body, "Prefix", "codes-prefix", "");
-        Command ok = Command.create(Lang.tr("Generate"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Generate"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (com.codename1.ui.Dialog.show(Lang.tr("Generate unique codes"), body, cancel, ok)
                 != ok) {
             return;
@@ -154,8 +154,8 @@ final class DiscountsPane extends MerchantPane {
         CheckBox active = new CheckBox(Lang.tr("Active"));
         active.setSelected(d == null || d.active());
         body.add(once).add(combinable).add(active);
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Discount"), body, cancel, ok) != ok) {
             return;
         }

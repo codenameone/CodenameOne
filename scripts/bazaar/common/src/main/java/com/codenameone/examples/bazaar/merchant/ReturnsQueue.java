@@ -110,8 +110,8 @@ final class ReturnsQueue extends Container {
         restock.setSelected(true);
         restock.setName("return-restock");
         Container body = BoxLayout.encloseY(restock);
-        Command ok = Command.create(Lang.tr("Receive"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Receive"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Receive return"), body, cancel, ok) != ok) {
             return;
         }
@@ -122,8 +122,8 @@ final class ReturnsQueue extends Container {
     private void refund(ReturnDto r) {
         Container body = new Container(BoxLayout.y());
         TextField shipping = MUi.money(body, Lang.tr("Shipping to refund"), "return-shipping", 0);
-        Command ok = Command.create(Lang.tr("Refund"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Refund"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Refund return"), body, cancel, ok) != ok) {
             return;
         }

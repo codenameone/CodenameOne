@@ -115,8 +115,8 @@ final class WebhooksPage {
         TextField secret = MUi.text(body, "Signing secret", "webhook-secret",
                 w == null ? "" : w.secret());
         body.add(Ui.text(Lang.tr("Leave the secret empty and the server makes one."), "SvMuted"));
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr(w == null ? "Add webhook" : "Edit webhook"), body, cancel, ok)
                 != ok) {
             return;
@@ -200,6 +200,6 @@ final class WebhooksPage {
                 d.payload() == null ? "" : d.payload(), 12, 40);
         text.setEditable(false);
         text.setUIID("MeCode");
-        Dialog.show(Lang.tr("Payload"), text, Command.create(Lang.tr("Close"), null, null));
+        Dialog.show(Lang.tr("Payload"), text, new com.codename1.ui.Command(Lang.tr("Close")));
     }
 }

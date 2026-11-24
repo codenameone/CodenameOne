@@ -88,8 +88,8 @@ final class GiftCardsPane extends MerchantPane {
         TextField message = MUi.text(body, "Message", "giftcard-message", "");
         TextField days = Ui.field(body, "Send in days (blank: now)", "giftcard-days", "",
                 com.codename1.ui.TextArea.NUMERIC);
-        Command ok = Command.create(Lang.tr("Issue"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Issue"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Issue gift card"), body, cancel, ok) != ok) {
             return;
         }

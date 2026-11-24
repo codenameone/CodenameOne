@@ -95,8 +95,8 @@ final class DigitalFiles {
         keys.setUIID("SvField");
         keys.setName("download-keys");
         body.add(keys);
-        Command save = Command.create(Lang.tr("Save download"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command save = new com.codename1.ui.Command(Lang.tr("Save download"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(v.title(), body, cancel, save) != save) {
             return;
         }

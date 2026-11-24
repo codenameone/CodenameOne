@@ -282,8 +282,8 @@ final class CollectionsPane extends MerchantPane {
                 boxes.add(box);
                 pick.add(box);
             }
-            Command ok = Command.create(Lang.tr("Add"), null, null);
-            Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+            Command ok = new com.codename1.ui.Command(Lang.tr("Add"));
+            Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
             if (Dialog.show(Lang.tr("Add products"), pick, cancel, ok) == ok) {
                 for (CheckBox box : boxes) {
                     if (box.isSelected()) {

@@ -280,8 +280,8 @@ final class SettingsPane extends MerchantPane {
         TextField threshold = MUi.number(body, Lang.tr("Threshold (amount or orders)"),
                 "fraud-rule-threshold", 0);
         Picker action = MUi.picker(body, Lang.tr("Action"), "fraud-rule-action", RULE_ACTIONS, "HOLD");
-        Command ok = Command.create(Lang.tr("Add"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Add"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Fraud filter rule"), body, cancel, ok) != ok) {
             return;
         }
@@ -341,8 +341,8 @@ final class SettingsPane extends MerchantPane {
         CheckBox active = new CheckBox(Lang.tr("Active"));
         active.setSelected(l == null || l.active());
         body.add(online).add(active);
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Location"), body, cancel, ok) != ok
                 || name.getText().trim().length() == 0) {
             return;
@@ -402,8 +402,8 @@ final class SettingsPane extends MerchantPane {
                 st == null ? "CASHIER" : st.role());
         TextField pin = Ui.field(body, Lang.tr("Register PIN (4-8 digits, empty to keep)"), "staff-pin",
                 "", TextField.NUMERIC | TextField.PASSWORD);
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Staff member"), body, cancel, ok) != ok
                 || user.getText().trim().length() == 0) {
             return;

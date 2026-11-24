@@ -182,8 +182,8 @@ final class Transfers extends Container {
                     String.valueOf(Math.max(0, left.get(iter)[0])), TextField.NUMERIC);
             fields.add(f);
         }
-        Command ok = Command.create(Lang.tr("Receive"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Receive"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Receive items"), body, cancel, ok) != ok) {
             return null;
         }

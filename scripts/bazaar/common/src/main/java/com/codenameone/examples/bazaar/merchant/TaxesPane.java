@@ -85,8 +85,8 @@ final class TaxesPane extends MerchantPane {
         CheckBox shipping = new CheckBox(Lang.tr("Charge on shipping too"));
         shipping.setSelected(t != null && t.appliesToShipping());
         body.add(shipping);
-        Command ok = Command.create(Lang.tr("Save"), null, null);
-        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        Command ok = new com.codename1.ui.Command(Lang.tr("Save"));
+        Command cancel = new com.codename1.ui.Command(Lang.tr("Cancel"));
         if (Dialog.show(Lang.tr("Tax rate"), body, cancel, ok) != ok) {
             return;
         }
