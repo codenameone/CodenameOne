@@ -141,16 +141,19 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
         // PENDING_FRAMES frames. This runs on the EDT, where the analysis
         // result is delivered, so it needs no lock.
         if (strictCount == 0) {
-            if (pending != null && ++pendingAge > PENDING_FRAMES) {
-                pending = null;
+            if (pending != null) {
+                pendingAge++;
+                if (pendingAge > PENDING_FRAMES) {
+                    pending = null;
+                }
             }
         } else {
             pendingAge = 0;
             Barcode[] next = new Barcode[strictCount];
             int n = 0;
-            for (int i = 0; i < codes.length; i++) {
-                if (codes[i] != null && o.isStrictBarcode(codes[i].getFormat())) {
-                    next[n++] = codes[i];
+            for (Barcode c : codes) {
+                if (c != null && o.isStrictBarcode(c.getFormat())) {
+                    next[n++] = c;
                 }
             }
             pending = next;
