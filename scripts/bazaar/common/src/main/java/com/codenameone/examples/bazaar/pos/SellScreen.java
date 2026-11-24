@@ -26,6 +26,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
@@ -34,6 +35,8 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codenameone.examples.bazaar.api.DiscountDto;
 import com.codenameone.examples.bazaar.api.GridTileDto;
 import com.codenameone.examples.bazaar.api.PosGridDto;
@@ -44,7 +47,6 @@ import com.codenameone.examples.bazaar.api.PosItemDto;
 import com.codenameone.examples.bazaar.api.PosLineDto;
 import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.ui.Lang;
-import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.Shell;
 import com.codenameone.examples.bazaar.ui.Ui;
 import com.codenameone.examples.bazaar.ui.Windows;
@@ -61,7 +63,21 @@ import java.util.Map;
 /// and Enter with nothing typed pays.
 final class SellScreen {
     private final Container root = new Container(new BorderLayout());
-    private final Container grid = new Container();
+    /// The width the tiles were last laid out for; when the grid turns out to
+    /// be another width (a side menu took part of the screen, the window
+    /// resized) it is filled again for the width it really has.
+    private int filledWidth;
+    private final Container grid = new Container() {
+        @Override
+        protected void laidOut() {
+            super.laidOut();
+            int w = getWidth();
+            if (w > 0 && filledWidth > 0 && w != filledWidth) {
+                filledWidth = w;
+                CN.callSerially(() -> fillGrid());
+            }
+        }
+    };
     private final Container chips = new Container(BoxLayout.x());
     private final Container cartBox = new Container(BoxLayout.y());
     private final Container totalsBox = new Container(BoxLayout.y());
@@ -218,8 +234,8 @@ final class SellScreen {
         }
         List<String> ids = collection.length() == 0 ? null : PosState.collections().get(collection);
         List<List<PosItemDto>> products = Snapshot.products(Snapshot.filter(c.items(), query, ids));
-        int width = PosUi.wide() ? CN.getDisplayWidth() - cartWidth() : CN.getDisplayWidth();
-        int cols = Layouts.columns(width, 30f, 6);
+        int width = gridWidth();
+        int cols = columns(width, c);
         grid.setLayout(new GridLayout(Math.max(1, (products.size() + cols - 1) / cols), cols));
         int side = tileSide(width, cols);
         for (int iter = 0; iter < products.size(); iter++) {
@@ -258,8 +274,8 @@ final class SellScreen {
     /// The smart grid: a tile per product, variant or collection the store
     /// placed, in its order; a tile whose target left the catalog is skipped.
     private void fillHome(PosCatalogDto c, List<GridTileDto> tiles) {
-        int width = PosUi.wide() ? CN.getDisplayWidth() - cartWidth() : CN.getDisplayWidth();
-        int cols = Layouts.columns(width, 30f, 6);
+        int width = gridWidth();
+        int cols = columns(width, c);
         int side = tileSide(width, cols);
         List<Component> shown = new ArrayList<Component>();
         for (int iter = 0; iter < tiles.size(); iter++) {
@@ -339,6 +355,110 @@ final class SellScreen {
         }
     }
 
+    /// The grid's own width once it has been laid out; before that, the
+    /// screen less the cart, which the first layout then corrects.
+    private int gridWidth() {
+        int w = grid.getWidth();
+        if (w <= 0) {
+            w = PosUi.wide() ? CN.getDisplayWidth() - cartWidth() : CN.getDisplayWidth();
+        }
+        filledWidth = w;
+        return w;
+    }
+
+    /// As many columns as tiles fit, where a tile is never narrower than its
+    /// longest word and its widest price: no word loses letters and the
+    /// price is never cut; a long name wraps to two lines (`fitTwoLines`).
+    static int columns(int width, PosCatalogDto c) {
+        int inner = width - CN.convertToPixels(3);
+        int tile = Math.max(CN.convertToPixels(20), minTileWidth(c));
+        return Math.max(1, Math.min(6, inner / Math.max(1, tile)));
+    }
+
+    /// The narrowest a tile can be: the widest word of any title and the
+    /// widest price, plus the text block's padding and the tile's margin and
+    /// border.
+    static int minTileWidth(PosCatalogDto c) {
+        UIManager m = UIManager.getInstance();
+        Style title = m.getComponentStyle("PosTileTitle");
+        Style price = m.getComponentStyle("PosTilePrice");
+        Font tf = title.getFont();
+        Font pf = price.getFont();
+        int text = 0;
+        int money = 0;
+        List<PosItemDto> items = c == null ? null : c.items();
+        if (items != null) {
+            for (int iter = 0; iter < items.size(); iter++) {
+                PosItemDto it = items.get(iter);
+                text = Math.max(text, widestWord(twoLines(it.title()), tf));
+                money = Math.max(money, pf.stringWidth(Lang.tr("From {0}", PosState.money(it.priceCents()))));
+            }
+        }
+        Style body = m.getComponentStyle("PosTileBody");
+        Style tileStyle = m.getComponentStyle("PosTile");
+        int chrome = body.getHorizontalPadding() + tileStyle.getHorizontalMargins() + 2;
+        return Math.max(text + title.getHorizontalPadding(), money + price.getHorizontalPadding()) + chrome;
+    }
+
+    /// The name broken between words into at most two lines of `width`, the
+    /// second ending in "..." when the rest does not fit. Broken here, where
+    /// the tile's width is known, so a name is never cut off by the label.
+    static String fitTwoLines(String s, Font f, int width) {
+        StringBuilder[] lines = {new StringBuilder(), new StringBuilder()};
+        int line = 0;
+        int start = 0;
+        int len = s.length();
+        boolean rest = false;
+        for (int iter = 0; iter <= len; iter++) {
+            if (iter < len && s.charAt(iter) != ' ') {
+                continue;
+            }
+            if (iter > start) {
+                String word = s.substring(start, iter);
+                StringBuilder b = lines[line];
+                String joined = b.length() == 0 ? word : b + " " + word;
+                if (f.stringWidth(joined) <= width || b.length() == 0) {
+                    b.setLength(0);
+                    b.append(joined);
+                } else if (line == 0) {
+                    line = 1;
+                    lines[1].append(word);
+                } else {
+                    rest = true;
+                    break;
+                }
+            }
+            start = iter + 1;
+        }
+        if (rest) {
+            StringBuilder b = lines[1];
+            while (b.length() > 0 && f.stringWidth(b + "...") > width) {
+                b.setLength(b.length() - 1);
+            }
+            while (b.length() > 0 && b.charAt(b.length() - 1) == ' ') {
+                b.setLength(b.length() - 1);
+            }
+            b.append("...");
+        }
+        return lines[1].length() == 0 ? lines[0].toString() : lines[0] + "\n" + lines[1];
+    }
+
+    /// The width of the longest run of characters between spaces.
+    static int widestWord(String s, Font f) {
+        int widest = 0;
+        int start = 0;
+        int len = s.length();
+        for (int iter = 0; iter <= len; iter++) {
+            if (iter == len || s.charAt(iter) == ' ') {
+                if (iter > start) {
+                    widest = Math.max(widest, f.stringWidth(s.substring(start, iter)));
+                }
+                start = iter + 1;
+            }
+        }
+        return widest;
+    }
+
     /// The width of a tile's photo: the grid's share per column, less the
     /// grid's padding and each tile's border and margin.
     private static int tileSide(int width, int cols) {
@@ -368,7 +488,10 @@ final class SellScreen {
         tile.add(art);
         Container text = new Container(BoxLayout.y());
         text.setUIID("PosTileBody");
-        SpanLabel name = new SpanLabel(twoLines(first.title()));
+        Style ts = UIManager.getInstance().getComponentStyle("PosTileTitle");
+        int textW = side - ts.getHorizontalPadding()
+                - UIManager.getInstance().getComponentStyle("PosTileBody").getHorizontalPadding();
+        SpanLabel name = new SpanLabel(fitTwoLines(twoLines(first.title()), ts.getFont(), textW));
         name.setTextUIID("PosTileTitle");
         name.setUIID("Container");
         // Always two lines tall: a grid row is as tall as its first tile, so
@@ -1016,11 +1139,13 @@ final class SellScreen {
         refocus();
     }
 
-    /// The cart panel's width beside the grid: two fifths of the screen, at
-    /// least 90mm where the screen is wide and 64mm on an upright tablet,
-    /// where 90mm would leave the grid a single column.
+    /// The cart panel's width beside the grid: two fifths of what the sidebar
+    /// leaves, at least 90mm where that is wide and 64mm on a tablet, where
+    /// 90mm beside the sidebar left the grid a single column.
     private static int cartWidth() {
-        int min = CN.convertToPixels(Layouts.wide() ? 90 : 64);
-        return Math.max(min, CN.getDisplayWidth() * 2 / 5);
+        Shell shell = Shell.current();
+        int beside = CN.getDisplayWidth() - (shell == null ? 0 : shell.sidebarWidth());
+        int min = CN.convertToPixels(beside >= CN.convertToPixels(220) ? 90 : 64);
+        return Math.max(min, beside * 2 / 5);
     }
 }

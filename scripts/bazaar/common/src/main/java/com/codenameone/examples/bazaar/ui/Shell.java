@@ -175,6 +175,15 @@ public final class Shell implements Nav.Home {
         form.revalidateWithAnimationSafety();
     }
 
+    /// The width the sidebar takes from the screen: none on a phone or while
+    /// it is hidden.
+    public int sidebarWidth() {
+        if (side == null || side.isHidden()) {
+            return 0;
+        }
+        return side.getWidth() > 0 ? side.getWidth() : CN.convertToPixels(SIDE_MM);
+    }
+
     /// Hides the sidebar of a wide screen, or shows it again.
     public void toggleSidebar() {
         if (side == null) {

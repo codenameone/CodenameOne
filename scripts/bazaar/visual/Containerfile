@@ -1,5 +1,5 @@
 FROM docker.io/library/eclipse-temurin:17
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    xvfb xauth libxtst6 libxi6 libxrender1 libxext6 libgtk-3-0 fonts-dejavu fonts-roboto maven curl \
+    xvfb xauth libxtst6 libxi6 libxrender1 libxext6 libgtk-3-0 fonts-dejavu fonts-roboto maven curl ffmpeg \
  && rm -rf /var/lib/apt/lists/*

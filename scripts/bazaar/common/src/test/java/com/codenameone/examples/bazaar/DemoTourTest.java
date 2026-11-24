@@ -1422,9 +1422,14 @@ private void screens() throws Exception {
         recorder = JavaSEPort.instance.getSimulatorRecorder();
         RecordingOptions o = new RecordingOptions();
         o.setPath(new File(dir, name + ".mp4").getAbsolutePath());
-        o.setFps(30);
-        o.setScale(1f);
-        o.setFrame(desktopRun() ? RecordingOptions.Frame.SCREEN : RecordingOptions.Frame.SKIN);
+        o.setFps(Integer.getInteger("bazaar.demo.fps", 60).intValue());
+        // Below 1 for a large screen: every frame is copied, piped and
+        // encoded, and at a tablet's 2048x1536 that work, not the app, held
+        // the recording under 20 distinct frames a second.
+        o.setScale(Float.parseFloat(System.getProperty("bazaar.demo.scale", "1")));
+        // The device's own pixels and nothing else: a skin frame is the whole
+        // skin canvas, with the device small in the middle of empty space.
+        o.setFrame(RecordingOptions.Frame.SCREEN);
         o.setTouches(TouchOverlay.Style.DOT);
         o.setAudio(RecordingOptions.Audio.NONE);
         o.setMaxSeconds(420);
