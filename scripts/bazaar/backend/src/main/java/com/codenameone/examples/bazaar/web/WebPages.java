@@ -26,7 +26,6 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.mvc.Model;
 import com.codenameone.examples.bazaar.Roles;
 import com.codenameone.examples.bazaar.account.Accounts;
-import com.codenameone.examples.bazaar.api.StoreRoleDto;
 import com.codenameone.examples.bazaar.store.Stores;
 import com.codenameone.examples.bazaar.web.account.WebSessions;
 import com.codenameone.examples.bazaar.web.security.WebHeaders;
@@ -43,54 +42,6 @@ import java.util.List;
 /// the sidebar is a section that test covers.
 @Component
 public class WebPages {
-    /// Back-office sections: label, path under `/admin/{store}`, shortcut.
-    public static final String[][] ADMIN = {
-        {"Dashboard", "", "d"},
-        {"Orders", "/orders", "o"},
-        {"Products", "/products", "p"},
-        {"Inventory", "/inventory", "i"},
-        {"Customers", "/customers", "c"},
-        {"Fulfilment", "/fulfilment", "f"},
-        {"Sales pipeline", "/pipeline", ""},
-        {"Sales", "/sales", "r"},
-        {"Discounts", "/discounts", "t"},
-        {"Calendar", "/calendar", "l"},
-        {"Loyalty", "/loyalty", "y"},
-        {"Clubs", "/clubs", "b"},
-        {"Segments", "/segments", "s"},
-        {"Campaigns", "/campaigns", "e"},
-        {"Journeys", "/journeys", "j"},
-        {"Subscriptions", "/subscriptions", "u"},
-        {"Companies", "/companies", "n"},
-        {"Price lists", "/price-lists", "k"},
-        {"Quotes", "/quotes", "q"},
-        {"Invoices", "/invoices", "v"},
-        {"Markets", "/markets", "m"},
-        {"Translations", "/translations", "x"},
-        {"Tax", "/tax", "z"},
-        {"Tax rules", "/tax-rules", ""},
-        {"Security and API", "/security", ""},
-        {"Fraud review", "/risk", "h"},
-        {"Disputes", "/disputes", "w"},
-        {"Warehouse", "/warehouse", "g"},
-        {"Stock states", "/stock-states", ""},
-        {"Serials and lots", "/serials", ""},
-        {"Label sheets", "/labels", ""},
-        {"Order settings", "/order-settings", ""},
-        {"Checkout settings", "/checkout-settings", ""},
-        {"Shipping", "/shipping", ""},
-        {"Notifications", "/notifications", ""},
-        {"Forecast", "/forecast", "1"},
-        {"Reports", "/reports", "2"},
-        {"Cohorts", "/cohorts", "3"},
-        {"Attribution", "/attribution", "4"},
-        {"Inbox", "/inbox", "5"},
-        {"Permissions", "/permissions", "6"},
-        {"Listings", "/listings", "7"},
-        {"Channels", "/channels", "8"},
-        {"Online store", "/online-store", "a"},
-        {"Apps", "/apps", "a"},
-    };
     /// Account sections: label, path, shortcut.
     public static final String[][] ACCOUNT = {
         {"Overview", "/account", "h"},
@@ -107,11 +58,6 @@ public class WebPages {
     };
     /// The account section only a company buyer sees: label, path, shortcut.
     public static final String[] BUYER = {"Company", "/account/company", "n"};
-    /// Platform sections.
-    public static final String[][] PLATFORM = {
-        {"Overview", "/platform", "h"},
-    };
-
     static final String TOAST = "web.toast";
 
     private final Accounts accounts;
@@ -158,8 +104,8 @@ public class WebPages {
         s.merchant = Caller.hasRole(Roles.MERCHANT);
         s.admin = Caller.hasRole(Roles.ADMIN);
         String path = path(request);
-        String[][] table = "platform".equals(area) ? PLATFORM : ACCOUNT;
-        if (!"admin".equals(area)) {
+        String[][] table = ACCOUNT;
+        {
             for (int iter = 0; iter < table.length; iter++) {
                 NavItem n = new NavItem(table[iter][0], table[iter][1], table[iter][2]);
                 // The overview matches only itself, not every page under it.
@@ -179,11 +125,10 @@ public class WebPages {
             s.home = table[0][1];
         }
         s.toast = takeToast(request);
-        if ("account".equals(area) || "admin".equals(area)) {
+        if ("account".equals(area)) {
             // The reader's language, picked as the storefront picks it
-            // (StoreText#forRequest); account and back-office pages are
-            // no-store, so nothing about caching depends on it. The platform
-            // admin, run by the operator, stays English.
+            // (StoreText#forRequest); account pages are
+            // no-store, so nothing about caching depends on it.
             language(s, request);
             s.title = StoreText.translate(s.t, title) + " - Bazaar";
             s.heading = StoreText.translate(s.t, title);
@@ -203,53 +148,6 @@ public class WebPages {
         s.t = StoreText.table(s.lang);
         s.langs = StoreText.options(s.lang);
         s.langBack = StoreText.back(request.getTarget());
-    }
-
-    /// A back-office shell for `storeId`, after checking the caller works
-    /// there: a store they do not work at is a 404, never a 403, so the page
-    /// does not confirm which stores exist.
-    public Shell admin(HttpServer.Request request, String storeId, String title)
-            throws IOException {
-        Shell s = shell(request, "admin", title);
-        List<StoreRoleDto> mine = stores.myStores(Caller.name());
-        String path = path(request);
-        for (int iter = 0; iter < mine.size(); iter++) {
-            StoreRoleDto r = mine.get(iter);
-            NavItem n = new NavItem(r.store().name(), "/admin/" + r.store().id(), "");
-            if (r.store().id().equals(storeId)) {
-                n.active = true;
-                n.current = "page";
-                s.storeId = storeId;
-                s.storeName = r.store().name();
-            }
-            s.stores.add(n);
-        }
-        if (s.storeId.length() == 0) {
-            throw new ResponseStatusException(404, "No such store");
-        }
-        if (mine.size() > 1) {
-            NavItem org = new NavItem("Organization overview", "/admin/" + storeId
-                    + "/organization", "");
-            if (path.endsWith("/organization")) {
-                org.current = "page";
-            }
-            s.stores.add(org);
-        }
-        String base = "/admin/" + storeId;
-        for (int iter = 0; iter < ADMIN.length; iter++) {
-            NavItem n = new NavItem(StoreText.translate(s.t, ADMIN[iter][0]),
-                    base + ADMIN[iter][1], ADMIN[iter][2]);
-            if (iter == 0) {
-                n.active = path.equals(base);
-                n.current = n.active ? "page" : "false";
-            } else {
-                n.activeIf(path);
-            }
-            s.nav.add(n);
-        }
-        s.home = base;
-        s.brand = s.storeName;
-        return s;
     }
 
     /// Leaves `message` for the next page this session renders.
@@ -281,9 +179,6 @@ public class WebPages {
     /// its `main` fragment for an htmx request that targets it.
     public static String view(Model model, Shell shell, String template) {
         model.addAttribute("shell", shell);
-        if ("admin".equals(shell.area)) {
-            com.codenameone.examples.bazaar.web.admin.AdminText.localize(model, shell.t);
-        }
         return template;
     }
 }

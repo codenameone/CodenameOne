@@ -405,7 +405,7 @@ on a row.
 | Audit log / activity | &#10003; | core | app/plugin | core | core | 
 | Two-factor authentication | &#10003; | core | app/plugin | core | core | Authenticator-app codes (TOTP) with a QR code on the web and in the app, single-use recovery codes, and a store setting that requires them of every staff member.
 | SSO / SAML | &#10003; | core | app/plugin | core | no | OpenID Connect from any provider: authorization code with PKCE, the ID token checked against the provider's keys, and a verified email's domain mapped to a staff role. SAML is not supported.
-| Organization admin across stores | &#10003; | core | app/plugin | core | core | An owner runs several stores, switches between them in the app and the web back office, and sees an organization overview of sales per store; a platform administrator manages all stores.
+| Organization admin across stores | &#10003; | core | app/plugin | core | core | An owner runs several stores, switches between them in the app, and sees an organization overview of sales per store; a platform administrator manages all stores.
 |===
 
 === Platform
@@ -451,8 +451,6 @@ about how the platform is built and run rather than what a store sells.
   provider at all.
 * *A Kanban board for fulfilment.* Orders move through columns from paid to
   delivered.
-* *Charts drawn by the server.* The back-office dashboard draws its charts on
-  the server, so they show in any browser with no chart library.
 * *Documents as PDF files.* Invoices, receipts, pick lists and shipping
   labels are rendered as PDF files.
 * *Any of four databases.* The same server and migrations run on SQLite,

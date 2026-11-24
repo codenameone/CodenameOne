@@ -509,12 +509,15 @@ invoices of orders placed on net terms. Quantities follow the price list's
 rules, such as a minimum or cases of six.
 
 [[bazaar-web-back-office]]
-==== The back office on the web
+==== The back office in a browser
 
-A merchant who signs in at `/auth/signin` reaches the back office at
-`/admin/<store>`. Staff whose account has two-step sign-in enrolled enter their
-authenticator code too. The dashboard shows the day's sales and charts; the
-sections below are reached from the menu.
+The back office in a browser is the Bazaar app itself: the server hosts the
+app's JavaScript build at `/app/`, so a merchant opens that address, signs in
+from the Account tab and gets the same back office as on a phone, tablet or
+desktop. Staff whose account has two-step sign-in enrolled enter their
+authenticator code too. The server renders only the storefront; an old
+`/admin` address redirects to `/app/`. The dashboard shows the day's sales and
+charts; the sections below are reached from the menu.
 
 *Orders and stock.* Orders can be searched, refunded or cancelled, and fulfilled
 from the order page: pack a parcel, buy a label at one of the carrier's rates,
@@ -604,7 +607,7 @@ holds up to ten blocks in order (a heading, text, an image, a product, a
 collection or a button), written one a line as `kind | text | reference`; the
 web storefront and the app's store home both show them once the theme is
 published. An owner of more than one store finds *Organization overview* in the
-store switcher, in the app and the web back office: every store they own, with
+store switcher: every store they own, with
 its orders and sales.
 Pages and policies, blog posts, the header and footer menus, and redirects from
 old addresses are edited here too. Metafields add typed fields to products,
@@ -623,8 +626,7 @@ picks one dimension, a measure and a date range from pickers, then runs the
 report and saves it under a name. The cohort grid shows how many
 customers of each month came back, and the attribution page shows sales by the
 campaign or site the customer came from. The profit and loss statement (the
-Reports section's Profit and loss button in the app, or the CSV link on the web
-admin's tax page) shows net sales after discounts and refunds, the cost of goods
+Reports section's Profit and loss button) shows net sales after discounts and refunds, the cost of goods
 from each variant's cost, gross margin, and the shipping and tax shoppers paid,
 and counts the units sold without a cost. In the app it opens with a waterfall
 chart that steps from gross sales through discounts, refunds and cost to the
@@ -643,34 +645,6 @@ that one member of staff answers stops ringing for everyone else. The listings p
 as draft products, combining the colors of one item into a single listing.
 
 image::img/bazaar-merchant-inbox-tablet.png["The app's inbox with a storefront chat waiting, its unread count beside it",scaledwidth=90%]
-
-image::img/bazaar-web-admin-dashboard.png["The web back office dashboard",scaledwidth=90%]
-
-image::img/bazaar-web-admin-dashboard-dark.png["The web back office dashboard in dark mode",scaledwidth=90%]
-
-image::img/bazaar-web-admin-orders.png["Orders in the web back office",scaledwidth=90%]
-
-image::img/bazaar-web-admin-order.png["An order in the web back office",scaledwidth=90%]
-
-image::img/bazaar-web-admin-products.png["Products in the web back office",scaledwidth=90%]
-
-image::img/bazaar-web-admin-product.png["The web product editor",scaledwidth=90%]
-
-image::img/bazaar-web-admin-inventory.png["Inventory in the web back office",scaledwidth=90%]
-
-image::img/bazaar-web-admin-pipeline.png["The sales pipeline on the web",scaledwidth=90%]
-
-image::img/bazaar-web-admin-sales.png["Scheduled sales",scaledwidth=90%]
-
-image::img/bazaar-web-admin-reports.png["Reports",scaledwidth=90%]
-
-image::img/bazaar-web-admin-fulfilment.png["Fulfilment on the web",scaledwidth=90%]
-
-image::img/bazaar-web-admin-inbox.png["The inbox on the web",scaledwidth=90%]
-
-image::img/bazaar-web-admin-customers.png["Customers on the web",scaledwidth=90%]
-
-image::img/bazaar-web-admin-discounts.png["Discounts on the web",scaledwidth=90%]
 
 ==== The register's extras
 

@@ -51,6 +51,11 @@ frames that differ from the previous one.
 ORIGIN=http://localhost:18097 OUT=target/record/web SCHEME=light FLOW=storefront node visual/record/web-rec.mjs
 ```
 
-records a CDP screencast of the server-rendered pages (`FLOW` is
-`storefront`, `account` or `backoffice`, `SCHEME` `light` or `dark`) against
-a running backend; Playwright must be resolvable from the working directory.
+records the server-rendered pages (`FLOW` is `storefront` or `account`,
+`SCHEME` `light` or `dark`) against a running backend; Playwright must be
+resolvable from the working directory. It keeps every screencast frame with the
+timestamp the browser painted it at, writes an ffconcat that holds each frame
+for its real duration, and encodes that at a constant 60 fps, so motion keeps
+its timing. Scrolling is an eased `requestAnimationFrame` tween clamped to the
+page's ends, never a jump. The back office in a browser is the app at `/app/`,
+recorded with the app's own walkthroughs.

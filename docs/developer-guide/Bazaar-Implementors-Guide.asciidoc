@@ -538,16 +538,18 @@ image::img/bazaar-web-product.png["A server-rendered product page",scaledwidth=8
 
 === The web application
 
-Beside the server-rendered storefront, the backend serves a full web version of
-the account area, the back office and checkout. The code is under
-`backend/src/main/java/.../bazaar/web`: `account` (the shopper's account), `admin`
-(the back office, one `*Pages` controller per area: commerce, B2B accounts,
-marketing, global selling, online store, operations), `auth` (sign-in and sign-up),
-`slots` (app slots and consent), `table` (the sortable, exportable data table) and
-`security`. Pages are compiled templates; small interactions, such as moving a
-card on a board or refreshing delivery rates, use htmx and fall back to a plain
-form post. Every page calls the same services the app's REST endpoints call, so a
-rule is enforced once.
+The server renders two things for a browser: the storefront with its checkout
+and the shopper's account, and the Bazaar app itself, whose JavaScript build it
+serves at `/app/`. The back office in a browser is that app, the same one that
+runs on phones, tablets and desktops, calling the same REST API; the server
+renders no back-office page, and an old `/admin` or `/platform` address
+redirects to `/app/`. The page code is under
+`backend/src/main/java/.../bazaar/web`: `account` (the shopper's account), `commerce` (its
+company, quote and subscription pages), `auth` (sign-in and sign-up), `slots` (app slots and consent), `table` (CSV cells for
+exports) and `security`. Pages are compiled templates; small interactions, such
+as refreshing delivery rates, use htmx and fall back to a plain form post. Every
+page calls the same services the app's REST endpoints call, so a rule is
+enforced once.
 
 *Security.* `WebSecurity` adds three filter chains beside the app's own:
 fingerprinted assets under `/static/**` cached as immutable; signed-in pages with
@@ -560,7 +562,7 @@ signed in to the account: each successful sign-in sets a year-long, HttpOnly,
 SameSite=Lax known-device cookie (Secure when HSTS is on), an HMAC of the
 account under a server secret, and an attempt carrying a valid one for the
 account it names skips that rule while still meeting the other two
-(`KnownDevices`). The third chain is the public storefront. Signed-in
+(`KnownDevices`). The third chain is the public storefront, and a fourth answers an old `/admin` or `/platform` address with a redirect to `/app/`. Signed-in
 pages carry a
 per-request CSP nonce. Public pages carry none, so they can be cached: their one
 inline style is allowed by its hash, which the build writes into `InlineHashes`.
@@ -575,8 +577,8 @@ third-party CAPTCHA: a hidden honeypot field, a form timestamp signed with a
 per-process key that must be older than `bazaar.bot.min-fill-ms` and younger
 than six hours, and the throttle.
 
-*App slots.* `Slots` lets the store owner, and only the owner, place script
-snippets and widgets at named places of the storefront. A page widens its CSP by
+*App slots.* `Slots` lets the store owner, and only the owner, from the app's
+back office, place script snippets and widgets at named places of the storefront. A page widens its CSP by
 exactly the hosts of the snippets it prints, never a wildcard or
 `'unsafe-inline'`, and mixes the slot version into its ETag. A widget's HTML is
 framed from `/w/{id}` in a sandbox, never in the storefront's origin. Each slot
@@ -590,9 +592,6 @@ order, which is how a guest returns to it. A cart reminder links back with a
 recovery token that `Carts.recover` turns into that cart in the new session.
 
 [[bazaar-online-store]]
-
-image::img/bazaar-web-admin-pipeline-dark.png["The web back office in dark mode",scaledwidth=80%]
-
 === The online store
 
 The `content` package holds what a merchant edits about the storefront itself:
@@ -608,8 +607,7 @@ The `content` package holds what a merchant edits about the storefront itself:
   block when the page renders. The app reads them from
   `/api/shop/stores/{handle}/blocks`.
 * `Platform.organization`: the stores an owner owns (`Store.ownerUsername`), with
-  counted orders and sales less refunds, behind `/api/merchant/organization` and
-  `/admin/{storeId}/organization`.
+  counted orders and sales less refunds, behind `/api/merchant/organization`.
 * `Pages` and `RichText`: pages, the four policies and blog posts, sanitized when
   saved, so what is stored is already clean.
 * `Navigation`: the `main` and `footer` menus, two levels deep, and the redirect
@@ -1031,8 +1029,7 @@ business contracts for. Plan for these before taking real orders:
   browser's `Accept-Language`, then English. A page drawn from the cookie is
   the shopper's private copy, every shared page says `Vary: Cookie`, and each
   language also has an address of its own (`?lang=fr`) that crawlers find as
-  an `hreflang` alternate. The back office and platform admin stay English,
-  and messages that come from the services (validation errors, refusals)
+  an `hreflang` alternate. Messages that come from the services (validation errors, refusals)
   arrive in English. Shopper mail, SMS and push follow the shopper
   (`notify.ShopperLanguage`): the order and the cart record the language they
   were placed or filled in (the storefront's resolved language, or an API

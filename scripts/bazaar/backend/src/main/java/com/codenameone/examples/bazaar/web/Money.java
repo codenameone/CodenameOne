@@ -58,4 +58,15 @@ public final class Money {
         }
         return "";
     }
+
+    /// Basis points as a percentage: 1000 is "10", 1250 is "12.5".
+    public static String percent(int bps) {
+        String whole = Integer.toString(bps / 100);
+        int rest = bps % 100;
+        if (rest == 0) {
+            return whole;
+        }
+        return whole + "." + (rest % 10 == 0 ? Integer.toString(rest / 10)
+                : (rest < 10 ? "0" : "") + rest);
+    }
 }

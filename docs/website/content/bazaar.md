@@ -40,10 +40,6 @@ Bazaar is a complete, full-stack commerce platform in Java. Shoppers browse inde
 <a href="/bazaar/bazaar-web-account.mp4">Download the video</a>.
 </video>
 
-<video controls playsinline preload="metadata" poster="/bazaar/bazaar-web-backoffice-dark-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:1.5rem auto 0" aria-label="The web back office in dark mode: the dashboard, orders and an order, products and the editor, inventory, the sales pipeline, scheduled sales, reports, fulfilment, the inbox, customers and discounts">
-<source src="/bazaar/bazaar-web-backoffice-dark.mp4" type="video/mp4">
-<a href="/bazaar/bazaar-web-backoffice-dark.mp4">Download the video</a>.
-</video>
 {{< /guide-block >}}
 
 **[Generate your project](/initializr/)** · **[Read the user's guide](/developer-guide/bazaar-users-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/bazaar)**
@@ -58,7 +54,7 @@ In the Initializr, choose the **Bazaar** commerce template, set your application
 | Merchant | A dashboard, products with variants, media, translations and SEO, inventory across locations with transfers and purchase orders, orders with bulk actions, a fulfilment board from packing to delivery, customers and segments, discounts, gift cards, campaigns and journeys, shipping and taxes, automations and webhooks |
 | Sales and insight | A sales pipeline of every live cart and open order with purchase intent, analytics against the previous period, reports, a forecast, and a store assistant that answers from the store's data |
 | Register | A cashier's PIN, shifts with a counted float, a product grid and scanner, discounts, parked carts, layaways, split tenders and tips, receipts printed, emailed or texted, returns, and sales that sync once the network is back |
-| Web | A server-rendered storefront search engines can read, a guest and signed-in checkout, a customer account, and the whole back office in a browser, in light and dark |
+| Web | A server-rendered storefront search engines can read, a guest and signed-in checkout, a customer account, in light and dark, and the whole app, back office included, served at `/app/` as its JavaScript build |
 | Administrator | Store approval and suspension, accounts, and the platform's payments and totals |
 | Java backend | Accounts and roles, stores, catalog and an inventory ledger, carts and checkout, payments authorized at checkout and captured at shipping, markets and tax, a simulated carrier, webhooks, push notifications and the live channel |
 
@@ -70,7 +66,6 @@ The account's roles decide which screens a person sees. The same client project 
 ![Bazaar sales pipeline on a tablet](/developer-guide/img/bazaar-merchant-pipeline-tablet.png)
 ![Bazaar register taking a payment](/developer-guide/img/bazaar-pos-tender-tablet.png)
 ![Bazaar web storefront](/developer-guide/img/bazaar-web-store.png)
-![Bazaar web back office dashboard in dark mode](/developer-guide/img/bazaar-web-admin-dashboard-dark.png)
 
 ## From first run to customization
 

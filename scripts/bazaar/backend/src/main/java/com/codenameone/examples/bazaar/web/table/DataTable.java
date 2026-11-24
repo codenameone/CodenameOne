@@ -61,7 +61,7 @@ public class DataTable {
     public List<NavItem> actions = new ArrayList<NavItem>();
     public String empty = "Nothing here yet.";
     /// The frame's own words, in the reader's language
-    /// ([com.codenameone.examples.bazaar.web.admin.AdminText]).
+    /// ([com.codenameone.examples.bazaar.web.commerce.AdminText]).
     public String applyLabel = "Apply";
     public String columnsLabel = "Columns";
     public String saveLabel = "Save";

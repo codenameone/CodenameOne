@@ -280,37 +280,6 @@ class BundlesSchedulesTest {
         assertEquals(8, inventory.available(s.variantId, s.locationId));
     }
 
-    @Test
-    void theBackOfficeSavesABundleAndAWindow() throws Exception {
-        Shop s = shop("bdl-web", 6);
-        String set = giftSet(s);
-        String setProduct = productOf(set);
-        Browser b = new Browser(mvc);
-        b.signIn(s.owner, People.PASSWORD);
-        String page = "/admin/" + s.storeId + "/products/" + setProduct;
-        MockResponse r = b.get(page);
-        b.assertPage(r, "Save bundle");
-        b.assertPage(r, "Publishing schedule");
-        MockResponse saved = b.post(page + "/bundle", "bundle", "1", "c0_variant", s.variantId,
-                "c0_qty", "3");
-        assertTrue(saved.getStatus() == 302 || saved.getStatus() == 303,
-                saved.getStatus() + " " + saved.getContentAsString());
-        BundleDto now = catalog.bundle(s.owner, s.storeId, setProduct);
-        assertTrue(now.bundle());
-        assertEquals(3, now.parts().get(0).quantity());
-        assertEquals(2, now.available());
-        // The first channel is the online store.
-        saved = b.post(page + "/schedule", "ch0", Schedules.ONLINE, "pub0", "2099-01-01T09:30",
-                "unpub0", "");
-        assertTrue(saved.getStatus() == 302 || saved.getStatus() == 303,
-                saved.getStatus() + " " + saved.getContentAsString());
-        ChannelScheduleDto online = catalog.schedule(s.owner, s.storeId, setProduct).get(0);
-        assertEquals(Schedules.ONLINE, online.channel());
-        assertEquals(4070943000000L, online.publishAt());
-        assertFalse(online.visible());
-        b.assertPage(b.get(page), "2099-01-01T09:30");
-    }
-
     // ============================================================== schedules
 
     @Test

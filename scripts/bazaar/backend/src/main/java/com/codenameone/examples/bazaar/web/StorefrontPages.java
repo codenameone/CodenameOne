@@ -504,7 +504,7 @@ public class StorefrontPages {
                 VariantView pv = new VariantView();
                 pv.id = sp.id();
                 pv.title = "Subscribe, " + planWords(sp.unit(), sp.cadence()) + ", save "
-                        + com.codenameone.examples.bazaar.web.admin.CommerceData.percent(
+                        + Money.percent(
                         sp.discountBps()) + "%";
                 pv.price = Money.format(chosen.priceCents() - chosen.priceCents()
                         * sp.discountBps() / 10000, store.getCurrency());

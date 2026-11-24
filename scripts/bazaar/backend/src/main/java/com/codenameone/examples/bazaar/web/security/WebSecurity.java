@@ -39,7 +39,6 @@ import com.codename1.backend.security.mfa.JdbcTotpRepository;
 import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.ratelimit.RateLimitKeys;
-import com.codenameone.examples.bazaar.Roles;
 import com.codenameone.examples.bazaar.web.ErrorPages;
 
 import java.io.IOException;
@@ -50,8 +49,10 @@ import java.io.IOException;
 /// - **Assets** (`/static/**`): a file whose name carries its content hash
 ///   (`app.1a2b3c4d.css`) never changes, so it is cached for a year as
 ///   immutable; anything else keeps the server's `no-cache`.
-/// - **Signed-in pages** (`/auth/**`, `/account/**`, `/admin/**`,
-///   `/platform/**`, checkout and order pages): a session cookie from a password form (and an
+/// - **The back office** (`/admin/**`, `/platform/**`): there is no page there.
+///   The merchant and platform back offices are the Bazaar app's own screens,
+///   served at `/app/`, so an old bookmark is redirected there.
+/// - **Signed-in pages** (`/auth/**`, `/account/**`, checkout and order pages): a session cookie from a password form (and an
 ///   authenticator code once enrolled), CSRF tokens on every state-changing
 ///   request, the session id replaced at sign-in, sign-out by POST only, and the
 ///   password guarded per address by rate ([Throttle] `signin`) and by failure
@@ -99,6 +100,28 @@ public class WebSecurity {
         return http.build();
     }
 
+    /// Old back-office addresses: answered with a permanent redirect to the
+    /// app (`/app/`), which carries the merchant and platform back offices.
+    /// Stateless, and nothing is read from the request but its path.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain backOfficeChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/admin", "/admin/**", "/platform", "/platform/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .addFilterBefore(new SecurityFilter() {
+                @Override
+                public HttpServer.Response doFilter(HttpServer.Request request,
+                        com.codename1.backend.security.FilterChain chain) {
+                    return HttpServer.Response.text(301, "")
+                            .header("Location", "/app/")
+                            .header("Cache-Control", "public, max-age=3600");
+                }
+            }, CsrfFilter.class);
+        return http.build();
+    }
+
     /// App slot widgets (`/w/{id}`): stateless, so the framed document never
     /// reads or makes a session and no cookie is set on its response. The
     /// route writes its own policy (a sandbox), so no page headers filter here.
@@ -140,8 +163,8 @@ public class WebSecurity {
         final SavedRequestAwareAuthenticationSuccessHandler saved =
                 new SavedRequestAwareAuthenticationSuccessHandler();
         saved.setDefaultTargetUrl("/account");
-        http.securityMatcher("/auth/**", "/account", "/account/**", "/admin", "/admin/**",
-                    "/platform", "/platform/**", "/s/*/checkout", "/s/*/checkout/**",
+        http.securityMatcher("/auth/**", "/account", "/account/**",
+                    "/s/*/checkout", "/s/*/checkout/**",
                     "/s/*/orders/**")
             .sessionManagement(s -> s.sessionFixation(f -> f.changeSessionId()))
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
@@ -164,8 +187,6 @@ public class WebSecurity {
                     // Guests check out and open their order by its link token.
                     .requestMatchers("/s/*/checkout", "/s/*/checkout/**", "/s/*/orders/**")
                         .permitAll()
-                    .requestMatchers("/platform", "/platform/**").hasRole(Roles.ADMIN)
-                    .requestMatchers("/admin", "/admin/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())
             .formLogin(form -> form
                     .loginPage(SIGN_IN)
@@ -202,7 +223,7 @@ public class WebSecurity {
                             com.codenameone.examples.bazaar.staff.SsoProviders.START)
                     .redirectionEndpointBaseUri(
                             com.codenameone.examples.bazaar.staff.SsoProviders.CALLBACK)
-                    .defaultSuccessUrl("/admin")
+                    .defaultSuccessUrl("/app/")
                     .failureUrl(SIGN_IN + "?error=sso"))
             .mfa(mfa -> mfa.totpService(totp).recoveryCodeService(recoveryCodes)
                     .secondFactorPage(SECOND_FACTOR)

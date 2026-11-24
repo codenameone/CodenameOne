@@ -11,8 +11,7 @@
 <details class="switch" th:unless="${shell.stores.empty}"><summary th:text="${shell.storeName}">Store</summary><ul><li th:each="s : ${shell.stores}"><a th:href="${s.url}" th:text="${s.label}" th:attr="aria-current=${s.current}">Store</a></li></ul></details>
 <span class="grow"></span>
 <button class="icon" type="button" data-shortcuts title="Keyboard shortcuts (?)"><span class="sr" th:text="${shell.t['bo.shortcuts']}">Keyboard shortcuts</span>?</button>
-<a th:if="${shell.merchant and shell.area != 'admin'}" href="/admin" th:text="${shell.t['bo.backOffice']}">Back office</a>
-<a th:if="${shell.admin and shell.area != 'platform'}" href="/platform" th:text="${shell.t['bo.platform']}">Platform</a>
+<a th:if="${shell.merchant or shell.admin}" href="/app/" hx-boost="false" th:text="${shell.t['bo.backOffice']}">Back office</a>
 <form method="post" action="/lang" class="inline langs" hx-boost="false" th:unless="${shell.langs.empty}"><input type="hidden" name="back" th:value="${shell.langBack}"><span class="sr" th:text="${shell.t['lang.pick']}">Language</span><button th:each="l : ${shell.langs}" class="quiet" type="submit" name="lang" th:value="${l.url}" th:text="${l.label}" th:attr="lang=${l.url},aria-pressed=${l.current}">English</button></form>
 <a th:unless="${shell.area == 'account'}" href="/account" th:text="${shell.t['account']}">Account</a>
 <form method="post" action="/auth/signout" class="inline"><button class="quiet" type="submit" th:text="${shell.t['signOut'] + ' ' + shell.user}">Sign out</button></form></header>

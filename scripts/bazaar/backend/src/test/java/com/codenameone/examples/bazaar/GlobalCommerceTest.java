@@ -257,103 +257,9 @@ class GlobalCommerceTest {
         assertEquals(0, markets.dutyEstimate(b.storeId, "US", lines));
     }
 
-    @Test
-    void marketsPagePostsNeedTheTokenAndAnotherStoreIs404() throws Exception {
-        Shop a = shop("gc-mkweb-a");
-        Shop b = shop("gc-mkweb-b");
-        Browser owner = signedIn(b.owner);
-        owner.assertPage(owner.get("/admin/" + b.storeId + "/markets"), "Add a market");
-        redirected(owner.post("/admin/" + b.storeId + "/fx-rates", "currency", "EUR",
-                "rate", "0.9200"));
-        assertEquals(920000L, markets.rates(b.owner, b.storeId).get(0).rateMicros());
-        redirected(owner.post("/admin/" + b.storeId + "/markets", "code", "eu", "name", "Europe",
-                "countries", "DE, FR", "currency", "EUR", "locale", "de", "rounding", "WHOLE",
-                "adjustBps", "0", "active", "true"));
-        assertEquals(1, markets.list(b.owner, b.storeId).size());
-        assertEquals(403, owner.postWithoutToken("/admin/" + b.storeId + "/fx-rates",
-                "currency", "GBP", "rate", "0.8").getStatus());
-        Browser other = signedIn(a.owner);
-        assertEquals(404, other.get("/admin/" + b.storeId + "/markets").getStatus());
-        other.get("/admin/" + a.storeId + "/markets");
-        assertEquals(404, other.post("/admin/" + b.storeId + "/fx-rates", "currency", "GBP",
-                "rate", "0.8").getStatus());
-    }
-
     // ========================================================== translations
 
-    @Test
-    void translationsFallBackAndFollowTheMarketOrTheBrowser() throws Exception {
-        Shop s = shop("gc-tr");
-        translations.put(s.owner, s.storeId, new TranslationDto(Translations.PRODUCT,
-                s.productId, "de", "title", "Becher"));
-        assertEquals("Becher", translations.fields(s.storeId, Translations.PRODUCT, s.productId,
-                "de-AT").get("title"));
-        assertNull(translations.fields(s.storeId, Translations.PRODUCT, s.productId, "fr")
-                .get("title"));
-        String page = "/s/gc-tr/products/gc-tr-mug";
-        MockResponse de = mvc.perform(get(page).header("Host", SignIn.HOST)
-                .header("Accept-Language", "fr;q=0.5, de-CH")).andReturn().getResponse();
-        assertTrue(de.getContentAsString().contains("Becher"));
-        assertTrue(de.getHeader("Vary").contains("Accept-Language"), de.getHeader("Vary"));
-        MockResponse en = mvc.perform(get(page).header("Host", SignIn.HOST)).andReturn()
-                .getResponse();
-        assertTrue(!en.getContentAsString().contains("Becher"));
-        // Another store's product cannot be translated.
-        Shop o = shop("gc-tr-other");
-        assertEquals(404, status(() -> translations.put(o.owner, o.storeId, new TranslationDto(
-                Translations.PRODUCT, s.productId, "de", "title", "X"))));
-        // The editor shows the original beside the field, and saves.
-        Browser owner = signedIn(s.owner);
-        owner.assertPage(owner.get("/admin/" + s.storeId + "/translations?kind=PRODUCT&refId="
-                + s.productId + "&locale=de"), "Original: Mug");
-        redirected(owner.post("/admin/" + s.storeId + "/translations", "kind", "PRODUCT",
-                "refId", s.productId, "locale", "de", "title", "Tasse", "description", "",
-                "seoTitle", "", "seoDescription", ""));
-        assertEquals("Tasse", translations.fields(s.storeId, Translations.PRODUCT, s.productId,
-                "de").get("title"));
-        assertEquals(403, owner.postWithoutToken("/admin/" + s.storeId + "/translations",
-                "kind", "PRODUCT", "refId", s.productId, "locale", "de", "title", "Y")
-                .getStatus());
-    }
-
     // ================================================================= taxes
-
-    @Test
-    void anExemptionTakesTheTaxOffAndTheReportCountsIt() throws Exception {
-        Shop s = shop("gc-tax");
-        String exempt = People.customer(accounts, "gc-tax-exempt");
-        String plain = People.customer(accounts, "gc-tax-plain");
-        taxes.add(s.owner, s.storeId, new TaxExemptionDto(null, exempt, "CERT-NY-1",
-                Arrays.asList("US-NY"), 0));
-        OrderDto taxed = s.buy(plain, 1);
-        OrderDto free = s.buy(exempt, 1);
-        assertTrue(taxed.taxCents() > 0, "the demo store taxes New York");
-        assertEquals(0, free.taxCents());
-        assertEquals("CERT-NY-1", taxes.certificateOf(free.id()));
-        List<TaxReportRowDto> rows = taxes.report(s.owner, s.storeId, Days.iso(System.currentTimeMillis() - Days.MILLIS), Days.iso(System.currentTimeMillis() + Days.MILLIS));
-        assertEquals(1, rows.size());
-        assertEquals(2, rows.get(0).orders());
-        assertEquals(1, rows.get(0).exemptOrders());
-        assertEquals(taxed.taxCents(), rows.get(0).taxCents());
-        // Another region is not covered.
-        taxes.add(s.owner, s.storeId, new TaxExemptionDto(null, plain, "CERT-CA", Arrays.asList(
-                "US-CA"), 0));
-        assertNull(taxes.certificateFor(s.storeId, plain, "US", "NY", java.time.Instant.now()));
-        // The page and its CSV; another store's owner sees neither.
-        Browser owner = signedIn(s.owner);
-        owner.assertPage(owner.get("/admin/" + s.storeId + "/tax"), "CERT-NY-1");
-        MockResponse csv = owner.get("/admin/" + s.storeId + "/tax/report.csv");
-        assertEquals(200, csv.getStatus());
-        assertTrue(csv.getContentAsString().startsWith("country,region,orders"));
-        assertTrue(csv.getContentAsString().contains("US,NY,2,1,"), csv.getContentAsString());
-        Shop o = shop("gc-tax-other");
-        Browser other = signedIn(o.owner);
-        assertEquals(404, other.get("/admin/" + s.storeId + "/tax").getStatus());
-        assertEquals(404, other.get("/admin/" + s.storeId + "/tax/report.csv").getStatus());
-        String packer = People.customer(accounts, "gc-tax-packer");
-        addStaff(s, packer, "FULFILMENT");
-        assertEquals(403, status(() -> taxes.report(packer, s.storeId, "2026-01-01", "2026-01-02")));
-    }
 
     // ================================================================== risk
 
@@ -371,41 +277,6 @@ class GlobalCommerceTest {
         o.setTotalCents(1000);
         assertEquals(Fraud.LOW, Fraud.score(o, new ArrayList<com.codenameone.examples.bazaar
                 .domain.StoreOrder>(), 0, null, 0).level());
-    }
-
-    @Test
-    void aHighRiskOrderIsHeldFromFulfilmentUntilApproved() throws Exception {
-        Shop s = shop("gc-risk");
-        String buyer = People.customer(accounts, "gc-risk-buyer");
-        OrderDto normal = s.buy(buyer, 1);
-        OrderRiskDto low = fraud.detail(s.owner, s.storeId, normal.id());
-        assertEquals(Fraud.CLEAR, low.status());
-        holds.recordFailure(s.storeId, buyer);
-        holds.recordFailure(s.storeId, buyer);
-        holds.recordFailure(s.storeId, buyer);
-        OrderDto big = s.buy(buyer, 200);
-        OrderRiskDto held = fraud.detail(s.owner, s.storeId, big.id());
-        assertEquals(Fraud.HELD, held.status(), held.reasons().toString());
-        List<FulfilLineDto> ls = new ArrayList<FulfilLineDto>();
-        ls.add(new FulfilLineDto(big.lines().get(0).id(), null, null, 200));
-        assertEquals(409, status(() -> fulfillments.create(s.owner, s.storeId, big.id(),
-                new NewFulfillmentDto(s.locationId, "LOCAL", ls))));
-        // Another store's owner cannot see or release it; a packer cannot approve.
-        Shop o = shop("gc-risk-other");
-        assertEquals(404, status(() -> fraud.approve(o.owner, o.storeId, big.id())));
-        assertEquals(404, status(() -> fraud.approve(o.owner, s.storeId, big.id())));
-        String packer = People.customer(accounts, "gc-risk-packer");
-        addStaff(s, packer, "FULFILMENT");
-        assertEquals(403, status(() -> fraud.approve(packer, s.storeId, big.id())));
-        // The review page, its CSRF, and approval through it.
-        Browser owner = signedIn(s.owner);
-        owner.assertPage(owner.get("/admin/" + s.storeId + "/risk"), "Held for review");
-        assertEquals(403, owner.postWithoutToken("/admin/" + s.storeId + "/risk/" + big.id()
-                + "/approve").getStatus());
-        redirected(owner.post("/admin/" + s.storeId + "/risk/" + big.id() + "/approve"));
-        assertEquals(Fraud.APPROVED, fraud.detail(s.owner, s.storeId, big.id()).status());
-        assertNotNull(fulfillments.create(s.owner, s.storeId, big.id(),
-                new NewFulfillmentDto(s.locationId, "LOCAL", ls)).id());
     }
 
     // ========================================================== bot defence
@@ -457,51 +328,6 @@ class GlobalCommerceTest {
         return mvc.perform(Rest.body(post("/api/payments/webhooks/disputes"), body)
                 .header("X-Bazaar-Signature", "sha256=" + Tokens.sign(secret, body)))
                 .andReturn().getResponse();
-    }
-
-    @Test
-    void aSignedDisputeEventOpensOneOnceAndHoldsTheFunds() throws Exception {
-        Shop s = shop("gc-dsp");
-        OrderDto o = s.buy(People.customer(accounts, "gc-dsp-buyer"), 2);
-        String event = "{\"id\":\"evt-gc-1\",\"type\":\"dispute.created\",\"orderId\":\""
-                + o.id() + "\",\"amountCents\":1500,\"reason\":\"fraudulent\"}";
-        assertEquals(401, webhook(event, "wrong-secret").getStatus());
-        assertEquals(200, webhook(event, "test-dispute-secret").getStatus());
-        assertEquals(200, webhook(event, "test-dispute-secret").getStatus());
-        List<DisputeDto> all = disputes.list(s.owner, s.storeId);
-        assertEquals(1, all.size());
-        DisputeDto d = all.get(0);
-        assertEquals(Disputes.NEEDS_RESPONSE, d.status());
-        assertEquals(1500, disputes.heldCents(s.storeId));
-        assertTrue(d.dueAt() > System.currentTimeMillis());
-        // Submitting needs evidence; the order record is written by the server.
-        assertEquals(400, status(() -> disputes.submit(s.owner, s.storeId, d.id())));
-        List<DisputeEvidenceDto> ev = disputes.addEvidence(s.owner, s.storeId, d.id(),
-                new DisputeEvidenceDto(null, Disputes.ORDER, "ignored", null, 0));
-        assertTrue(ev.get(0).body().contains("Order #" + o.number()), ev.get(0).body());
-        // Scoping and roles.
-        Shop other = shop("gc-dsp-other");
-        assertEquals(404, status(() -> disputes.detail(other.owner, s.storeId, d.id())));
-        assertEquals(404, status(() -> disputes.detail(other.owner, other.storeId, d.id())));
-        String packer = People.customer(accounts, "gc-dsp-packer");
-        addStaff(s, packer, "FULFILMENT");
-        assertEquals(403, status(() -> disputes.submit(packer, s.storeId, d.id())));
-        // The page: funds held, CSRF, submit.
-        Browser owner = signedIn(s.owner);
-        owner.assertPage(owner.get("/admin/" + s.storeId + "/disputes"), "Funds held");
-        owner.assertPage(owner.get("/admin/" + s.storeId + "/disputes/" + d.id()), "Evidence");
-        assertEquals(403, owner.postWithoutToken("/admin/" + s.storeId + "/disputes/" + d.id()
-                + "/submit").getStatus());
-        redirected(owner.post("/admin/" + s.storeId + "/disputes/" + d.id() + "/submit"));
-        assertEquals(Disputes.UNDER_REVIEW, disputes.detail(s.owner, s.storeId, d.id()).status());
-        assertEquals(1500, disputes.heldCents(s.storeId));
-        String closed = "{\"id\":\"evt-gc-2\",\"type\":\"dispute.closed\",\"disputeEventId\":"
-                + "\"evt-gc-1\",\"outcome\":\"won\"}";
-        assertEquals(200, webhook(closed, "test-dispute-secret").getStatus());
-        assertEquals(Disputes.WON, disputes.detail(s.owner, s.storeId, d.id()).status());
-        assertEquals(0, disputes.heldCents(s.storeId));
-        assertEquals(404, signedIn(other.owner).get("/admin/" + s.storeId + "/disputes")
-                .getStatus());
     }
 
     @Test

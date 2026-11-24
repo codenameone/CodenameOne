@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// App slots: the owner's editor under `/admin/{store}/apps`, what a slot does
+/// App slots: what a slot does
 /// to a storefront page's policy, cache validators and HTML, the sandboxed
 /// widget route, consent gating, and the places nothing optional loads.
 @BackendTest
@@ -53,6 +53,8 @@ class WebSlotsTest {
 
     @Autowired
     private MockMvc mvc;
+    @Autowired
+    private com.codenameone.examples.bazaar.web.slots.Slots slots;
     @Autowired
     private Accounts accounts;
     @Autowired
@@ -83,18 +85,21 @@ class WebSlotsTest {
                 "answered " + r.getStatus() + " " + r.getContentAsString());
     }
 
-    /// Adds an app as the owner `b`; answers its id.
+    /// Adds an app as the store's owner (`b` is unused: the editor is the
+    /// app's, so the test saves through [Slots] as its REST API does); answers
+    /// its id.
     private String add(Browser b, Shop s, String name, String slot, String script, String html,
             String origins, String category) throws Exception {
-        b.get("/admin/" + s.storeId + "/new-app");
-        MockResponse r = b.post("/admin/" + s.storeId + "/apps", "name", name, "slot", slot,
-                "scriptUrl", script, "widgetHtml", html, "origins", origins,
-                "category", category, "enabled", "1");
-        redirected(r);
-        String to = r.getRedirectedUrl();
-        String prefix = "/admin/" + s.storeId + "/apps/";
-        assertTrue(to.startsWith(prefix), to);
-        return to.substring(prefix.length());
+        com.codenameone.examples.bazaar.web.slots.AppSlot a =
+                new com.codenameone.examples.bazaar.web.slots.AppSlot();
+        a.name = name;
+        a.slot = slot;
+        a.scriptUrl = script;
+        a.widgetHtml = html;
+        a.origins = origins;
+        a.category = category;
+        a.enabled = true;
+        return slots.save(s.owner, s.storeId, null, a);
     }
 
     private int apps(Shop s) throws Exception {
@@ -114,92 +119,6 @@ class WebSlotsTest {
     private static String scriptSrc(String csp) {
         int at = csp.indexOf("script-src");
         return csp.substring(at, csp.indexOf(';', at));
-    }
-
-    @Test
-    void anAppWidensThePagePolicyByItsHostsAndChangesTheTag() throws Exception {
-        Shop s = shop("wsl-csp");
-        Browser owner = signedIn(s.owner);
-        MockResponse list = owner.get("/admin/" + s.storeId + "/apps");
-        owner.assertPage(list, "No apps yet.");
-        String id = add(owner, s, "Reviews", "body-end", CDN + "/reviews.js", "", API,
-                "necessary");
-        owner.assertPage(owner.get("/admin/" + s.storeId + "/apps"), "Reviews");
-        Map audit = db.queryOne("SELECT action, username FROM audit_event WHERE store_id = ? "
-                + "AND subject = ?", new Object[] {s.storeId, id});
-        assertEquals("APP_SLOT_CREATED", audit.get("action"));
-        assertEquals(s.owner, audit.get("username"));
-
-        Browser visitor = new Browser(mvc);
-        MockResponse p = visitor.get("/s/wsl-csp/products/wsl-csp-mug");
-        assertEquals(200, p.getStatus());
-        String csp = p.getHeader("Content-Security-Policy");
-        assertTrue(scriptSrc(csp).contains(CDN), csp);
-        assertTrue(scriptSrc(csp).contains(API), csp);
-        assertTrue(csp.contains("connect-src 'self' " + API), csp);
-        assertFalse(csp.contains("unsafe-inline"), csp);
-        assertTrue(p.getContentAsString().contains("data-src=\"" + CDN + "/reviews.js\""));
-        assertEquals("public, max-age=60, stale-while-revalidate=600",
-                p.getHeader("Cache-Control"));
-        String tag = p.getHeader("ETag");
-        assertNotNull(tag);
-        assertEquals(304, visitor.send(page("/s/wsl-csp/products/wsl-csp-mug", null)
-                .header("If-None-Match", tag)).getStatus());
-
-        // Only the allowed origins change: the HTML is the same, the policy
-        // is not, so the old copy must not be revalidated.
-        owner.get("/admin/" + s.storeId + "/apps/" + id);
-        redirected(owner.post("/admin/" + s.storeId + "/apps/" + id, "name", "Reviews", "slot",
-                "body-end", "scriptUrl", CDN + "/reviews.js", "widgetHtml", "", "origins",
-                API + " https://api2.example.com", "category", "necessary", "enabled", "1"));
-        MockResponse again = visitor.send(page("/s/wsl-csp/products/wsl-csp-mug", null)
-                .header("If-None-Match", tag));
-        assertEquals(200, again.getStatus());
-        assertNotEquals(tag, again.getHeader("ETag"));
-        assertTrue(again.getHeader("Content-Security-Policy").contains("https://api2.example.com"));
-        assertEquals(1, db.query("SELECT id FROM audit_event WHERE store_id = ? AND subject = ? "
-                + "AND action = 'APP_SLOT_UPDATED'", new Object[] {s.storeId, id}).size());
-
-        redirected(owner.post("/admin/" + s.storeId + "/apps/" + id + "/delete"));
-        assertEquals(0, apps(s));
-        assertEquals(1, db.query("SELECT id FROM audit_event WHERE store_id = ? AND subject = ? "
-                + "AND action = 'APP_SLOT_DELETED'", new Object[] {s.storeId, id}).size());
-        MockResponse gone = visitor.get("/s/wsl-csp/products/wsl-csp-mug");
-        assertFalse(gone.getHeader("Content-Security-Policy").contains(CDN));
-        assertFalse(gone.getContentAsString().contains(CDN));
-    }
-
-    @Test
-    void aWidgetIsFramedSandboxedAndServedWithItsOwnPolicyAndNoCookie() throws Exception {
-        Shop s = shop("wsl-widget");
-        Browser owner = signedIn(s.owner);
-        String id = add(owner, s, "Size chart", "product-below-price", "",
-                "<p>Fits true to size</p><script>document.title='x'</script>", API, "necessary");
-        MockResponse p = new Browser(mvc).get("/s/wsl-widget/products/wsl-widget-mug");
-        String html = p.getContentAsString();
-        assertTrue(html.contains("sandbox=\"allow-scripts\""), html);
-        assertTrue(html.contains("src=\"/w/" + id + "\""), html);
-        assertFalse(html.contains("Fits true to size"));
-        assertFalse(p.getHeader("Content-Security-Policy").contains("unsafe-inline"));
-
-        MockResponse w = new Browser(mvc).get("/w/" + id);
-        assertEquals(200, w.getStatus());
-        assertTrue(w.getContentAsString().contains("Fits true to size"));
-        String csp = w.getHeader("Content-Security-Policy");
-        assertTrue(csp.startsWith("sandbox allow-scripts;"), csp);
-        assertTrue(csp.contains("default-src 'none'"), csp);
-        assertTrue(csp.contains("frame-ancestors 'self'"), csp);
-        assertTrue(csp.contains("form-action 'none'"), csp);
-        assertTrue(csp.contains("connect-src " + API), csp);
-        assertNull(w.getHeader("Set-Cookie"));
-        assertNull(w.getCookie("CN1SESSION"));
-
-        assertEquals(404, new Browser(mvc).get("/w/nope").getStatus());
-        owner.get("/admin/" + s.storeId + "/apps/" + id);
-        redirected(owner.post("/admin/" + s.storeId + "/apps/" + id, "name", "Size chart",
-                "slot", "product-below-price", "scriptUrl", "", "widgetHtml", "<p>x</p>",
-                "origins", "", "category", "necessary"));
-        assertEquals(404, new Browser(mvc).get("/w/" + id).getStatus());
     }
 
     @Test
@@ -296,81 +215,16 @@ class WebSlotsTest {
         assertFalse(account.getHeader("Content-Security-Policy").contains(CDN));
     }
 
+    /// The back office is the app's: an old back-office address, signed in
+    /// or not, is a permanent redirect to `/app/`, never a page.
     @Test
-    void onlyTheOwnerOfTheStoreEditsItsApps() throws Exception {
-        Shop mine = shop("wsl-idor-a");
-        Shop theirs = shop("wsl-idor-b");
-        String theirApp = add(signedIn(theirs.owner), theirs, "Theirs", "body-end",
-                CDN + "/t.js", "", "", "necessary");
-        Browser b = signedIn(mine.owner);
-        String a = "/admin/" + mine.storeId + "/apps";
-        String other = "/admin/" + theirs.storeId + "/apps";
-        String[] gets = {other, other + "/" + theirApp, "/admin/" + theirs.storeId + "/new-app",
-            a + "/" + theirApp};
-        for (int iter = 0; iter < gets.length; iter++) {
-            assertEquals(404, b.get(gets[iter]).getStatus(), gets[iter]);
+    void oldBackOfficeAddressesGoToTheApp() throws Exception {
+        String[] old = {"/admin", "/admin/s1/orders", "/admin/s1/apps/x", "/platform"};
+        for (int iter = 0; iter < old.length; iter++) {
+            MockResponse r = new Browser(mvc).get(old[iter]);
+            assertEquals(301, r.getStatus(), old[iter]);
+            assertEquals("/app/", r.getHeader("Location"), old[iter]);
         }
-        b.get(a);
-        String[] posts = {other, other + "/" + theirApp, other + "/" + theirApp + "/delete",
-            a + "/" + theirApp, a + "/" + theirApp + "/delete"};
-        for (int iter = 0; iter < posts.length; iter++) {
-            assertEquals(404, b.post(posts[iter], "name", "Mine now", "slot", "body-end",
-                    "scriptUrl", "https://evil.example.com/x.js", "category", "necessary",
-                    "enabled", "1").getStatus(), posts[iter]);
-        }
-        assertEquals(CDN + "/t.js", db.queryOne("SELECT script_url FROM app_slot WHERE id = ?",
-                new Object[] {theirApp}).get("script_url"));
-        assertEquals(1, apps(theirs));
-        assertEquals(0, apps(mine));
-
-        // A manager works at the store but may not put code on its pages.
-        String manager = People.customer(accounts, "wsl-idor-manager");
-        stores.saveStaff(mine.owner, mine.storeId, new StaffDto(null, manager, null, "MANAGER",
-                null, null, false));
-        Browser m = signedIn(manager);
-        assertEquals(403, m.get(a).getStatus());
-        m.get("/admin/" + mine.storeId);
-        assertEquals(403, m.post(a, "name", "x", "slot", "body-end", "scriptUrl",
-                CDN + "/x.js", "category", "necessary").getStatus());
-
-        // A shopper is refused the whole back office.
-        Browser shopper = signedIn(People.customer(accounts, "wsl-idor-shopper"));
-        assertEquals(403, shopper.get(a).getStatus());
-        shopper.get("/account");
-        assertEquals(403, shopper.post(a, "name", "x", "slot", "body-end", "scriptUrl",
-                CDN + "/x.js", "category", "necessary").getStatus());
-        assertEquals(0, apps(mine));
     }
 
-    @Test
-    void aPostWithoutItsTokenOrWithABadAddressSavesNothing() throws Exception {
-        Shop s = shop("wsl-bad");
-        Browser b = signedIn(s.owner);
-        String a = "/admin/" + s.storeId + "/apps";
-        b.get(a);
-        assertEquals(403, b.postWithoutToken(a, "name", "Forged", "slot", "body-end",
-                "scriptUrl", CDN + "/x.js", "category", "necessary").getStatus());
-        String[][] bad = {
-            {"scriptUrl", "http://cdn.example.com/x.js", "origins", ""},
-            {"scriptUrl", "javascript:alert(1)", "origins", ""},
-            {"scriptUrl", "https://user@cdn.example.com/x.js", "origins", ""},
-            {"scriptUrl", "https://cdn.example.com/x.js\" onload=\"x", "origins", ""},
-            {"scriptUrl", CDN + "/x.js", "origins", "http://api.example.com"},
-            {"scriptUrl", CDN + "/x.js", "origins", "https://*.example.com"},
-            {"scriptUrl", CDN + "/x.js", "origins", "'unsafe-inline'"},
-            {"scriptUrl", "", "origins", ""},
-        };
-        for (int iter = 0; iter < bad.length; iter++) {
-            b.get(a);
-            MockResponse r = b.post(a, "name", "Bad", "slot", "body-end", bad[iter][0],
-                    bad[iter][1], bad[iter][2], bad[iter][3], "category", "necessary",
-                    "enabled", "1");
-            redirected(r);
-            assertEquals("/admin/" + s.storeId + "/new-app", r.getRedirectedUrl(), bad[iter][1]);
-        }
-        b.get(a);
-        redirected(b.post(a, "name", "Bad place", "slot", "checkout-payment", "scriptUrl",
-                CDN + "/x.js", "category", "necessary"));
-        assertEquals(0, apps(s));
-    }
 }

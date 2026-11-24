@@ -1,5 +1,19 @@
 // Records the server-rendered web walkthroughs with a CDP screencast.
-// ORIGIN=http://localhost:18097 OUT=dir SCHEME=light|dark FLOW=storefront|account|backoffice node web-rec.mjs
+// ORIGIN=http://localhost:18097 OUT=dir SCHEME=light|dark FLOW=storefront|account node web-rec.mjs
+//
+// The back office in a browser is the app at /app/, recorded with the app's
+// own walkthroughs; the server renders only the storefront and the account.
+//
+// Smooth motion: screencast frames arrive whenever the page repaints, not at
+// a fixed rate, so each frame is kept with the time the browser painted it
+// (its metadata timestamp, never its arrival), an ffconcat holds every frame
+// for exactly that long, and ffmpeg resamples the result to a constant 60 fps
+// by repeating frames. Scrolling is an eased requestAnimationFrame tween in
+// the page, clamped to the document's ends, so it repaints every vsync and
+// never overshoots. Writes OUT/bazaar-web-FLOW[-dark].mp4 and its poster, and
+// OUT/scrolls-FLOW[-dark].json, the scroll windows in video seconds, for
+// measuring smoothness with mpdecimate.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -18,7 +32,8 @@ fs.mkdirSync(frames, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', viewport: { width: 1440, height: 810 }, deviceScaleFactor: 4 / 3,
   colorScheme: scheme });
-await context.addInitScript(() => {
+await context.addInitScript(dark => {
+  const DARK = dark;
   const css = (el, s) => Object.assign(el.style, s);
   const boot = () => {
     for (const a of document.querySelectorAll('a')) { if (/^\s*Skip to/.test(a.textContent)) a.style.display = 'none'; }
@@ -31,7 +46,13 @@ await context.addInitScript(() => {
     const cap = document.createElement('div');
     cap.id = '__rec_cap';
     css(cap, { position: 'fixed', left: '50%', bottom: '28px', transform: 'translateX(-50%)', maxWidth: '70%',
-      padding: '10px 20px', borderRadius: '10px', background: 'rgba(20,20,24,0.88)', color: '#fff',
+      padding: '10px 20px', borderRadius: '10px',
+      // On a dark page a dark pill disappears: there it is light with dark
+      // text, and both carry a ring and a shadow that separate it from any
+      // background.
+      background: DARK ? 'rgba(246,246,250,0.96)' : 'rgba(20,20,24,0.9)', color: DARK ? '#111' : '#fff',
+      border: DARK ? '1px solid rgba(0,0,0,0.25)' : '1px solid rgba(255,255,255,0.18)',
+      boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
       font: '500 17px system-ui, -apple-system, Segoe UI, Roboto, sans-serif', textAlign: 'center',
       zIndex: 2147483646, pointerEvents: 'none', opacity: '0', transition: 'opacity 250ms' });
     document.documentElement.appendChild(dot);
@@ -47,7 +68,7 @@ await context.addInitScript(() => {
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   document.addEventListener('htmx:afterSettle', boot);
-});
+}, scheme === 'dark');
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
@@ -57,12 +78,16 @@ page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 const cdp = await context.newCDPSession(page);
 const list = [];
 let n = 0;
-cdp.on('Page.screencastFrame', async f => {
+const writes = [];
+cdp.on('Page.screencastFrame', f => {
+  // Ack first, so the browser sends the next paint without waiting on the disk.
+  cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => { /* closed */ });
   const file = path.join(frames, String(n++).padStart(6, '0') + '.jpg');
-  fs.writeFileSync(file, Buffer.from(f.data, 'base64'));
   list.push([file, f.metadata.timestamp]);
-  try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch (e) { /* closed */ }
+  writes.push(fs.promises.writeFile(file, Buffer.from(f.data, 'base64')));
 });
+// Scroll windows, in screencast (wall clock) seconds.
+const scrolls = [];
 
 let mx = 720, my = 400;
 const wait = ms => page.waitForTimeout(ms);
@@ -103,10 +128,28 @@ async function type(sel, text) {
   await page.locator(sel).first().pressSequentially(text, { delay: 45 });
   await wait(300);
 }
-async function scroll(px, ms = 900) {
-  const steps = 20;
-  for (let i = 0; i < steps; i++) { await page.mouse.wheel(0, px / steps); await wait(ms / steps); }
-  await wait(400);
+// Scrolls by `px` over `ms` with an ease-in-out tween run in the page, one
+// step per animation frame, clamped to the document's ends.
+async function scroll(px, ms = 1400) {
+  const t0 = Date.now() / 1000;
+  await page.evaluate(([dy, dur]) => new Promise(done => {
+    const root = document.scrollingElement || document.documentElement;
+    root.style.scrollBehavior = 'auto';
+    const from = root.scrollTop;
+    const max = Math.max(0, root.scrollHeight - window.innerHeight);
+    const to = Math.min(max, Math.max(0, from + dy));
+    if (to === from) { done(); return; }
+    const start = performance.now();
+    const step = now => {
+      const t = Math.min(1, (now - start) / dur);
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      root.scrollTop = from + (to - from) * e;
+      if (t < 1) requestAnimationFrame(step); else done();
+    };
+    requestAnimationFrame(step);
+  }), [px, ms]);
+  scrolls.push([t0, Date.now() / 1000]);
+  await wait(700);
 }
 async function go(url) { await page.goto(origin + url, { waitUntil: 'load' }); await wait(600); }
 async function shot(name) {
@@ -121,23 +164,17 @@ async function signIn(user) {
   await type('input[name=password]', 'bazaar-demo');
   await click('form button[type=submit]', { nav: true, after: 1500 });
 }
-async function storeId() {
-  await go('/admin');
-  const links = await page.locator('a[href^="/admin/"]').evaluateAll(as => as.map(a => a.getAttribute('href')));
-  return links.map(h => (h.match(/^\/admin\/([^/?#]+)/) || [])[1]).find(id => id && id.length > 8);
-}
-
 async function storefront() {
   await go('/');
   await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, everyNthFrame: 1 });
   await caption('Bazaar on the web: one marketplace, many independent shops', 3200);
   if (!sfx) await shot('web-marketplace');
-  await scroll(500);
-  await scroll(-500);
+  await scroll(500, 1600);
+  await scroll(-500, 1400);
   await click('a[href="/s/northwind"]', { nav: true, after: 1500 });
   await caption('Each store has its own storefront, rendered on the server', 3000);
   await shot('web-store' + sfx);
-  await scroll(600, 1400);
+  await scroll(600, 2000);
   await wait(800);
   await type('input[type=search], input[name=q]', 'merino');
   await Promise.all([page.waitForURL(u => u.toString().includes('merino')), page.keyboard.press('Enter')]);
@@ -148,8 +185,8 @@ async function storefront() {
   await click(page.locator('a[href*="/products/"]').first(), { nav: true, after: 1500 });
   await caption('A product page: options, reviews and a one-step wallet', 3000);
   if (!sfx) await shot('web-product');
-  await scroll(500, 1200);
-  await scroll(-500, 800);
+  await scroll(500, 1700);
+  await scroll(-500, 1400);
   await click('form.add button[type=submit]', { nav: true, after: 1500 });
   await caption('The cart: quantities, discount codes and gift cards', 3000);
   if (!sfx) await shot('web-cart');
@@ -174,7 +211,7 @@ async function storefront() {
   await wait(1200);
   await caption('The order is placed, with its invoice and tracking', 3200);
   if (!sfx) await shot('web-order-placed');
-  await scroll(400, 1000);
+  await scroll(400, 1500);
   await wait(1500);
 }
 
@@ -209,7 +246,7 @@ async function account() {
   await click(page.locator('a[href^="/account/orders/"]').first(), { nav: true });
   await caption('An order: its items, delivery, invoice and returns', 3000);
   if (!sfx) await shot('web-account-order');
-  await scroll(500, 1200);
+  await scroll(500, 1700);
   await go('/account');
   await click('a[href="/account/loyalty"]', { nav: true });
   await caption('Loyalty points and tiers', 2800);
@@ -217,48 +254,7 @@ async function account() {
   await click('a[href="/account/security"]', { nav: true });
   await caption('Security: passkeys, two-step sign-in and sessions', 3000);
   if (!sfx) await shot('web-account-security');
-  await scroll(400, 1000);
-  await wait(1200);
-}
-
-async function backoffice() {
-  await go('/auth/signin');
-  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, everyNthFrame: 1 });
-  await caption('The store owner signs in to the back office', 1500);
-  await type('input[name=username]', 'owner@bazaar.example');
-  await type('input[name=password]', 'bazaar-demo');
-  await click('form button[type=submit]', { nav: true, after: 800 });
-  const id = await storeId();
-  if (!id) throw new Error('no store for the owner');
-  const a = '/admin/' + id;
-  await go(a);
-  await caption('The back office in a browser: the owner\'s dashboard', 3200);
-  await shot('web-admin-dashboard' + sfx);
-  const nav = async (p, text, name, ms = 2800) => {
-    const l = page.locator('a[href="' + a + p + '"]').first();
-    if (await l.count()) await click(l, { nav: true }); else await go(a + p);
-    await caption(text, ms);
-    if (name && !sfx) await shot(name);
-  };
-  await nav('/orders', 'Orders: filter, bulk fulfil, buy labels, print packing slips', 'web-admin-orders');
-  await click(page.locator('a[href^="' + a + '/orders/"]').first(), { nav: true });
-  await caption('An order: payment, fulfilment, refunds and its timeline', 3000);
-  if (!sfx) await shot('web-admin-order');
-  await scroll(700, 1500);
-  await nav('/products', 'Products, with variants, media and translations', 'web-admin-products');
-  await click(page.locator('a[href^="' + a + '/products/"]').first(), { nav: true });
-  await caption('The product editor', 2600);
-  if (!sfx) await shot('web-admin-product');
-  await scroll(600, 1300);
-  await nav('/inventory', 'Inventory by location', 'web-admin-inventory');
-  await nav('/fulfilment', 'Fulfilment: pick, pack and ship', 'web-admin-fulfilment');
-  await nav('/customers', 'Customers and their history', 'web-admin-customers');
-  await nav('/discounts', 'Discounts, codes and automatic offers', 'web-admin-discounts');
-  await nav('/inbox', 'The inbox: every conversation with shoppers', 'web-admin-inbox');
-  await nav('/sales', 'Sales: what sold, where and when', 'web-admin-sales');
-  await nav('/reports', 'Reports, built from any table', 'web-admin-reports');
-  await nav('/pipeline', 'The sales pipeline for B2B deals', null);
-  await shot('web-admin-pipeline' + sfx);
+  await scroll(400, 1500);
   await wait(1200);
 }
 
@@ -266,7 +262,7 @@ let ok = true;
 try {
   if (flow === 'storefront') await storefront();
   else if (flow === 'account') await account();
-  else await backoffice();
+  else throw new Error('FLOW is storefront or account');
 } catch (e) {
   ok = false;
   console.error('FAILED', e.message);
@@ -275,6 +271,7 @@ try {
 try { await cdp.send('Page.stopScreencast'); } catch (e) { /* */ }
 await wait(300);
 await browser.close();
+await Promise.all(writes);
 // concat list with real durations
 let txt = '';
 for (let i = 0; i < list.length; i++) {
@@ -282,6 +279,18 @@ for (let i = 0; i < list.length; i++) {
   txt += "file '" + list[i][0] + "'\nduration " + d.toFixed(4) + '\n';
 }
 if (list.length) txt += "file '" + list[list.length - 1][0] + "'\n";
-fs.writeFileSync(path.join(out, 'list-' + flow + sfx + '.txt'), txt);
+const listFile = path.join(out, 'list-' + flow + sfx + '.txt');
+fs.writeFileSync(listFile, 'ffconcat version 1.0\n' + txt);
+const first = list.length ? list[0][1] : 0;
+fs.writeFileSync(path.join(out, 'scrolls-' + flow + sfx + '.json'),
+    JSON.stringify(scrolls.map(([a, b]) => [+(a - first).toFixed(3), +(b - first).toFixed(3)])));
+if (ok && list.length) {
+  const mp4 = path.join(out, 'bazaar-web-' + flow + sfx + '.mp4');
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', listFile,
+    '-vf', 'scale=1920:1080:flags=lanczos,fps=60,format=yuv420p', '-c:v', 'libx264', '-preset', 'slow',
+    '-crf', '18', '-movflags', '+faststart', mp4]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-ss', '2.5', '-i', mp4, '-frames:v', '1', '-q:v', '3',
+    path.join(out, 'bazaar-web-' + flow + sfx + '-poster.jpg')]);
+}
 console.log('frames', list.length, 'errors', errors.slice(0, 5).join(' | '));
 process.exit(ok ? 0 : 1);

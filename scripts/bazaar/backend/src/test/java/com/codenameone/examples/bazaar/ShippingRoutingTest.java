@@ -395,24 +395,4 @@ class ShippingRoutingTest {
 
     // ------------------------------------------------------------ back office
 
-    @Test
-    void theBackOfficeEditsProfilesAndRouting() throws Exception {
-        Shop s = shop("shipweb", 2);
-        Browser b = new Browser(mvc);
-        b.signIn(s.owner, People.PASSWORD);
-        String base = "/admin/" + s.storeId + "/shipping";
-        b.assertPage(b.get(base), "Order routing");
-        b.post(base + "/profiles", "name", "Fragile", "p-" + s.productId, "1");
-        List<ShippingProfileDto> saved = rates.profiles(s.owner, s.storeId);
-        assertEquals(1, saved.size());
-        assertEquals("Fragile", saved.get(0).name());
-        assertEquals(s.productId, saved.get(0).productIds().get(0));
-        b.post(base + "/routing", "serviceLocationId", "", "service", "");
-        assertFalse(routing.routing(s.owner, s.storeId).allowSplit(), "the box was unticked");
-        b.post(base + "/rules", "kind", Router.PRIORITY, "l-" + s.locationId, "1");
-        RoutingDto r = routing.routing(s.owner, s.storeId);
-        assertEquals(1, r.rules().size());
-        assertEquals(s.locationId, r.rules().get(0).locationIds());
-        b.assertPage(b.get(base), "Fragile");
-    }
 }

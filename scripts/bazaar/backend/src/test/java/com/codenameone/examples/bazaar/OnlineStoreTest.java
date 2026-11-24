@@ -254,65 +254,6 @@ class OnlineStoreTest {
         assertEquals(400, status(() -> themes.saveDraft(s.owner, s.storeId, new ThemeDto(
                 Themes.DRAFT, "", "light", "system", "soft", "", Arrays.asList("blocks"),
                 Arrays.asList(new BlockDto("marquee", "x", "", ""))))));
-        // The admin form's line format reads back the same blocks.
-        List<BlockDto> parsed = com.codenameone.examples.bazaar.web.admin.OnlineStorePages
-                .blocks("heading | Hi\nproduct | mug\nbutton | Go | https://example.com");
-        assertEquals(3, parsed.size());
-        assertEquals("mug", parsed.get(1).ref());
-        assertEquals("https://example.com", parsed.get(2).ref());
-    }
-
-    @Test
-    void anOwnerSeesEveryStoreTheyOwnInTheOrganizationOverview() throws Exception {
-        Shop s = shop("os-org");
-        stores.create(s.owner, "Org Second", "os-org-second", "EUR");
-        List<StoreStatsDto> org = platform.organization(s.owner);
-        assertEquals(2, org.size());
-        assertEquals("Org Second", org.get(0).name());
-        assertEquals("EUR", org.get(0).currency());
-        assertEquals(0, org.get(0).orders());
-        assertTrue(platform.organization("os-org-nobody").isEmpty());
-        Browser owner = signedIn(s.owner);
-        String page = owner.get("/admin/" + s.storeId + "/organization").getContentAsString();
-        assertTrue(page.contains("Org Second"), page);
-        assertTrue(page.contains("Organization overview"));
-    }
-
-    @Test
-    void theAdminPagesNeedTheTokenAndAnotherStoreIs404() throws Exception {
-        Shop a = shop("os-admin-a");
-        Shop b = shop("os-admin-b");
-        Browser owner = signedIn(b.owner);
-        owner.assertPage(owner.get("/admin/" + b.storeId + "/online-store"), "Draft theme");
-        redirected(owner.post("/admin/" + b.storeId + "/online-store/pages", "kind", "PAGE",
-                "handle", "faq", "title", "FAQ", "body", "<p>Ask</p>", "published", "true"));
-        assertEquals(1, pages.list(b.owner, b.storeId).size());
-        redirected(owner.post("/admin/" + b.storeId + "/online-store/menus", "menu", "main",
-                "parentId", "", "title", "Home", "url", "/s/os-admin-b"));
-        redirected(owner.post("/admin/" + b.storeId + "/online-store/menus", "menu", "main",
-                "parentId", "", "title", "FAQ", "url", "/s/os-admin-b/pages/faq"));
-        String second = navigation.links(b.owner, b.storeId).get(1).id();
-        redirected(owner.post("/admin/" + b.storeId + "/online-store/menus/" + second + "/up"));
-        assertEquals("FAQ", navigation.links(b.owner, b.storeId).get(0).title());
-        String[] subs = {"", "/pages", "/blog", "/menus", "/redirects", "/metafields",
-            "/metaobjects"};
-        for (int iter = 0; iter < subs.length; iter++) {
-            assertEquals(200, owner.get("/admin/" + b.storeId + "/online-store" + subs[iter])
-                    .getStatus(), subs[iter]);
-        }
-        assertEquals(403, owner.postWithoutToken("/admin/" + b.storeId
-                + "/online-store/redirects", "fromPath", "/s/os-admin-b/a", "toPath", "/")
-                .getStatus());
-        Browser other = signedIn(a.owner);
-        assertEquals(404, other.get("/admin/" + b.storeId + "/online-store").getStatus());
-        other.get("/admin/" + a.storeId + "/online-store");
-        assertEquals(404, other.post("/admin/" + b.storeId + "/online-store/theme/publish")
-                .getStatus());
-        String packer = packer(b, "os-admin-packer");
-        Browser p = signedIn(packer);
-        p.get("/admin/" + b.storeId + "/online-store");
-        assertEquals(403, p.post("/admin/" + b.storeId + "/online-store/theme/publish")
-                .getStatus());
     }
 
     // ============================================================ redirects

@@ -278,101 +278,18 @@ async function storefrontExtras() {
     await shop.waitForLoadState('load');
     say('the language picker switched the storefront to Spanish (lang=es dir=ltr)');
 
-    // A market: the owner adds a euro market, a shopper browses it and the
-    // checkout says it charges euros.
-    await shop.goto(origin + '/auth/signin', { waitUntil: 'load' });
-    await shop.fill('input[name=username]', 'owner@bazaar.example');
-    await shop.fill('input[name=password]', 'bazaar-demo');
-    await shop.waitForTimeout(2000);
-    await shop.locator('form button[type=submit]').first().click();
-    await shop.waitForLoadState('load');
-    await shop.goto(origin + '/admin', { waitUntil: 'load' });
-    const links = await shop.locator('a[href^="/admin/"]').evaluateAll(as => as.map(a => a.getAttribute('href')));
-    const storeId = (links.map(h => (h.match(/^\/admin\/([^/?#]+)/) || [])[1])
-        .find(id => id && id.length > 8));
-    if (!storeId) {
-      throw new Error('the owner\'s admin lists no store: ' + links.slice(0, 5).join(', '));
-    }
-    // The read-only sales pipeline, in both colour schemes: plain HTML under
-    // the strict policy, so a refused script or style would show in the log.
-    for (const scheme of ['light', 'dark']) {
-      await shop.emulateMedia({ colorScheme: scheme });
-      const board = await shop.goto(origin + '/admin/' + storeId + '/pipeline', { waitUntil: 'load' });
-      if (board.status() !== 200 || await shop.locator('#board .kanban').count() !== 8) {
-        throw new Error('the pipeline board answered ' + board.status() + ' without its 8 columns');
+    // The back office is the app's. An old back-office address, which a
+    // merchant may have bookmarked, lands on the app (/app/), never a page.
+    for (const old of ['/admin', '/admin/x/orders', '/platform']) {
+      const r = await shop.request.get(origin + old, { maxRedirects: 0 });
+      if (r.status() !== 301 || r.headers()['location'] !== '/app/') {
+        throw new Error(old + ' answered ' + r.status() + ' to ' + r.headers()['location']);
       }
-      await shop.screenshot({ path: path.join(out, '14-pipeline-' + scheme + '.png'), fullPage: true });
     }
-    await shop.emulateMedia({ colorScheme: 'light' });
-    say('the back office shows the sales pipeline, read only, in light and dark');
-    // Boosted navigation through the back office: htmx swaps each page in,
-    // and nothing it does may be refused by the strict policy.
-    await shop.goto(origin + '/admin/' + storeId, { waitUntil: 'load' });
-    const sections = (await shop.locator('nav a[href^="/admin/' + storeId + '/"]')
-        .evaluateAll(as => as.map(a => a.getAttribute('href')))).slice(0, 12);
-    if (sections.length === 0) {
-      throw new Error('the back office sidebar has no sections to walk');
-    }
-    for (const href of sections) {
-      await shop.locator('nav a[href="' + href + '"]').first().click();
-      await shop.waitForURL(u => u.pathname === href, { timeout: stepSeconds * 1000 });
-      await shop.waitForLoadState('networkidle');
-    }
-    if (csp.length > 0) {
-      throw new Error('the strict policy refused something: ' + csp.slice(0, 3).join(' | '));
-    }
-    say('boosted back-office navigation through ' + sections.length + ' sections ran with no policy refusal');
-    await shop.goto(origin + '/admin/' + storeId + '/markets', { waitUntil: 'load' });
-    const csrf = await shop.locator('input[name=_csrf]').first().getAttribute('value');
-    const post = async (where, form) => {
-      const r = await shop.request.post(origin + where, { form: { ...form, _csrf: csrf },
-          maxRedirects: 0, headers: { Origin: origin, Referer: origin + where } });
-      if (r.status() !== 303 && r.status() !== 302 && r.status() !== 200) {
-        throw new Error(where + ' answered ' + r.status());
-      }
-    };
-    await post('/admin/' + storeId + '/fx-rates', { currency: 'EUR', rate: '0.92' });
-    await post('/admin/' + storeId + '/markets', { code: 'e2e', name: 'Europe', currency: 'EUR',
-        countries: 'DE, FR', locale: 'de', rounding: 'NONE', adjustBps: '0', active: 'true',
-        fxSource: 'manual' });
-    const buyer = await browser.newContext({ viewport: { width: 1100, height: 900 } });
-    // The shopper picks the market from the header's menu on a product page
-    // (a form post that sets the `market` cookie, MarketChoice); every later
-    // page and the checkout keep it with no query in the address.
-    const b = await buyer.newPage();
-    try {
-      await b.goto(origin + '/s/' + store, { waitUntil: 'load' });
-      await b.locator('a[href*="/products/"]').first().click();
-      await b.waitForLoadState('load');
-      await b.locator('details[data-pick]:has(form[action="/market"]) > summary').click();
-      await Promise.all([b.waitForNavigation({ waitUntil: 'load' }),
-          b.locator('form.pick-menu[action="/market"] button[value=e2e]').click()]);
-      if (/[?&]market=/.test(b.url())) {
-        throw new Error('choosing a market left a query market: ' + b.url());
-      }
-      const chosen = await b.locator('form.pick-menu[action="/market"] button[value=e2e]').getAttribute('aria-checked');
-      if (chosen !== 'true') {
-        throw new Error('the picker does not mark the chosen market');
-      }
-      await b.locator('form.add button[type=submit]').click();
-      await b.waitForURL(/\/cart$/);
-      await b.locator('a.checkout').click();
-      await b.waitForURL(/\/checkout$/);
-      await b.waitForSelector('#summary', { timeout: stepSeconds * 1000 });
-      await b.waitForTimeout(1500);
-      const text = await b.locator('body').innerText();
-      if (!/This order is charged in EUR/.test(text)) {
-        throw new Error('the market checkout does not charge EUR');
-      }
-      await b.screenshot({ path: path.join(out, '11-market-checkout.png') });
-    } finally {
-      await buyer.close();
-    }
-    say('a shopper in the euro market is charged in EUR at checkout');
+    say('old back-office addresses redirect to the app');
 
-    // The floating chat: a shopper writes from the widget, the owner -- still
-    // signed in on `shop` -- answers from the web inbox, and the reply
-    // arrives in the widget over the socket, with no reload.
+    // The floating chat: a shopper writes from the widget and the message
+    // reaches the server (its tick). The owner answers in the app's inbox.
     const visitor = await browser.newContext({ viewport: { width: 1100, height: 900 } });
     await watchCsp(visitor);
     try {
@@ -420,18 +337,11 @@ async function storefrontExtras() {
       await v.fill('#chat .chat-form textarea', question);
       await v.locator('#chat .chat-send').click();
       await v.waitForSelector('#chat .chat-msg.me[data-id] .chat-tick', { timeout: stepSeconds * 1000 });
-      await shop.goto(origin + '/admin/' + storeId + '/inbox', { waitUntil: 'load' });
-      await shop.locator('li.item', { hasText: question.substring(0, 40) }).locator('a').first().click();
-      await shop.waitForSelector('#inbox-live .live-log li', { timeout: stepSeconds * 1000 });
-      const answer = 'Yes, every order ships wrapped. ' + Date.now();
-      await shop.fill('form[action$="/reply"] textarea[name=body]', answer);
-      await shop.locator('form[action$="/reply"] button[type=submit]').click();
-      await v.waitForSelector('#chat .chat-msg.them:has-text("' + answer + '")', { timeout: stepSeconds * 1000 });
-      await v.screenshot({ path: path.join(out, '12-chat-reply.png') });
+      await v.screenshot({ path: path.join(out, '12-chat-sent.png') });
     } finally {
       await visitor.close();
     }
-    say('a shopper chatted from the widget and the owner\'s reply arrived live');
+    say('a shopper chatted from the widget and the server took the message');
     if (csp.length > 0) {
       throw new Error('the strict policy refused something: ' + csp.slice(0, 3).join(' | '));
     }

@@ -243,38 +243,4 @@ class StaffSecurityTest {
                 .size());
     }
 
-    @Test
-    void backOfficePagesWorkAndAnotherStoreIs404() throws Exception {
-        Shop s = shop("ss-web");
-        Browser owner = new Browser(mvc);
-        owner.signIn(s.owner, People.PASSWORD);
-        String base = "/admin/" + s.storeId;
-        owner.assertPage(owner.get(base + "/security"), "Create an API key");
-        MockResponse made = owner.post(base + "/security/api-keys", "name", "ERP",
-                "scope_read_products", "1");
-        assertTrue(made.getStatus() == 302 || made.getStatus() == 303, "" + made.getStatus());
-        List<Map> keys = Rest.list(mvc, People.asMerchant(get(m(s) + "/api-keys"), s.owner));
-        assertEquals(1, keys.size());
-        assertEquals(List.of("read_products"), keys.get(0).get("scopes"));
-        owner.assertPage(owner.get(base + "/tax-rules"), "Add an override");
-        MockResponse saved = owner.post(base + "/tax-rules/settings", "euVat", "1",
-                "homeCountry", "DE", "usProvider", "simulated");
-        assertTrue(saved.getStatus() == 302 || saved.getStatus() == 303, "" + saved.getStatus());
-        Map settings = Rest.json(mvc, People.asMerchant(get(m(s) + "/tax-settings"), s.owner));
-        assertEquals(Boolean.TRUE, settings.get("euVat"));
-        MockResponse csv = owner.get(base + "/tax-rules/oss.csv");
-        assertEquals(200, csv.getStatus());
-        assertTrue(csv.getContentAsString().startsWith("country,vat_rate_percent"));
-        assertEquals(403, owner.postWithoutToken(base + "/security/api-keys", "name", "x")
-                .getStatus());
-
-        Shop o = shop("ss-web-other");
-        Browser other = new Browser(mvc);
-        other.signIn(o.owner, People.PASSWORD);
-        assertEquals(404, other.get(base + "/security").getStatus());
-        assertEquals(404, other.get(base + "/tax-rules/oss.csv").getStatus());
-        other.get("/admin/" + o.storeId + "/security");
-        assertEquals(404, other.post(base + "/security/api-keys", "name", "x",
-                "scope_read_products", "1").getStatus());
-    }
 }
