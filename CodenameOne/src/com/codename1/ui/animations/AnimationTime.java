@@ -78,7 +78,9 @@ public final class AnimationTime {
     /// overridden value at the wall clock's pace. Every start time an animation or
     /// timer recorded under the override stays in step, where [reset()][#reset()]
     /// would jump to the wall clock and stall anything that started ahead of it.
-    /// Does nothing when no override is active.
+    /// Does nothing when no override is active. The offset stays until
+    /// [reset()][#reset()], so code that compares this clock with
+    /// `System.currentTimeMillis()` sees the difference; read one clock throughout.
     public static void resume() {
         if (overridden) {
             offset = overrideTime - System.currentTimeMillis();

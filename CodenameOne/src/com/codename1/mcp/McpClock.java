@@ -100,22 +100,28 @@ final class McpClock {
         boolean settled = false;
         while (AnimationTime.now() < limit) {
             AnimationTime.setTime(Math.min(limit, AnimationTime.now() + FRAME_MS));
-            if (!pump()) {
-                if (!inTransition() && waitForEdt()) {
-                    // The EDT was only slow (a first layout, an image decode); it has
-                    // now drawn this frame, so judge it like any other.
-                } else {
-                    // Still inside a transition; its frames are changing by definition.
-                    stableChecks = 0;
-                    last = null;
-                    continue;
-                }
+            // A miss outside a transition is only a slow EDT (a first layout, an image
+            // decode): wait for it to draw this frame, then judge it like any other.
+            // Inside a transition the frames are changing by definition.
+            if (!pump() && (inTransition() || !waitForEdt())) {
+                stableChecks = 0;
+                last = null;
+                continue;
             }
             if (AnimationTime.now() < nextCheck) {
                 continue;
             }
             nextCheck = AnimationTime.now() + SETTLE_CHECK_MS;
-            int[] pixels = McpUiTools.currentFramePixels();
+            int[] pixels;
+            try {
+                pixels = McpUiTools.currentFramePixels();
+            } catch (IllegalStateException held) {
+                // The frame just stepped started a transition, which holds the read
+                // back: keep stepping rather than tell the agent to settle from settle.
+                stableChecks = 0;
+                last = null;
+                continue;
+            }
             if (pixels != null && last != null && samePixels(pixels, last)) {
                 stableChecks++;
                 if (stableChecks >= 2) {

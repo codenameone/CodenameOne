@@ -198,19 +198,21 @@ final class SimulatorVerifier {
                 restoreFailed("orientation", ex);
             }
             try {
+                // Settled first, so no transition left running holds the theme call back.
+                tool("ui_clock_settle", "{\"maxMs\":3000}");
+            } catch (RuntimeException ex) {
+                restoreFailed("settling", ex);
+            }
+            try {
                 onEdt(new Runnable() {
                     public void run() {
                         Display.getInstance().setDarkMode(darkBefore[0]);
                         refreshTheme();
                     }
                 });
-            } catch (RuntimeException ex) {
-                restoreFailed("dark mode", ex);
-            }
-            try {
                 tool("ui_clock_settle", "{\"maxMs\":3000}");
             } catch (RuntimeException ex) {
-                restoreFailed("settling", ex);
+                restoreFailed("dark mode", ex);
             } finally {
                 if (!wasFrozen) {
                     tool("ui_clock_release", "{}");
