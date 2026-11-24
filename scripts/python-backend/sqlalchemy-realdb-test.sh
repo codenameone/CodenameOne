@@ -62,6 +62,10 @@ package com.pybackend;
 
 public class Main {
     public static void main(String[] args) {
+        // The build registers the engines application.properties names; this
+        // harness has none, so it names the ones the test opens itself.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
         com.codename1.python.runtime.Py.setArgv("main", args);
         System.exit(com.codename1.generated.python.PythonModules.runMain());
     }
@@ -77,6 +81,10 @@ import com.codename1.backend.Database;
 
 public class Reset {
     public static void main(String[] args) throws Exception {
+        // The build registers the engines application.properties names; this
+        // harness has none, so it names the ones the test opens itself.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
         Database db = Database.open(args[0]);
         try {
             if ("postgresql".equals(db.dialect().getName())) {

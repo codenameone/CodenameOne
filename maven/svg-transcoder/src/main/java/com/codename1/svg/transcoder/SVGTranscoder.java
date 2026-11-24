@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.svg.transcoder;
 
 import com.codename1.svg.transcoder.codegen.JavaCodeGenerator;
@@ -28,6 +50,17 @@ public final class SVGTranscoder {
         public final float widthMm;
         /** Explicit height from CSS (`cn1-svg-height`), in millimeters; {@code 0} if not specified. */
         public final float heightMm;
+        /** Fully qualified image class the registry constructs around an
+         *  instance of this class ({@code new Wrapper(new Cls())}), or null when
+         *  the generated class is itself the image. A Rive file transcodes to a
+         *  {@code RiveFile}, which {@code RiveImage} presents as an image. */
+        public final String wrapperClass;
+
+        /** An entry whose generated class is wrapped by {@code wrapperClass}. */
+        public static GeneratedClass wrapped(String packageName, String className, String resourceName,
+                                             String wrapperClass) {
+            return new GeneratedClass(packageName, className, resourceName, 0, 0f, 0f, wrapperClass);
+        }
 
         public GeneratedClass(String packageName, String className, String resourceName) {
             this(packageName, className, resourceName, 0, 0f, 0f);
@@ -39,6 +72,12 @@ public final class SVGTranscoder {
 
         public GeneratedClass(String packageName, String className, String resourceName,
                               int sourceDensity, float widthMm, float heightMm) {
+            this(packageName, className, resourceName, sourceDensity, widthMm, heightMm, null);
+        }
+
+        private GeneratedClass(String packageName, String className, String resourceName,
+                               int sourceDensity, float widthMm, float heightMm, String wrapperClass) {
+            this.wrapperClass = wrapperClass;
             this.packageName = packageName;
             this.className = className;
             this.resourceName = resourceName;
@@ -123,6 +162,9 @@ public final class SVGTranscoder {
     }
 
     private static String newInstance(GeneratedClass c) {
+        if (c.wrapperClass != null) {
+            return "new " + c.wrapperClass + "(new " + c.fullyQualified() + "())";
+        }
         // Explicit millimeter dimensions win over density-based scaling --
         // they yield a deterministic physical size regardless of how the
         // SVG itself declares width/height.
@@ -156,7 +198,10 @@ public final class SVGTranscoder {
                 upper = true;
                 continue;
             }
-            if (!Character.isJavaIdentifierPart(c)) c = '_';
+            // Generated sources are ASCII only (the device javac reads them as
+            // ASCII), so a letter outside ASCII becomes '_' like any other
+            // character an identifier cannot hold.
+            if (c > 127 || !Character.isJavaIdentifierPart(c)) c = '_';
             sb.append(upper ? Character.toUpperCase(c) : c);
             upper = false;
         }

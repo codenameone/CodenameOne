@@ -227,7 +227,9 @@ public final class TrueTypeOutlines {
             end = u16(loca + g * 2 + 2) * 2;
         }
         int glyf = tables.get("glyf")[0];
-        if (end <= start || glyf + end > d.length || end - start < 10) {
+        // A malformed loca can hold offsets with the high bit set (negative
+        // here) or past the glyf table; such a glyph has no outline.
+        if (start < 0 || end <= start || (long) glyf + end > d.length || end - start < 10) {
             return;
         }
         int p = glyf + start;
@@ -385,8 +387,8 @@ public final class TrueTypeOutlines {
                 dy = s16(p + 2);
                 p += 4;
             } else {
-                dx = (byte) d[p];
-                dy = (byte) d[p + 1];
+                dx = p >= 0 && p < d.length ? (byte) d[p] : 0;
+                dy = p >= 0 && p + 1 < d.length ? (byte) d[p + 1] : 0;
                 p += 2;
             }
             double m0 = 1;

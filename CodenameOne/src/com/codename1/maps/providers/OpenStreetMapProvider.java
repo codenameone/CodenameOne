@@ -33,7 +33,10 @@ public class OpenStreetMapProvider extends TiledProvider {
     /// {@inheritDoc}
     @Override
     public String attribution() {
-        return "(c) OpenStreetMap (and) contributors, CC-BY-SA";
+        // The OpenStreetMap Foundation's attribution guideline: the data is
+        // ODbL (not CC-BY-SA since 2012), and the credit must name
+        // OpenStreetMap; https://osmfoundation.org/wiki/Licence/Attribution_Guidelines
+        return "(c) OpenStreetMap contributors";
     }
 
     /// {@inheritDoc}
