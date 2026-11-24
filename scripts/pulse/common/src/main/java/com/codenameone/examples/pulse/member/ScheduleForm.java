@@ -34,7 +34,7 @@ import com.codenameone.examples.pulse.live.LiveChannel;
 import com.codenameone.examples.pulse.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
-import com.codename1.components.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -200,7 +200,7 @@ public final class ScheduleForm extends LiveChannel.Adapter {
                             : Lang.tr("Nothing on this day for {0}.", member.name())));
         }
         if (list.getComponentCount() == 0) {
-            list.add(Skeleton.rows(5).shimmer(false).uiid("SvSkeleton"));
+            list.add(new Skeleton(5, "SvSkeleton"));
         }
         Ui.refresh(form);
     }

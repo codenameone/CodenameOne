@@ -37,7 +37,7 @@ import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.pay.WalletForm;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Nav;
-import com.codename1.components.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.savor.ui.Ui;
 
 /// The cart, and everything the order still needs before the kitchen sees
@@ -227,7 +227,7 @@ public final class CheckoutForm {
             form.revalidateLater();
             return;
         }
-        totals.add(Skeleton.rows(3).shimmer(false).uiid("SvSkeleton"));
+        totals.add(new Skeleton(3, "SvSkeleton"));
         form.revalidateLater();
         Api.orders().quote(cart(), Net.to(quote -> {
             if (asked != quotes) {

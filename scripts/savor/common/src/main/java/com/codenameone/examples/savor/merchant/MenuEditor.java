@@ -40,7 +40,7 @@ import com.codenameone.examples.savor.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Photos;
-import com.codename1.components.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.savor.ui.Ui;
 
 import java.util.ArrayList;
@@ -56,7 +56,7 @@ final class MenuEditor {
     MenuEditor(Form form) {
         this.form = form;
         page.setName("menu-editor");
-        page.add(Skeleton.rows(5).shimmer(false).uiid("SvSkeleton"));
+        page.add(new Skeleton(5, "SvSkeleton"));
         load();
     }
 

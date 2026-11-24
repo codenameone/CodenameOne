@@ -33,7 +33,7 @@ import com.codenameone.examples.pulse.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.pulse.ui.Lang;
 import com.codenameone.examples.pulse.ui.Layouts;
-import com.codename1.components.Skeleton;
+import com.codename1.appkit.Skeleton;
 import com.codenameone.examples.pulse.ui.Split;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -85,7 +85,7 @@ public final class MembersForm {
         top.add(Ui.pills("filter", names, values, "ALL", value -> {
             filter = "ALL".equals(value) ? "" : value;
             list.removeAll();
-            list.add(Skeleton.rows(5).shimmer(false).uiid("SvSkeleton"));
+            list.add(new Skeleton(5, "SvSkeleton"));
             list.revalidate();
             load();
         }));

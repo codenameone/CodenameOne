@@ -13,4 +13,11 @@
         <Class name="com.codename1.appkit.server.push.RecordingPushSender$Sent"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- The bars vary in a cycle of three and of two on purpose (iter % 3 * 7):
+         the multiple of a remainder is the pattern, not a mistaken shift. -->
+    <Match>
+        <Class name="com.codename1.appkit.Skeleton"/>
+        <Method name="paint"/>
+        <Bug pattern="IM_MULTIPLYING_RESULT_OF_IREM"/>
+    </Match>
 </FindBugsFilter>

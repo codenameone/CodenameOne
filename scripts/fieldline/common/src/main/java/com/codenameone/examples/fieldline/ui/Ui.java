@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.fieldline.ui;
 
-import com.codename1.components.Skeleton;
+import com.codename1.appkit.Skeleton;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.components.Switch;
@@ -503,7 +503,7 @@ public final class Ui {
         list.setScrollVisible(false);
         list.setName(name);
         // Until it is filled: every list is emptied by what fills it.
-        list.add(Skeleton.rows(5).shimmer(false).uiid("WlSkeleton"));
+        list.add(new Skeleton(5, "WlSkeleton"));
         return list;
     }
 
@@ -654,7 +654,7 @@ public final class Ui {
             if (load != null) {
                 list.add(FlowLayout.encloseCenter(link("Try again", "retry", e -> {
                     list.removeAll();
-                    list.add(Skeleton.rows(5).shimmer(false).uiid("WlSkeleton"));
+                    list.add(new Skeleton(5, "WlSkeleton"));
                     list.revalidate();
                     load.run();
                 })));

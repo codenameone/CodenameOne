@@ -422,7 +422,7 @@ public final class BookForm extends LiveChannel.Adapter {
             return;
         }
         slots.removeAll();
-        slots.add(com.codename1.components.Skeleton.rows(3).shimmer(false).uiid("SvSkeleton"));
+        slots.add(new com.codename1.appkit.Skeleton(3, "SvSkeleton"));
         Ui.relayout(slots);
         if (WEEK.equals(view)) {
             List<String> who = provider.length() == 0 ? new ArrayList<String>()
