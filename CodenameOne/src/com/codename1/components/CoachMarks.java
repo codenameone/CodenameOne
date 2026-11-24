@@ -52,10 +52,16 @@ import java.util.List;
 /// a time is lit through a cut-out, and a bubble next to it says what it does.
 ///
 /// ```java
+/// Form form = new Form("Orders", BoxLayout.y());
+/// Button search = new Button("Search");
+/// Button filter = new Button("Filter");
+/// Button add = new Button("New order");
+/// form.add(FlowLayout.encloseIn(search, filter, add));
+/// form.show();
 /// new CoachMarks(form)
-///         .add(searchButton, "Search", "Find any order by number or name.")
-///         .add(filterChip, "Filters", "Narrow the list to what is still open.")
-///         .add(fab, "New order", "Start an order from here.")
+///         .add(search, "Search", "Find any order by number or name.")
+///         .add(filter, "Filters", "Narrow the list to what is still open.")
+///         .add(add, "New order", "Start an order from here.")
 ///         .showOnce("orders-tour");
 /// ```
 ///

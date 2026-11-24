@@ -71,4 +71,19 @@ class EmptyStateTest extends UITestBase {
         assertEquals(0, new Carousel().getStyle().getBgTransparency() & 0xff);
         assertEquals(0, new PageIndicator().getStyle().getBgTransparency() & 0xff);
     }
+
+    @FormTest
+    void centresInACentredBorderLayout() {
+        com.codename1.ui.Form f = new com.codename1.ui.Form("t",
+                new com.codename1.ui.layouts.BorderLayout(com.codename1.ui.layouts.BorderLayout.CENTER_BEHAVIOR_CENTER));
+        EmptyState e = new EmptyState(com.codename1.ui.FontImage.MATERIAL_CLOUD_OFF,
+                "Couldn't load your orders", "Check your connection and try again.").setAction("Retry", ev -> { });
+        f.add(com.codename1.ui.layouts.BorderLayout.CENTER, e);
+        f.show();
+        flushSerialCalls();
+        int area = f.getContentPane().getHeight();
+        int top = e.getY();
+        int bottom = area - e.getY() - e.getHeight();
+        assertTrue(Math.abs(top - bottom) <= 2, "top gap " + top + " vs bottom gap " + bottom);
+    }
 }

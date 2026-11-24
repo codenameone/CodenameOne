@@ -1046,7 +1046,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/L
 .An EmptyState with a retry action
 image::img/generated/components-empty-state.png[An EmptyState with a retry action,scaledwidth=20%]
 
-The UIIDs are `EmptyState`, `EmptyStateIcon`, `EmptyStateTitle`, `EmptyStateText` and `EmptyStateButton`. A theme that doesn't style them falls back to the `Label`, `SpanLabelText` and `Button` looks.
+The UIIDs are `EmptyState`, `EmptyStateIcon`, `EmptyStateTitle`, `EmptyStateText` and `EmptyStateButton`. A theme that doesn't style them falls back to the `Label` and `Button` looks.
 
 [[loading-feedback-section]]
 === Choosing a loading, feedback or onboarding component

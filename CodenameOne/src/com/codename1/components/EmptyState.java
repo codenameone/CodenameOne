@@ -39,16 +39,15 @@ import com.codename1.ui.plaf.Style;
 /// Show one when loading finished with nothing to show, or failed:
 ///
 /// ```java
-/// list.removeAll();
-/// if (orders.isEmpty()) {
-///     list.add(new EmptyState(FontImage.MATERIAL_INBOX, "No orders yet",
-///             "Orders you place show up here."));
-/// }
+/// Form form = new Form("Orders", new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+/// form.add(BorderLayout.CENTER, new EmptyState(FontImage.MATERIAL_INBOX,
+///         "No orders yet", "Orders you place show up here."));
+/// form.show();
 ///
-/// // or, after an error
-/// list.add(new EmptyState(FontImage.MATERIAL_CLOUD_OFF, "Can't load orders",
-///         "Check your connection and try again.")
-///         .setAction("Retry", e -> reload()));
+/// // or, after an error, offer a retry:
+/// // new EmptyState(FontImage.MATERIAL_CLOUD_OFF, "Can't load orders",
+/// //         "Check your connection and try again.")
+/// //         .setAction("Retry", e -> reload());
 /// ```
 ///
 /// It is the counterpart of [Skeleton], which fills the same place while the

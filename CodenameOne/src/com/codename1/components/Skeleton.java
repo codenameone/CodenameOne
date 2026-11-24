@@ -38,13 +38,16 @@ import com.codename1.ui.plaf.Style;
 /// spinner and does not jump when the content arrives:
 ///
 /// ```java
+/// Form form = new Form("Orders", new BorderLayout());
 /// Container list = new Container(BoxLayout.y());
 /// list.add(Skeleton.rows(4));
 /// form.add(BorderLayout.CENTER, list);
-/// fetchItems(items -> {
+/// form.show();
+/// // Stands in for a network call that answers after 2 seconds.
+/// UITimer.timer(2000, false, form, () -> {
 ///     list.removeAll();
-///     for (Item i : items) {
-///         list.add(new MultiButton(i.getName()));
+///     for (String order : new String[] {"Order #101", "Order #102"}) {
+///         list.add(new MultiButton(order));
 ///     }
 ///     list.animateLayout(200);
 /// });
@@ -53,10 +56,14 @@ import com.codename1.ui.plaf.Style;
 /// Or mask a component that already exists until its data is ready:
 ///
 /// ```java
-/// Skeleton.show(profileCard);
-/// loadProfile(p -> {
-///     fill(profileCard, p);
-///     Skeleton.hide(profileCard, CommonTransitions.createFade(200));
+/// Form form = new Form("Profile", BoxLayout.y());
+/// SpanLabel bio = new SpanLabel();
+/// form.add(bio);
+/// form.show();
+/// Skeleton.show(bio, Skeleton.text(3));
+/// UITimer.timer(2000, false, form, () -> {
+///     bio.setText("Builds mobile apps in Java.");
+///     Skeleton.hide(bio, CommonTransitions.createFade(200));
 /// });
 /// ```
 ///

@@ -40,13 +40,15 @@ import com.codename1.ui.util.EventDispatcher;
 /// [Carousel] includes one. Use it on its own with swipeable `Tabs`:
 ///
 /// ```java
+/// Form form = new Form("Pages", new BorderLayout());
 /// Tabs pages = new Tabs();
 /// pages.hideTabs();
-/// pages.addTab("", page1);
-/// pages.addTab("", page2);
+/// pages.addTab("", new Label("First page"));
+/// pages.addTab("", new Label("Second page"));
 /// PageIndicator dots = new PageIndicator();
 /// dots.bind(pages);
 /// form.add(BorderLayout.CENTER, pages).add(BorderLayout.SOUTH, dots);
+/// form.show();
 /// ```
 ///
 /// The dots are drawn in the foreground colour of the [PageIndicator] UIID, the

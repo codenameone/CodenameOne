@@ -27,43 +27,36 @@ import com.codename1.components.CoachMarks;
 import com.codename1.components.EmptyState;
 import com.codename1.components.MultiButton;
 import com.codename1.components.PageIndicator;
-import com.codename1.components.ScaleImageLabel;
 import com.codename1.components.Skeleton;
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
-import com.codename1.ui.Component;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import java.util.List;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.util.UITimer;
 
 /** Compiled source snippets for the loading, carousel and onboarding sections of the components chapter. */
 public class LoadingAndOnboardingSnippets {
 
-    interface Callback<T> {
-        void done(T value);
-    }
-
-    void fetchOrders(Callback<List<String>> callback) {
-    }
-
-    void loadProfile(Callback<String> callback) {
-    }
-
-    public void skeletonList(Form form) {
+    public void skeletonList() {
         // tag::skeleton-list[]
-        final Container list = new Container(BoxLayout.y());
+        Form form = new Form("Orders", new BorderLayout());
+        Container list = new Container(BoxLayout.y());
         list.add(Skeleton.rows(5));
         form.add(BorderLayout.CENTER, list);
-        fetchOrders(orders -> {
+        form.show();
+        // Stands in for a network call that answers after 2 seconds.
+        UITimer.timer(2000, false, form, () -> {
+            String[] orders = {"Order #101", "Order #102", "Order #103"};
             list.removeAll();
-            if (orders.isEmpty()) {
+            if (orders.length == 0) {
                 list.add(new EmptyState(FontImage.MATERIAL_INBOX, "No orders yet",
                         "Orders you place show up here."));
             }
@@ -75,73 +68,94 @@ public class LoadingAndOnboardingSnippets {
         // end::skeleton-list[]
     }
 
-    public void skeletonShapes(Container profile) {
+    public void skeletonShapes() {
         // tag::skeleton-shapes[]
+        Form form = new Form("Loading", BoxLayout.y());
         Container header = BorderLayout.centerEastWest(Skeleton.text(2), null, Skeleton.circle(10));
-        profile.add(header);
-        profile.add(Skeleton.rect(0, 30));      // an image across the full width
-        profile.add(Skeleton.card());           // image, title and two lines
-        profile.add(Skeleton.rows(3).shimmer(false).uiid("MyPlaceholder"));
+        form.add(header);
+        form.add(Skeleton.rect(0, 30));      // an image across the full width
+        form.add(Skeleton.card());           // image, title and two lines
+        form.add(Skeleton.rows(3).shimmer(false).uiid("MyPlaceholder"));
+        form.show();
         // end::skeleton-shapes[]
     }
 
-    public void skeletonMask(final SpanLabel bio) {
+    public void skeletonMask() {
         // tag::skeleton-mask[]
+        Form form = new Form("Profile", BoxLayout.y());
+        SpanLabel bio = new SpanLabel();
+        form.add(new Label("About")).add(bio);
+        form.show();
         Skeleton.show(bio, Skeleton.text(3));
-        loadProfile(text -> {
-            bio.setText(text);
+        // Stands in for loading the profile.
+        UITimer.timer(2000, false, form, () -> {
+            bio.setText("Builds mobile apps in Java and Kotlin, and drinks too much coffee.");
             Skeleton.hide(bio, CommonTransitions.createFade(200));
         });
         // end::skeleton-mask[]
     }
 
-    public void emptyStateRetry(Container list) {
+    public void emptyStateRetry() {
         // tag::empty-state-retry[]
-        list.add(new EmptyState(FontImage.MATERIAL_CLOUD_OFF, "Can't load orders",
+        Form form = new Form("Orders", new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+        form.add(BorderLayout.CENTER, new EmptyState(FontImage.MATERIAL_CLOUD_OFF, "Can't load orders",
                 "Check your connection and try again.")
-                .setAction("Retry", e -> reload()));
+                .setAction("Retry", e -> System.out.println("Retry tapped")));
+        form.show();
         // end::empty-state-retry[]
     }
 
-    void reload() {
-    }
-
-    public void carousel(Form form, Image banner1, Image banner2, Image banner3) {
+    public void carousel() {
         // tag::carousel[]
+        Form form = new Form("Carousel", new BorderLayout());
         Carousel carousel = new Carousel();
-        carousel.addPage(new ScaleImageLabel(banner1));
-        carousel.addPage(new ScaleImageLabel(banner2));
-        carousel.addPage(new ScaleImageLabel(banner3));
+        int[] colors = {0x3b82f6, 0x10b981, 0xf59e0b};
+        for (int i = 0; i < colors.length; i++) {
+            Label page = new Label("Page " + (i + 1));
+            page.getAllStyles().setBgColor(colors[i]);
+            page.getAllStyles().setBgTransparency(255);
+            page.getAllStyles().setFgColor(0xffffff);
+            page.getAllStyles().setAlignment(CN.CENTER);
+            page.setPreferredH(CN.convertToPixels(30));
+            carousel.addPage(page);
+        }
         carousel.setAutoPlay(4000);
-        carousel.addSelectionListener((oldPage, newPage) -> track(newPage));
+        carousel.addSelectionListener((oldPage, newPage) ->
+                System.out.println("Showing page " + (newPage + 1)));
         form.add(BorderLayout.NORTH, carousel);
+        form.show();
         // end::carousel[]
     }
 
-    void track(int page) {
-    }
-
-    public void pageIndicator(Form form, Component page1, Component page2, Component page3) {
+    public void pageIndicator() {
         // tag::page-indicator[]
+        Form form = new Form("Pages", new BorderLayout());
         Tabs pages = new Tabs();
         pages.hideTabs();
-        pages.addTab("", page1);
-        pages.addTab("", page2);
-        pages.addTab("", page3);
+        pages.addTab("", new Label("First page"));
+        pages.addTab("", new Label("Second page"));
+        pages.addTab("", new Label("Third page"));
         PageIndicator dots = new PageIndicator();
         dots.bind(pages);
         form.add(BorderLayout.CENTER, pages).add(BorderLayout.SOUTH, dots);
+        form.show();
         // end::page-indicator[]
     }
 
-    public void coachMarks(Form form, Button search, Label filter, Button add) {
+    public void coachMarks() {
         // tag::coach-marks[]
+        Form form = new Form("Orders", BoxLayout.y());
+        Button search = new Button("Search");
+        Button filter = new Button("Filter");
+        Button add = new Button("New order");
+        form.add(FlowLayout.encloseIn(search, filter, add));
+        form.show();
         new CoachMarks(form)
                 .add(search, "Search", "Find any order by number or name.")
                 .add(filter, "Filters", "Narrow the list to what is still open.")
                 .add(add, "New order", "Start an order from here.")
                 .setOnFinish(() -> form.getContentPane().requestFocus())
-                .showOnce("orders-tour");
+                .show();
         // end::coach-marks[]
     }
 

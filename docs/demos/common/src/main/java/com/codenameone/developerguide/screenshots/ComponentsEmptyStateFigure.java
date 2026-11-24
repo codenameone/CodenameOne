@@ -45,4 +45,11 @@ class ComponentsEmptyStateFigure implements GuideFigure {
         hi.show();
         return hi;
     }
+
+    @Override
+    public boolean fillsViewport() {
+        // The empty state centres itself in the form; cropped to its content
+        // height the figure showed it pushed to the bottom.
+        return true;
+    }
 }

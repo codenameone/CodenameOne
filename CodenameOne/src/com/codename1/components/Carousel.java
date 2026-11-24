@@ -40,13 +40,16 @@ import com.codename1.ui.util.UITimer;
 /// and optional auto play.
 ///
 /// ```java
+/// Form form = new Form("Carousel", new BorderLayout());
 /// Carousel carousel = new Carousel();
-/// carousel.addPage(new ScaleImageLabel(banner1));
-/// carousel.addPage(new ScaleImageLabel(banner2));
-/// carousel.addPage(new ScaleImageLabel(banner3));
+/// carousel.addPage(new Label("First"));
+/// carousel.addPage(new Label("Second"));
+/// carousel.addPage(new Label("Third"));
 /// carousel.setAutoPlay(4000);
-/// form.add(carousel);
-/// carousel.addSelectionListener((oldPage, newPage) -> track(newPage));
+/// carousel.addSelectionListener((oldPage, newPage) ->
+///         System.out.println("Page " + (newPage + 1)));
+/// form.add(BorderLayout.NORTH, carousel);
+/// form.show();
 /// ```
 ///
 /// It is swipeable `Tabs` with the tab bar hidden plus a [PageIndicator], so
