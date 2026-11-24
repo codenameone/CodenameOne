@@ -75,7 +75,8 @@ final class OrdersPane extends MerchantPane {
                 .col(Lang.tr("Channel"), o -> Lang.tr(Words.of(o.channel())))
                 .col(Lang.tr("Payment"), o -> o.financial())
                 .col(Lang.tr("Fulfilment"), o -> o.fulfilment())
-                .col(Lang.tr("Items"), o -> Integer.valueOf(items(o)))
+                // No item count: a list order carries no lines (OrderDto), so it
+                // read 0 on every row.
                 .col(Lang.tr("Total"), o -> Long.valueOf(o.totalCents()));
     }
 
@@ -145,8 +146,7 @@ final class OrdersPane extends MerchantPane {
             // recent orders use; the cells hold the status codes.
             grid.getColumn(4).setRenderer(new StatusPill());
             grid.getColumn(5).setRenderer(new StatusPill());
-            grid.getColumn(6).setKind(GridColumn.Kind.NUMBER).setWidthMM(16);
-            grid.getColumn(7).setKind(GridColumn.Kind.NUMBER).setFormatter(new MoneyFormat()).setWidthMM(22);
+            grid.getColumn(6).setKind(GridColumn.Kind.NUMBER).setFormatter(new MoneyFormat()).setWidthMM(22);
             grid.addActionListener(e -> {
                 OrderDto o = rows.at(grid.getModelRow(grid.getSelectedRow()));
                 if (o != null) {
@@ -366,12 +366,12 @@ final class OrdersPane extends MerchantPane {
     private void export() {
         String[][] table = new String[rows.getRowCount() + 1][];
         table[0] = new String[] {"Order", "Date", "Customer", "Channel", "Payment", "Fulfilment",
-            "Items", "Total"};
+            "Total"};
         for (int iter = 0; iter < rows.getRowCount(); iter++) {
             OrderDto o = rows.at(iter);
             table[iter + 1] = new String[] {String.valueOf(o.number()), MUi.when(o.createdAt()),
                 customer(o), o.channel(), o.financial(), o.fulfilment(),
-                String.valueOf(items(o)), ProductCsv.major(o.totalCents())};
+                ProductCsv.major(o.totalCents())};
         }
         Files.saveCsv("orders.csv", table);
     }
@@ -389,14 +389,6 @@ final class OrdersPane extends MerchantPane {
             return o.email();
         }
         return o.username() == null ? Lang.tr("Guest") : o.username();
-    }
-
-    static int items(OrderDto o) {
-        int n = 0;
-        for (int iter = 0; o.lines() != null && iter < o.lines().size(); iter++) {
-            n += o.lines().get(iter).quantity();
-        }
-        return n;
     }
 
     /// Cents in a grid column shown in the store's currency.
