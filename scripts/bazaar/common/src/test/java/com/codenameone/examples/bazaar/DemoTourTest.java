@@ -144,13 +144,18 @@ public class DemoTourTest extends E2e {
             shotAs("shop-checkout");
             tap("address-continue");
             pause(2500);
+            // The steps stack on one page: scroll to the rates the address opened.
+            scrollDown(4);
+            pause(1200);
             caption("Live shipping rates for the address", 2800);
             tapFirst("rate-");
             pause(2500);
             shotAs("shop-checkout-shipping");
             caption("Pay with a saved card, a wallet or another way", 3000);
             tapFirst("method-");
-            pause(2000);
+            pause(1200);
+            scrollDown(4);
+            pause(1200);
             shotAs("shop-checkout-payment");
             if (tap("place-order")) {
                 pause(4000);

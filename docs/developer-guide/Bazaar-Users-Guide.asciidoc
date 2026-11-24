@@ -16,8 +16,10 @@ platforms.
 
 One app serves everyone, on a phone, a tablet, a desktop or in a browser. The
 server gives every account a set of roles, and the app opens on the screen that
-fits them. On a phone the sections are tabs at the bottom; on a wide screen they
-are a sidebar, and on a desktop the app adds native menus, keyboard shortcuts,
+fits them. On a phone the sections are tabs at the bottom, and the button at the
+top right opens a More options sheet that switches between the shop, the back
+office and the register the account can use, and holds Settings and Sign in or
+Sign out. On a wide screen the sections are a sidebar, and on a desktop the app adds native menus, keyboard shortcuts,
 right-click menus on rows and second windows.
 
 [cols="1,3"]
@@ -123,9 +125,9 @@ image::img/bazaar-shop-product-phone.png["A product page with its gallery, ratin
 
 image::img/bazaar-shop-cart-phone.png["The cart with a discount code, a gift card and the summary",scaledwidth=35%]
 
-image::img/bazaar-shop-checkout-shipping-phone.png["Checkout: the shipping address in steps",scaledwidth=35%]
+image::img/bazaar-shop-checkout-shipping-phone.png["Checkout: the address step done, live shipping rates for it",scaledwidth=35%]
 
-image::img/bazaar-shop-checkout-payment-phone.png["Checkout: the delivery options and the payment method",scaledwidth=35%]
+image::img/bazaar-shop-checkout-payment-phone.png["Checkout: the payment method and the review, with Place order",scaledwidth=35%]
 
 image::img/bazaar-shop-order-placed-phone.png["The order placed, with its number and total",scaledwidth=35%]
 
@@ -616,13 +618,17 @@ on the storefront. Each one says which cookie category it needs, and it loads
 only for shoppers who accepted that category.
 
 *Operations.* The report builder groups sales by up to two dimensions (day,
-product, channel, source) and saves the result. The cohort grid shows how many
+product, channel, source) and saves the result. In the app, the Reports section
+picks one dimension, a measure and a date range from pickers, then runs the
+report and saves it under a name. The cohort grid shows how many
 customers of each month came back, and the attribution page shows sales by the
 campaign or site the customer came from. The profit and loss statement (the
 Reports section's Profit and loss button in the app, or the CSV link on the web
 admin's tax page) shows net sales after discounts and refunds, the cost of goods
 from each variant's cost, gross margin, and the shipping and tax shoppers paid,
-and counts the units sold without a cost. A product page, on the web and in the
+and counts the units sold without a cost. In the app it opens with a waterfall
+chart that steps from gross sales through discounts, refunds and cost to the
+margin, above the table of lines. A product page, on the web and in the
 app, recommends the products most often bought in the same order, then others
 from its collections. Every storefront page starts with a "Skip to content"
 link. Permission sets give a staff member
