@@ -94,8 +94,23 @@ public final class IOSVisionImpl extends VisionImpl {
                 image.getRotationDegrees(), width, height, frameFormat,
                 options.getMinimumConfidence(), options.getMaximumResults(),
                 script == null ? null : script.getId(),
-                joinFormats(options.getBarcodeFormats()));
+                joinFormats(options.getBarcodeFormats()),
+                barcodeCharset());
         return out;
+    }
+
+    /// The charset an application named for PDF417 payloads that are not
+    /// UTF-8: the `barcodeCharset` Display property, or the older
+    /// `android.barcodeCharset` spelling. Null when neither is set. The
+    /// native side decodes with it, since the device's class library knows no
+    /// charset beyond UTF-8 and ISO-8859-1.
+    private static String barcodeCharset() {
+        Display d = Display.getInstance();
+        String charset = d.getProperty("barcodeCharset", null);
+        if (charset == null || charset.length() == 0) {
+            charset = d.getProperty("android.barcodeCharset", null);
+        }
+        return charset == null || charset.length() == 0 ? null : charset;
     }
 
     /// The barcode formats as the comma-separated list the native side splits;
@@ -128,14 +143,15 @@ public final class IOSVisionImpl extends VisionImpl {
                                                  final float minimumConfidence,
                                                  final int maximumResults,
                                                  final String textScript,
-                                                 final String barcodeFormats) {
+                                                 final String barcodeFormats,
+                                                 final String barcodeCharset) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
                     String json = IOSImplementation.nativeInstance.cn1VisionAnalyze(
                             input, nativeFeatureId(feature), mlKit,
                             rotation, width, height, frameFormat, textScript,
-                            barcodeFormats);
+                            barcodeFormats, barcodeCharset);
                     if (json == null || json.length() == 0) {
                         throw new VisionException(VisionException.BACKEND_ERROR,
                                 "Apple Vision returned no result");

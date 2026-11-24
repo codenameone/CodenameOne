@@ -48,6 +48,7 @@ public final class CodeScannerOptions {
     private CameraFacing facing = CameraFacing.BACK;
     private boolean torchButton = true;
     private boolean strict;
+    private boolean strictSet;
     private VisionOptions visionOptions;
 
     /// Sets the scanner form's title.
@@ -110,27 +111,21 @@ public final class CodeScannerOptions {
         return this;
     }
 
-    /// Accepts a code only when two frames read it identically. Off by
-    /// default, where the first decoded code ends the scan.
+    /// Accepts a code only when two frames read it identically. By default
+    /// this applies to PDF417 codes alone; {@code true} extends it to every
+    /// symbology and {@code false} turns it off for PDF417 too.
     ///
-    /// Turn this on for codes printed with little or no error correction. A
-    /// PDF417 at error correction level 0 carries two check codewords, which
-    /// can detect some misreads but correct none, so a blurred or tilted
-    /// frame can decode to a value with a few wrong characters and still be
-    /// reported as a valid code. Two frames rarely misread the same way, so
-    /// requiring them to agree filters those reads out, at the cost of one
-    /// more frame before the scan completes.
-    ///
-    /// The two frames need not be adjacent: a frame in which no accepted code
-    /// is found keeps the pending read. Every accepted code in a frame is
-    /// checked against the pending read, so several codes in view still
-    /// confirm; only when none of them matches does the frame's first
-    /// accepted code become the pending read.
+    /// Turn this on for codes printed with little or no error correction,
+    /// such as a PDF417 at level 0; see
+    /// {@link VisionOptions#strictBarcodes(boolean)}, which this sets on the
+    /// scanner's detector, for why and how frames are compared. It also
+    /// reaches a {@link BarcodeScanner} built from {@link #getVisionOptions()}.
     ///
     /// @param value whether two matching reads are required
     /// @return this options object
     public CodeScannerOptions strict(boolean value) {
         strict = value;
+        strictSet = true;
         return this;
     }
 
@@ -172,14 +167,31 @@ public final class CodeScannerOptions {
         return torchButton;
     }
 
-    /// @return whether a code must be read identically twice before it is
-    ///         accepted
+    /// @return whether every code must be read identically twice before it is
+    ///         accepted (PDF417 is by default either way)
     public boolean isStrict() {
         return strict;
     }
 
-    /// @return the analyzer configuration, or {@code null} for the defaults
+    /// The options a {@link BarcodeScanner} needs to scan the way these options
+    /// describe: a copy of the ones passed to
+    /// {@link #visionOptions(VisionOptions)} (or the defaults), plus the
+    /// accepted {@link #formats(String...)} unless those options name formats
+    /// of their own, plus {@link #strict(boolean)} when it was called. So
+    /// `new BarcodeScanner(options.getVisionOptions())` in a pipeline of your
+    /// own detects exactly what {@link CodeScanner#scan(CodeScannerOptions)}
+    /// would. Each call returns a new object.
+    ///
+    /// @return the analyzer configuration, never {@code null}
     public VisionOptions getVisionOptions() {
-        return visionOptions;
+        VisionOptions out = visionOptions == null
+                ? new VisionOptions() : visionOptions.snapshot();
+        if (out.getBarcodeFormats().length == 0) {
+            out.barcodeFormats(formats);
+        }
+        if (strictSet) {
+            out.strictBarcodes(strict);
+        }
+        return out;
     }
 }

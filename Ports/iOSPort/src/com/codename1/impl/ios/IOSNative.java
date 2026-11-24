@@ -750,7 +750,7 @@ public class IOSNative {
     native String cn1VisionAnalyze(byte[] imageData, int feature, boolean mlKit,
                                    int rotationDegrees, int width, int height,
                                    int frameFormat, String textScript,
-                                   String barcodeFormats);
+                                   String barcodeFormats, String barcodeCharset);
     native boolean cn1LanguageIsSupported(int feature, boolean mlKit);
     native String cn1LanguageIdentify(String text, float minimumConfidence,
                                       boolean mlKit);

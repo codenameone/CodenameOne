@@ -22,6 +22,8 @@
  */
 package com.codename1.ai.vision;
 
+import java.util.Arrays;
+
 /// Decodes barcodes and QR codes out of a still image or a camera frame.
 ///
 /// Scanning a picture the user already has:
@@ -65,7 +67,17 @@ package com.codename1.ai.vision;
 ///
 /// Create one analyzer and reuse it for a sequence of images; it keeps the
 /// native detector alive between calls. Close it when you are finished.
+///
+/// A PDF417 is reported only once two frames have read it identically, since
+/// one printed with little error correction (level 0, as on many payment
+/// slips) misreads into plausible wrong payloads; see
+/// {@link VisionOptions#strictBarcodes(boolean)} to change that. A single still
+/// image therefore reports no PDF417 unless strict mode is turned off.
 public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
+    /// In strict mode, the codes of the last frame that had any, waiting for a
+    /// later frame to confirm them.
+    private Barcode[] pending;
+
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions
     public BarcodeScanner() {
@@ -77,5 +89,67 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     ///        uses defaults
     public BarcodeScanner(VisionOptions options) {
         super(VisionFeature.BARCODE_SCANNING, options);
+    }
+
+    @Override
+    synchronized Object filter(Object value) {
+        if (!(value instanceof Barcode[])) {
+            return value;
+        }
+        Barcode[] codes = (Barcode[]) value;
+        if (codes.length == 0) {
+            // A frame with no code keeps the pending read: the code may simply
+            // have been out of focus for a frame.
+            return codes;
+        }
+        VisionOptions o = options();
+        int kept = 0;
+        boolean[] keep = new boolean[codes.length];
+        for (int i = 0; i < codes.length; i++) {
+            Barcode c = codes[i];
+            if (c == null) {
+                continue;
+            }
+            keep[i] = !o.isStrictBarcode(c.getFormat())
+                    || (c.getValue() != null && pending != null
+                            && confirmedBy(pending, c));
+            if (keep[i]) {
+                kept++;
+            }
+        }
+        pending = codes;
+        if (kept == codes.length) {
+            return codes;
+        }
+        Barcode[] out = new Barcode[kept];
+        int n = 0;
+        for (int i = 0; i < codes.length; i++) {
+            if (keep[i]) {
+                out[n++] = codes[i];
+            }
+        }
+        return out;
+    }
+
+    private static boolean confirmedBy(Barcode[] previous, Barcode code) {
+        for (Barcode p : previous) {
+            if (p != null && sameRead(p, code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether two reads carry the same payload. The raw bytes are compared
+    /// when both have them, since two different byte sequences can decode to
+    /// one string in a lossy charset.
+    static boolean sameRead(Barcode a, Barcode b) {
+        if (a.getValue() == null || !a.getValue().equals(b.getValue())
+                || !String.valueOf(a.getFormat()).equals(String.valueOf(b.getFormat()))) {
+            return false;
+        }
+        byte[] ra = a.getRawBytes();
+        byte[] rb = b.getRawBytes();
+        return ra == null || rb == null || Arrays.equals(ra, rb);
     }
 }
