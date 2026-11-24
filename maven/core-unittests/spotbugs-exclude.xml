@@ -307,6 +307,15 @@
     </Match>
 
     <!--
+    Same idiom for the geocoding request: NominatimGeocoder's one-shot
+    ConnectionRequest subclass is never compared or used as a map key.
+    -->
+    <Match>
+        <Class name="com.codename1.maps.geocoding.NominatimGeocoder$GeocodeConnection" />
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+    </Match>
+
+    <!--
     Same idiom for the crypto RPC transport: NetworkTransport's one-shot
     ConnectionRequest subclass records the failure and error code of a single
     blocking call and is never compared or used as a map key.

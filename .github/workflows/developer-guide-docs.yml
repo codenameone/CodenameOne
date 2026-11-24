@@ -207,10 +207,12 @@ jobs:
           # on a plugin dependency (maven-shared-utils) failed the whole guide build.
           # dart-runtime, flutter-runtime and python-runtime: docs/demos/common depends on
           # the Flutter and Python runtimes at this version, which nothing else selected
+          # (rive-runtime: the guide's Rive snippet puts a .riv beside the demo CSS, and
+          # the plugin copies that runtime, at its own version, into the demo's classes)
           # here pulls in; they are
           # in the reactor because this job runs on JDK 17 (the flutter-modules profile).
           RETRY_ONLY_MATCHING=transient xvfb-run -a bash scripts/ci/retry.sh mvn -B -ntp -f maven/pom.xml \
-            -pl core,javase,android,css-compiler,codenameone-maven-plugin,annotation-processor,backend,backend-test,dart-runtime,flutter-runtime,python-runtime \
+            -pl core,javase,android,css-compiler,codenameone-maven-plugin,annotation-processor,backend,backend-test,dart-runtime,flutter-runtime,python-runtime,rive-runtime \
             -am install \
             -Plocal-dev-javase \
             -DskipTests \

@@ -238,6 +238,22 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The Rive runtime, which lives outside the core: an application gets it
+             only through the build, with its .riv files. The tests in
+             com.codename1.impl.rive drive it with the core's headless Display. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-rive-runtime</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Translates the Rive fixtures that RiveGeneratedClassTest compiles and runs. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-rive-transcoder</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>cn1-ads-mock</artifactId>

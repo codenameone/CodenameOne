@@ -748,6 +748,13 @@ SpinnerStyle {
 }
 /* end::svg-transcoder-css-003[] */
 
+/* tag::svg-transcoder-css-004[] */
+JuiceStyle {
+    background: url(juice.riv);
+    cn1-background-type: cn1-image-scaled-fit;
+}
+/* end::svg-transcoder-css-004[] */
+
 /* tag::psd-theme[] */
 TitleContainer {
     background-image: url(images/background.jpg);
