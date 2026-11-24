@@ -313,15 +313,16 @@ Approving a return buys a prepaid return label and mails it to the shopper.
 An international fulfilment has a customs form (CN 22 or CN 23) beside its
 label, filled from each variant's HS code and country of origin.
 
-*Checkout settings*, in the back office on the web, choose the payment methods
-the store takes beside cards (Klarna, Afterpay/Clearpay, iDEAL, Bancontact,
+*Checkout settings*, under *Store settings* in the app, has a switch for each
+payment method the store takes beside cards (Klarna, Afterpay/Clearpay, iDEAL, Bancontact,
 SEPA debit and more). Checkout offers each one only where the order's currency
 and country allow it. An order paid by a pay-later or bank method shows
 "payment pending" until the payment clears; if it fails, the order is
 cancelled and its stock goes back on sale. Cash on delivery and bank transfer
 are on the same list: such an order is placed unpaid, and a manager marks it
-paid from the order once the money arrives. The same page turns on tips, with
-up to four presets such as `15%, 20%, 5.00`, and lists the questions shoppers
+paid from the order once the money arrives. The same checkout settings, saved
+through the store's API, turn on tips, with
+up to four presets such as `15%, 20%, 5.00`, and list the questions shoppers
 answer at checkout, one per line as `Label | text, checkbox or select |
 required | choice; choice`. Tips are charged outside the order total and show in
 the Tips report; answers show on the order, in the confirmation mail and in the

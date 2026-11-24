@@ -45,6 +45,13 @@ public final class PhotoCache {
         void delete(String name);
     }
 
+    /// Runs the index write later, once: `Display.callSerially` on a device.
+    /// A cache with none writes a pending index on its next put or eviction,
+    /// or on [#flush].
+    public interface Later {
+        void later(Runnable task);
+    }
+
     /// Twelve megabytes: a few hundred catalog photos at register size.
     public static final long DEFAULT_BUDGET = 12L * 1024 * 1024;
     private static final String PREFIX = "photo-";
@@ -58,22 +65,35 @@ public final class PhotoCache {
     private final List<String> ids = new ArrayList<String>();
     private final List<Long> sizes = new ArrayList<Long>();
     private long total;
+    private final Later later;
+    /// The index in memory differs from the one in the store.
+    private boolean dirty;
+    private boolean flushQueued;
 
     public PhotoCache(Store store, long budget) {
+        this(store, budget, null);
+    }
+
+    public PhotoCache(Store store, long budget, Later later) {
         this.store = store;
         this.budget = budget;
+        this.later = later;
         load();
     }
 
     /// The app's cache, over [Storage].
     public static PhotoCache shared() {
         if (shared == null) {
-            shared = new PhotoCache(new StorageStore(), DEFAULT_BUDGET);
+            shared = new PhotoCache(new StorageStore(), DEFAULT_BUDGET,
+                    task -> com.codename1.ui.Display.getInstance().callSerially(task));
         }
         return shared;
     }
 
-    /// The photo `id` as it was downloaded, or null when it is not here.
+    /// The photo `id` as it was downloaded, or null when it is not here. A
+    /// hit only reorders the index in memory; the write is deferred
+    /// ([#flush]), so scrolling a grid of cached photos does not rewrite the
+    /// index once per photo.
     public byte[] get(String id) {
         int at = ids.indexOf(id);
         if (at < 0) {
@@ -84,15 +104,34 @@ public final class PhotoCache {
             // The entry went missing behind our back: forget it.
             total -= sizes.remove(at).longValue();
             ids.remove(at);
-            save();
+            touched();
             return null;
         }
         if (at != ids.size() - 1) {
             ids.add(ids.remove(at));
             sizes.add(sizes.remove(at));
-            save();
+            touched();
         }
         return data;
+    }
+
+    /// Writes the index if a hit or a vanished entry changed it since the
+    /// last write.
+    public void flush() {
+        if (dirty) {
+            save();
+        }
+    }
+
+    private void touched() {
+        dirty = true;
+        if (later != null && !flushQueued) {
+            flushQueued = true;
+            later.later(() -> {
+                flushQueued = false;
+                flush();
+            });
+        }
     }
 
     /// Keeps `data` as the photo `id`, dropping the least recently used
@@ -132,14 +171,20 @@ public final class PhotoCache {
         return ids.size();
     }
 
-    /// An id as a storage name: letters, digits, `-` and `_` only.
+    /// An id as a storage name: its UTF-8 bytes in hex, so two ids never
+    /// share a name ("a.b" and "a_b" did when odd characters became `_`).
     static String safe(String id) {
-        StringBuilder b = new StringBuilder();
-        for (int iter = 0; iter < id.length(); iter++) {
-            char c = id.charAt(iter);
-            boolean ok = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
-                    || c == '-' || c == '_';
-            b.append(ok ? c : '_');
+        byte[] bytes;
+        try {
+            bytes = id.getBytes("UTF-8");
+        } catch (IOException bad) {
+            bytes = new byte[0];
+        }
+        String digits = "0123456789abcdef";
+        StringBuilder b = new StringBuilder(bytes.length * 2);
+        for (int iter = 0; iter < bytes.length; iter++) {
+            int v = bytes[iter] & 0xff;
+            b.append(digits.charAt(v >> 4)).append(digits.charAt(v & 0xf));
         }
         return b.toString();
     }
@@ -183,6 +228,7 @@ public final class PhotoCache {
     }
 
     private void save() {
+        dirty = false;
         StringBuilder b = new StringBuilder();
         for (int iter = 0; iter < ids.size(); iter++) {
             b.append(ids.get(iter)).append(' ').append(sizes.get(iter).longValue()).append('\n');

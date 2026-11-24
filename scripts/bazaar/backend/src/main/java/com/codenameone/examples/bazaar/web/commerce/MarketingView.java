@@ -21,16 +21,12 @@ package com.codenameone.examples.bazaar.web.commerce;
 import java.util.ArrayList;
 import java.util.List;
 
-/// What `templates/marketing.html` draws: fulfilment board, promotions,
-/// calendar, loyalty, clubs, segments, campaigns and journeys. `page` picks
-/// the section; most pages are a list (`table` in the model), some
-/// [FormView]s, a few facts and a table of rows.
+/// What `templates/marketing.html` draws for the shopper's subscription and
+/// company pages ([CommerceAccountPages]): some [FormView]s, a few facts, a
+/// list of cards with their own buttons and a table of rows.
 public class MarketingView {
-    /// "board", "sales", "sale", "calendar", "discounts", "discount",
-    /// "loyalty", "clubs", "club", "segments", "segment", "campaigns",
-    /// "campaign", "journeys" or "journey"; and for subscriptions and B2B
-    /// ([CommercePages], [CommerceAccountPages]) "quotes" (the quote board)
-    /// and any name that only uses the generic parts below.
+    /// "subscriptions", "subscribe", "companies", "company", "my-quotes",
+    /// "my-quote" or "my-invoices".
     public String page = "";
     public String base = "";
     public String heading = "";
@@ -69,37 +65,7 @@ public class MarketingView {
     /// A list whose entries carry their own buttons, under `cardsTitle`.
     public String cardsTitle = "";
     public List<ActionCard> cards = new ArrayList<ActionCard>();
-
-    // ---------------------------------------------------------------- board
-    public List<BoardColumn> columns = new ArrayList<BoardColumn>();
-
-    // ------------------------------------------------------------- calendar
-    public String month = "";
-    public String prevUrl = "";
-    public String nextUrl = "";
-    public List<CalendarWeek> weeks = new ArrayList<CalendarWeek>();
-
-    // -------------------------------------------------------------- segment
-    public String segAction = "";
-    public String segUrl = "";
-    public String segName = "";
-    public String segOp = "AND";
-    public String segKeep = "";
-    public String segRows = "";
-    public String segCount = "";
-    public String segError = "";
-    public boolean segNew;
-    public List<RuleRow> rules = new ArrayList<RuleRow>();
-    public List<AdminRow> sample = new ArrayList<AdminRow>();
-
-    // -------------------------------------------------------------- journey
-    public String flowBox = "0 0 100 100";
-    public List<FlowNode> nodes = new ArrayList<FlowNode>();
-    public List<FlowEdge> edges = new ArrayList<FlowEdge>();
+    /// What the shopper must fix, above the page (a typo in a quick order,
+    /// refused CSV lines), one title each.
     public List<AdminRow> problems = new ArrayList<AdminRow>();
-    /// A server-drawn chart (warehouse, timeline, report, cohort pages).
-    public String chartTitle = "";
-    public String chartBox = "0 0 100 100";
-    public List<ChartMark> marks = new ArrayList<ChartMark>();
-    public List<FlowEdge> lines = new ArrayList<FlowEdge>();
 }

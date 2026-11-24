@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +34,7 @@ import org.junit.jupiter.api.Test;
 class PhotoCacheTest {
     private static final class MapStore implements PhotoCache.Store {
         final Map<String, byte[]> entries = new HashMap<String, byte[]>();
+        int indexWrites;
 
         @Override
         public byte[] read(String name) {
@@ -40,6 +43,9 @@ class PhotoCacheTest {
 
         @Override
         public void write(String name, byte[] data) {
+            if ("photo-cache-index".equals(name)) {
+                indexWrites++;
+            }
             entries.put(name, data);
         }
 
@@ -72,7 +78,7 @@ class PhotoCacheTest {
         assertFalse(c.contains("b"));
         assertTrue(c.contains("c"));
         assertEquals(80, c.size());
-        assertNull(store.read("photo-b"));
+        assertNull(store.read("photo-" + PhotoCache.safe("b")));
         c.put("huge", new byte[101]);
         assertFalse(c.contains("huge"));
     }
@@ -82,9 +88,60 @@ class PhotoCacheTest {
         MapStore store = new MapStore();
         PhotoCache c = new PhotoCache(store, 100);
         c.put("x/y:z", new byte[5]);
-        assertTrue(store.entries.containsKey("photo-x_y_z"));
-        store.entries.remove("photo-x_y_z");
+        assertTrue(store.entries.containsKey("photo-782f793a7a"));
+        store.entries.remove("photo-782f793a7a");
         assertNull(c.get("x/y:z"));
         assertEquals(0, c.count());
+    }
+
+    @Test
+    void idsThatLookAlikeNeverShareAName() {
+        assertEquals("612e62", PhotoCache.safe("a.b"));
+        assertEquals("615f62", PhotoCache.safe("a_b"));
+        MapStore store = new MapStore();
+        PhotoCache c = new PhotoCache(store, 100);
+        c.put("a.b", new byte[] {1});
+        c.put("a_b", new byte[] {2});
+        assertArrayEquals(new byte[] {1}, c.get("a.b"));
+        assertArrayEquals(new byte[] {2}, c.get("a_b"));
+    }
+
+    @Test
+    void hitsWriteTheIndexOnceAndLater() {
+        MapStore store = new MapStore();
+        final List<Runnable> queued = new ArrayList<Runnable>();
+        PhotoCache c = new PhotoCache(store, 100, queued::add);
+        c.put("a", new byte[10]);
+        c.put("b", new byte[10]);
+        c.put("c", new byte[10]);
+        int afterPuts = store.indexWrites;
+        for (int iter = 0; iter < 20; iter++) {
+            c.get("a");
+            c.get("b");
+        }
+        assertEquals(afterPuts, store.indexWrites, "a hit never writes on the spot");
+        assertEquals(1, queued.size(), "one deferred write, however many hits");
+        queued.get(0).run();
+        assertEquals(afterPuts + 1, store.indexWrites);
+        c.get("a");
+        assertEquals(2, queued.size(), "a later hit queues again");
+        c.flush();
+        int flushed = store.indexWrites;
+        queued.get(1).run();
+        assertEquals(flushed, store.indexWrites, "nothing left to write");
+    }
+
+    @Test
+    void aPendingIndexIsWrittenByTheNextPut() {
+        MapStore store = new MapStore();
+        PhotoCache c = new PhotoCache(store, 30);
+        c.put("a", new byte[10]);
+        c.put("b", new byte[10]);
+        c.put("c", new byte[10]);
+        c.get("a");
+        c.put("d", new byte[10]);
+        PhotoCache after = new PhotoCache(store, 30);
+        assertTrue(after.contains("a"), "the hit's order was saved with the put");
+        assertFalse(after.contains("b"), "the least recently used went");
     }
 }

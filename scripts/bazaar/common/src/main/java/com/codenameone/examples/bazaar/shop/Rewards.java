@@ -76,6 +76,21 @@ public final class Rewards {
         return badgeHave(badge, orders, reviews, stores) + "/" + need;
     }
 
+    /// The points the shopper holds at stores other than the best one
+    /// (`balances` lists the best first). Each store runs its own programme,
+    /// so these are shown apart from the best store's balance, never added
+    /// to it.
+    public static long otherPoints(RewardsDto r) {
+        if (r == null || r.balances() == null) {
+            return 0;
+        }
+        long sum = 0;
+        for (int iter = 1; iter < r.balances().size(); iter++) {
+            sum += Math.max(0, r.balances().get(iter).points());
+        }
+        return sum;
+    }
+
     /// Which badges `r` has earned, by index ([#FIRST_ORDER] ...).
     public static boolean[] badges(RewardsDto r) {
         if (r == null) {

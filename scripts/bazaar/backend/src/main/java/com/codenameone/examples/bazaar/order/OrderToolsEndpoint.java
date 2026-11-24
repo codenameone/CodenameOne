@@ -121,4 +121,10 @@ public class OrderToolsEndpoint implements OrderToolsApiServer {
             throws Exception {
         return checkout.save(Caller.name(), storeId, wanted);
     }
+
+    @Override
+    public java.util.List<com.codenameone.examples.bazaar.api.PaymentTypeDto> paymentTypes(
+            String storeId) throws Exception {
+        return checkout.types(Caller.name(), storeId);
+    }
 }

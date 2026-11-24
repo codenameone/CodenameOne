@@ -60,7 +60,6 @@ public final class AdminText {
             m.headC = StoreText.translate(t, m.headC);
             m.headD = StoreText.translate(t, m.headD);
             m.cardsTitle = StoreText.translate(t, m.cardsTitle);
-            m.chartTitle = StoreText.translate(t, m.chartTitle);
             rows(m.sinceOptions, t);
             for (int iter = 0; m.forms != null && iter < m.forms.size(); iter++) {
                 form(m.forms.get(iter), t);

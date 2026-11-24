@@ -228,6 +228,7 @@ class MerchantIdorTest {
         "POST /orders/{orderId}/archive", "POST /orders/{orderId}/unarchive",
         "GET /archived-orders", "POST /bulk-orders", "GET /order-settings",
         "POST /order-settings", "GET /checkout-settings", "POST /checkout-settings",
+        "GET /checkout-settings/payment-types",
         "POST /drafts/{orderId}/pay-link", "GET /templates",
         "POST /templates", "POST /templates/reset", "POST /templates/preview",
         // Label sheets and bulk packing slips.

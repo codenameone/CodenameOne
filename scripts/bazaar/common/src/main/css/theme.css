@@ -279,17 +279,6 @@ SvPrimary.disabled {
     background-color: var(--surface-press);
 }
 
-SvSecondary {
-    color: var(--text);
-    background-color: var(--surface-alt);
-    border-radius: var(--radius);
-    font-family: "native:MainBold";
-    font-size: 2.9mm;
-    text-align: center;
-    padding: 2.75mm 4mm 2.75mm 4mm;
-    margin: 1.6mm 0 0.8mm 0;
-}
-
 SvSecondary.pressed {
     background-color: var(--surface-press);
 }
@@ -1475,8 +1464,6 @@ MeTileCaption { color: var(--text-muted); background-color: transparent; font-si
 MeTileValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
 MeSpark { color: var(--brand); background-color: transparent; padding: 0; margin: 0.6mm 0 0 0; }
 MeFilters { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
-MeFilter { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); font-size: 2.8mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0 0 0 1.2mm; }
-MeSearch { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); padding: 1.4mm 2mm 1.4mm 2mm; margin: 0; }
 MeBulk { background-color: var(--brand-tint); padding: 1.2mm 3mm 1.2mm 3mm; margin: 0; }
 MeBulkText { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; padding: 1.4mm 2mm 1.4mm 0; margin: 0; }
 MeButtons { background-color: var(--surface); border-top: 1px solid var(--line); padding: 1.6mm 3.6mm 1.6mm 3.6mm; margin: 0; }
@@ -1519,8 +1506,6 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     SvPrimary.pressed { background-color: var(--brand-pressed-dark); }
     SvPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
-    SvSecondary { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvSecondary.pressed { background-color: var(--surface-press-dark); }
     SvPairStart, SvPairEnd { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvPairStart.pressed, SvPairEnd.pressed { background-color: var(--surface-press-dark); }
     SvFieldButton { color: var(--brand-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
@@ -1766,8 +1751,6 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     MeTileValue { color: var(--text-dark); }
     MeSpark { color: var(--brand-dark); }
     MeFilters { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    MeFilter { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
-    MeSearch { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
     MeBulk { background-color: var(--brand-tint-dark); }
     MeBulkText { color: var(--brand-dark); }
     MeTimelineDot { color: var(--brand-dark); }
@@ -3068,9 +3051,15 @@ PosMuted { background-color: transparent; }
    and secondary buttons that stay visible on a page of surface-alt, the
    colour they were filled with, in both modes. */
 SvSecondary {
+    color: var(--text);
     background-color: var(--surface);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
 }
 
 MeSplitList {

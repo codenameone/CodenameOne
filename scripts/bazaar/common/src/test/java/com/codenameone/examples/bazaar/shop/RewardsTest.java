@@ -48,8 +48,15 @@ class RewardsTest {
         assertEquals(Rewards.REGULAR, Rewards.unlocked(Rewards.badges(4, 1, 3), later));
         assertEquals(-1, Rewards.unlocked(later, later));
         assertEquals(Rewards.FIRST_ORDER, Rewards.unlocked(null, first));
-        RewardsDto dto = new RewardsDto(120, 300, "Silver", "Gold", 50, 50, 5, 3, 0, 2, 4, 0);
+        RewardsDto dto = new RewardsDto(120, 300, "Silver", "Gold", 50, 50, 5, 3, 0, 2, 4, 0,
+                "Northwind", java.util.Arrays.asList(
+                    new com.codenameone.examples.bazaar.api.StoreBalanceDto("a", "Northwind", 120,
+                        "Silver"),
+                    new com.codenameone.examples.bazaar.api.StoreBalanceDto("b", "Fennel", 40, ""),
+                    new com.codenameone.examples.bazaar.api.StoreBalanceDto("c", "Kiln", 2, "")), 120);
         assertFalse(Rewards.badges(dto)[Rewards.REVIEWER]);
+        assertEquals(42, Rewards.otherPoints(dto), "the best store is shown apart");
+        assertEquals(0, Rewards.otherPoints(null));
         assertEquals(4, Rewards.badges(null).length);
         assertEquals(800, Rewards.badgeProgress(Rewards.REGULAR, 4, 0, 1));
         assertEquals(1000, Rewards.badgeProgress(Rewards.REGULAR, 9, 0, 1));

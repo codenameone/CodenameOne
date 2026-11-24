@@ -250,6 +250,23 @@ class OnlinePaymentsTest {
         } catch (ResponseStatusException e) {
             assertTrue(e.getStatus() == 403 || e.getStatus() == 404);
         }
+        // The app's switches list every type the server accepts; only the
+        // store's staff may ask.
+        try {
+            settings.types(stranger, s.storeId);
+            fail("not their store's types");
+        } catch (ResponseStatusException e) {
+            assertTrue(e.getStatus() == 403 || e.getStatus() == 404);
+        }
+        List<com.codenameone.examples.bazaar.api.PaymentTypeDto> types =
+                settings.types(s.owner, s.storeId);
+        assertEquals(PaymentTypes.all().size(), types.size());
+        boolean cod = false;
+        for (int iter = 0; iter < types.size(); iter++) {
+            assertTrue(PaymentTypes.known(types.get(iter).type()));
+            cod |= "cod".equals(types.get(iter).type());
+        }
+        assertTrue(cod);
         save(s, Arrays.asList("klarna", "ideal"), false, Collections.<CheckoutFieldDto>emptyList());
         CheckoutOptionsDto us = settings.options(s.storeId, "simulated", "USD", "US", 1000,
                 "/s/op-set/checkout");

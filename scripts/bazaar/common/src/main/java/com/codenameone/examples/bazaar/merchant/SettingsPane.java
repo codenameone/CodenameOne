@@ -32,8 +32,10 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.spinner.Picker;
+import com.codenameone.examples.bazaar.api.CheckoutSettingsDto;
 import com.codenameone.examples.bazaar.api.FraudRuleDto;
 import com.codenameone.examples.bazaar.api.LocationDto;
+import com.codenameone.examples.bazaar.api.PaymentTypeDto;
 import com.codenameone.examples.bazaar.api.StaffDto;
 import com.codenameone.examples.bazaar.api.StoreDto;
 import com.codenameone.examples.bazaar.net.Api;
@@ -217,6 +219,12 @@ final class SettingsPane extends MerchantPane {
             }, Ui::fail));
         })));
 
+        Ui.section(page, "Checkout settings");
+        final Container checkout = new Container(BoxLayout.y());
+        checkout.setUIID("MeCard");
+        checkout.setName("settings-checkout");
+        page.add(checkout);
+
         Ui.section(page, "Webhooks");
         Container hooks = new Container(BoxLayout.y());
         hooks.setUIID("MeCard");
@@ -242,6 +250,40 @@ final class SettingsPane extends MerchantPane {
         loadLocations(locations);
         loadStaff(staff);
         loadRules(rules);
+        loadCheckout(checkout);
+    }
+
+    /// The payment methods the store takes beside cards, one switch each.
+    /// Each flip saves at once through the checkout settings API, keeping the
+    /// store's tips and checkout fields as they are.
+    private void loadCheckout(final Container to) {
+        final String storeId = MerchantState.storeId();
+        Api.orderTools().checkoutSettings(storeId, Net.to(settings -> Api.orderTools()
+                .paymentTypes(storeId, Net.to(types -> showCheckout(to, settings, types),
+                        Ui::fail)), Ui::fail));
+    }
+
+    private void showCheckout(final Container to, CheckoutSettingsDto settings,
+            List<PaymentTypeDto> types) {
+        to.removeAll();
+        to.add(Ui.text(Lang.tr("Payment methods beside cards. Checkout offers each one only "
+                + "where the order's currency and country allow it."), "SvMuted"));
+        final CheckoutSettingsDto[] current = {settings};
+        for (final PaymentTypeDto t : types) {
+            to.add(Ui.row(FontImage.MATERIAL_PAYMENTS, Lang.tr(t.label()), null,
+                    Ui.toggle("checkout-method-" + t.type(), CheckoutMethods.on(settings, t.type()),
+                            on -> {
+                                // Applied here first, so a second switch flipped
+                                // before the first answer keeps the first one.
+                                current[0] = CheckoutMethods.switched(current[0], t.type(), on);
+                                Api.orderTools().saveCheckoutSettings(MerchantState.storeId(),
+                                        current[0], Net.to(saved -> { }, (status, message) -> {
+                                            Ui.fail(status, message);
+                                            loadCheckout(to);
+                                        }));
+                            })));
+        }
+        Ui.relayout(to);
     }
 
     private static final String[] RULE_KINDS = {"TOTAL_OVER", "ORDERS_PER_HOUR", "COUNTRY_MISMATCH"};

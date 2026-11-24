@@ -20,12 +20,15 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// The shopper's standing across every store, for the rewards on the Account
-/// tab and the points burst after checkout. `points` is the spendable balance
-/// summed over the stores' programmes; the tier fields are those of the store
-/// where the shopper has qualified most (`qualifying` reached of
-/// `qualifying + toNextTier`). The counts feed the badges. `orderPoints` is
-/// what the order asked about earns, or will earn once paid; 0 without one.
+/// The shopper's standing, for the rewards on the Account tab and the points
+/// burst after checkout. Every store runs its own programme, so points are
+/// never summed across stores: `balances` holds one entry per store the
+/// shopper is a member of, best first (the one where they have qualified
+/// most), and the top-level points and tier fields are that store's
+/// (`storeName`; `qualifying` reached of `qualifying + toNextTier`). The
+/// counts feed the badges. `orderPoints` is what the loyalty ledger credited
+/// for the order asked about (0 without one, or before it is credited), and
+/// `orderBalance` the balance at that order's store.
 @Mapped
 public record RewardsDto(
         long points,
@@ -39,5 +42,8 @@ public record RewardsDto(
         int reviews,
         int stores,
         int wishlist,
-        long orderPoints) {
+        long orderPoints,
+        String storeName,
+        java.util.List<StoreBalanceDto> balances,
+        long orderBalance) {
 }

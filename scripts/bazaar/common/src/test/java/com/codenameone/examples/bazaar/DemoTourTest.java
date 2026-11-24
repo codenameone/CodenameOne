@@ -1015,6 +1015,12 @@ private void screens() throws Exception {
         visualShot("merchant-settings");
         scrollDown(3);
         visualShot("merchant-settings-2");
+        // The payment method switches load after the page: wait for one,
+        // then bring the whole card into view.
+        reveal("checkout-method-klarna");
+        reveal("settings-checkout");
+        pause(1200);
+        visualShot("merchant-checkout-settings");
         if (tap("fraud-rule-add")) {
             pause(2000);
             visualShot("merchant-fraud-rule-editor");

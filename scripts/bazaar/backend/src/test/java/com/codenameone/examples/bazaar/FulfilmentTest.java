@@ -261,6 +261,22 @@ class FulfilmentTest {
     }
 
     @Test
+    void advancingOneParcelLeavesAnotherStoresParcelInTransit() throws Exception {
+        Shop a = shop("adv-one-a", 5);
+        Shop b = shop("adv-one-b", 5);
+        String user = People.customer(accounts, "adv-one-buyer");
+        FulfillmentDto mine = shipWithLabel(a, fulfil(a, a.buy(user, 1), 1, "SHIP").id());
+        FulfillmentDto theirs = shipWithLabel(b, fulfil(b, b.buy(user, 1), 1, "SHIP").id());
+        long month = System.currentTimeMillis() + 30L * 24 * 3600000L;
+        assertTrue(fulfillments.advanceParcel(mine.id(), month));
+        assertEquals(Fulfillments.DELIVERED, fulfillments.detail(mine.id()).status());
+        assertEquals(Fulfillments.SHIPPED, fulfillments.detail(theirs.id()).status(),
+                "the demo seed's clock must not deliver another store's parcel");
+        assertFalse(fulfillments.advanceParcel(mine.id(), month), "delivered stays delivered");
+        assertFalse(fulfillments.advanceParcel("no-such-parcel", month));
+    }
+
+    @Test
     void simulatedTrackingWalksTheParcelToTheDoor() throws Exception {
         Shop s = shop("track-shop", 5);
         String user = People.customer(accounts, "track-buyer");

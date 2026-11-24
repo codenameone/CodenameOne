@@ -29,6 +29,7 @@ import com.codenameone.examples.bazaar.api.CheckoutOptionsDto;
 import com.codenameone.examples.bazaar.api.CheckoutSettingsDto;
 import com.codenameone.examples.bazaar.api.FieldAnswerDto;
 import com.codenameone.examples.bazaar.api.OrderFieldDto;
+import com.codenameone.examples.bazaar.api.PaymentTypeDto;
 import com.codenameone.examples.bazaar.api.TipOptionDto;
 import com.codenameone.examples.bazaar.api.TipPresetDto;
 import com.codenameone.examples.bazaar.ops.Perms;
@@ -93,6 +94,14 @@ public class CheckoutSettings {
             tips = presets(Rows.text(r.get("tip_presets")));
         }
         return new CheckoutSettingsDto(methods, tipsOn, tips, fields(storeId));
+    }
+
+    /// Every payment method type the store may switch on, for the staff who
+    /// may read its settings.
+    @Transactional(readOnly = true)
+    public List<PaymentTypeDto> types(String username, String storeId) throws IOException {
+        access.requireArea(username, storeId, Perms.SETTINGS, false, StoreAccess.MANAGERS);
+        return PaymentTypes.all();
     }
 
     @Transactional(rollbackFor = IOException.class)

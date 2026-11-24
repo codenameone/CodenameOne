@@ -198,6 +198,11 @@ public final class ProductArt {
             try {
                 byte[] bytes = Base64.decode(photo.data().getBytes("UTF-8"));
                 EncodedImage decoded = EncodedImage.create(bytes);
+                // Kept on the device only once the bytes really decode: a
+                // broken download cached here would never be fetched again.
+                if (decoded == null || decoded.getWidth() <= 0) {
+                    return;
+                }
                 keep(photoId, decoded);
                 PhotoCache.shared().put(photoId, bytes);
                 for (int iter = 0; told != null && iter < told.size(); iter++) {

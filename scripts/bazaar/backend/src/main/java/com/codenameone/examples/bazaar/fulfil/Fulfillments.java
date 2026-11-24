@@ -969,21 +969,46 @@ public class Fulfillments {
         List<Fulfillment> fs = movingRead(moving);
         int changed = 0;
         for (int iter = 0; iter < fs.size(); iter++) {
-            Fulfillment f = fs.get(iter);
-            if (!carrier.name().equals(f.getCarrier()) || f.getTrackingNumber().length() == 0) {
-                continue;
-            }
-            try {
-                String to = advanceOne(f, now);
-                if (to != null) {
-                    changed++;
-                    announce(f, to);
-                }
-            } catch (IOException | RuntimeException err) {
-                System.err.println("[tracking] " + f.getTrackingNumber() + ": " + err);
+            if (track(fs.get(iter), now)) {
+                changed++;
             }
         }
         return changed;
+    }
+
+    /// [#advance] for the one parcel `id` and no other: the demo seed runs
+    /// the clock forward for the parcels it shipped, where the platform-wide
+    /// [#advance] would also deliver every other store's parcel in transit.
+    /// Answers whether the parcel changed status.
+    public boolean advanceParcel(String id, long now) throws IOException {
+        Fulfillment f = parcelRead(id);
+        if (f == null || !(SHIPPED.equals(f.getStatus()) || IN_TRANSIT.equals(f.getStatus())
+                || OUT_FOR_DELIVERY.equals(f.getStatus()))) {
+            return false;
+        }
+        return track(f, now);
+    }
+
+    @Transactional(readOnly = true)
+    private Fulfillment parcelRead(String id) throws IOException {
+        return fulfillments.findById(id);
+    }
+
+    /// One parcel's carrier news as of `now`; true when it moved.
+    private boolean track(Fulfillment f, long now) {
+        if (!carrier.name().equals(f.getCarrier()) || f.getTrackingNumber().length() == 0) {
+            return false;
+        }
+        try {
+            String to = advanceOne(f, now);
+            if (to != null) {
+                announce(f, to);
+                return true;
+            }
+        } catch (IOException | RuntimeException err) {
+            System.err.println("[tracking] " + f.getTrackingNumber() + ": " + err);
+        }
+        return false;
     }
 
     /// Tells the shopper a parcel moved to `to` and republishes the order.

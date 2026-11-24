@@ -170,10 +170,11 @@ public class DemoPipeline {
                 }
                 fulfil.ship(owner, storeId, f);
                 if ("DELIVERED".equals(stage)) {
-                    // Only the carrier says a parcel arrived: run its tracking a
-                    // month ahead. These are the first parcels shipped, so no
-                    // other seeded card moves with them.
-                    fulfil.advance(System.currentTimeMillis() + 30L * 24 * 3600000L);
+                    // Only the carrier says a parcel arrived: run this parcel's
+                    // tracking a month ahead, and no one else's -- other stores'
+                    // parcels in transit (the shopper demo's tracking walkthrough)
+                    // must keep their own clock.
+                    fulfil.advanceParcel(f, System.currentTimeMillis() + 30L * 24 * 3600000L);
                 }
             } catch (IOException | RuntimeException err) {
                 System.err.println("[demo-pipeline] seeding " + stage + ": " + err);

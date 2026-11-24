@@ -18,10 +18,26 @@
  */
 package com.codenameone.examples.bazaar;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.test.MockMvc;
+import com.codenameone.examples.bazaar.account.Accounts;
+import com.codenameone.examples.bazaar.api.FulfilLineDto;
+import com.codenameone.examples.bazaar.api.FulfillmentDto;
+import com.codenameone.examples.bazaar.api.LabelRequestDto;
+import com.codenameone.examples.bazaar.api.NewFulfillmentDto;
+import com.codenameone.examples.bazaar.api.OrderDto;
+import com.codenameone.examples.bazaar.api.PackDto;
+import com.codenameone.examples.bazaar.cart.Carts;
+import com.codenameone.examples.bazaar.checkout.Checkouts;
+import com.codenameone.examples.bazaar.fulfil.Fulfillments;
+import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.pricing.DemoPricing;
+import com.codenameone.examples.bazaar.store.Stores;
 import com.codename1.backend.test.BackendTest;
 import com.codenameone.examples.bazaar.account.DemoAccounts;
 import com.codenameone.examples.bazaar.api.PipelineCardDto;
@@ -33,6 +49,7 @@ import com.codenameone.examples.bazaar.pipeline.Pipeline;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.store.DemoPipeline;
 import com.codenameone.examples.bazaar.store.DemoStores;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,14 +70,53 @@ class DemoPipelineTest {
     private Pipeline pipeline;
     @Autowired
     private LiveHub hub;
+    @Autowired
+    private Accounts accounts;
+    @Autowired
+    private Stores stores;
+    @Autowired
+    private Inventory inventory;
+    @Autowired
+    private DemoPricing pricing;
+    @Autowired
+    private Carts carts;
+    @Autowired
+    private Checkouts checkouts;
+    @Autowired
+    private Fulfillments fulfillments;
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private DataSource db;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.OrderLineRepository lines;
+
+    /// A parcel another store shipped, still in the carrier's hands.
+    private String shippedElsewhere() throws Exception {
+        Shop s = new Shop("dp-other", 5, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        OrderDto o = s.buy(People.customer(accounts, "dp-other-buyer"), 1);
+        List<FulfilLineDto> ls = new ArrayList<FulfilLineDto>();
+        ls.add(new FulfilLineDto(lines.findByOrderId(o.id()).get(0).getId(), null, null, 1));
+        String id = fulfillments.create(s.owner, s.storeId, o.id(),
+                new NewFulfillmentDto(s.locationId, "SHIP", ls)).id();
+        fulfillments.pack(s.owner, s.storeId, id, new PackDto(0));
+        fulfillments.buyLabel(s.owner, s.storeId, id, new LabelRequestDto(null));
+        FulfillmentDto shipped = fulfillments.ship(s.owner, s.storeId, id);
+        assertEquals(Fulfillments.SHIPPED, shipped.status());
+        return id;
+    }
 
     @Test
     void seedsEveryColumnAndEachStepMovesACardAndIsPublished() throws Exception {
         assertFalse(demo.enabled(), "never on unless bazaar.demo.pipeline asks");
         demoStores.seed(DemoAccounts.MERCHANT, DemoAccounts.CASHIER);
         Store store = storeRows.findByHandle(DemoStores.NORTHWIND);
+        String elsewhere = shippedElsewhere();
         long before = hub.changes();
         assertTrue(demo.seed(store.getId()));
+        assertEquals(Fulfillments.SHIPPED, fulfillments.detail(elsewhere).status(),
+                "the seed runs its own parcels' clock, never another store's");
         assertFalse(demo.seed(store.getId()), "seeds once");
         assertTrue(hub.changes() > before, "the seeded orders were published");
         Map<String, Integer> counts = counts(board(store));

@@ -38,6 +38,9 @@ public interface LoyaltyMemberRepository extends CrudRepository<LoyaltyMember, S
 
     LoyaltyMember findByCardToken(String cardToken);
 
+    /// Every store's membership of one shopper.
+    List<LoyaltyMember> findByUsername(String username);
+
     LoyaltyMember findByStoreIdAndReferralCode(String storeId, String referralCode);
 
     List<LoyaltyMember> findByStoreIdOrderByLifetimeDesc(String storeId);

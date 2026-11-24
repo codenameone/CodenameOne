@@ -70,6 +70,12 @@ public interface OrderToolsApi {
             @Body CheckoutSettingsDto settings,
             OnComplete<Response<CheckoutSettingsDto>> callback);
 
+    /// Every payment method type the store may switch on beside cards, with
+    /// the label a shopper reads; the store's staff only.
+    @GET("/api/merchant/stores/{storeId}/checkout-settings/payment-types")
+    void paymentTypes(@Path("storeId") String storeId,
+            OnComplete<Response<List<PaymentTypeDto>>> callback);
+
     /// Sends the draft to its customer as a signed checkout link.
     @POST("/api/merchant/stores/{storeId}/drafts/{orderId}/pay-link")
     void payLink(@Path("storeId") String storeId, @Path("orderId") String orderId,

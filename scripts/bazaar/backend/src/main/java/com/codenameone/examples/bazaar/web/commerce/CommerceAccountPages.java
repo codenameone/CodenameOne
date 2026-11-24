@@ -261,16 +261,16 @@ public class CommerceAccountPages {
             List<SubscriptionDto> subs = subscriptions.mine(me, storeId);
             for (int s = 0; s < subs.size(); s++) {
                 SubscriptionDto d = subs.get(s);
-                ActionCard k = CommerceData.actions(d, "/account/subscriptions/" + storeId + "/"
+                ActionCard k = AccountFormat.actions(d, "/account/subscriptions/" + storeId + "/"
                         + d.id());
                 k.title = itemName(d.variantId()) + " x " + d.quantity();
-                k.status = AdminData.words(d.status());
+                k.status = AccountFormat.words(d.status());
                 k.detail = StoreText.format(words, "a.subDetail", storeName(storeId),
-                        CommerceData.cadence(d.unit(), d.cadence()),
-                        CommerceData.percent(d.discountBps()));
+                        AccountFormat.cadence(d.unit(), d.cadence()),
+                        AccountFormat.percent(d.discountBps()));
                 k.meta = Subscriptions.CANCELLED.equals(d.status()) ? ""
                         : Subscriptions.PAUSED.equals(d.status()) ? words.get("a.paused")
-                        : StoreText.format(words, "a.nextDelivery", AdminData.date(d.dueAt()));
+                        : StoreText.format(words, "a.nextDelivery", AccountFormat.date(d.dueAt()));
                 v.cards.add(k);
             }
         }
@@ -317,9 +317,9 @@ public class CommerceAccountPages {
         v.back = "/s/" + store.getHandle();
         v.backLabel = store.getName();
         v.facts.add(fact("Item", itemName(variant.getId()) + " x " + qty));
-        v.facts.add(fact("Delivers", CommerceData.cadence(plan.unit(), plan.cadence())));
+        v.facts.add(fact("Delivers", AccountFormat.cadence(plan.unit(), plan.cadence())));
         v.facts.add(fact("Each delivery", Money.format(unit * qty, store.getCurrency())
-                + " (saves " + CommerceData.percent(plan.discountBps()) + "%)"));
+                + " (saves " + AccountFormat.percent(plan.discountBps()) + "%)"));
         FormView form = new FormView("subscribe", "Subscribe", "/account/subscriptions/start",
                 "Subscribe and pay the first delivery");
         form.text = "Skip, pause or cancel any time from Subscriptions.";
@@ -345,7 +345,7 @@ public class CommerceAccountPages {
                 to.value = a.getId();
             }
         }
-        CommerceData.selectChosen(form);
+        AccountFormat.selectChosen(form);
         if (!cards.isEmpty()) {
             v.forms.add(form);
         }
@@ -431,12 +431,12 @@ public class CommerceAccountPages {
         v.intro = StoreText.format(t(request), "a.buyingAt", store.getName(), terms.companyName);
         v.links.add(link("Quotes", base + "/quotes"));
         v.links.add(link("Invoices", base + "/invoices"));
-        v.facts.add(fact("Payment terms", CommerceData.terms(terms.termsDays)));
+        v.facts.add(fact("Payment terms", AccountFormat.terms(terms.termsDays)));
         v.facts.add(fact("Price list", terms.priceListName.length() == 0 ? "List prices"
                 : terms.priceListName));
         if (terms.percentOffBps > 0) {
             v.facts.add(fact("Everything else", StoreText.format(t(request), "a.pctOff",
-                    CommerceData.percent(terms.percentOffBps))));
+                    AccountFormat.percent(terms.percentOffBps))));
         }
         FormView quick = new FormView("quick", "Quick order", base + "/quick-order",
                 "Request a quote");
@@ -521,7 +521,7 @@ public class CommerceAccountPages {
         if (r.errors() != null && !r.errors().isEmpty()) {
             MarketingView v = view("company");
             DataTable t = overview(me, storeId, request, v);
-            CommerceData.csvErrors(r.errors(), v);
+            AccountFormat.csvErrors(r.errors(), v);
             v.problems.add(fact("Nothing was ordered: " + r.errors().size()
                     + (r.errors().size() == 1 ? " line needs" : " lines need")
                     + " fixing.", ""));
@@ -558,11 +558,11 @@ public class CommerceAccountPages {
     /// accepted.
     private static ActionCard quoteCard(TradeQuoteDto q, String url) {
         ActionCard k = new ActionCard();
-        k.title = "Quote " + CommerceData.shortId(q.id());
+        k.title = "Quote " + AccountFormat.shortId(q.id());
         k.url = url;
-        k.status = AdminData.words(q.status());
+        k.status = AccountFormat.words(q.status());
         k.amount = Money.format(q.totalCents(), q.currency());
-        k.meta = AdminData.date(q.updatedAt());
+        k.meta = AccountFormat.date(q.updatedAt());
         k.detail = q.lines() == null ? "" : q.lines().size()
                 + (q.lines().size() == 1 ? " line" : " lines");
         String[][] moves = {{Trade.ACCEPTED, "Accept"}, {Trade.ORDERED, "Place the order"},
@@ -594,7 +594,7 @@ public class CommerceAccountPages {
         MarketingView v = view("my-quote");
         v.back = base + "/quotes";
         v.backLabel = "Quotes";
-        CommerceData.quoteFacts(q, v);
+        AccountFormat.quoteFacts(q, v);
         ActionCard k = quoteCard(q, base + "/quotes/" + q.id());
         if (!k.buttons.isEmpty()) {
             k.url = "";
@@ -602,7 +602,7 @@ public class CommerceAccountPages {
             v.cards.add(k);
         }
         return render(model, request, StoreText.format(t(request), "a.quoteN",
-                CommerceData.shortId(q.id())), v, null);
+                AccountFormat.shortId(q.id())), v, null);
     }
 
     @PostMapping("/account/company/{store}/quotes/{id}/{to}")
@@ -626,7 +626,7 @@ public class CommerceAccountPages {
         v.cardsTitle = "Invoices";
         for (int iter = 0; iter < rows.size(); iter++) {
             NetTermDto t = rows.get(iter);
-            v.cards.add(CommerceData.invoiceCard(t, store.getCurrency(), base + "/invoices/"
+            v.cards.add(AccountFormat.invoiceCard(t, store.getCurrency(), base + "/invoices/"
                     + t.orderId() + "/invoice.pdf"));
         }
         if (rows.isEmpty()) {

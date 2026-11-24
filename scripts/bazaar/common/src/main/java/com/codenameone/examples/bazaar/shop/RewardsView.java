@@ -87,6 +87,13 @@ final class RewardsView {
         words.setUIID("ShopRewardsWords");
         words.add(Ui.plain(r.tierName() == null || r.tierName().length() == 0
                 ? Lang.tr("Member") : r.tierName(), "ShopRewardsTierB"));
+        // Tier and points are the best store's own: each store runs its own
+        // programme, so the card names it rather than adding stores up.
+        if (r.storeName() != null && r.storeName().length() > 0) {
+            Label at = Ui.plain(Lang.tr("at {0}", r.storeName()), "ShopRewardsSpent");
+            at.setName("rewards-store");
+            words.add(at);
+        }
         boolean hasNext = r.nextTierName() != null && r.nextTierName().length() > 0
                 && r.toNextTier() > 0;
         words.add(Ui.text(hasNext
@@ -102,8 +109,16 @@ final class RewardsView {
         Label star = new Label("", "ShopPointsIcon");
         FontImage.setMaterialIcon(star, FontImage.MATERIAL_STARS, 3.4f);
         balance.add(BorderLayout.WEST, star);
-        balance.add(BorderLayout.CENTER, Ui.plain(Lang.tr("Points to spend"),
-                "ShopRewardsBalanceLabel"));
+        Container spend = new Container(BoxLayout.y());
+        spend.add(Ui.plain(Lang.tr("Points to spend"), "ShopRewardsBalanceLabel"));
+        long others = Rewards.otherPoints(r);
+        if (others > 0) {
+            Label more = Ui.plain(Lang.tr("+{0} pts at other stores", String.valueOf(others)),
+                    "ShopRewardsSpent");
+            more.setName("rewards-other-stores");
+            spend.add(more);
+        }
+        balance.add(BorderLayout.CENTER, spend);
         final Label pts = Ui.plain(points(0), "ShopRewardsBalancePts");
         pts.setName("rewards-points");
         balance.add(BorderLayout.EAST, pts);
@@ -192,7 +207,7 @@ final class RewardsView {
             earned.setName("points-earned");
             words.add(earned);
             words.add(Ui.text(Lang.tr("Added when your order ships. Balance after: {0}",
-                    points(r.points() + r.orderPoints())), "ShopPointsNote"));
+                    points(r.orderBalance())), "ShopPointsNote"));
             row.add(BorderLayout.CENTER, words);
             card.add(row);
             boolean[] now = Rewards.badges(r);

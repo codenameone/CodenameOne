@@ -16,12 +16,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-package com.codenameone.examples.bazaar.web.commerce;
+package com.codenameone.examples.bazaar.api;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.codename1.annotations.Mapped;
 
-/// A row of seven [CalendarDay]s.
-public class CalendarWeek {
-    public List<CalendarDay> days = new ArrayList<CalendarDay>();
+/// The shopper's standing in one store's loyalty programme: its spendable
+/// points and the tier reached there. Programmes differ store to store, so
+/// these are never added together into one balance.
+@Mapped
+public record StoreBalanceDto(
+        String storeId,
+        String storeName,
+        long points,
+        String tierName) {
 }
