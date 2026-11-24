@@ -1013,7 +1013,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/L
 ----
 
 .Skeleton rows, an avatar beside text, and a card
-image::img/generated/components-skeleton.png[Skeleton rows, an avatar beside text, and a card,scaledwidth=20%]
+image::img/generated/components-skeleton.png["Skeleton rows, an avatar beside text, and a card",scaledwidth=20%]
 
 `rows(n)`:: a list: per row, a round icon, a title, a shorter second line and a value at the far end
 `text(n)`:: lines of a paragraph, the last one shorter
@@ -1817,7 +1817,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/L
 ----
 
 .A Carousel on its second page, with its page dots
-image::img/generated/components-carousel.png[A Carousel on its second page, with its page dots,scaledwidth=20%]
+image::img/generated/components-carousel.png["A Carousel on its second page, with its page dots",scaledwidth=20%]
 
 `Carousel` is the swipeable `Tabs` described above with the tab bar hidden, plus a `PageIndicator`. It swipes, snaps and mirrors for right-to-left languages exactly as `Tabs` does, and `getTabs()` gives access to anything the class doesn't wrap. Auto play advances one page per interval while the carousel is on screen, waits at least one interval after the user touches it, and wraps from the last page to the first unless `setLoop(false)` is set. `setIndicatorPosition` moves the dots to `BorderLayout.NORTH`, or hides them with `null`. Each page change is announced to screen readers.
 
