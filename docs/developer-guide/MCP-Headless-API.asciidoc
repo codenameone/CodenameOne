@@ -128,7 +128,7 @@ Input timing (long press, double tap, fling velocity) keeps reading the wall clo
 
 A typical frozen loop is `ui_clock_freeze` once, then `ui_activate`, `ui_clock_settle` and `ui_snapshot` for each step.
 
-In the simulator, `sim_record_film` films an animation the same way: called right after the tap that starts it, with `{"path": "/tmp/open.png", "overMs": 600, "everyMs": 50}`, it steps the frozen clock and writes one contact-sheet PNG of the frames as they were shown, form transitions included. Every run of the script produces the same sheet.
+In the simulator, `sim_record_film` films an animation the same way: called right after the tap that starts it, with `{"path": "/tmp/open.png", "overMs": 600, "everyMs": 50}`, it steps the frozen clock and writes one contact-sheet PNG of the frames as they were shown, form transitions included. Each frame sits at the same point of the animation on every run, however fast the machine.
 
 === Publishing application tools
 

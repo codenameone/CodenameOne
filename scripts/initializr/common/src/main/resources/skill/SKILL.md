@@ -369,7 +369,7 @@ You can run, see and drive the app yourself -- no human, display or MCP host set
 For any UI-altering change:
 
 1. Start the app for yourself in the background: `./mvnw cn1:agent &` (Gradle: `./gradlew cn1Agent &`; Linux without a display: `xvfb-run -a ./gradlew cn1Agent &` -- the Maven goal starts Xvfb by itself). The window never takes the focus.
-2. From the project root, `java .agent-skills/codename-one/tools/Sim.java wait`, then `freeze` once, then `snapshot` to read the screen, `tap`/`type` to walk the changed flow (by label or node id), `settle` after every tap that navigates or animates, and `screenshot out.png` -- **open the PNG and look at it**. Frozen time means a screenshot never catches half a transition; never sleep to wait for an animation.
+2. From the project root, `java .agent-skills/codename-one/tools/Sim.java wait`, then `freeze` once, then `snapshot` to read the screen, `tap`/`type` to walk the changed flow (by label or node id), `settle` after every tap that navigates or animates, and `screenshot out.png` -- **open the PNG and look at it**. Frozen time means a screenshot never catches half a transition; never sleep to wait for an animation. `release` when you hand the simulator back to the developer.
 3. For a flow worth showing, `record-start flow.mp4` ... `record-stop` (needs ffmpeg). `call sim_rotate '{"orientation":"landscape"}'` checks another form factor.
 4. If you wrote a `screenshotTest`, delete the auto-generated baseline once if the screen has changed, then re-run twice -- the second run should pass with `true`.
 5. Stop the background simulator (`kill %1`) when you are done.

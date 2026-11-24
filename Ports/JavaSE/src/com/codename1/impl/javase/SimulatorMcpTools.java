@@ -804,6 +804,10 @@ final class SimulatorMcpTools {
             r.run();
             return;
         }
+        if (com.codename1.ui.animations.AnimationTime.isOverridden()) {
+            onEdtWhileFrozen(d, r);
+            return;
+        }
         final RuntimeException[] err = new RuntimeException[1];
         d.callSeriallyAndWait(new Runnable() {
             public void run() {
@@ -818,6 +822,57 @@ final class SimulatorMcpTools {
             throw err[0];
         }
     }
+
+    /// A form transition holds back every serial call, and on a frozen clock it never
+    /// ends, so an unbounded wait would hang the tool for good. Bounded instead: a call
+    /// the EDT has not started within the limit is withdrawn (it never runs late) and the
+    /// agent is told to settle. Mirrors `McpUiTools.runOnEdtWhileFrozen`.
+    private static void onEdtWhileFrozen(Display d, final Runnable r) {
+        final java.util.concurrent.atomic.AtomicInteger state = new java.util.concurrent.atomic.AtomicInteger(0);
+        final RuntimeException[] err = new RuntimeException[1];
+        final Object gate = new Object();
+        d.callSerially(new Runnable() {
+            public void run() {
+                if (!state.compareAndSet(0, 1)) {
+                    return;
+                }
+                try {
+                    r.run();
+                } catch (RuntimeException e) {
+                    err[0] = e;
+                } finally {
+                    synchronized (gate) {
+                        state.set(3);
+                        gate.notifyAll();
+                    }
+                }
+            }
+        });
+        long deadline = System.currentTimeMillis() + FROZEN_EDT_WAIT_MS;
+        synchronized (gate) {
+            while (state.get() != 3) {
+                long left = deadline - System.currentTimeMillis();
+                if (left <= 0 && state.compareAndSet(0, 2)) {
+                    throw new IllegalStateException("A form transition is running and the clock is frozen, "
+                            + "so the simulator cannot act until it finishes. Call ui_clock_settle "
+                            + "(or ui_clock_advance), then try again.");
+                }
+                try {
+                    gate.wait(left > 0 ? left : 50);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    if (state.compareAndSet(0, 2)) {
+                        throw new IllegalStateException("Interrupted", ex);
+                    }
+                }
+            }
+        }
+        if (err[0] != null) {
+            throw err[0];
+        }
+    }
+
+    private static final long FROZEN_EDT_WAIT_MS = 1500;
 
     /// The fold script of the running recording, cancelled when it stops.
     private FoldScript foldScript;
