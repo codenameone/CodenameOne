@@ -26,13 +26,13 @@ import java.util.Arrays;
 
 /// A live Codename One component placed in a document's text, such as a chart, a map, a button
 /// or a form. The document stores only a type name and the component's saved state; a view
-/// builds the component through the `ComponentFactory` registered for that type and keeps it in
+/// builds the component through the `EmbeddedComponents.Factory` registered for that type and keeps it in
 /// the reserved box while its line is on screen.
 ///
 /// Formats that cannot hold a live component (DOCX, ODT, HTML, PDF) receive the `snapshot`
 /// image when there is one, so the document still shows what the component looked like.
 public final class EmbeddedComponent implements Inline {
-    /// The factory type, as registered with `ComponentFactory.register`.
+    /// The factory type, as registered with `EmbeddedComponents.register`.
     public final String type;
 
     /// The component's saved state, in whatever form its factory chooses; often JSON.
