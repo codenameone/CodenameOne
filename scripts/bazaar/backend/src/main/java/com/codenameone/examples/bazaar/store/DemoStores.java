@@ -353,6 +353,7 @@ public class DemoStores {
         }
         List<Register> tills = new ArrayList<Register>();
         if (registers.findByStoreId(store.getId()).isEmpty()) {
+            com.codenameone.examples.bazaar.domain.TaxRate tax = pricing.counterTax(store.getId());
             for (Location place : locations.findByStoreIdOrderByPositionAsc(store.getId())) {
                 if ("WAREHOUSE".equals(place.getKind())) {
                     continue;
@@ -363,6 +364,10 @@ public class DemoStores {
                 r.setLocationId(place.getId());
                 r.setName(place.getName() + " register");
                 r.setActive(place.isActive());
+                if (tax != null) {
+                    r.setTaxCountry(tax.getCountry());
+                    r.setTaxRegion(tax.getRegion());
+                }
                 registers.insert(r);
                 tills.add(r);
             }

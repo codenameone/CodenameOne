@@ -452,6 +452,10 @@ public class PosSales {
             line.price = new PriceLine(line.cartLineId, p.getId(), v.getId(),
                     l.unitCents() > 0 ? l.unitCents() : v.getPriceCents(), l.quantity(),
                     v.getWeightGrams(), v.isTaxable());
+            // The register prices with the collections, so the server must too.
+            if (!custom(l)) {
+                quoter.collect(line.price);
+            }
             line.availableQty = Integer.MAX_VALUE;
             quote.lines.add(line);
         }

@@ -78,6 +78,11 @@ class PosTest {
     private AuditEventRepository audits;
     @Autowired
     private OrderEventRepository orderEvents;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.CollectionProductRepository
+            collectionMembers;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.DiscountRepository discountRows;
 
     /// A shop with a register at its location, taxed as New York (4%), and a
     /// shift open on it with a $100 float.
@@ -365,6 +370,69 @@ class PosTest {
         Map refused = (Map) t.sync(t.sale("unpaid", 2, card(1000))).get(0);
         assertEquals("ERROR", refused.get("status"));
         assertFalse(String.valueOf(refused.get("message")).isEmpty());
+    }
+
+    @Test
+    void anAutomaticCollectionDiscountIsTakenOffAsTheRegisterTookItOff() throws Exception {
+        Till t = new Till("pos-collection-off", 10);
+        com.codenameone.examples.bazaar.domain.CollectionProduct member =
+                new com.codenameone.examples.bazaar.domain.CollectionProduct();
+        member.setId(com.codenameone.examples.bazaar.Ids.next());
+        member.setCollectionId("sale-rack");
+        member.setProductId(t.shop.productId);
+        member.setPosition(0);
+        collectionMembers.insert(member);
+        com.codenameone.examples.bazaar.domain.Discount d =
+                new com.codenameone.examples.bazaar.domain.Discount();
+        d.setId(com.codenameone.examples.bazaar.Ids.next());
+        d.setStoreId(t.shop.storeId);
+        d.setCode("");
+        d.setTitle("Half off the rack");
+        d.setKind(com.codenameone.examples.bazaar.pricing.DiscountEngine.PERCENT);
+        d.setAmount(5000);
+        d.setAppliesTo(com.codenameone.examples.bazaar.pricing.DiscountEngine.COLLECTION);
+        d.setTargetId("sale-rack");
+        d.setAutomatic(true);
+        d.setCombinable(true);
+        d.setActive(true);
+        d.setCreatedAt(java.time.Instant.now());
+        discountRows.insert(d);
+        // Two $10.00 items at half off, plus New York's 4%: the register
+        // charged the card $10.40. The server used to skip the collection,
+        // ask $20.80 and refuse the sale as unpaid.
+        Map r = (Map) t.sync(t.sale("half", 2, card(1040))).get(0);
+        assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
+        assertEquals(1040, Rest.number(r, "totalCents"));
+    }
+
+    @Test
+    void aMembersOnlyPerkIsNotInTheRegistersCatalogAndASaleWithoutItUploads()
+            throws Exception {
+        Till t = new Till("pos-member-perk", 10);
+        com.codenameone.examples.bazaar.domain.Discount d =
+                new com.codenameone.examples.bazaar.domain.Discount();
+        d.setId(com.codenameone.examples.bazaar.Ids.next());
+        d.setStoreId(t.shop.storeId);
+        d.setCode("");
+        d.setTitle("Gold members save");
+        d.setKind(com.codenameone.examples.bazaar.pricing.DiscountEngine.PERCENT);
+        d.setAmount(2000);
+        d.setAppliesTo(com.codenameone.examples.bazaar.pricing.DiscountEngine.ALL);
+        d.setTargetId("");
+        d.setAutomatic(true);
+        d.setCombinable(true);
+        d.setEligibility("tier-gold");
+        d.setActive(true);
+        d.setCreatedAt(java.time.Instant.now());
+        discountRows.insert(d);
+        Map catalog = t.owner(get(t.base + "/registers/" + t.registerId + "/catalog"), null);
+        for (Object o : (List) catalog.get("discounts")) {
+            assertFalse(d.getId().equals(((Map) o).get("id")), "the register would take it off");
+        }
+        // The server prices the sale with no memberships: $10.00 + 4%.
+        Map r = (Map) t.sync(t.sale("full", 1, card(1040))).get(0);
+        assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
+        assertEquals(1040, Rest.number(r, "totalCents"));
     }
 
     @Test

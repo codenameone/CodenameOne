@@ -226,8 +226,10 @@ public final class Outbox {
     }
 
     /// The server answered `batch` with `results`, matched by client id. A
-    /// sale the answer does not mention goes back to wait.
-    public void answered(List<Entry> batch, List<PosSaleResultDto> results, long now) {
+    /// sale the answer does not mention goes back to wait. Answers the sales
+    /// the server refused (ERROR or APPROVAL), so the cashier is told.
+    public List<Entry> answered(List<Entry> batch, List<PosSaleResultDto> results, long now) {
+        List<Entry> refused = new ArrayList<Entry>();
         Map<String, PosSaleResultDto> byId = new HashMap<String, PosSaleResultDto>();
         for (int iter = 0; results != null && iter < results.size(); iter++) {
             PosSaleResultDto r = results.get(iter);
@@ -261,9 +263,13 @@ public final class Outbox {
             e.changeCents = r.changeCents();
             e.oversold = r.oversold();
             e.message = r.message() == null ? "" : r.message();
+            if (ERROR.equals(e.state) || APPROVAL.equals(e.state)) {
+                refused.add(e);
+            }
         }
         prune();
         save();
+        return refused;
     }
 
     /// The request for `batch` got no answer: every sale waits longer.

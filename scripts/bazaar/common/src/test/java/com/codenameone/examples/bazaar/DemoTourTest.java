@@ -622,6 +622,8 @@ public class DemoTourTest extends E2e {
                 }
                 pause(800);
                 visualShot("reg-receipt" + mode);
+                pause(6000);
+                dumpOutbox("receipt+6s");
                 tap("pos-new-sale");
                 pause(1500);
             }
@@ -670,9 +672,25 @@ public class DemoTourTest extends E2e {
         pause(2500);
         if (tap("pos-layaway-new")) {
             pause(1500);
-            // $50.00: the store asks 20% of the taxed total down, which is
-            // more than $20.00 for these two items.
-            for (String k : new String[] {"5", "0", "00"}) {
+            // The minimum the prompt itself asks ("Deposit, at least ..."):
+            // the store's share of the taxed total, rounded up to a dollar.
+            // A fixed $20.00 is under 20% of these two items.
+            final long[] min = new long[1];
+            onEdt(() -> {
+                com.codenameone.examples.bazaar.api.PosPolicyDto p =
+                        com.codenameone.examples.bazaar.pos.PosState.policy();
+                min[0] = com.codenameone.examples.bazaar.pos.PosRules.minimumDeposit(
+                        com.codenameone.examples.bazaar.pos.PosState.totals().totalCents,
+                        p == null ? 0 : p.layawayDepositBp());
+            });
+            String dollars = Long.toString(Math.max(1, (min[0] + 99) / 100));
+            java.util.List<String> keys = new java.util.ArrayList<>();
+            for (int i = 0; i < dollars.length(); i++) {
+                keys.add(dollars.substring(i, i + 1));
+            }
+            keys.add("00");
+            log("visual-register: layaway deposit $" + dollars);
+            for (String k : keys) {
                 tap("pos-amount-" + k);
                 pause(200);
             }
@@ -1003,6 +1021,32 @@ private void screens() throws Exception {
 
     /// "-dark" while [#screens] runs dark, so both modes share one folder.
     private String screensMode = "";
+
+    /// Writes the outbox's states and the server's messages next to the
+    /// shots, so a sale that never uploads says why.
+    private void dumpOutbox(String when) {
+        final StringBuilder b = new StringBuilder();
+        onEdt(() -> {
+            java.util.List<com.codenameone.examples.bazaar.pos.Outbox.Entry> es =
+                    com.codenameone.examples.bazaar.pos.PosState.outbox().entries();
+            for (int i = 0; i < es.size(); i++) {
+                b.append(when).append(' ').append(es.get(i).state).append(' ')
+                        .append(es.get(i).number).append(' ').append(es.get(i).message)
+                        .append('\n');
+            }
+        });
+        String dir = System.getProperty("bazaar.shots.dir");
+        if (dir == null) {
+            return;
+        }
+        try {
+            java.nio.file.Files.write(java.nio.file.Paths.get(dir, "outbox.txt"),
+                    b.toString().getBytes("UTF-8"), java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND);
+        } catch (java.io.IOException err) {
+            log("visual-register: outbox dump failed " + err);
+        }
+    }
 
     private void visualShot(String name) {
         shot("visual-" + name + screensMode + "-" + device());

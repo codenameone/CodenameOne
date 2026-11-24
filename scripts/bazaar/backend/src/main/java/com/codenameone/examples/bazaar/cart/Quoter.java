@@ -160,6 +160,17 @@ public class Quoter {
     ///
     /// @param address where it goes, or null for no shipping and tax yet
     /// @param username the shopper, or null for a guest
+    /// Writes the collections `line`'s product is in, so a discount aimed at a
+    /// collection finds it. The register's sales go through this too: they
+    /// left it out, the register took a collection discount off that the
+    /// server never did, and every such sale was refused as underpaid.
+    public void collect(PriceLine line) {
+        List<CollectionProduct> in = collections.findByProductId(line.productId);
+        for (int c = 0; c < in.size(); c++) {
+            line.collectionIds.add(in.get(c).getCollectionId());
+        }
+    }
+
     @Transactional(readOnly = true)
     public Quote price(Cart cart, AddressDto address, String rateId, String username)
             throws IOException {
@@ -243,10 +254,7 @@ public class Quoter {
                     variant.getPriceCents(), want.quantity,
                     variant.isDigital() ? 0 : variant.getWeightGrams(),
                     variant.isTaxable());
-            List<CollectionProduct> in = collections.findByProductId(product.getId());
-            for (int c = 0; c < in.size(); c++) {
-                line.price.collectionIds.add(in.get(c).getCollectionId());
-            }
+            collect(line.price);
             List<com.codenameone.examples.bazaar.catalog.Bundles.Part> parts =
                     bundleParts.get(variant.getId());
             if (parts != null) {

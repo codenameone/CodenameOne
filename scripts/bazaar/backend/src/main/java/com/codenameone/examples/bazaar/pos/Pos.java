@@ -556,7 +556,12 @@ public class Pos {
         List<Discount> ds = discounts.findByStoreIdOrderByCreatedAtDesc(storeId);
         List<DiscountDto> discountDtos = new ArrayList<DiscountDto>();
         for (int iter = 0; iter < ds.size(); iter++) {
-            if (!ds.get(iter).isActive()) {
+            // A members-only perk is left out: a sale at the counter is priced
+            // with no memberships (`PosSales.price`), and the register cannot
+            // read the eligibility off a DiscountDto, so it used to take the
+            // perk off every sale and the server refused each one as underpaid.
+            String members = ds.get(iter).getEligibility();
+            if (!ds.get(iter).isActive() || members != null && members.length() > 0) {
                 continue;
             }
             DiscountDto d = RateSettings.dto(ds.get(iter));

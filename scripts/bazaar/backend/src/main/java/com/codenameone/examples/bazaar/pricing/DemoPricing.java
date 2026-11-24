@@ -63,6 +63,16 @@ public class DemoPricing {
         this.locations = locations;
     }
 
+    /// The tax a demo register at the counter charges: the store's first
+    /// rate, which `Pos.addRegister` also falls back to. A register with no
+    /// tax country charges no tax at all, and the demo registers used to be
+    /// seeded that way, so the counter sold tax free while the store had
+    /// rates.
+    public TaxRate counterTax(String storeId) {
+        List<TaxRate> all = taxes.findByStoreId(storeId);
+        return all.isEmpty() ? null : all.get(0);
+    }
+
     @Transactional(rollbackFor = IOException.class)
     public void seed(String storeId) throws IOException {
         if (!zones.findByStoreIdOrderByPositionAsc(storeId).isEmpty()) {

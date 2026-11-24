@@ -25,6 +25,8 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.bazaar.api.PosSaleDto;
 import com.codenameone.examples.bazaar.api.PosSyncDto;
 import com.codenameone.examples.bazaar.net.Api;
+import com.codenameone.examples.bazaar.ui.Lang;
+import com.codenameone.examples.bazaar.ui.Ui;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -132,9 +134,15 @@ public final class PosSync {
                         inFlight = null;
                     }
                     online = true;
-                    box.answered(batch, result == null ? null : result.results(),
+                    List<Outbox.Entry> refused = box.answered(batch,
+                            result == null ? null : result.results(),
                             System.currentTimeMillis());
                     PosState.fireStatus();
+                    // A refused sale waits for a person: say so at once, with
+                    // the server's reason, instead of only a count on the pill.
+                    for (int iter = 0; iter < refused.size(); iter++) {
+                        Ui.say(Lang.tr("A sale did not upload: {0}", refused.get(iter).message));
+                    }
                     if (!box.due(System.currentTimeMillis()).isEmpty()) {
                         kick();
                     }

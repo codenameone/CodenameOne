@@ -221,6 +221,36 @@ class PosLogicTest {
     }
 
     @Test
+    void theAnswerNamesTheSalesTheServerRefusedSoTheCashierIsTold() {
+        final Map<String, String> disk = new HashMap<String, String>();
+        Outbox.Persist persist = new Outbox.Persist() {
+            @Override
+            public String read(String key) {
+                return disk.get(key);
+            }
+
+            @Override
+            public void write(String key, String value) {
+                disk.put(key, value);
+            }
+        };
+        Outbox box = new Outbox(persist, codec());
+        box.add(sale("ok", "v1", 1));
+        box.add(sale("bad", "v2", 1));
+        box.add(sale("mgr", "v3", 1));
+        List<Outbox.Entry> batch = box.due(0);
+        box.sending(batch);
+        List<Outbox.Entry> refused = box.answered(batch, Arrays.asList(result("ok", "OK"),
+                result("bad", "ERROR"), result("mgr", "APPROVAL")), 10);
+        assertEquals(2, refused.size());
+        assertEquals("bad", refused.get(0).clientId());
+        assertEquals("m", refused.get(0).message, "the server's reason travels with it");
+        assertEquals("mgr", refused.get(1).clientId());
+        assertTrue(box.answered(box.due(1000000), Arrays.<PosSaleResultDto>asList(), 20)
+                .isEmpty(), "a sale with no answer is not a refusal");
+    }
+
+    @Test
     void aLateAnswerToAnAbandonedRequestNeverReopensASettledSale() {
         final Map<String, String> disk = new HashMap<String, String>();
         Outbox.Persist persist = new Outbox.Persist() {
