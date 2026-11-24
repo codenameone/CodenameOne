@@ -506,6 +506,27 @@ final class PptxWriter {
         return id;
     }
 
+    /// The adjust guides of the presets whose names do not follow the adj / adj1..adjN
+    /// pattern, in the order of ECMA-376's presetShapeDefinitions.xml. PowerPoint matches a
+    /// guide by name, so a wrong name is silently ignored and the shape takes its default.
+    private static final String[][] GUIDE_NAMES = {
+        {"star5", "adj", "hf", "vf"},
+        {"star6", "adj", "hf"},
+        {"hexagon", "adj", "vf"},
+        {"pentagon", "hf", "vf"},
+        {"bentConnector3", "adj1"},
+        {"curvedConnector3", "adj1"},
+    };
+
+    static String guideName(String geometry, int i, int count) {
+        for (String[] g : GUIDE_NAMES) {
+            if (g[0].equals(geometry)) {
+                return i + 1 < g.length ? g[i + 1] : "adj" + (i + 1);
+            }
+        }
+        return count == 1 ? "adj" : "adj" + (i + 1);
+    }
+
     private static void nv(XmlOut x, int id, SlideElement e, String kind) throws IOException {
         String name = e.name != null && e.name.length() > 0 ? e.name
                 : kind + " " + (id - 1);
@@ -577,7 +598,7 @@ final class PptxWriter {
         x.raw("<a:prstGeom").attr("prst", geometry).raw("><a:avLst>");
         int n = s.adjustCount();
         for (int i = 0; i < n; i++) {
-            x.raw("<a:gd").attr("name", n == 1 ? "adj" : "adj" + (i + 1))
+            x.raw("<a:gd").attr("name", guideName(geometry, i, n))
                     .attr("fmla", "val " + pct(s.adjust(i, 0))).raw("/>");
         }
         x.raw("</a:avLst></a:prstGeom>");

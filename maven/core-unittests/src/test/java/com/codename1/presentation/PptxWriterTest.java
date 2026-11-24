@@ -173,4 +173,14 @@ class PptxWriterTest extends UITestBase {
             assertTrue(count(d, "pt") >= 8, kinds[i]);
         }
     }
+
+    @Test
+    void adjustGuidesUseThePresetNames() {
+        org.junit.jupiter.api.Assertions.assertEquals("hf", PptxWriter.guideName("star5", 1, 3));
+        org.junit.jupiter.api.Assertions.assertEquals("adj1",
+                PptxWriter.guideName("bentConnector3", 0, 1));
+        org.junit.jupiter.api.Assertions.assertEquals("adj", PptxWriter.guideName("roundRect", 0, 1));
+        org.junit.jupiter.api.Assertions.assertEquals("adj2",
+                PptxWriter.guideName("rightArrow", 1, 2));
+    }
 }
