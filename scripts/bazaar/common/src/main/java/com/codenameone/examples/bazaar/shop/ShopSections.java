@@ -90,7 +90,11 @@ public final class ShopSections {
 
     /// A collection from the storefront: the search, filtered to it.
     static void collection(String handle, String title) {
-        search(handle);
+        ShopState.query().clearFilters();
+        ShopState.query().collection = handle;
+        // The banner names the collection; the handle is for the server.
+        ShopState.query().collectionTitle = title;
+        show(Sections.SEARCH);
     }
 
     /// Goes to section `id` of the shop, back on the home screen if a pushed

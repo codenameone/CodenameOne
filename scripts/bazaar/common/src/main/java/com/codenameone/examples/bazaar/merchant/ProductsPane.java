@@ -22,6 +22,7 @@ import com.codename1.appkit.Net;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Component;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
@@ -384,5 +385,11 @@ final class ProductsPane extends MerchantPane {
     @Override
     boolean splits() {
         return true;
+    }
+
+    @Override
+    Component emptyDetail() {
+        return Ui.empty(FontImage.MATERIAL_SELL, "Select a product",
+                "Pick a product from the list to edit it here.");
     }
 }

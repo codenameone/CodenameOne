@@ -24,6 +24,7 @@ import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Component;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -310,7 +311,7 @@ final class CustomersPane extends MerchantPane {
     private void open(CustomerDto c) {
         final Container page = MUi.page("customer-detail");
         page.add(new com.codename1.appkit.Skeleton(4, "SvSkeleton"));
-        push(name(c), page);
+        pick(name(c), page);
         Api.customers().detail(MerchantState.storeId(), c.id(), Net.to(d -> detail(page, d),
                 Ui::fail));
     }
@@ -519,5 +520,11 @@ final class CustomersPane extends MerchantPane {
     @Override
     boolean splits() {
         return true;
+    }
+
+    @Override
+    Component emptyDetail() {
+        return Ui.empty(FontImage.MATERIAL_PERSON, "Select a customer",
+                "Pick a customer from the list to see them here.");
     }
 }

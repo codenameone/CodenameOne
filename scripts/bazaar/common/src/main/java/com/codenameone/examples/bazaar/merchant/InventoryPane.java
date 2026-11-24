@@ -306,7 +306,7 @@ final class InventoryPane extends MerchantPane {
                                 "Nothing has moved yet."));
                     }
                     page.add(card);
-                    push(l.productTitle() + " - " + l.variantTitle(), page);
+                    pick(l.productTitle() + " - " + l.variantTitle(), page);
                 }, Ui::fail));
     }
 
@@ -414,7 +414,7 @@ final class InventoryPane extends MerchantPane {
 
     /// Opens a detail screen from one of the tabs.
     void open(String heading, Component c) {
-        push(heading, c);
+        pick(heading, c);
     }
 
     void back() {
@@ -461,5 +461,11 @@ final class InventoryPane extends MerchantPane {
     @Override
     boolean splits() {
         return true;
+    }
+
+    @Override
+    Component emptyDetail() {
+        return Ui.empty(FontImage.MATERIAL_INVENTORY_2, "Select an item",
+                "Pick a row from the list to see its history here.");
     }
 }

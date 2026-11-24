@@ -267,7 +267,7 @@ final class OrdersPane extends MerchantPane {
     private void detailThen(String id, final boolean refund) {
         Api.orders().detail(MerchantState.storeId(), id, Net.to(order -> {
             OrderDetail detail = new OrderDetail(order, this::reload);
-            push(Lang.tr("Order #{0}", String.valueOf(order.number())), detail);
+            pick(Lang.tr("Order #{0}", String.valueOf(order.number())), detail);
             if (refund) {
                 detail.refund();
             }
@@ -400,5 +400,11 @@ final class OrdersPane extends MerchantPane {
     @Override
     boolean splits() {
         return true;
+    }
+
+    @Override
+    Component emptyDetail() {
+        return Ui.empty(FontImage.MATERIAL_RECEIPT_LONG, "Select an order",
+                "Pick an order from the list to see it here.");
     }
 }

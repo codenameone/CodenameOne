@@ -64,6 +64,8 @@ final class HomePane extends ShopPane {
     /// of the next, so the row reads as something to swipe.
     private static final float STORE_CARD_W_MM = 40f;
     private static final float STORE_CARD_H_MM = 20f;
+    private static final int STORE_CARD_W_MM_INT = 40;
+    private static final int STORE_CARD_H_MM_INT = 20;
 
     private ProductGrid grid;
     private final SearchQuery featured = new SearchQuery();
@@ -149,15 +151,16 @@ final class HomePane extends ShopPane {
         page.add(followingTitle);
         page.add(following);
 
+        final int width = Math.max(1, ProductGrid.room());
+        final int columns = ProductGrid.columns(width);
+        final int cardWidth = width / columns - CN.convertToPixels(3);
+
         page.add(title("Popular right now", null));
         final Container popular = row("discover-popular");
         placeholders(popular);
         page.add(popular);
 
         page.add(title("New across Bazaar", null));
-        final int width = Math.max(1, ProductGrid.room());
-        final int columns = ProductGrid.columns(width);
-        final int cardWidth = width / columns - CN.convertToPixels(3);
         final Container fresh = new Container(new com.codename1.ui.layouts.GridLayout(2, columns));
         fresh.setUIID("ShopGrid");
         fresh.setName("discover-new");
@@ -180,7 +183,15 @@ final class HomePane extends ShopPane {
             });
             Api.discover().feed(null, "popular", String.valueOf(ROW), Net.to(answer -> {
                 if (ticket == built) {
-                    fillRow(popular, answer);
+                    if (Layouts.split()) {
+                        // Wide, a carousel cut its last card off at the edge;
+                        // one full row of the grid fits the width instead.
+                        popular.setScrollableX(false);
+                        popular.setUIID("ShopGrid");
+                        fillGrid(popular, first(answer, columns), columns, cardWidth);
+                    } else {
+                        fillRow(popular, answer);
+                    }
                 }
             }, (status, message) -> popular.setHidden(true)));
             Api.discover().feed(null, "newest", String.valueOf(FEED), Net.to(answer -> {
@@ -239,9 +250,23 @@ final class HomePane extends ShopPane {
 
     private void fillStores(Container row, List<StoreDto> list) {
         row.removeAll();
+        int open = 0;
         for (StoreDto s : list) {
             if ("ACTIVE".equals(s.status())) {
-                row.add(storeCard(s));
+                open++;
+            }
+        }
+        int w = CN.convertToPixels(STORE_CARD_W_MM);
+        if (Layouts.split() && open > 0) {
+            // Wide, a couple of phone-sized cards left half the row empty:
+            // the cards share the width, two to four of them a row.
+            int across = Math.max(2, Math.min(open, 4));
+            row.setScrollableX(open > across);
+            w = Math.max(w, (Math.max(1, ProductGrid.room()) - CN.convertToPixels(3) * across) / across);
+        }
+        for (StoreDto s : list) {
+            if ("ACTIVE".equals(s.status())) {
+                row.add(storeCard(s, w));
             }
         }
         if (row.getComponentCount() == 0) {
@@ -251,9 +276,8 @@ final class HomePane extends ShopPane {
         Ui.relayout(row);
     }
 
-    private Component storeCard(final StoreDto s) {
-        int w = CN.convertToPixels(STORE_CARD_W_MM);
-        int h = CN.convertToPixels(STORE_CARD_H_MM);
+    private Component storeCard(final StoreDto s, int w) {
+        int h = Math.max(CN.convertToPixels(STORE_CARD_H_MM), w * STORE_CARD_H_MM_INT / STORE_CARD_W_MM_INT);
         Container card = new Container(new BorderLayout());
         card.setUIID("ShopStoreCard");
         Container top = new Container(new LayeredLayout());
@@ -335,6 +359,19 @@ final class HomePane extends ShopPane {
             row.setHidden(false);
             fillRow(row, answer);
         }, (status, message) -> { }));
+    }
+
+    /// The first `count` items of `answer`, for a single row of the grid.
+    private static ProductPageDto first(ProductPageDto answer, int count) {
+        List<ProductCardDto> items = answer.items();
+        if (items == null || items.size() <= count) {
+            return answer;
+        }
+        List<ProductCardDto> some = new java.util.ArrayList<ProductCardDto>();
+        for (int iter = 0; iter < count; iter++) {
+            some.add(items.get(iter));
+        }
+        return new ProductPageDto(some, answer.total(), answer.page(), answer.size());
     }
 
     private static void fillRow(Container row, ProductPageDto answer) {

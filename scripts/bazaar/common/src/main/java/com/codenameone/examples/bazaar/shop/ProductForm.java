@@ -602,7 +602,9 @@ final class ProductForm {
         final Container box = new Container(BoxLayout.y());
         box.setName("product-together");
         box.setHidden(true);
-        Ui.section(box, "Frequently bought together");
+        // A section of the page, under the description: the full heading gap,
+        // not the first-heading one an empty box would get from Ui.section.
+        box.add(Ui.label("Frequently bought together", "SvSection"));
         final Container row = new Container(BoxLayout.x());
         row.setScrollableX(true);
         box.add(row);

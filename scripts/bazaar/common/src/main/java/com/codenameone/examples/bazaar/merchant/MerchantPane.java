@@ -81,7 +81,6 @@ abstract class MerchantPane extends Container {
     /// The section's content, replacing whatever is shown.
     final void content(Component c) {
         stack.clear();
-        listShowing = false;
         c.remove();
         body.removeAll();
         body.add(BorderLayout.CENTER, c);
@@ -136,14 +135,12 @@ abstract class MerchantPane extends Container {
     }
 
     /// Opens a detail screen over the content.
+    ///
+    /// Beside the list, the screen stacks inside the detail pane, and Back
+    /// comes back to what was under it.
     final void push(String heading, Component detail) {
         if (split && root != null) {
-            if (!stack.isEmpty() && Boolean.TRUE.equals(stack.get(stack.size() - 1)[2])) {
-                // A second row picked from the list replaces the detail
-                // beside it; a screen the detail opens goes over it.
-                stack.remove(stack.size() - 1);
-            }
-            stack.add(new Object[] {heading, detail, Boolean.valueOf(listShowing)});
+            stack.add(new Object[] {heading, detail});
             beside(detail);
             return;
         }
@@ -163,6 +160,22 @@ abstract class MerchantPane extends Container {
         form.show();
     }
 
+    /// Opens what a row of the list was picked for. Beside the list it replaces
+    /// whatever the detail pane held, so Back never walks through rows picked
+    /// before; elsewhere it is [#push(String, Component)].
+    final void pick(String heading, Component detail) {
+        if (split && root != null) {
+            stack.clear();
+        }
+        push(heading, detail);
+    }
+
+    /// What the detail pane shows beside the list before a row is picked.
+    Component emptyDetail() {
+        return Ui.empty(FontImage.MATERIAL_TOUCH_APP, "Nothing selected",
+                "Pick a row from the list to see it here.");
+    }
+
     /// Goes back from the detail screen on top.
     final void pop() {
         if (split && root != null) {
@@ -171,7 +184,7 @@ abstract class MerchantPane extends Container {
             }
             stack.remove(stack.size() - 1);
             if (stack.isEmpty()) {
-                content(root);
+                beside(emptyDetail());
             } else {
                 beside((Component) stack.get(stack.size() - 1)[1]);
             }
@@ -203,6 +216,11 @@ abstract class MerchantPane extends Container {
 
     /// Back to the list after a detail screen saved or deleted something.
     final void popAll() {
+        if (split && root != null) {
+            stack.clear();
+            beside(emptyDetail());
+            return;
+        }
         if (wide) {
             while (!stack.isEmpty()) {
                 pop();
@@ -218,9 +236,6 @@ abstract class MerchantPane extends Container {
 
     private Component root;
 
-    /// Whether the section's list is on screen beside the detail, so a row
-    /// picked now replaces that detail rather than stacking over it.
-    private boolean listShowing;
 
     /// Whether this section's root is a list whose rows open a detail, which
     /// a wide screen shows beside it.
@@ -250,7 +265,6 @@ abstract class MerchantPane extends Container {
         right.add(BorderLayout.CENTER, detail);
         pair.add(BorderLayout.CENTER, right);
         body.add(BorderLayout.CENTER, pair);
-        listShowing = true;
         paintBar();
         Ui.relayout(this);
     }
@@ -259,6 +273,11 @@ abstract class MerchantPane extends Container {
     final void root(Component c) {
         root = c;
         content(c);
+        if (split) {
+            // Both panes from the start: the list, and an empty detail that
+            // says what picking a row will show.
+            beside(emptyDetail());
+        }
     }
 
     private void paintBar() {

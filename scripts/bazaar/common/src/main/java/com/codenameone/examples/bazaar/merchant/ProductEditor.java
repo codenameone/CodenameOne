@@ -118,11 +118,11 @@ final class ProductEditor extends Container {
     /// Opens the editor over `pane`: a new product when `productId` is null.
     static void open(final MerchantPane pane, String productId, final Runnable saved) {
         if (productId == null) {
-            pane.push(Lang.tr("New product"), new ProductEditor(pane, null, saved));
+            pane.pick(Lang.tr("New product"), new ProductEditor(pane, null, saved));
             return;
         }
         Api.catalog().merchantProduct(MerchantState.storeId(), productId, Net.to(p ->
-                pane.push(p.title(), new ProductEditor(pane, p, saved)), Ui::fail));
+                pane.pick(p.title(), new ProductEditor(pane, p, saved)), Ui::fail));
     }
 
     private void show(ProductDto p) {

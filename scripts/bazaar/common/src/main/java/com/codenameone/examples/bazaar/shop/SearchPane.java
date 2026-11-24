@@ -189,10 +189,12 @@ final class SearchPane extends ShopPane {
         if (query.collection != null) {
             Container on = new Container(new BorderLayout());
             on.setUIID("ShopFilterOn");
-            on.add(BorderLayout.CENTER, Ui.plain(Lang.tr("Collection: {0}", query.collection),
+            on.add(BorderLayout.CENTER, Ui.plain(Lang.tr("Collection: {0}",
+                    query.collectionTitle != null ? query.collectionTitle : query.collection),
                     "SvMutedSmall"));
             on.add(BorderLayout.EAST, Ui.link("Clear", "collection-clear", e -> {
                 query.collection = null;
+                query.collectionTitle = null;
                 build();
                 Ui.relayout(this);
             }));
@@ -266,6 +268,7 @@ final class SearchPane extends ShopPane {
                         }, (status, message) -> { }));
             } else {
                 query.collection = s.handle();
+                query.collectionTitle = s.title();
                 query.q = "";
                 build();
                 Ui.relayout(this);

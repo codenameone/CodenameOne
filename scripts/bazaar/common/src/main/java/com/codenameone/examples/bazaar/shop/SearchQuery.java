@@ -25,6 +25,9 @@ package com.codenameone.examples.bazaar.shop;
 public final class SearchQuery {
     public String q = "";
     public String collection;
+    /// The collection's title, for the banner; null when only the handle is
+    /// known. Never sent to the server.
+    public String collectionTitle;
     public String type;
     /// A top-level taxonomy category id, 0 for any.
     public int category;
@@ -55,6 +58,7 @@ public final class SearchQuery {
 
     public void clearFilters() {
         collection = null;
+        collectionTitle = null;
         type = null;
         vendor = null;
         tag = null;
