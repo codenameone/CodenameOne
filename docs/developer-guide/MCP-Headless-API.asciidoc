@@ -145,6 +145,10 @@ The largest-text condition is skipped, and says so, when the application hasn't 
 
 `mvn cn1:verify` runs the same check without an agent: it starts the simulator hidden, verifies the first form, writes `common/target/cn1-verify/report.html` and fails the build when the report has an error. Pass `-Dcn1.verify.failOnError=false` to only write the report. To check the other screens, navigate to each one in `cn1:agent` and call `sim_verify` there.
 
+=== Recording friction: `cn1:feedback`
+
+`mvn cn1:feedback -Dnote="The CSS error didn't name the file"` saves the note as a Markdown file under `.cn1/feedback/` in the project, with the time and the plugin, Java and OS versions. Nothing else is recorded, no source code included, and nothing leaves the machine. The project skill asks agents to log a note whenever something gets in their way, so the folder becomes a list the developer can read or send to Codename One.
+
 === Publishing application tools
 
 An application publishes its own data and actions as MCP tools. A `Tool` has a name, a description, a JSON schema for its parameters, and a handler:
