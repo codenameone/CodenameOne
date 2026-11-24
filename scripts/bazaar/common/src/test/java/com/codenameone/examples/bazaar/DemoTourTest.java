@@ -166,7 +166,9 @@ public class DemoTourTest extends E2e {
                     safeBack();
                 }
                 pause(3000);
-                shotAs("shop-order");
+                shotAs("shop-order-tracking");
+                caption("Followed live, all the way to the door", 3000);
+                followToDelivered(this::shotAs, "shop-order");
             }
         }
         go(Sections.ORDERS);
@@ -1026,6 +1028,7 @@ private void screens() throws Exception {
                 }
                 pause(3000);
                 visualShot("shop-order-tracking");
+                followToDelivered(this::visualShot, "shop-order");
                 safeBack();
                 pause(1500);
             }
@@ -1033,6 +1036,9 @@ private void screens() throws Exception {
         go(Sections.ACCOUNT);
         pause(2000);
         visualShot("shop-account-signed-in");
+        scrollDown(2);
+        pause(900);
+        visualShot("shop-account-rewards");
         signOut();
         pause(1500);
 
@@ -1421,6 +1427,52 @@ private void screens() throws Exception {
             pause(1000);
         }
         return false;
+    }
+
+    /// The tracking hero's name now: `track-stage-N` or `track-delivered`.
+    private String trackStage() {
+        final String[] name = new String[1];
+        onEdt(() -> {
+            java.util.List<Component> out = new java.util.ArrayList<Component>();
+            collect(Display.getInstance().getCurrent(), "track-", out);
+            for (Component c : out) {
+                String nm = c.getName();
+                if (nm.startsWith("track-stage-") || nm.equals("track-delivered")) {
+                    name[0] = nm;
+                }
+            }
+        });
+        return name[0];
+    }
+
+    /// Follows the order on screen to Delivered: the dev server's shopper
+    /// demo moves it a step every few seconds over the WebSocket. Each new
+    /// stage is shot through `shot` with its name, and once mid-step (the
+    /// van moving, the banner coming in) as `<base>-moving`. Waits on the
+    /// names, never a fixed time, up to 90 seconds.
+    private void followToDelivered(java.util.function.Consumer<String> shot, String base) {
+        String last = null;
+        boolean moving = false;
+        long end = System.currentTimeMillis() + 90000;
+        while (System.currentTimeMillis() < end) {
+            String now = trackStage();
+            if (now != null && !now.equals(last)) {
+                if (last != null && !moving) {
+                    pause(120);
+                    shot.accept(base + "-moving");
+                    moving = true;
+                }
+                last = now;
+                if ("track-delivered".equals(now)) {
+                    pause(900);
+                    shot.accept(base + "-delivered");
+                    pause(1800);
+                    return;
+                }
+            }
+            pause(100);
+        }
+        shot.accept(base + "-timeout");
     }
 
     private boolean tapRow(final String prefix) {

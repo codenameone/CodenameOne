@@ -33,13 +33,13 @@ import com.codename1.ui.plaf.Style;
 /// asks for and the caption what is left, so a long value cut the caption to
 /// "Legal nar" or "Veh". This row puts the two side by side while they fit,
 /// and otherwise the caption on a line of its own with the value under it.
-final class FactRow extends Container {
+public final class FactRow extends Container {
     private final Label caption;
     private final Label value;
     /// Whether the height last reported was the stacked one.
     private boolean plannedStacked;
 
-    FactRow(Label caption, Label value) {
+    public FactRow(Label caption, Label value) {
         this.caption = caption;
         this.value = value;
         value.setEndsWith3Points(true);

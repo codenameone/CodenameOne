@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
-import com.codename1.appkit.Skeleton;
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -59,7 +58,7 @@ final class CartPane extends ShopPane {
     CartPane() {
         super(new BorderLayout());
         setName("shop-cart");
-        add(BorderLayout.CENTER, new Skeleton(5, "SvSkeleton"));
+        add(BorderLayout.CENTER, new com.codenameone.examples.bazaar.ui.Shimmer(5, "SvSkeleton"));
         reload();
     }
 
@@ -168,7 +167,9 @@ final class CartPane extends ShopPane {
         words.add(FlowLayout.encloseIn(stepper));
         row.add(BorderLayout.CENTER, words);
         Container prices = new Container(BoxLayout.y());
-        prices.add(Ui.plain(ShopState.money(line.priceCents() * line.quantity()), "SvRowValue"));
+        // A quantity change rolls the line's price to its new amount.
+        prices.add(ShopFx.rolling("line-" + line.id(), line.priceCents() * line.quantity(),
+                "SvRowValue", ShopState::money));
         if (line.discountCents() > 0) {
             prices.add(Ui.plain(ShopState.money(-line.discountCents()), "SvDiscount"));
         }
@@ -263,6 +264,14 @@ final class CartPane extends ShopPane {
             String value = row.kind == Estimate.NOTE ? Lang.tr(row.note) : ShopState.money(row.cents);
             String uiid = row.kind == Estimate.TOTAL ? "SvTotal"
                     : row.kind == Estimate.SAVING ? "SvDiscount" : "SvFactValue";
+            if (row.kind == Estimate.TOTAL) {
+                Container fact = new com.codenameone.examples.bazaar.ui.FactRow(
+                        Ui.label(caption, "SvFactLabel"), ShopFx.rolling("total", row.cents, uiid,
+                        ShopState::money));
+                fact.setUIID("SvFact");
+                box.add(fact);
+                continue;
+            }
             box.add(Ui.fact(caption, value, uiid));
         }
     }

@@ -46,8 +46,12 @@ for run in $RUNS; do
   done
   # ~/.cn1 is where the simulator keeps the app's Storage.
   rm -rf "${HOME:?}/.cn1" "${HOME:?}/CodenameOneStorage"
+  # The shopper side (a history, and the tour's order followed to Delivered)
+  # only for the shopper tour: the merchant tour seeds orders for the owner to
+  # pack, which it would pack first.
+  SHOPPER=false; [ "$tour" = shop ] && SHOPPER=true
   # A fresh database per run, so every tour starts from the seed.
-  CN1_PROFILE=test BAZAAR_DEMO_PIPELINE=true BAZAAR_CARRIER_SIMULATED_STEP_SECONDS=8 "$HERE/backend/server.sh" run --jvm --prebuilt --port "$PORT" >"$OUT/server-$tour-$device.log" 2>&1 &
+  CN1_PROFILE=test BAZAAR_DEMO_PIPELINE=true BAZAAR_DEMO_SHOPPER=$SHOPPER BAZAAR_CARRIER_SIMULATED_STEP_SECONDS=8 "$HERE/backend/server.sh" run --jvm --prebuilt --port "$PORT" >"$OUT/server-$tour-$device.log" 2>&1 &
   SERVER=$!
   for _ in $(seq 1 120); do curl -fs -o /dev/null "http://localhost:$PORT/oauth2/jwks" && break; sleep 1; done
   OPTS="-Xmx1500m -Dbazaar.server.url=http://localhost:$PORT -Dbazaar.shots.dir=$OUT/shots -Dbazaar.demo.tour=$tour -Dbazaar.demo.dir=$OUT/video -Dbazaar.demo.fps=${FPS:-60}"

@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
-import com.codename1.appkit.Skeleton;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
@@ -64,7 +63,7 @@ final class ProductReviews {
     /// The summary for the product page.
     static Container create(String productId, String title) {
         ProductReviews r = new ProductReviews(productId, title, false);
-        r.box.add(new Skeleton(2, "SvSkeleton"));
+        r.box.add(new com.codenameone.examples.bazaar.ui.Shimmer(2, "SvSkeleton"));
         r.load();
         return r.box;
     }
@@ -79,7 +78,7 @@ final class ProductReviews {
         Container page = Ui.page();
         page.setName("reviews");
         ProductReviews r = new ProductReviews(productId, title, true);
-        r.box.add(new Skeleton(4, "SvSkeleton"));
+        r.box.add(new com.codenameone.examples.bazaar.ui.Shimmer(4, "SvSkeleton"));
         page.add(r.box);
         form.add(BorderLayout.CENTER, page);
         form.show();

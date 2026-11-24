@@ -138,6 +138,12 @@ final class HomePane extends ShopPane {
         head.add(search);
         page.add(head);
 
+        // The daily drop, filled from the popular feed below.
+        final Container drop = new Container(BoxLayout.y());
+        drop.setName("discover-drop");
+        drop.setHidden(true);
+        page.add(drop);
+
         page.add(title("Stores", null));
         final Container stores = row("discover-stores");
         stores.add(storePlaceholder());
@@ -183,6 +189,7 @@ final class HomePane extends ShopPane {
             });
             Api.discover().feed(null, "popular", String.valueOf(ROW), Net.to(answer -> {
                 if (ticket == built) {
+                    RewardsView.dailyDrop(drop, answer);
                     if (Layouts.split()) {
                         // Wide, a carousel cut its last card off at the edge;
                         // one full row of the grid fits the width instead.

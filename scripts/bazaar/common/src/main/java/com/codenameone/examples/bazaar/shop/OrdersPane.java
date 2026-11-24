@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
-import com.codename1.appkit.Skeleton;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
@@ -46,6 +45,14 @@ final class OrdersPane extends ShopPane {
 
     /// An order to open when the pane is next built: the one just placed.
     static String open;
+
+    /// The tracking stage each order was last seen at, so that a change heard
+    /// over the live channel animates from there and is announced once.
+    /// The order last drawn on screen, so an identical answer is not drawn again.
+    private OrderDto onScreen;
+
+    private static final java.util.Map<String, Integer> SEEN =
+            new java.util.HashMap<String, Integer>();
 
     private final boolean wide = Layouts.split();
     private final Container list = Ui.list("orders");
@@ -105,6 +112,7 @@ final class OrdersPane extends ShopPane {
                     "Orders you place show up here, with where they are."));
         }
         for (final OrderDto o : orders) {
+            announce(o);
             Container row = new Container(new BorderLayout());
             row.setUIID(o.id().equals(shown) && wide ? "SvRowPicked" : "SvOrderRow");
             Container words = new Container(BoxLayout.y());
@@ -136,11 +144,31 @@ final class OrdersPane extends ShopPane {
         }
     }
 
+    /// Drops in the banner for an order that moved on while its screen is not
+    /// the one up; the screen of the order on show announces its own.
+    private void announce(OrderDto o) {
+        int now = TrackStages.reached(o);
+        Integer was = SEEN.get(o.id());
+        if (was == null) {
+            SEEN.put(o.id(), Integer.valueOf(now));
+            return;
+        }
+        if (o.id().equals(shown)) {
+            return;
+        }
+        SEEN.put(o.id(), Integer.valueOf(now));
+        String banner = TrackStages.banner(was.intValue(), now);
+        if (banner != null) {
+            ShopFx.banner(CN.getCurrentForm(), FontImage.MATERIAL_LOCAL_SHIPPING, banner,
+                    Lang.tr("Order #{0}", String.valueOf(o.number())));
+        }
+    }
+
     private void show(final String id) {
         shown = id;
         if (wide) {
             detail.removeAll();
-            detail.add(BorderLayout.CENTER, new Skeleton(6, "SvSkeleton"));
+            detail.add(BorderLayout.CENTER, new com.codenameone.examples.bazaar.ui.Shimmer(6, "SvSkeleton"));
             Ui.relayout(detail);
         }
         // A phone pushes a form for the answer; if the user has gone elsewhere
@@ -150,7 +178,26 @@ final class OrdersPane extends ShopPane {
             if (!id.equals(shown)) {
                 return;
             }
-            Container view = OrderView.create(order, wide, changed -> {
+            // One change on the server can be heard more than once (the order
+            // and its parcel); the same answer again must not replace the
+            // screen while it animates the step.
+            if (order.equals(onScreen) && (wide || CN.getCurrentForm() == pushed)) {
+                return;
+            }
+            onScreen = order;
+            int now = TrackStages.reached(order);
+            Integer was = SEEN.get(order.id());
+            if (was == null) {
+                SEEN.put(order.id(), Integer.valueOf(now));
+            } else if (was.intValue() != now) {
+                // Recorded once the step has played, so a second answer for
+                // the same change, drawn over the first, still animates it.
+                final String key = order.id();
+                final Integer seen = Integer.valueOf(now);
+                CN.setTimeout(900, () -> SEEN.put(key, seen));
+            }
+            Container view = OrderView.create(order, wide, was == null ? now : was.intValue(),
+                    changed -> {
                 reload();
                 show(changed.id());
             });

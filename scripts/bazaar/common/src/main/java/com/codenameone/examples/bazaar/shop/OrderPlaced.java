@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -33,8 +34,9 @@ import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Sections;
 import com.codenameone.examples.bazaar.ui.Ui;
 
-/// The order went through: its number, a check that fades in (no confetti),
-/// and the ways on -- to the order, or back to the store.
+/// The order went through: its number, a check that fades in, a short burst
+/// of confetti, the points it earns and any badge it unlocked, and the ways
+/// on -- to the order (followed there to the door), or back to the store.
 final class OrderPlaced {
     private OrderPlaced() {
     }
@@ -55,6 +57,7 @@ final class OrderPlaced {
         page.add(Ui.text(Lang.tr("We sent a receipt to {0}. You will hear from us when it ships.",
                 order.email() == null ? "" : order.email()), "ShopCentered"));
         page.add(Ui.fact(Lang.tr("Total"), ShopState.money(order.totalCents()), "SvTotal"));
+        page.add(RewardsView.placed(order));
         final Container offer = new Container(BoxLayout.y());
         offer.setName("order-upsell");
         page.add(offer);
@@ -66,6 +69,12 @@ final class OrderPlaced {
         // Fades in after the slide: quiet, and over within half a second.
         page.setVisible(true);
         page.animateHierarchyFade(450, 0);
+        // The celebration starts as the page settles.
+        CN.setTimeout(350, () -> {
+            if (CN.getCurrentForm() == form) {
+                ShopFx.confetti(form);
+            }
+        });
     }
 
     /// The store's post-purchase offer, when it has one for this order: one

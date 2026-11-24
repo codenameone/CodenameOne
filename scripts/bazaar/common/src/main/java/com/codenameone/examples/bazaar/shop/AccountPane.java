@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
-import com.codename1.appkit.Skeleton;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -88,6 +87,10 @@ final class AccountPane extends ShopPane {
         wallet.setUIID("SvPairEnd");
         buttons.add(edit).add(wallet);
         page.add(buttons);
+        if (user != null) {
+            // Points, the tier ring and the badges, from the server.
+            page.add(RewardsView.account());
+        }
 
         Container main = page;
         Container side = page;
@@ -237,7 +240,7 @@ final class AccountPane extends ShopPane {
     /// Unfollow drops it from the list there and then.
     private void follows() {
         followed.removeAll();
-        followed.add(new Skeleton(1, "SvSkeleton"));
+        followed.add(new com.codenameone.examples.bazaar.ui.Shimmer(1, "SvSkeleton"));
         ShopState.loadFollows(this::fillFollows);
     }
 
@@ -276,7 +279,7 @@ final class AccountPane extends ShopPane {
     /// got; a tap opens its order.
     private void returns() {
         returned.removeAll();
-        returned.add(new Skeleton(1, "SvSkeleton"));
+        returned.add(new com.codenameone.examples.bazaar.ui.Shimmer(1, "SvSkeleton"));
         Api.returns().requested(Net.to(list -> {
             returned.removeAll();
             for (int iter = 0; list != null && iter < list.size(); iter++) {

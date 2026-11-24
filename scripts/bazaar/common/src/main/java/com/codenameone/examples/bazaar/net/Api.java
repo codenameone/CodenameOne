@@ -91,6 +91,7 @@ public final class Api {
     private static OrderToolsApi orderTools;
     private static com.codenameone.examples.bazaar.api.TrialApi trials;
     private static com.codenameone.examples.bazaar.api.UpsellApi upsells;
+    private static com.codenameone.examples.bazaar.api.RewardsApi rewards;
     private static StockStatesApi stockStates;
     private static ShippingApi shipping;
     private static RoutingApi routing;
@@ -155,6 +156,8 @@ public final class Api {
         orderTools = RestClients.create(OrderToolsApi.class, baseUrl);
         trials = RestClients.create(com.codenameone.examples.bazaar.api.TrialApi.class, baseUrl);
         upsells = RestClients.create(com.codenameone.examples.bazaar.api.UpsellApi.class,
+                baseUrl);
+        rewards = RestClients.create(com.codenameone.examples.bazaar.api.RewardsApi.class,
                 baseUrl);
         stockStates = RestClients.create(StockStatesApi.class, baseUrl);
         shipping = RestClients.create(ShippingApi.class, baseUrl);
@@ -252,6 +255,11 @@ public final class Api {
 
     public static com.codenameone.examples.bazaar.api.UpsellApi upsells() {
         return upsells;
+    }
+
+    /// The shopper's points, tier and badge counts.
+    public static com.codenameone.examples.bazaar.api.RewardsApi rewards() {
+        return rewards;
     }
 
     public static StockStatesApi stockStates() {

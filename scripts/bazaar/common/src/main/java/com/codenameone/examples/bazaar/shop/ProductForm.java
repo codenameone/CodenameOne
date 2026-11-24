@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
-import com.codename1.appkit.Skeleton;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -90,7 +89,7 @@ final class ProductForm {
         this.host = host;
         this.wide = wide;
         root.setName("product");
-        root.add(BorderLayout.CENTER, new Skeleton(6, "SvSkeleton"));
+        root.add(BorderLayout.CENTER, new com.codenameone.examples.bazaar.ui.Shimmer(6, "SvSkeleton"));
     }
 
     /// Opens the product with `id` as a screen, with a way back.
@@ -108,8 +107,25 @@ final class ProductForm {
             }
         };
         form.addKeyListener(ESC, esc);
-        form.addShowListener(e -> view.listen());
-        form.show();
+        form.addShowListener(e -> {
+            view.listen();
+            ShopFx.hero(form);
+        });
+        if (ShopFx.hasHero() && previous != null) {
+            // The photo growing out of the card is the transition: no slide
+            // under it, then the usual ones again for Back.
+            com.codename1.ui.animations.Transition out = previous.getTransitionOutAnimator();
+            com.codename1.ui.animations.Transition in = form.getTransitionInAnimator();
+            com.codename1.ui.animations.Transition none =
+                    com.codename1.ui.animations.CommonTransitions.createEmpty();
+            previous.setTransitionOutAnimator(none);
+            form.setTransitionInAnimator(none);
+            form.show();
+            previous.setTransitionOutAnimator(out);
+            form.setTransitionInAnimator(in);
+        } else {
+            form.show();
+        }
         view.load(id);
     }
 
@@ -342,6 +358,9 @@ final class ProductForm {
             boolean on = ShopState.toggleWish(product.id());
             ShopUi.tap();
             FontImage.setMaterialIcon(heart, ProductCard.wishIcon(on), 3.8f);
+            if (on) {
+                ShopFx.pop(heart);
+            }
             Ui.say(on ? "Saved to your wishlist" : "Removed from your wishlist");
         });
         Button share = new Button("", "ShopIconButton");

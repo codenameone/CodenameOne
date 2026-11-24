@@ -138,6 +138,11 @@ final class ShopUi {
             if (c instanceof Label) {
                 ((Label) c).setBadgeText(text);
                 ((Label) c).setBadgeUIID("ShopBadge");
+                if (text != null && !text.equals(c.getClientProperty("bz.badge"))
+                        && c.getClientProperty("bz.badge") != null) {
+                    ShopFx.pop((Label) c);
+                }
+                c.putClientProperty("bz.badge", text == null ? "" : text);
                 c.repaint();
             }
         }

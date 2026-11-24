@@ -46,7 +46,7 @@ chmod +x "$WRAP"
 export MVN="$WRAP"
 
 "$HERE/backend/server.sh" build --jvm
-CN1_PROFILE=test BAZAAR_DEMO_PIPELINE=true BAZAAR_CARRIER_SIMULATED_STEP_SECONDS=8 "$HERE/backend/server.sh" run --jvm --prebuilt --port "$PORT" \
+CN1_PROFILE=test BAZAAR_DEMO_PIPELINE=true BAZAAR_DEMO_SHOPPER=true BAZAAR_CARRIER_SIMULATED_STEP_SECONDS=8 "$HERE/backend/server.sh" run --jvm --prebuilt --port "$PORT" \
   >"$HERE/target/visual-server.log" 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true' EXIT

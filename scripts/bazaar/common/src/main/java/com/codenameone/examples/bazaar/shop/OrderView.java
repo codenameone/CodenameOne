@@ -57,6 +57,14 @@ final class OrderView {
     /// order: the page then opens on its date and status instead of saying
     /// "Order #1015" a second time under the same words.
     static Container create(final OrderDto order, final boolean titled, final Changed changed) {
+        int now = TrackStages.reached(order);
+        return create(order, titled, now, changed);
+    }
+
+    /// [#create] that animates the tracker from stage `before`, the one the
+    /// shopper last saw this order at.
+    static Container create(final OrderDto order, final boolean titled, final int before,
+            final Changed changed) {
         Container page = Ui.page();
         page.setName("order-" + order.number());
         Container head = new Container(new BorderLayout());
@@ -71,7 +79,11 @@ final class OrderView {
         if (titled) {
             page.add(Ui.plain(Ui.when(order.createdAt()), "SvMuted"));
         }
-        page.add(timeline(order));
+        if (TrackStages.reached(order) == TrackStages.CANCELLED) {
+            page.add(timeline(order));
+        } else {
+            page.add(TrackerView.create(order, before));
+        }
 
         Ui.section(page, "Items");
         for (OrderLineDto line : order.lines()) {

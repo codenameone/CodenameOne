@@ -3427,3 +3427,98 @@ MeFunnelValue { color: var(--text-muted); background-color: transparent; font-fa
     MeFunnelValue { color: var(--text-muted-dark); }
 }
 /* ---- end MERCHANT ROUND B ---- */
+/* ---- SHOPPER ROUND A: order tracking, rewards, motion ---- */
+ShopTrackHero { background-color: var(--brand-tint); border-radius: var(--radius); padding: 3mm 3mm 1mm 3mm; margin: 1mm 0 2mm 0; }
+ShopTrackTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.6mm; padding: 0; margin: 0; }
+ShopTrackTitleDone { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 4.6mm; padding: 0; margin: 0; }
+ShopTrackSub { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.6mm 0 0 0; margin: 0; }
+ShopRoute { background-color: transparent; padding: 0; margin: 1mm 0 0 0; }
+ShopRouteLine { color: var(--line-strong); background-color: transparent; }
+ShopRouteDone { color: var(--brand); background-color: transparent; }
+ShopRouteMarker { color: var(--brand-contrast); background-color: var(--brand); }
+ShopTrackSteps { background-color: var(--surface-alt); border-radius: var(--radius); padding: 2.4mm 2.4mm 0.6mm 2.4mm; margin: 0 0 2mm 0; }
+ShopTrackStep { background-color: transparent; padding: 0; margin: 0; }
+ShopTrackTick { color: var(--brand); background-color: transparent; padding: 0; margin: 0; }
+ShopTrackTickNow { color: var(--brand); background-color: transparent; padding: 0; margin: 0; }
+ShopTrackTickTodo { color: var(--line-strong); background-color: transparent; padding: 0; margin: 0; }
+ShopTrackLine { background-color: var(--line-strong); padding: 0 0.15mm 0 0.15mm; margin: 0.4mm 0 0.4mm 1.7mm; }
+ShopTrackLineDone { background-color: var(--brand); padding: 0 0.2mm 0 0.2mm; margin: 0.4mm 0 0.4mm 1.65mm; }
+ShopTrackTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0.6mm 0 2.6mm 0; margin: 0; background-color: transparent; }
+ShopBanner { color: var(--brand); background-color: var(--surface); }
+ShopBannerTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.75mm; }
+ShopBannerText { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; }
+ShopBurst { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; }
+ShopRewards { background-color: var(--surface-alt); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
+ShopRewardsWords { background-color: transparent; padding: 1.4mm 0 0 3mm; margin: 0; }
+ShopRewardsTier { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0; margin: 0; }
+ShopRewardsPoints { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 5.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
+ShopRewardsNext { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0; margin: 0; }
+ShopRing { background-color: var(--surface-alt); padding: 0; margin: 0; }
+ShopRingTrack { color: var(--line); background-color: transparent; }
+ShopRingFill { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.8mm; }
+ShopBadges { background-color: transparent; padding: 2.4mm 0 0 0; margin: 0; }
+ShopBadgeTile { background-color: transparent; padding: 0 0.6mm 0 0.6mm; margin: 0; }
+ShopBadgeOn { color: var(--warning); background-color: transparent; padding: 0; margin: 0; }
+ShopBadgeOff { color: var(--line-strong); background-color: transparent; padding: 0; margin: 0; }
+ShopBadgeName { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 0.6mm 0 0 0; margin: 0; }
+ShopBadgeHint { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 1.9mm; text-align: center; padding: 0; margin: 0; }
+ShopRewardsPlaced { background-color: var(--warning-tint); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
+ShopPointsIcon { color: var(--warning); background-color: transparent; padding: 0 3mm 0 0; margin: 0; }
+ShopPointsEarned { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.6mm; padding: 0; margin: 0; }
+ShopPointsNote { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopReveal { background-color: var(--surface); border-radius: var(--radius); padding: 2.6mm; margin: 2.4mm 0 0 0; }
+ShopRevealKicker { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 2mm; padding: 0 0 0 2.4mm; margin: 0; }
+ShopRevealTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0 0 0 2.4mm; margin: 0; }
+ShopRevealText { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0 0 0 2.4mm; margin: 0; }
+ShopDrop { background-color: var(--brand-tint); border-radius: var(--radius); padding: 2.4mm; margin: 2mm 3mm 0 3mm; }
+ShopDropPhoto { background-color: transparent; border-radius: var(--radius-small); padding: 0; margin: 0; }
+ShopDropWords { background-color: transparent; padding: 0.6mm 0 0 3mm; margin: 0; }
+ShopDropKicker { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0; margin: 0; }
+ShopDropTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopDropPrice { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopDropStreak { color: #c2410c; background-color: transparent; font-family: "native:MainBold"; font-size: 2.2mm; padding: 1mm 0 0 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    ShopTrackHero { background-color: var(--brand-tint-dark); }
+    ShopTrackTitle { color: var(--text-dark); }
+    ShopTrackTitleDone { color: var(--success-dark); }
+    ShopTrackSub { color: var(--text-muted-dark); }
+    ShopRouteLine { color: var(--line-strong-dark); }
+    ShopRouteDone { color: var(--brand-dark); }
+    ShopRouteMarker { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopTrackSteps { background-color: var(--surface-alt-dark); }
+    ShopTrackTick { color: var(--brand-dark); }
+    ShopTrackTickNow { color: var(--brand-dark); }
+    ShopTrackTickTodo { color: var(--line-strong-dark); }
+    ShopTrackLine { background-color: var(--line-strong-dark); }
+    ShopTrackLineDone { background-color: var(--brand-dark); }
+    ShopTrackTodo { color: var(--text-muted-dark); }
+    ShopBanner { color: var(--brand-dark); background-color: var(--surface-press-dark); }
+    ShopBannerTitle { color: var(--text-dark); }
+    ShopBannerText { color: var(--text-muted-dark); }
+    ShopBurst { color: var(--warning-dark); }
+    ShopRewards { background-color: var(--surface-alt-dark); }
+    ShopRewardsTier { color: var(--brand-dark); }
+    ShopRewardsPoints { color: var(--text-dark); }
+    ShopRewardsNext { color: var(--text-muted-dark); }
+    ShopRing { background-color: var(--surface-alt-dark); }
+    ShopRingTrack { color: var(--line-dark); }
+    ShopRingFill { color: var(--brand-dark); }
+    ShopBadgeOn { color: var(--warning-dark); }
+    ShopBadgeOff { color: var(--line-strong-dark); }
+    ShopBadgeName { color: var(--text-dark); }
+    ShopBadgeHint { color: var(--text-muted-dark); }
+    ShopRewardsPlaced { background-color: var(--warning-tint-dark); }
+    ShopPointsIcon { color: var(--warning-dark); }
+    ShopPointsEarned { color: var(--text-dark); }
+    ShopPointsNote { color: var(--text-muted-dark); }
+    ShopReveal { background-color: var(--surface-dark); }
+    ShopRevealKicker { color: var(--warning-dark); }
+    ShopRevealTitle { color: var(--text-dark); }
+    ShopRevealText { color: var(--text-muted-dark); }
+    ShopDrop { background-color: var(--brand-tint-dark); }
+    ShopDropKicker { color: var(--brand-dark); }
+    ShopDropTitle { color: var(--text-dark); }
+    ShopDropPrice { color: var(--text-dark); }
+    ShopDropStreak { color: #fdba74; }
+}
+/* ---- end SHOPPER ROUND A ---- */

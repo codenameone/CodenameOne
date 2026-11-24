@@ -18,7 +18,6 @@
  */
 package com.codenameone.examples.bazaar.ui;
 
-import com.codename1.appkit.Skeleton;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.components.Switch;
@@ -542,7 +541,7 @@ public final class Ui {
         list.setScrollVisible(false);
         list.setName(name);
         // Until it is filled: every list is emptied by what fills it.
-        list.add(new Skeleton(5, "SvSkeleton"));
+        list.add(new Shimmer(5, "SvSkeleton"));
         return list;
     }
 
@@ -762,7 +761,7 @@ public final class Ui {
     public static Net.Failed failed(final Container list, final Runnable load) {
         return (status, message) -> {
             fail(status, message);
-            if (list.getComponentCount() != 1 || !(list.getComponentAt(0) instanceof Skeleton)) {
+            if (list.getComponentCount() != 1 || !(list.getComponentAt(0) instanceof Shimmer)) {
                 return;
             }
             list.removeAll();
@@ -770,7 +769,7 @@ public final class Ui {
             if (load != null) {
                 list.add(FlowLayout.encloseCenter(link("Try again", "retry", e -> {
                     list.removeAll();
-                    list.add(new Skeleton(5, "SvSkeleton"));
+                    list.add(new Shimmer(5, "SvSkeleton"));
                     list.revalidate();
                     load.run();
                 })));

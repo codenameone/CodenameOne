@@ -85,7 +85,7 @@ final class ProductCard {
         card.add(BorderLayout.NORTH, picture);
         card.add(BorderLayout.CENTER, text);
         Container tappable = Ui.tap(card, "product-" + p.handle(),
-                e -> open(p));
+                e -> open(p, art));
         RowMenus.attach(tappable, () -> new Command[] {
             Command.create(Lang.tr("Open in new window"), null,
                     e -> ProductForm.openInWindow(p.id(), p.title())),
@@ -104,6 +104,16 @@ final class ProductCard {
     /// Opens `p`, in its own store: a card from the feed may be another
     /// store's than the current one, and its cart is the one it goes into.
     static void open(ProductCardDto p) {
+        open(p, null);
+    }
+
+    /// [#open] from the photo `art` of a card, which the product page then
+    /// grows out of.
+    static void open(ProductCardDto p, Label art) {
+        if (art != null && art.getIcon() != null) {
+            ShopFx.heroFrom(art.getIcon(), art.getAbsoluteX(), art.getAbsoluteY(), art.getWidth(),
+                    art.getHeight());
+        }
         ShopState.enter(p.storeId());
         ProductForm.show(p.id(), p.title());
     }

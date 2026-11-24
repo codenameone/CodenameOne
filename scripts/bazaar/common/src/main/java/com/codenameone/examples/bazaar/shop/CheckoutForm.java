@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
-import com.codename1.appkit.Skeleton;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -260,7 +259,7 @@ final class CheckoutForm {
     private void quote() {
         shippingBox.removeAll();
         Ui.section(shippingBox, "Shipping");
-        shippingBox.add(new Skeleton(3, "SvSkeleton"));
+        shippingBox.add(new com.codenameone.examples.bazaar.ui.Shimmer(3, "SvSkeleton"));
         go(Math.max(step, 1));
         final int asked = ++quotes;
         if (placeButton != null) {
@@ -327,7 +326,7 @@ final class CheckoutForm {
         go(Math.max(step, 2));
         paymentBox.removeAll();
         Ui.section(paymentBox, "Payment");
-        paymentBox.add(new Skeleton(2, "SvSkeleton"));
+        paymentBox.add(new com.codenameone.examples.bazaar.ui.Shimmer(2, "SvSkeleton"));
         Api.payments().methods(Net.to(this::drawPayment, (status, message) -> {
             paymentBox.removeAll();
             Ui.section(paymentBox, "Payment");
