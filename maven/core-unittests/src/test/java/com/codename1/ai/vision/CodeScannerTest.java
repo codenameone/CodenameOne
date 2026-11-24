@@ -166,7 +166,8 @@ class CodeScannerTest extends UITestBase {
         new Form("Caller").show();
         flushSerialCalls();
         Recorder recorder = new Recorder(CodeScanner.scan(
-                new CodeScannerOptions().strict(true)));
+                new CodeScannerOptions().strict(true)
+                        .formats(BarcodeFormat.PDF417)));
         flushSerialCalls();
         Barcode qr = new Barcode("qr", BarcodeFormat.QR_CODE, null,
                 VisionRect.EMPTY, null);
@@ -190,12 +191,125 @@ class CodeScannerTest extends UITestBase {
         new Form("Caller").show();
         flushSerialCalls();
         Recorder recorder = new Recorder(CodeScanner.scan(
-                new CodeScannerOptions()));
+                new CodeScannerOptions().strict(false)));
         flushSerialCalls();
         vision.result = new Barcode[] {pdf("once", new byte[] {1})};
         camera.deliver(new byte[] {1});
         flushSerialCalls();
         assertEquals(1, recorder.values.size());
+    }
+
+    @Test
+    void theOptionsAnApplicationHandsItsOwnScannerCarryFormatsAndStrict() {
+        VisionOptions built = new CodeScannerOptions()
+                .formats(BarcodeFormat.PDF417, BarcodeFormat.QR_CODE)
+                .strict(true).getVisionOptions();
+        assertNotNull(built, "a BarcodeScanner built from these must not fall back to defaults");
+        assertArrayEquals(new String[] {BarcodeFormat.PDF417, BarcodeFormat.QR_CODE},
+                built.getBarcodeFormats());
+        assertTrue(built.isStrictBarcodes());
+        VisionOptions defaults = new CodeScannerOptions().getVisionOptions();
+        assertFalse(defaults.isStrictBarcodes());
+        assertTrue(defaults.isStrictBarcode(BarcodeFormat.PDF417),
+                "PDF417 is confirmed by a second frame by default");
+        assertFalse(defaults.isStrictBarcode(BarcodeFormat.QR_CODE));
+        assertFalse(new CodeScannerOptions().strict(false).getVisionOptions()
+                .isStrictBarcode(BarcodeFormat.PDF417));
+    }
+
+    @Test
+    void aPdf417NeedsTwoFramesByDefaultButAQrCodeDoesNot() {
+        new Form("Caller").show();
+        flushSerialCalls();
+        Recorder recorder = new Recorder(CodeScanner.scan(new CodeScannerOptions()));
+        flushSerialCalls();
+        vision.result = new Barcode[] {pdf("slip", new byte[] {1})};
+        camera.deliver(new byte[] {1});
+        flushSerialCalls();
+        assertTrue(recorder.values.isEmpty(), "one PDF417 read is not enough");
+        vision.result = new Barcode[] {new Barcode("qr", BarcodeFormat.QR_CODE, null,
+                VisionRect.EMPTY, null)};
+        camera.deliver(new byte[] {2});
+        flushSerialCalls();
+        assertEquals(1, recorder.values.size());
+        assertEquals("qr", recorder.values.get(0).getValue());
+    }
+
+    @Test
+    void aBarcodeScannerOfItsOwnIsStrictToo() {
+        BarcodeScanner scanner = new BarcodeScanner(new CodeScannerOptions()
+                .formats(BarcodeFormat.PDF417).strict(true).getVisionOptions());
+        VisionImage frame = VisionImage.encoded(new byte[] {1});
+
+        vision.result = new Barcode[] {pdf("slip misread", new byte[] {1})};
+        assertEquals(0, processNow(scanner, frame).length, "one read is not enough");
+        vision.result = new Barcode[] {pdf("slip", new byte[] {2})};
+        assertEquals(0, processNow(scanner, frame).length,
+                "a read that disagrees replaces the pending one");
+        vision.result = new Barcode[0];
+        assertEquals(0, processNow(scanner, frame).length);
+        vision.result = new Barcode[] {pdf("slip", new byte[] {2})};
+        Barcode[] confirmed = processNow(scanner, frame);
+        assertEquals(1, confirmed.length);
+        assertEquals("slip", confirmed[0].getValue());
+        assertEquals(vision.lastOptions.getBarcodeFormats()[0], BarcodeFormat.PDF417);
+        scanner.close();
+    }
+
+    @Test
+    void aStillImageReportsAPdf417AtOnceByDefault() {
+        BarcodeScanner scanner = new BarcodeScanner();
+        vision.result = new Barcode[] {pdf("slip", new byte[] {1})};
+        assertEquals(1, processNow(scanner, VisionImage.encoded(new byte[] {1})).length,
+                "a gallery photo is one read; there is no second frame to wait for");
+        scanner.close();
+    }
+
+    @Test
+    void aQrCodeDecodingAloneDoesNotPushOutThePendingPdf417() {
+        BarcodeScanner scanner = new BarcodeScanner();
+        VisionImage frame = VisionImage.detachedCameraData(new byte[] {1}, false,
+                0, 0, 0, 1L, null);
+        Barcode qr = new Barcode("qr", BarcodeFormat.QR_CODE, null, VisionRect.EMPTY, null);
+
+        vision.result = new Barcode[] {pdf("slip", new byte[] {5})};
+        assertEquals(0, processNow(scanner, frame).length);
+        vision.result = new Barcode[] {qr};
+        assertEquals(1, processNow(scanner, frame).length, "a QR code is reported at once");
+        vision.result = new Barcode[] {qr, pdf("slip", new byte[] {5})};
+        Barcode[] both = processNow(scanner, frame);
+        assertEquals(2, both.length, "the PDF417 is confirmed across the QR-only frame");
+        scanner.close();
+    }
+
+    @Test
+    void aPendingReadExpiresSoAStaleMisreadCannotConfirmLater() {
+        BarcodeScanner scanner = new BarcodeScanner();
+        VisionImage frame = VisionImage.detachedCameraData(new byte[] {1}, false,
+                0, 0, 0, 1L, null);
+        vision.result = new Barcode[] {pdf("misread", new byte[] {9})};
+        assertEquals(0, processNow(scanner, frame).length);
+        vision.result = new Barcode[0];
+        for (int i = 0; i < 16; i++) {
+            processNow(scanner, frame);
+        }
+        vision.result = new Barcode[] {pdf("misread", new byte[] {9})};
+        assertEquals(0, processNow(scanner, frame).length,
+                "a read from long ago must not confirm this one");
+        scanner.close();
+    }
+
+    private Barcode[] processNow(BarcodeScanner scanner, VisionImage frame) {
+        final Barcode[][] out = new Barcode[1][];
+        scanner.process(frame).ready(new SuccessCallback<Barcode[]>() {
+            @Override
+            public void onSucess(Barcode[] value) {
+                out[0] = value;
+            }
+        });
+        flushSerialCalls();
+        assertNotNull(out[0]);
+        return out[0];
     }
 
     private static Barcode pdf(String value, byte[] raw) {
