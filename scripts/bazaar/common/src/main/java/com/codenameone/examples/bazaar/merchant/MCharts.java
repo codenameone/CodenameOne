@@ -150,8 +150,38 @@ final class MCharts {
     private static Chart cartesian(String name, String[] labels, ValueFormatter values) {
         Chart chart = chart(name, HEIGHT_MM);
         chart.setXAxis(new CategoryAxis(Axis.BOTTOM, shortDays(labels)).setGridVisible(false));
-        chart.setYAxis(new NumberAxis(Axis.LEFT).setIncludeZero(true).setFormatter(values));
+        Axis y = values == COUNT ? new CountAxis() : new NumberAxis(Axis.LEFT);
+        chart.setYAxis(y.setIncludeZero(true).setFormatter(values));
         return chart;
+    }
+
+    /// A count axis: only whole-number ticks. A small maximum (2 orders on the
+    /// busiest day) made the nice step 0.5, and those halves were rounded to
+    /// the same label twice ("2, 2, 1, 1").
+    static final class CountAxis extends NumberAxis {
+        CountAxis() {
+            super(Axis.LEFT);
+        }
+
+        @Override
+        public double[] ticks(int maxCount) {
+            return wholeTicks(super.ticks(maxCount));
+        }
+    }
+
+    /// `ticks` without the fractional ones, ascending and each value once.
+    static double[] wholeTicks(double[] ticks) {
+        int n = 0;
+        double[] out = new double[ticks.length];
+        for (int iter = 0; iter < ticks.length; iter++) {
+            double t = ticks[iter];
+            if (t == Math.rint(t) && (n == 0 || out[n - 1] != t)) {
+                out[n++] = t;
+            }
+        }
+        double[] fit = new double[n];
+        System.arraycopy(out, 0, fit, 0, n);
+        return fit;
     }
 
     private static Container box(Component chart) {

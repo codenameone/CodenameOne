@@ -73,6 +73,15 @@ final class CheckoutForm {
     private String methodId;
     private boolean cashPicked;
     private CartDto quoted;
+    /// Counts the estimates asked for; only the newest one's answer is drawn.
+    private int quotes;
+    /// The review's Place button. Picking a rate redraws the review only after
+    /// two round trips (the estimate, then the payment methods); until then
+    /// the review still showed the previous rate's total (free shipping,
+    /// $102.96) while Place sent the new rate (standard, $108.95). It is
+    /// disabled the moment a new estimate is asked for, and the review enables
+    /// it only when its total was priced with the chosen rate.
+    private Button placeButton;
     /// What the store's hosted checkout adds (see [CheckoutHandoff]); null
     /// until the server answers.
     private CheckoutOptionsDto options;
@@ -253,8 +262,15 @@ final class CheckoutForm {
         Ui.section(shippingBox, "Shipping");
         shippingBox.add(new Skeleton(3, "SvSkeleton"));
         go(Math.max(step, 1));
+        final int asked = ++quotes;
+        if (placeButton != null) {
+            placeButton.setEnabled(false);
+        }
         Api.cart().estimate(ShopState.store().id(), ShopState.token(),
                 new EstimateDto(address, rateId), Net.to(cart -> {
+                    if (asked != quotes) {
+                        return;
+                    }
                     quoted = cart;
                     ShopState.setCart(cart);
                     drawShipping();
@@ -367,8 +383,9 @@ final class CheckoutForm {
         note = Ui.field(noteBox, "Note for the store (optional)", "order-note", "");
         reviewBox.add(noteBox);
         Button place = Ui.primary("Place order", "place-order", null);
-        place.setEnabled(methodId != null && rateId != null && address != null
+        place.setEnabled(methodId != null && Estimate.agrees(quoted, rateId) && address != null
                 && !CheckoutHandoff.required(options));
+        placeButton = place;
         place.addActionListener(e -> place(place));
         reviewBox.add(place);
         if (CheckoutHandoff.offersMore(options)) {

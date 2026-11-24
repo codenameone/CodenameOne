@@ -64,6 +64,31 @@ class ShopRulesTest {
         assertFalse(Variants.low(new StockDto("l", "x", 6)));
     }
 
+    /// The phone checkout reviewed $102.96 (free shipping over $75) and placed
+    /// $108.95 (standard, $5.99): Standard was tapped and the review, still
+    /// the free rate's quote, could be placed before it was priced again.
+    /// A review may be placed only with the rate its total was priced with.
+    @org.junit.jupiter.api.Test
+    void reviewIsPlacedOnlyWithTheRateItWasPricedWith() {
+        CartDto free = cart("free75", 0, false, 0);
+        assertFalse(Estimate.agrees(free, "standard"));
+        assertTrue(Estimate.agrees(free, "free75"));
+        assertFalse(Estimate.agrees(null, "free75"));
+        assertFalse(Estimate.agrees(cart(null, 0, false, 0), "standard"));
+        CartDto standard = cart("standard", 599, false, 0);
+        assertEquals(standard.totalCents(), totalOf(standard));
+    }
+
+    private static long totalOf(CartDto cart) {
+        long total = -1;
+        for (Estimate.Row row : Estimate.rows(cart)) {
+            if (row.kind == Estimate.TOTAL) {
+                total = row.cents;
+            }
+        }
+        return total;
+    }
+
     private static CartDto cart(String rate, long shipping, boolean inclusive, long gift) {
         return new CartDto("c", "s", null, "USD", Collections.emptyList(), "SAVE", "GC", 5000, 500,
                 shipping, 400, inclusive, 4900 + shipping, gift, 4900 + shipping - gift, false,

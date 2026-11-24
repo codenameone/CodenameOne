@@ -102,6 +102,12 @@ public final class Estimate {
         return rows;
     }
 
+    /// Whether the review of `quoted` may be placed with the delivery option
+    /// `chosen`: the total on screen was priced with exactly that option.
+    public static boolean agrees(CartDto quoted, String chosen) {
+        return quoted != null && chosen != null && chosen.equals(quoted.shippingRateId());
+    }
+
     /// How many units the cart holds, for the badge on the cart tab.
     public static int units(CartDto cart) {
         if (cart == null || cart.lines() == null) {

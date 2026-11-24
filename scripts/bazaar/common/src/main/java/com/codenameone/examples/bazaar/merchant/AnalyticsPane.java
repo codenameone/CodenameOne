@@ -189,7 +189,10 @@ final class AnalyticsPane extends MerchantPane {
         rangeBox.add(range);
         // Wraps rather than cutting the end date off beside the Compare switch.
         com.codename1.components.SpanLabel compared = new com.codename1.components.SpanLabel(
-                Lang.tr("Compared with {0} - {1}", shortDay(data.previousFrom()),
+                // Names the range itself too: "Last 30 days, compared with Sep 26 -
+                // Oct 25" read as if the data were from October.
+                Lang.tr("{0} - {1}, compared with {2} - {3}", shortDay(data.from()),
+                shortDay(data.to() - Period.DAY), shortDay(data.previousFrom()),
                 shortDay(data.from() - Period.DAY)));
         compared.setUIID("Container");
         compared.setTextUIID("SvMuted");
