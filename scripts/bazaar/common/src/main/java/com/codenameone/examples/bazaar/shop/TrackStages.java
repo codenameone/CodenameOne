@@ -162,6 +162,22 @@ public final class TrackStages {
         return fill(out, reached(order));
     }
 
+    /// How a step's time reads: whole seconds since `at` when that is under
+    /// an hour, or -1 when the step is old enough to show its clock time. A
+    /// fast order moves through several steps in one minute, and the same
+    /// clock time on each of them reads as a glitch; "40 sec ago", "12 sec
+    /// ago" and "just now" read as the order moving.
+    public static int secondsAgo(long at, long now) {
+        long age = now - at;
+        if (age < 0) {
+            return 0;
+        }
+        if (age >= 3600000L) {
+            return -1;
+        }
+        return (int) (age / 1000L);
+    }
+
     /// [#times] once the events are sorted into stages: the stages past
     /// `now` cleared, the gaps up to it filled forward, never backwards.
     public static long[] fill(long[] at, int now) {

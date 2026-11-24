@@ -42,9 +42,27 @@ final class PosSheet {
     /// A new register panel titled `title` (already translated), named `name`
     /// for the tour and the tests. Fill its content pane and call `show()`.
     static Sheet open(String title, String name) {
-        Sheet sheet = PosUi.wide() ? new Sheet(null, title, "PosSheet") : new Sheet(null, title, "PosSheet") {
+        final boolean wide = PosUi.wide();
+        Sheet sheet = new Sheet(null, title, "PosSheet") {
+            @Override
+            protected void initComponent() {
+                super.initComponent();
+                // The sheet's own dim is a fixed 30% black that ignores the
+                // theme's tintColor: over the light title bar it read as a
+                // flat grey slab. The layered pane it sits in takes the same
+                // 40% scrim dialogs use instead, in light and dark alike.
+                Container host = getParent();
+                if (host != null && !(host.getStyle().getBgPainter() instanceof Scrim)) {
+                    host.getStyle().setBgPainter(new Scrim());
+                    host.repaint();
+                }
+            }
+
             @Override
             protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                if (wide) {
+                    return super.calcPreferredSize();
+                }
                 // A phone sheet stops below the title bar: grown to the top of
                 // the screen it slid over the title and cut it in half. The
                 // tallest content scrolls inside it instead.
@@ -68,6 +86,19 @@ final class PosSheet {
         sheet.getContentPane().setLayout(BoxLayout.y());
         sheet.getContentPane().setUIID("PosSheetBody");
         return sheet;
+    }
+
+    /// The dim behind a register panel: 40% black, the `tintColor` the theme
+    /// gives dialogs, so the screen behind reads as the same screen set back.
+    static final class Scrim implements com.codename1.ui.Painter {
+        @Override
+        public void paint(com.codename1.ui.Graphics g, com.codename1.ui.geom.Rectangle rect) {
+            int alpha = g.getAlpha();
+            g.setAlpha(alpha * 0x66 / 0xff);
+            g.setColor(0x0);
+            g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+            g.setAlpha(alpha);
+        }
     }
 
     /// A new register panel the caller names itself.

@@ -127,7 +127,11 @@ final class TrackerView {
             words.add(Ui.plain(Lang.tr(TrackStages.LABELS[iter]), current ? "ShopTrackStepNow"
                     : done ? "ShopTrackStepDone" : "ShopTrackStepTodo"));
             if (done && times[iter] > 0) {
-                words.add(Ui.plain(Ui.when(times[iter]), "ShopTrackDetail"));
+                int secs = TrackStages.secondsAgo(times[iter], System.currentTimeMillis());
+                String at = secs < 0 ? Ui.when(times[iter]) : secs < 5 ? Lang.tr("just now")
+                        : secs < 60 ? Lang.tr("{0} sec ago", String.valueOf(secs))
+                        : Lang.tr("{0} min ago", String.valueOf(secs / 60));
+                words.add(Ui.plain(at, "ShopTrackDetail"));
             }
             String carrier = iter == TrackStages.SHIPPED && done ? carrier(order) : null;
             if (carrier != null) {

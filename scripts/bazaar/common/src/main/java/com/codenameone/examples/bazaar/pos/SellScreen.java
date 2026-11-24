@@ -191,7 +191,22 @@ final class SellScreen {
 
     private Container cartSheetContent;
     private final PosMotion.GoalBar goalBar = new PosMotion.GoalBar();
-    private final Label goalText = new Label("", "PosGoalText");
+    private final Label goalText = new Label("", "PosGoalText") {
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            // Measured from the style's font and nothing else, plus a digit of
+            // slack: on the tablet the label came out narrower than the text
+            // it then drew, and the target read "$300.0(".
+            com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+            com.codename1.ui.Font f = getStyle().getFont();
+            if (f != null) {
+                int need = f.stringWidth(getText()) + f.charWidth('0')
+                        + getStyle().getHorizontalPadding();
+                d.setWidth(Math.max(d.getWidth(), need));
+            }
+            return d;
+        }
+    };
 
     /// The shift's sales against its target: a slim bar under the search,
     /// so the cashier sees the day moving without it taking a row of tiles.

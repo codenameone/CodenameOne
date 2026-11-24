@@ -461,6 +461,9 @@ public class DemoTourTest extends E2e {
         go(Sections.DASHBOARD);
         pause(3000);
         visualShot("merchant-dashboard" + mode);
+        go(Sections.ORDERS);
+        pause(3000);
+        visualShot("merchant-orders" + mode);
         go(Sections.ANALYTICS);
         pause(3500);
         visualShot("merchant-analytics" + mode);
@@ -675,8 +678,7 @@ public class DemoTourTest extends E2e {
                 pause(1800);
             }
         }
-        reopen("pos-tender", "pos-pay");
-        if (tap("pos-tender")) {
+        if (openTender()) {
             pause(2000);
             visualShot("reg-approval" + mode);
             for (String k : new String[] {"1", "2"}) {
@@ -696,8 +698,7 @@ public class DemoTourTest extends E2e {
         }
         // With the discount taken off again the sale is under the threshold,
         // so the tender opens without a manager.
-        reopen("pos-tender", "pos-pay");
-        if (tap("pos-tender")) {
+        if (openTender()) {
             pause(2500);
             visualShot("reg-tender" + mode);
             if (tap("pos-cash-other")) {
@@ -878,6 +879,19 @@ public class DemoTourTest extends E2e {
         /// Opens the sheet holding `name` again through `opener` (the pay
     /// button opens the cart, then the tender) when a closed child sheet took
     /// it down with it.
+    /// Opens the tender: on a phone through the cart sheet's own button, on
+    /// a tablet or desktop straight from the pay button beside the cart,
+    /// where there is no cart sheet and no `pos-tender` to tap.
+    private boolean openTender() {
+        if (findByName("pos-tender") == null) {
+            if (!tap("pos-pay")) {
+                return false;
+            }
+            pause(1800);
+        }
+        return findByName("pos-tender") == null || tap("pos-tender");
+    }
+
     private void reopen(String name, String opener) {
         for (int i = 0; i < 2 && findByName(name) == null; i++) {
             if (!tap(opener) && !tap("pos-pay")) {

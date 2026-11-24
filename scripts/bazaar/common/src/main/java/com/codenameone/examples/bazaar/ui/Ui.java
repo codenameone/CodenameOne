@@ -106,8 +106,12 @@ public final class Ui {
 
     /// Gives `label` a material icon `size` millimetres tall, and the space
     /// between it and the label's words: without one the two touch.
+    /// Set through the label, which remembers the glyph and redraws it in
+    /// the new colour when the theme changes: the static
+    /// `FontImage.setMaterialIcon` bakes today's colour in, and the tablet
+    /// sidebar's icons stayed navy on navy after a switch to dark.
     public static void icon(Label label, char icon, float size) {
-        FontImage.setMaterialIcon(label, icon, size);
+        label.setMaterialIcon(icon, size);
         label.setGap(CN.convertToPixels(ICON_GAP));
     }
 

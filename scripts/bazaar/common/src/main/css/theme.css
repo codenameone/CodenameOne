@@ -3604,3 +3604,22 @@ ShopStoreMonogram { color: #ffffff; background-color: #4f46e5; border: 0.6mm sol
     ShopBadgeCount { color: var(--brand-dark); }
 }
 /* ---- end SHOPPER ROUND B ---- */
+/* ---- POLISH ROUND E: variant chips ---- */
+/* The dark variant chips redeclared a full border after the radius they
+   inherit, and a border declared after a radius draws square (see the
+   milestone card in POLISH ROUND D). The derived light ones set their border
+   after cn1-derive the same way. Every chip states its radius after its
+   border here, in both modes. */
+PosVpChip { border: 1px solid var(--line-strong); border-radius: var(--radius); }
+PosVpChipOn { border: 2px solid var(--brand); border-radius: var(--radius); }
+PosVpChipOnOut { border: 2px solid var(--text-muted); border-radius: var(--radius); }
+PosVpChipOut { border: 1px solid var(--line); border-radius: var(--radius); }
+PosVpChipNone { border: 1px solid var(--line); border-radius: var(--radius); }
+@media (prefers-color-scheme: dark) {
+    PosVpChip { border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    PosVpChipOn { border: 2px solid var(--brand-dark); border-radius: var(--radius); }
+    PosVpChipOnOut { border: 2px solid var(--text-muted-dark); border-radius: var(--radius); }
+    PosVpChipOut { border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    PosVpChipNone { border: 1px solid var(--line-dark); border-radius: var(--radius); }
+}
+/* ---- end POLISH ROUND E ---- */
