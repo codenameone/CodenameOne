@@ -204,6 +204,7 @@ final class SellScreen {
         row.add(BorderLayout.WEST, flag);
         row.add(BorderLayout.CENTER, goalBar);
         goalText.setName("pos-goal-text");
+        goalText.setEndsWith3Points(false);
         row.add(BorderLayout.EAST, goalText);
         fillGoal(false);
         return row;
@@ -213,6 +214,11 @@ final class SellScreen {
         ShiftGoal g = PosState.goal();
         goalText.setText(Lang.tr("{0} of {1}", PosState.money(g.sold()), PosState.money(g.target())));
         goalBar.fill(g.permille(), celebrate);
+        // The amount grows a digit as the shift sells; the row has to make
+        // room for it or the end of the target is cut off.
+        if (goalText.getParent() != null) {
+            goalText.getParent().revalidateLater();
+        }
     }
     /// The total the cart last showed, for counting to the next one; -1
     /// before the first fill, which shows its total without counting.

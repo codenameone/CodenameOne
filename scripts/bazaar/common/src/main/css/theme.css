@@ -3558,3 +3558,18 @@ PosMilestoneText { font-size: 3.8mm; }
     SvSide { background-color: var(--surface-alt-dark); }
 }
 /* ---- end POLISH ROUND C ---- */
+
+/* ---- POLISH ROUND D: milestone card, goal text, sheet scrim ---- */
+/* A full border declared after the radius drew the milestone card square;
+   the radius has to come after it to round the border with the fill. */
+PosMilestone { border: 1px solid var(--brand); border-radius: var(--radius); }
+PosGoalText { padding: 0 1mm 0 2mm; }
+@media (prefers-color-scheme: dark) {
+    PosMilestone { border: 1px solid var(--brand-dark); border-radius: var(--radius); }
+}
+/* The dim under a sheet or dialog: 40% black, so the screen behind reads as
+   the same screen, set back, in light and dark alike. */
+#Constants {
+    tintColor: "66000000";
+}
+/* ---- end POLISH ROUND D ---- */

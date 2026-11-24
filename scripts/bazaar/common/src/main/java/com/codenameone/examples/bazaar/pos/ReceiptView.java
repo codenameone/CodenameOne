@@ -73,8 +73,13 @@ final class ReceiptView {
             Container m = new Container(BoxLayout.y());
             m.setUIID("PosMilestone");
             m.setName("pos-milestone");
-            Label star = new Label(milestoneText(r.milestone), "PosMilestoneText");
-            FontImage.setMaterialIcon(star, r.milestone >= 100 ? FontImage.MATERIAL_EMOJI_EVENTS
+            // Wraps: on one line a phone cut "Three quarters of today's goal"
+            // to "Three quarters of today..".
+            com.codename1.components.SpanLabel star = new com.codename1.components.SpanLabel(
+                    milestoneText(r.milestone), "PosMilestoneText");
+            star.setUIID("Container");
+            star.setIconUIID("PosMilestoneText");
+            star.setMaterialIcon(r.milestone >= 100 ? FontImage.MATERIAL_EMOJI_EVENTS
                     : FontImage.MATERIAL_AUTO_AWESOME, 3.6f);
             // Air between the sparkle and the words; flush they read as one glyph.
             star.setGap(com.codename1.ui.CN.convertToPixels(1.6f));

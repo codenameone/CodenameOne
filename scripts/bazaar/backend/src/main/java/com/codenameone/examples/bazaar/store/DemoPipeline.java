@@ -186,6 +186,13 @@ public class DemoPipeline {
     /// How old a new order is before the simulator packs it.
     static final long PACK_AFTER_MILLIS = 8L * 60000L;
 
+    /// How old an order is before the simulator ships it. A store does not
+    /// ship the hour an order lands: with every order shipped a minute after
+    /// it was packed, the dashboard's recent orders read all Fulfilled. Four
+    /// hours leaves the afternoon's orders packed or labelled and waiting,
+    /// about two in five of the day's online orders.
+    static final long SHIP_AFTER_MILLIS = 4L * 3600000L;
+
     /// Ticks between two new orders.
     static final int NEW_ORDER_TICKS = 30;
 
@@ -231,6 +238,11 @@ public class DemoPipeline {
                             ? Fulfillments.LABEL_CREATED : f.getStatus();
                     if (f != null && wanted[w] != null && wanted[w].equals(st)) {
                         if (Fulfillments.LABEL_CREATED.equals(st)) {
+                            boolean waits = o.getCreatedAt() != null && System.currentTimeMillis()
+                                    - o.getCreatedAt().toEpochMilli() < SHIP_AFTER_MILLIS;
+                            if (waits) {
+                                continue;
+                            }
                             fulfil.ship(owner, storeId, f.getId());
                             return SHIPPED;
                         }
@@ -266,7 +278,11 @@ public class DemoPipeline {
             List<com.codenameone.examples.bazaar.api.FulfilLineDto> send =
                     new ArrayList<com.codenameone.examples.bazaar.api.FulfilLineDto>();
             List<OrderLine> ls = lines.findByOrderId(orderId);
-            for (int iter = 0; iter < ls.size(); iter++) {
+            // A basket of two goes out in two parcels: the first item is in
+            // stock here and ships, the second waits, so the order reads
+            // Partially fulfilled once the parcel is out.
+            int parcel = ls.size() < 2 ? ls.size() : 1;
+            for (int iter = 0; iter < parcel; iter++) {
                 OrderLine l = ls.get(iter);
                 send.add(new com.codenameone.examples.bazaar.api.FulfilLineDto(l.getId(),
                         l.getTitle(), l.getSku(), l.getQuantity()));

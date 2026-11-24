@@ -129,6 +129,9 @@ final class OrdersPane extends MerchantPane {
         if (wide) {
             grid = MUi.grid(rows, "orders-grid");
             grid.getColumn(0).setWidthMM(18);
+            // "Nov 24, 14:05" whole: shared out by weight on a narrow window
+            // the date was cut to "Nov ...". The customer column gives way.
+            grid.getColumn(1).setWidthMM(27);
             grid.getColumn(2).setFlex(1);
             grid.getColumn(6).setKind(GridColumn.Kind.NUMBER).setWidthMM(16);
             grid.getColumn(7).setKind(GridColumn.Kind.NUMBER).setFormatter(new MoneyFormat());
