@@ -375,8 +375,13 @@ public class CoachMarks {
                 // the padding no longer cleared it and the text spilled past
                 // the drawn bubble. The dim already sets the bubble apart.
                 s.setBorder(RoundRectBorder.create().cornerRadius(3f));
-                s.setPaddingUnit(Style.UNIT_TYPE_DIPS);
-                s.setPadding(4, 4, 4, 4);
+                // At least a line of text: on ports where a millimetre is a
+                // few pixels (JavaScript) 4mm alone left the text touching
+                // the bubble's edge.
+                int pad = Math.max(CN.convertToPixels(4f),
+                        text.getTextComponent().getUnselectedStyle().getFont().getHeight());
+                s.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
+                s.setPadding(pad, pad, pad, pad);
             }
             title.setTextUIID("CoachMarkTitle");
             text.setTextUIID("CoachMarkText");

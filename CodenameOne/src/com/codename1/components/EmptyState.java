@@ -89,7 +89,7 @@ public class EmptyState extends Container {
         setUIID("EmptyState");
         icon.setUIID(themed("EmptyStateIcon", "Label"));
         this.title.setTextUIID(themed("EmptyStateTitle", "Label"));
-        this.text.setTextUIID(themed("EmptyStateText", "SpanLabelText"));
+        this.text.setTextUIID(themed("EmptyStateText", "Label"));
         this.title.setUIID("Container");
         this.text.setUIID("Container");
         this.title.getTextComponent().setAlignment(Component.CENTER);
