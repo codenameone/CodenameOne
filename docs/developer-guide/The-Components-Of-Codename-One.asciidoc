@@ -1029,7 +1029,7 @@ To hide a component that already exists until its data is ready, mask it. `Skele
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=skeleton-mask,indent=0]
 ----
 
-The shapes use the foreground color of the `Skeleton` UIID. A theme that doesn't style it gets the theme's text color at a low opacity, which works in light and dark themes alike. Give a placeholder its own UIID with `uiid(String)` to color it differently. The shimmer runs only while the placeholder is on screen; `shimmer(false)` turns it off, which also keeps screenshot tests deterministic.
+The shapes use the foreground color of the `Skeleton` UIID. A theme that doesn't style it gets the theme's text color at a low opacity, which works in light and dark themes alike. Give a placeholder its own UIID with `uiid(String)` to color it differently. The shimmer runs only while the placeholder is visible; `shimmer(false)` turns it off, which also keeps screenshot tests deterministic.
 
 TIP: `Skeleton` is a `CommonProgressAnimations.ProgressAnimation`, so it works with the older `CommonProgressAnimations.ProgressAnimation.markComponentLoading` and `markComponentReady` API as well. Prefer `Skeleton` in new code; `CircleProgress` and `LoadingTextAnimation` remain for existing apps.
 
@@ -1760,7 +1760,7 @@ image::img/generated/components-tabs.png[Simple usage of Tabs,scaledwidth=20%]
 
 A common usage for `Tabs` is the swipe to proceed effect which is common in iOS applications. In the code below you use https://www.codenameone.com/javadoc/com/codename1/ui/RadioButton.html[RadioButton] and https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] with hidden tabs to produce that effect:
 
-TIP: The <<carousel-section,Carousel>> component packages this pattern, with dots, auto play and accessibility announcements. Use the code below only when you need a layout `Carousel` doesn't support, and even then prefer binding a `PageIndicator` to the `Tabs` over a row of radio buttons.
+TIP: The <<carousel-section,Carousel>> component packages this pattern, with dots, autoplay and accessibility announcements. Use the code below only when you need a layout `Carousel` doesn't support, and even then prefer binding a `PageIndicator` to the `Tabs` over a row of radio buttons.
 
 [source,java]
 ----
@@ -1809,7 +1809,7 @@ indicator chains cleanly.
 [[carousel-section]]
 === Carousel and PageIndicator
 
-https://www.codenameone.com/javadoc/com/codename1/components/Carousel.html[Carousel] shows pages that the user swipes between, with page dots under them and optional auto play. This component is also called an image slider, a view pager, a banner rotator or an onboarding pager.
+https://www.codenameone.com/javadoc/com/codename1/components/Carousel.html[Carousel] shows pages that the user swipes between, with page dots under them and optional autoplay. This component is also called an image slider, a view pager, a banner rotator or an onboarding pager.
 
 [source,java]
 ----
@@ -1819,7 +1819,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/L
 .A Carousel on its second page, with its page dots
 image::img/generated/components-carousel.png["A Carousel on its second page, with its page dots",scaledwidth=20%]
 
-`Carousel` is the swipeable `Tabs` described above with the tab bar hidden, plus a `PageIndicator`. It swipes, snaps and mirrors for right-to-left languages exactly as `Tabs` does, and `getTabs()` gives access to anything the class doesn't wrap. Auto play advances one page per interval while the carousel is on screen, waits at least one interval after the user touches it, and wraps from the last page to the first unless `setLoop(false)` is set. `setIndicatorPosition` moves the dots to `BorderLayout.NORTH`, or hides them with `null`. Each page change is announced to screen readers.
+`Carousel` is the swipeable `Tabs` described above with the tab bar hidden, plus a `PageIndicator`. It swipes, snaps and mirrors for right-to-left languages exactly as `Tabs` does, and `getTabs()` gives access to anything the class doesn't wrap. Autoplay advances one page per interval while the carousel is visible, waits at least one interval after the user touches it, and wraps from the last page to the first unless `setLoop(false)` is set. `setIndicatorPosition` moves the dots to `BorderLayout.NORTH`, or hides them with `null`. Each page change is announced to screen readers.
 
 https://www.codenameone.com/javadoc/com/codename1/components/PageIndicator.html[PageIndicator] is the row of dots on its own, the current page drawn as a wider pill. Older code built this out of a row of radio buttons kept in step with `Tabs` by hand; `bind(Tabs)` replaces that code:
 

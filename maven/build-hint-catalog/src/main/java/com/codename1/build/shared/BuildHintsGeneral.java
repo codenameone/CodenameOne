@@ -52,6 +52,16 @@ final class BuildHintsGeneral {
                 .doc("Whether video calls are offered, on both platforms. `ios.call.video` and "
                         + "`android.call.video` override it per platform."));
 
+        h.add(new Hint("crashProtection.enabled")
+                .group(HintGroup.GENERAL)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("general")
+                .doc("Read by the cloud build service: whether a release build uploads its "
+                        + "symbols to Crash Protection, so the crash reports from that build can be "
+                        + "symbolized. Needs a Pro or Enterprise plan; without it the reports of that "
+                        + "build are dropped."));
+
         h.add(new Hint("commerce.cloud.enabled")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
