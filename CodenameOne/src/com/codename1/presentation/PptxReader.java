@@ -721,7 +721,7 @@ final class PptxReader {
         }
         PptxNode blipFill = s.child("blipFill");
         Picture p = blipFill == null ? null : PptxDrawing.picture(blipFill, this, c.part, at[2],
-                at[3]);
+                at[3], cNvPr == null ? null : cNvPr.attr("descr"));
         if (p == null) {
             return null;
         }
@@ -909,12 +909,14 @@ final class PptxReader {
                 type = k;
             }
             String d = effect.attr("dir");
-            if ("l".equals(d)) {
+            // OOXML names the way the slide moves, the model where it comes from: dir="l"
+            // slides toward the left, in from the right, which is the default
+            if ("r".equals(d)) {
                 dir = Transition.FROM_LEFT;
             } else if ("u".equals(d)) {
-                dir = Transition.FROM_TOP;
-            } else if ("d".equals(d)) {
                 dir = Transition.FROM_BOTTOM;
+            } else if ("d".equals(d)) {
+                dir = Transition.FROM_TOP;
             }
         } else if (after < 0 && click) {
             return null;

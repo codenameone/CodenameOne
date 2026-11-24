@@ -288,6 +288,12 @@ final class PptxDrawing {
     /// The picture of a blip fill, or null with a warning.
     static Picture picture(PptxNode blipFill, PptxReader r, PptxReader.Part part, float w,
             float h) {
+        return picture(blipFill, r, part, w, h, null);
+    }
+
+    /// The picture of a blip fill with its alt text, or null with a warning.
+    static Picture picture(PptxNode blipFill, PptxReader r, PptxReader.Part part, float w,
+            float h, String description) {
         PptxNode blip = blipFill.child("blip");
         if (blip == null) {
             return null;
@@ -304,7 +310,7 @@ final class PptxDrawing {
             return null;
         }
         return new Picture(r.nextId('b'), data, mime(target), Math.max(1, w), Math.max(1, h),
-                null);
+                description);
     }
 
     /// The MIME type for an image part name.

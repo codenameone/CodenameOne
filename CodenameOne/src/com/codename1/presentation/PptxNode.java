@@ -40,7 +40,7 @@ final class PptxNode {
     /// The most elements one part may have.
     static final int MAX_NODES = 400000;
 
-    private static final String[] ATTRS = {"id", "name", "type", "idx", "x", "y", "cx", "cy",
+    private static final String[] ATTRS = {"id", "name", "descr", "type", "idx", "x", "y", "cx", "cy",
         "rot", "flipH", "flipV", "prst", "fmla", "val", "sz", "b", "i", "u", "strike", "algn",
         "lvl", "marL", "indent", "typeface", "r:id", "r:embed", "r:link", "l", "t", "r",
         "lIns", "tIns", "rIns", "bIns", "anchor", "wrap", "w", "h", "gridSpan", "rowSpan",

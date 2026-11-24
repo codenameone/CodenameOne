@@ -509,7 +509,10 @@ final class PptxWriter {
     private static void nv(XmlOut x, int id, SlideElement e, String kind) throws IOException {
         String name = e.name != null && e.name.length() > 0 ? e.name
                 : kind + " " + (id - 1);
-        x.raw("<p:cNvPr").attr("id", id).attr("name", name).raw("/>");
+        // a picture's description is its alt text
+        String descr = e instanceof PictureElement ? ((PictureElement) e).picture.description
+                : null;
+        x.raw("<p:cNvPr").attr("id", id).attr("name", name).attr("descr", descr).raw("/>");
     }
 
     private static void xfrm(XmlOut x, String tag, SlideElement e, boolean group)

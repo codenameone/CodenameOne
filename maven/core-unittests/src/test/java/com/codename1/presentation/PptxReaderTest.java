@@ -245,7 +245,7 @@ class PptxReaderTest extends UITestBase {
 
         assertEquals("Say hi", ((Paragraph) s.notes.get(0)).plainText());
         assertEquals(Transition.PUSH, s.transition.type);
-        assertEquals(Transition.FROM_TOP, s.transition.direction);
+        assertEquals(Transition.FROM_BOTTOM, s.transition.direction); // dir="u" moves up, in from the bottom
         assertEquals(1200, s.transition.duration);
         assertEquals(3000, s.transition.advanceAfter);
         assertEquals(1, s.builds.size());
