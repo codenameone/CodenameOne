@@ -87,7 +87,10 @@ final class LayawayPane {
                         "Add a customer to a sale and lay it away on a deposit."));
             }
             page.revalidateLater();
-        }, (s, m) -> Ui.fail(s, s <= 0 ? "Layaways need the network" : m)));
+        }, (s, m) -> {
+                    com.codename1.io.Log.p("Layaway not created: " + s + " " + m);
+                    Ui.fail(s, s <= 0 ? "Layaways need the network" : m);
+                }));
     }
 
     /// Lays the cart away: a customer, and a deposit of at least the
@@ -148,14 +151,21 @@ final class LayawayPane {
         page.add(Ui.fact("Balance", PosState.money(balance)));
         for (int iter = 0; l.payments() != null && iter < l.payments().size(); iter++) {
             LayawayPaymentDto p = l.payments().get(iter);
-            page.add(PosUi.data(TenderSheet.kindName(p.kind()) + Ui.DOT
-                    + PosState.money(p.amountCents()), "PosCartDetail"));
+            // A payment row like the totals above it: the white strip of a
+            // cart line stood out on the page.
+            Container row = new Container(new BorderLayout());
+            row.setUIID("PosTotalRow");
+            row.add(BorderLayout.WEST, PosUi.label(TenderSheet.kindName(p.kind()), "PosTotalRowLabel"));
+            row.add(BorderLayout.EAST, PosUi.data(PosState.money(p.amountCents()), "PosTotalRowValue"));
+            page.add(row);
         }
         boolean open = "OPEN".equalsIgnoreCase(l.status());
         if (open && balance > 0) {
-            Container acts = new Container(new GridLayout(1, 2));
+            // Side by side only where there is room: on a phone half a row cut
+            // "Take a payment" down to "ke a p...".
+            Container acts = new Container(PosUi.wide() ? new GridLayout(1, 2) : BoxLayout.y());
             acts.add(PosUi.icon(FontImage.MATERIAL_PAYMENTS, "Take a payment", "pos-layaway-pay",
-                    "PosChoice", e -> pay(page, l)));
+                    "PosLayawayPay", e -> pay(page, l)));
             acts.add(PosUi.icon(FontImage.MATERIAL_CANCEL, "Cancel", "pos-layaway-cancel",
                     "PosChoice", e -> cancel(page, l)));
             page.add(acts);

@@ -70,6 +70,11 @@ final class Receipt {
                 PosState.money(t.taxCents)});
         }
         r.totals.add(new String[] {"Total", PosState.money(t.totalCents)});
+        if (sale.tipCents() > 0) {
+            // The card carries the tip on top of the total; without this row
+            // the tender line read larger than the total with no reason.
+            r.totals.add(new String[] {"Tip", PosState.money(sale.tipCents())});
+        }
         for (int iter = 0; iter < sale.tenders().size(); iter++) {
             PosTenderDto td = sale.tenders().get(iter);
             r.cash |= "CASH".equals(td.kind());

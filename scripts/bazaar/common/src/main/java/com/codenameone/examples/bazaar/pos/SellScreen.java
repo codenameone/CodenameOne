@@ -851,7 +851,17 @@ final class SellScreen {
         final TextField q = new TextField("", Lang.tr("Name, e-mail or phone"), 20, TextField.ANY);
         q.setUIID("PosField");
         q.setName("pos-customer-q");
-        final Container results = new Container(BoxLayout.y());
+        // A sheet takes its height when it opens, and an empty list made it
+        // just the field: the matches that came back after had no room and
+        // could not be seen or tapped. The list reserves room up front.
+        final Container results = new Container(BoxLayout.y()) {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+                d.setHeight(CN.getDisplayHeight() * 2 / 5);
+                return d;
+            }
+        };
         results.setScrollableY(true);
         q.setDoneListener(e -> {
             results.removeAll();

@@ -21,10 +21,13 @@ package com.codenameone.examples.bazaar.pos;
 import com.codename1.appkit.Net;
 import com.codename1.qrcode.QrCode;
 import com.codename1.qrcode.QrCodeImage;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -58,17 +61,25 @@ final class ReceiptView {
             row.add(BorderLayout.EAST, PosUi.data(p[1], big ? "PosGrandValue" : "PosTotalRowValue"));
             c.add(row);
         }
-        final Label order = PosUi.data("", "PosMuted");
+        final TextArea order = new TextArea("");
+        order.setEditable(false);
+        order.setFocusable(false);
+        order.setUIID("PosReceiptNote");
         order.setName("pos-receipt-order");
         final Container qr = new Container(new BorderLayout());
         c.add(order).add(qr);
         Container actions = new Container(new GridLayout(1, 3));
-        actions.add(PosUi.icon(FontImage.MATERIAL_PRINT, "Print", "pos-receipt-print", "PosChoice",
+        actions.add(PosUi.icon(FontImage.MATERIAL_PRINT, "Print", "pos-receipt-print", "PosReceiptAction",
                 e -> print(r)));
-        actions.add(PosUi.icon(FontImage.MATERIAL_EMAIL, "E-mail", "pos-receipt-email", "PosChoice",
+        actions.add(PosUi.icon(FontImage.MATERIAL_EMAIL, "E-mail", "pos-receipt-email", "PosReceiptAction",
                 e -> send(r, false)));
-        actions.add(PosUi.icon(FontImage.MATERIAL_SMS, "Text", "pos-receipt-sms", "PosChoice",
+        actions.add(PosUi.icon(FontImage.MATERIAL_SMS, "Text", "pos-receipt-sms", "PosReceiptAction",
                 e -> send(r, true)));
+        for (int iter = 0; iter < actions.getComponentCount(); iter++) {
+            // Icon over the word: three words side by side ran out of room on a
+            // phone and read "Pr..." and "E-...".
+            ((Button) actions.getComponentAt(iter)).setTextPosition(Component.BOTTOM);
+        }
         c.add(actions);
         if (CounterDevices.printer() != null) {
             // The till's own printer and the drawer wired to it.

@@ -638,26 +638,41 @@ public class DemoTourTest extends E2e {
         reopen("pos-customer", "pos-pay");
         if (tap("pos-customer")) {
             pause(1500);
-            type("pos-customer-q", "Riley");
+            // Set on the EDT: typing into the field that is still starting its
+            // edit left it empty, so no search ran and no customer was added.
             onEdt(() -> {
                 Component q = findByName("pos-customer-q");
                 if (q instanceof com.codename1.ui.TextArea) {
+                    ((com.codename1.ui.TextArea) q).stopEditing();
+                    ((com.codename1.ui.TextArea) q).setText("Demo customer");
                     ((com.codename1.ui.TextArea) q).fireDoneEvent();
                 }
             });
             pause(2500);
+            visualShot("reg-customer-found" + mode);
             if (!tap("pos-customer-0")) {
+                log("visual-register: no customer row");
                 dismiss();
             }
             pause(1500);
+        } else {
+            log("visual-register: no customer button");
         }
         dismiss();
         pause(1000);
+        onEdt(() -> {
+            com.codenameone.examples.bazaar.pos.PosCart cart =
+                    com.codenameone.examples.bazaar.pos.PosState.cart();
+            log("visual-register: layaway cart empty=" + cart.isEmpty()
+                    + " customer=" + (cart.customer() != null));
+        });
         go(com.codenameone.examples.bazaar.pos.PosSections.LAYAWAYS);
         pause(2500);
         if (tap("pos-layaway-new")) {
             pause(1500);
-            for (String k : new String[] {"2", "0", "00"}) {
+            // $50.00: the store asks 20% of the taxed total down, which is
+            // more than $20.00 for these two items.
+            for (String k : new String[] {"5", "0", "00"}) {
                 tap("pos-amount-" + k);
                 pause(200);
             }
@@ -665,7 +680,9 @@ public class DemoTourTest extends E2e {
             pause(1500);
             visualShot("reg-layaway-paid-by" + mode);
             tap("pos-layaway-kind-first");
-            pause(2500);
+            pause(900);
+            visualShot("reg-layaway-created" + mode);
+            pause(1600);
         }
         visualShot("reg-layaways" + mode);
         if (tapFirst("pos-layaway-0")) {

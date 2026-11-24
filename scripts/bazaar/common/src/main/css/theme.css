@@ -3092,3 +3092,77 @@ MeSplitDetail {
     SvSecondary { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
     SvSecondary.pressed { background-color: var(--line-strong-dark); }
 }
+
+/* ---- REGISTER ROUND 8 -- approval keypad that fits a phone's sheet ---- */
+PosKeyCompact {
+    cn1-derive: PosKey;
+    font-size: 4.2mm;
+    padding: 1.2mm 1mm 1.2mm 1mm;
+    margin: 0.6mm;
+}
+PosKeyCompact.pressed { cn1-derive: PosKey.pressed; }
+PosPinDotsCompact {
+    cn1-derive: PosPinDots;
+    font-size: 5mm;
+    padding: 0.6mm;
+}
+/* ---- end REGISTER ROUND 8 ---- */
+/* REGISTER ROUND 8 -- receipt actions (icon over the word) and the note. */
+PosReceiptAction {
+    cn1-derive: PosChoice;
+    font-size: 3.2mm;
+    padding: 2.4mm 0.5mm 2.4mm 0.5mm;
+}
+PosReceiptAction.pressed { background-color: var(--surface-press); }
+PosReceiptNote {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 3.2mm;
+    text-align: center;
+    border: none;
+    padding: 1.5mm 0 1.5mm 0;
+    margin: 0;
+}
+/* ---- end REGISTER ROUND 8 (receipt) ---- */
+/* REGISTER ROUND 8 -- the layaway's main action. */
+PosLayawayPay {
+    cn1-derive: PosPrimary;
+    margin: 1.2mm;
+}
+PosLayawayPay.pressed { background-color: var(--brand-pressed); }
+/* ---- end REGISTER ROUND 8 (layaway) ---- */
+/* REGISTER ROUND 8 -- the cash count's running total: on the page, not on
+   a white strip as wide as the screen and twice the size of the counts. */
+PosCountTotal {
+    cn1-derive: PosAmount;
+    background-color: transparent;
+    border: none;
+    font-size: 5mm;
+    text-align: left;
+    padding: 3mm 3mm 0 3mm;
+    margin: 0;
+}
+/* ---- end REGISTER ROUND 8 (count) ---- */
+/* REGISTER ROUND 8 -- dark: these styles named no background, so the
+   platform's white filled them in the dark theme (white keypads, totals,
+   cart lines, tip keys and amount displays). Transparent in both modes:
+   they sit on a surface that is already themed. PosQr stays white, as a
+   code is scanned dark on light. */
+PosAmount, PosCartDeal, PosCartDetail, PosCartTitle, PosDisplayLine,
+PosDisplayStore, PosDisplayTotal, PosGrand, PosGrandLabel, PosGrandValue,
+PosGrid, PosGroup, PosLineTotal, PosPad, PosPinDots, PosPinFooter, PosQty,
+PosScanHint, PosStepper, PosTileLow, PosTilePrice, PosTileStock,
+PosTileTitle, PosTipAmount, PosTipShare, PosTotalRow, PosTotalRowLabel,
+PosTotalRowValue {
+    background-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+    PosReceiptAction.pressed, PosLayawayPay.pressed { background-color: var(--surface-press-dark); }
+    PosReceiptNote { color: var(--text-muted-dark); }
+    PosKeyCompact { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PosKeyCompact.pressed { background-color: var(--surface-press-dark); }
+    PosReceiptAction { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    PosLayawayPay { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PosCountTotal { color: var(--text-dark); background-color: transparent; }
+}
+/* ---- end REGISTER ROUND 8 (dark) ---- */

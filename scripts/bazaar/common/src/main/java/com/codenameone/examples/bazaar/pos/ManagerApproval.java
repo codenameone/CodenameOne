@@ -66,13 +66,12 @@ final class ManagerApproval {
         // The PIN is typed on the register's own keypad: large keys, and the
         // digits are never shown, only a dot for each.
         final StringBuilder pin = new StringBuilder();
-        final Label dots = new Label(dotsFor(0), "PosPinDots");
+        final Label dots = new Label(dotsFor(0), "PosPinDotsCompact");
         dots.setName("pos-approval-pin");
         final Label message = new Label("", "PosError");
         message.setName("pos-approval-message");
-        c.add(PosUi.label(Lang.tr("PIN"), "PosSheetLabel"));
         c.add(dots);
-        c.add(PosUi.pad("pos-approval-key", "", k -> {
+        c.add(PosUi.pad("pos-approval-key", "", "PosKeyCompact", k -> {
             if (k == '\b') {
                 if (pin.length() > 0) {
                     pin.setLength(pin.length() - 1);

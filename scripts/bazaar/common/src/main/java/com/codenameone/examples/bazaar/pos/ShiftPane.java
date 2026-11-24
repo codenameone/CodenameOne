@@ -115,7 +115,7 @@ final class ShiftPane {
         final int[] counts = new int[CashCount.DENOMINATIONS.length];
         final long expected = CashCount.expected(s.openingCents(), s.cashSalesCents(),
                 s.cashMovesCents());
-        final Label total = PosUi.data("", "PosAmount");
+        final Label total = PosUi.data("", "PosCountTotal");
         final Label variance = PosUi.data("", "PosMuted");
         final Runnable sum = () -> {
             long counted = CashCount.total(counts);

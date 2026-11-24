@@ -189,7 +189,8 @@ public class Layaways {
         }
         long min = Money.basisPoints(total, tools.policyOf(storeId).getLayawayDepositBp());
         if (d.amountCents() < min) {
-            throw new ResponseStatusException(400, "The deposit is at least " + min + " cents");
+            throw new ResponseStatusException(400, "The deposit is at least "
+                    + com.codenameone.examples.bazaar.web.Money.plain(min));
         }
         if (d.amountCents() > total) {
             throw new ResponseStatusException(400, "The deposit is more than the total");

@@ -194,6 +194,12 @@ final class PosUi {
 
     /// A 3 by 4 pad: 1-9, then `left` (sent as a newline), 0 and backspace.
     static Container pad(String name, String left, final Keys keys) {
+        return pad(name, left, "PosKey", keys);
+    }
+
+    /// The keypad with keys of style `keyUiid`: the approval sheet uses
+    /// shorter keys so the pad and its actions fit a phone's sheet.
+    static Container pad(String name, String left, String keyUiid, final Keys keys) {
         Container pad = new Container(new GridLayout(4, 3));
         pad.setUIID("PosPad");
         String[] labels = {"1", "2", "3", "4", "5", "6", "7", "8", "9", left, "0", ""};
@@ -201,7 +207,7 @@ final class PosUi {
             final String l = labels[iter];
             final boolean back = iter == 11;
             final boolean left9 = iter == 9;
-            Button b = new Button(l, "PosKey");
+            Button b = new Button(l, keyUiid);
             b.setShouldLocalize(false);
             b.setName(name + "-" + (back ? "back" : l.length() == 0 ? "blank" : l));
             if (back) {
