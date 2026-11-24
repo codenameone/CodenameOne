@@ -68,6 +68,10 @@ kill %1                                           # stop the simulator when done
   serves MCP tools at `http://127.0.0.1:8080/mcp` for inspecting and exercising it.
   See `.agent-skills/codename-one/references/backend.md`, and
   `references/full-stack-loop.md` for changes that span the app and the server.
+- To deploy the backend and ship the apps against it (a VPS, AWS, containers,
+  HTTPS), read `.agent-skills/codename-one/references/deployment.md` first:
+  `cn1:backend-package` builds for the host only, so a Linux server binary is
+  packaged on Linux or in a container.
 
 When in doubt, open `.agent-skills/codename-one/SKILL.md` and follow the
 reference table at the bottom.

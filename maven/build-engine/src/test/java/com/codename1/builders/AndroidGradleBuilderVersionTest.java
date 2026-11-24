@@ -97,6 +97,20 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void overrideLibrariesAreAddedOrMergedNeverDuplicated() {
+        assertEquals(" tools:overrideLibrary=\"a.b,c.d\"",
+                AndroidGradleBuilder.withOverrideLibraries("", "a.b,c.d"));
+        // A project's own override is extended, not followed by a second
+        // attribute of the same name, which would not parse.
+        assertEquals("tools:overrideLibrary=\"androidx.car.app,a.b,c.d\" android:maxSdkVersion=\"34\"",
+                AndroidGradleBuilder.withOverrideLibraries(
+                        "tools:overrideLibrary=\"androidx.car.app\" android:maxSdkVersion=\"34\"",
+                        "a.b,c.d"));
+        assertEquals("tools:overrideLibrary='c.d,a.b'",
+                AndroidGradleBuilder.withOverrideLibraries("tools:overrideLibrary='c.d'", "a.b,c.d"));
+    }
+
+    @Test
     void agp9UsesSdkKeepsOnlyWhatTheMergerStillAccepts() {
         // AGP 9 fails the merge on all three SDK versions in <uses-sdk>, max included.
         String hint = "tools:overrideLibrary=\"androidx.car.app\" android:minSdkVersion=\"21\""

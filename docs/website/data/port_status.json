@@ -368,6 +368,47 @@
       ]
     },
     {
+      "id": "charts-interactive",
+      "category": "Data visualization",
+      "name": "Interactive charts",
+      "description": "Renders the animated chart package: mixed bar and line, dense labels, candlesticks, waterfall, box plot, heatmap, pie, doughnut, gauge, radar, treemap, sunburst, sankey, funnel and sparklines, plus frame grids of the grow-in, data-change and zoom animations and still captures of the shared tooltip and a brush selection.",
+      "tests": [
+        "Chart2BoxplotScreenshotTest",
+        "Chart2BrushScreenshotTest",
+        "Chart2CandlesScreenshotTest",
+        "Chart2DataChangeAnimationScreenshotTest",
+        "Chart2DenseLabelsScreenshotTest",
+        "Chart2DoughnutScreenshotTest",
+        "Chart2FunnelScreenshotTest",
+        "Chart2GaugeScreenshotTest",
+        "Chart2GrowInAnimationScreenshotTest",
+        "Chart2HeatmapScreenshotTest",
+        "Chart2MixedScreenshotTest",
+        "Chart2PieScreenshotTest",
+        "Chart2RadarScreenshotTest",
+        "Chart2SankeyScreenshotTest",
+        "Chart2SharedTooltipScreenshotTest",
+        "Chart2SparklinesScreenshotTest",
+        "Chart2SunburstScreenshotTest",
+        "Chart2TreemapScreenshotTest",
+        "Chart2WaterfallScreenshotTest",
+        "Chart2ZoomAnimationScreenshotTest",
+        "Chart2BarStylesScreenshotTest",
+        "Chart2BarsGrowInAnimationScreenshotTest",
+        "Chart2FinancialGrowInAnimationScreenshotTest",
+        "Chart2FinancialStylesScreenshotTest",
+        "Chart2FlameGraphScreenshotTest",
+        "Chart2HierarchyGrowInAnimationScreenshotTest",
+        "Chart2LegendToggleAnimationScreenshotTest",
+        "Chart2LineStylesScreenshotTest",
+        "Chart2LinesGrowInAnimationScreenshotTest",
+        "Chart2PartsDataChangeAnimationScreenshotTest",
+        "Chart2PartsGrowInAnimationScreenshotTest",
+        "Chart2PointStylesScreenshotTest",
+        "Chart2PointsGrowInAnimationScreenshotTest"
+      ]
+    },
+    {
       "id": "embedded-web-content",
       "category": "Rich components",
       "name": "Embedded browser content",
@@ -969,6 +1010,15 @@
       ]
     },
     {
+      "id": "on-device-system-llm",
+      "category": "On-device AI",
+      "name": "Operating system language model",
+      "description": "Checks that the build keeps the platform's own language model backend (Gemini Nano, Apple Foundation Models), that every feature reports a status in bounded time, and that a device without the model refuses a request instead of hanging.",
+      "tests": [
+        "SystemLlmOnDeviceApiTest"
+      ]
+    },
+    {
       "id": "calendar-integration",
       "category": "Platform-dependent APIs",
       "name": "Calendar integration",
@@ -984,7 +1034,8 @@
       "description": "Checks image pixel readback with and without active clips.",
       "tests": [
         "MutableImageClipReadbackTest",
-        "MutableImageReadbackTest"
+        "MutableImageReadbackTest",
+        "MutableImageDisposeWhileDrawingTest"
       ]
     },
     {
@@ -1431,6 +1482,138 @@
     {
       "pattern": "chart-rotated-pie",
       "test": "ChartRotatedScreenshotTest"
+    },
+    {
+      "pattern": "chart2-mixed",
+      "test": "Chart2MixedScreenshotTest"
+    },
+    {
+      "pattern": "chart2-dense-labels",
+      "test": "Chart2DenseLabelsScreenshotTest"
+    },
+    {
+      "pattern": "chart2-candles",
+      "test": "Chart2CandlesScreenshotTest"
+    },
+    {
+      "pattern": "chart2-waterfall",
+      "test": "Chart2WaterfallScreenshotTest"
+    },
+    {
+      "pattern": "chart2-boxplot",
+      "test": "Chart2BoxplotScreenshotTest"
+    },
+    {
+      "pattern": "chart2-heatmap",
+      "test": "Chart2HeatmapScreenshotTest"
+    },
+    {
+      "pattern": "chart2-pie",
+      "test": "Chart2PieScreenshotTest"
+    },
+    {
+      "pattern": "chart2-doughnut",
+      "test": "Chart2DoughnutScreenshotTest"
+    },
+    {
+      "pattern": "chart2-gauge",
+      "test": "Chart2GaugeScreenshotTest"
+    },
+    {
+      "pattern": "chart2-radar",
+      "test": "Chart2RadarScreenshotTest"
+    },
+    {
+      "pattern": "chart2-treemap",
+      "test": "Chart2TreemapScreenshotTest"
+    },
+    {
+      "pattern": "chart2-sunburst",
+      "test": "Chart2SunburstScreenshotTest"
+    },
+    {
+      "pattern": "chart2-sankey",
+      "test": "Chart2SankeyScreenshotTest"
+    },
+    {
+      "pattern": "chart2-funnel",
+      "test": "Chart2FunnelScreenshotTest"
+    },
+    {
+      "pattern": "chart2-sparklines",
+      "test": "Chart2SparklinesScreenshotTest"
+    },
+    {
+      "pattern": "chart2-shared-tooltip",
+      "test": "Chart2SharedTooltipScreenshotTest"
+    },
+    {
+      "pattern": "chart2-brush",
+      "test": "Chart2BrushScreenshotTest"
+    },
+    {
+      "pattern": "Chart2GrowInAnimationScreenshotTest",
+      "test": "Chart2GrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2DataChangeAnimationScreenshotTest",
+      "test": "Chart2DataChangeAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2ZoomAnimationScreenshotTest",
+      "test": "Chart2ZoomAnimationScreenshotTest"
+    },
+    {
+      "pattern": "chart2-bar-styles",
+      "test": "Chart2BarStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2BarsGrowInAnimationScreenshotTest",
+      "test": "Chart2BarsGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2FinancialGrowInAnimationScreenshotTest",
+      "test": "Chart2FinancialGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "chart2-financial-styles",
+      "test": "Chart2FinancialStylesScreenshotTest"
+    },
+    {
+      "pattern": "chart2-flame-graph",
+      "test": "Chart2FlameGraphScreenshotTest"
+    },
+    {
+      "pattern": "Chart2HierarchyGrowInAnimationScreenshotTest",
+      "test": "Chart2HierarchyGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2LegendToggleAnimationScreenshotTest",
+      "test": "Chart2LegendToggleAnimationScreenshotTest"
+    },
+    {
+      "pattern": "chart2-line-styles",
+      "test": "Chart2LineStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2LinesGrowInAnimationScreenshotTest",
+      "test": "Chart2LinesGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PartsDataChangeAnimationScreenshotTest",
+      "test": "Chart2PartsDataChangeAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PartsGrowInAnimationScreenshotTest",
+      "test": "Chart2PartsGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "chart2-point-styles",
+      "test": "Chart2PointStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PointsGrowInAnimationScreenshotTest",
+      "test": "Chart2PointsGrowInAnimationScreenshotTest"
     },
     {
       "pattern": "BrowserComponent",

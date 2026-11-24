@@ -20,6 +20,9 @@ import java.util.List;
 
 
 /// An abstract renderer to be extended by the multiple series classes.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused text font constant
     /// A no color constant.
     public static final int NO_COLOR = 0;

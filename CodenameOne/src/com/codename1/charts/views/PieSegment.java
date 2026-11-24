@@ -18,6 +18,9 @@ import com.codename1.ui.geom.Shape;
 
 
 /// Holds A PieChart Segment
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class PieSegment {
     private final float mStartAngle;
 

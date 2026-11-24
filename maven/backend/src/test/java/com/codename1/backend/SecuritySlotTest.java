@@ -66,6 +66,13 @@ class SecuritySlotTest {
         }
 
         @Override
+        public HttpServer.Response serveAs(HttpServer.Request request, Object authentication,
+                                           Next next) throws Exception {
+            served.add("as " + authentication + " " + request.getTarget());
+            return next.route(request);
+        }
+
+        @Override
         public void decorate(HttpServer.Request request, HttpServer.Response response) {
             response.header("X-Guard", "on");
         }

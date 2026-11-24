@@ -1,0 +1,50 @@
+// Installed into ~/.gradle/init.d by the maven-central-mirror action.
+//
+// Gradle never reads ~/.m2/settings.xml, so every Gradle build in CI -- the generated
+// Android project, gradle-smoke, the samples' Android legs -- still went to Maven Central
+// directly and failed nightly on its throttling: a 429, or a bare "Could not find" (a
+// throttled 404 that Gradle, like Maven, never retries). plugins.gradle.org redirects
+// to Central for kotlin-stdlib and friends, so it is throttled the same way.
+//
+// This puts Google's copy of Central FIRST in every repository list, keeping the
+// build's own repositories after it as the fallback. Nothing is removed.
+def mirrorUrl = 'https://maven-central.storage-download.googleapis.com/maven2/'
+
+def addMirror = { RepositoryHandler repos ->
+    if (repos.find { it instanceof MavenArtifactRepository && it.url.toString() == mirrorUrl } == null) {
+        def m = repos.maven {
+            name = 'GoogleCentralMirror'
+            url = mirrorUrl
+        }
+        // maven {} appends; move it to the front so it is searched first.
+        repos.remove(m)
+        repos.addFirst(m)
+    }
+}
+
+beforeSettings { settings ->
+    addMirror(settings.pluginManagement.repositories)
+    addMirror(settings.buildscript.repositories)
+}
+
+settingsEvaluated { settings ->
+    // Projects using dependencyResolutionManagement declare their repositories here,
+    // and may forbid project-level ones (FAIL_ON_PROJECT_REPOS).
+    try {
+        addMirror(settings.dependencyResolutionManagement.repositories)
+    } catch (Throwable ignored) {
+        // Gradle older than 6.8 has no dependencyResolutionManagement.
+    }
+}
+
+allprojects { project ->
+    addMirror(project.buildscript.repositories)
+    // Only when the project declares repositories of its own: adding one to a project
+    // under FAIL_ON_PROJECT_REPOS fails its build, and a project with none resolves
+    // through the settings repositories handled above.
+    project.repositories.whenObjectAdded { r ->
+        if (!(r instanceof MavenArtifactRepository && r.url.toString() == mirrorUrl)) {
+            addMirror(project.repositories)
+        }
+    }
+}

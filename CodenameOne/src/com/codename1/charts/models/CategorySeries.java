@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// A series for the category charts like the pie ones.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class CategorySeries {
     /// The series title.
     private final String mTitle;

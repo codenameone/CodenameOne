@@ -380,7 +380,7 @@ public final class SecureKeyboard extends Component {
         CN.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (field.getComponentForm() != f) {
+                if (field.getComponentForm() != f) { //NOPMD CompareObjectsWithEquals - same Form instance is the question
                     showDeferred = false;
                     return;
                 }

@@ -88,7 +88,7 @@ class GraphicsJava076Snippet {
         XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
         renderer.addSeriesRenderer(seriesRenderer);
 
-        XYSeries series = new XYSeries("Sales");
+        com.codename1.charts.models.XYSeries series = new com.codename1.charts.models.XYSeries("Sales");
         series.add(1, 42);
         series.add(2, 57);
 

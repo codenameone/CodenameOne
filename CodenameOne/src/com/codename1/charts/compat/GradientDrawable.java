@@ -24,6 +24,7 @@ package com.codename1.charts.compat;
 
 import com.codename1.ui.geom.Rectangle;
 
+@Deprecated
 public class GradientDrawable {
 
     Orientation orientation;

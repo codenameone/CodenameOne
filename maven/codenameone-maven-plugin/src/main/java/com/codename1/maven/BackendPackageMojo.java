@@ -63,8 +63,7 @@ import java.util.List;
  * 2. Runs the translator over the result, with the runtime's C sources already in
  *    the source root -- they have to be there BEFORE it runs, because a native's
  *    Java method is kept alive by its C symbol being present.
- * 3. Compiles the generated C, either with the host compiler or, for a named
- *    Linux target, in a container.
+ * 3. Compiles the generated C with the host compiler, for this machine.
  *
  * The compiler flags are not negotiable and are documented at the call site:
  * generated C relies on wrapping arithmetic, and clang -O3 miscompiles it without
@@ -125,8 +124,12 @@ public class BackendPackageMojo extends AbstractMojo {
 
     /**
      * A Linux deployment target -- musl-x86_64, musl-arm64, glibc-x86_64,
-     * glibc-arm64 -- built in a container. Omitted, it compiles for this machine
-     * with the host compiler, which is what a developer wants and what CI checks.
+     * glibc-arm64. Not supported by this goal yet: naming one fails the build
+     * (BackendPackager.link says why) rather than returning a host binary under
+     * a cross-compiled name. Omitted, it compiles for this machine with the host
+     * compiler; a Linux server is therefore packaged on Linux -- a CI runner, a
+     * container, or the server -- as the developer guide's deployment chapter
+     * describes.
      */
     @Parameter(property = "cn1.backend.target")
     private String target;

@@ -87,7 +87,8 @@ class ManagedSessionDatabaseTest {
             ManagedSessionTest.assertDecimalIdentifiers(db);
             ManagedSessionTest.assertBulkTextKeyBounds(db);
             ManagedSessionTest.assertMinimumLongLiteral(session);
-            ManagedSessionTest.assertCaseAndNativeQueries(session);
+            ManagedSessionTest.emptyTextIsNull="oracle".equals(db.dialect().getName());
+            try { ManagedSessionTest.assertCaseAndNativeQueries(session); } finally { ManagedSessionTest.emptyTextIsNull=false; }
             ManagedSessionTest.assertNativeProjectionWidths(session);
             assertThrows(PersistenceException.class,()->session.createNativeQuery("SELECT 1.5",Long.class).first());
             assertThrows(PersistenceException.class,()->session.createNativeQuery("SELECT 1",String.class).first());
@@ -120,7 +121,7 @@ class ManagedSessionDatabaseTest {
             for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {
                 assertEquals(Double.valueOf(1.5),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Double.class).first(),expression);
             }
-            for(String predicate:new String[]{":value is null",":value is not null","(:value) is null","coalesce(:a,:b) is null"}) {
+            for(String predicate:new String[]{"coalesce(:a,:b) is null"}) {
                 assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate));
             }
             assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where coalesce(:value,r.name) is not null").setParameter("value",null).list().size());

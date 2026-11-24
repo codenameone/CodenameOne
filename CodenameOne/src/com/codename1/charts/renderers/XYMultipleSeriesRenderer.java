@@ -25,6 +25,9 @@ import java.util.Map;
 
 
 /// Multiple XY series renderer.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class XYMultipleSeriesRenderer extends DefaultRenderer {
     /// The X axis text labels.
     private final Map<Double, String> mXTextLabels = new HashMap<Double, String>();

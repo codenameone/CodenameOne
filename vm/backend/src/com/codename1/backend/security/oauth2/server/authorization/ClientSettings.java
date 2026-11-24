@@ -25,9 +25,11 @@ package com.codename1.backend.security.oauth2.server.authorization;
 /// What is asked of one client beyond what OAuth2 asks of every client.
 public final class ClientSettings {
     private final boolean requireProofKey;
+    private final boolean requireAuthorizationConsent;
 
-    private ClientSettings(boolean requireProofKey) {
+    private ClientSettings(boolean requireProofKey, boolean requireAuthorizationConsent) {
         this.requireProofKey = requireProofKey;
+        this.requireAuthorizationConsent = requireAuthorizationConsent;
     }
 
     public static Builder builder() {
@@ -40,15 +42,19 @@ public final class ClientSettings {
         return requireProofKey;
     }
 
-    /// Always false: this server has no consent page, and a client is
-    /// authorized for the scopes it was registered with.
+    /// Whether the user must approve each authorization of this client on a
+    /// consent page, which grants only the scopes they approve. False unless
+    /// set, and then a client is authorized for the scopes it asks for out of
+    /// those it was registered with. A client that registered itself always
+    /// asks.
     public boolean isRequireAuthorizationConsent() {
-        return false;
+        return requireAuthorizationConsent;
     }
 
     /// Builds a [ClientSettings].
     public static final class Builder {
         private boolean requireProofKey;
+        private boolean requireAuthorizationConsent;
 
         Builder() {
         }
@@ -58,18 +64,14 @@ public final class ClientSettings {
             return this;
         }
 
-        /// Accepted as false only; see
-        /// [ClientSettings#isRequireAuthorizationConsent].
+        /// See [ClientSettings#isRequireAuthorizationConsent].
         public Builder requireAuthorizationConsent(boolean requireAuthorizationConsent) {
-            if (requireAuthorizationConsent) {
-                throw new IllegalArgumentException("This authorization server has no consent "
-                        + "page; requireAuthorizationConsent can only be false");
-            }
+            this.requireAuthorizationConsent = requireAuthorizationConsent;
             return this;
         }
 
         public ClientSettings build() {
-            return new ClientSettings(requireProofKey);
+            return new ClientSettings(requireProofKey, requireAuthorizationConsent);
         }
     }
 }

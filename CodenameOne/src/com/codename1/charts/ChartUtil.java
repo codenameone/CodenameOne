@@ -30,6 +30,9 @@ import com.codename1.ui.geom.Rectangle;
 
 /// A utility class for painting a chart onto a Graphics context.  This is a low level
 /// API.  You should use the `ChartComponent` class instead.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class ChartUtil {
     private final Canvas c = new Canvas();
 

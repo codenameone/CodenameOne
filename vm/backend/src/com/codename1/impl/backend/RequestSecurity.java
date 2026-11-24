@@ -44,6 +44,15 @@ public interface RequestSecurity {
     /// a filter, a controller, a service -- is answered here rather than thrown.
     HttpServer.Response serve(HttpServer.Request request, Next next) throws Exception;
 
+    /// Answers `request` as `authentication` -- a
+    /// `com.codename1.backend.security.Authentication` the caller already
+    /// established -- running only the authorization rules of the chain that
+    /// claims the request, never its sign-in filters, CSRF or session
+    /// handling. The caller has [#enter]ed and will [#leave]. A refusal is a
+    /// plain 401 or 403, never a redirect to a login page.
+    HttpServer.Response serveAs(HttpServer.Request request, Object authentication, Next next)
+            throws Exception;
+
     /// Adds the headers the chain of `request` writes to `response`, which is the
     /// caller's own copy: the response a handler returns may be one shared by
     /// every request. Called for the server's own 404 and 500 as well, after

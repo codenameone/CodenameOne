@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// A series for the multiple category charts like the doughnut.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class MultipleCategorySeries {
     /// The series title.
     private final String mTitle;
