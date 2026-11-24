@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.merchant;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -45,6 +46,17 @@ final class MUi {
         page.setName(name);
         return page;
     }
+
+    /// A scrolling page for a dashboard or a report, as wide as the pane up to
+    /// a large monitor's comfortable reading width.
+    static Container widePage(String name) {
+        Container page = Ui.widePage("MePage", CN.convertToPixels(DASH_MM));
+        page.setName(name);
+        return page;
+    }
+
+    /// The widest a dashboard's content is drawn, in millimetres.
+    private static final float DASH_MM = 420f;
 
     /// A status as a coloured badge.
     static Label badge(String code) {
@@ -144,6 +156,13 @@ final class MUi {
 
     /// A card on the dashboard: a big number, its caption and a sparkline.
     static Container tile(String value, String caption, Component trailing, String name) {
+        Label v = new Label(value, "MeTileValue");
+        v.setShouldLocalize(false);
+        return tile(v, caption, trailing, name);
+    }
+
+    /// A tile whose value is a label of the caller's: a counter that counts up.
+    static Container tile(Label v, String caption, Component trailing, String name) {
         Container tile = new Container(new BorderLayout());
         tile.setUIID("MeTile");
         tile.setName(name);
@@ -157,8 +176,6 @@ final class MUi {
         c.setAutoSizeMode(true);
         c.setMaxAutoSize(2.6f);
         words.add(c);
-        Label v = new Label(value, "MeTileValue");
-        v.setShouldLocalize(false);
         v.setAutoSizeMode(true);
         v.setMaxAutoSize(5f);
         words.add(v);

@@ -228,14 +228,24 @@ final class MCharts {
         Chart chart = chart(name, 30f);
         chart.addSeries(pie);
         chart.setPreferredW(CN.convertToPixels(30f));
+        // Each part's name wraps on a line of its own with its share under it:
+        // a name and a share side by side were both cut to "..." in a card a
+        // third of a desktop wide.
         Container legend = new Container(BoxLayout.y());
         for (int iter = 0; iter < labels.length; iter++) {
-            Container row = new Container(new BorderLayout());
-            row.add(BorderLayout.WEST, swatch(color("MeChartSlice" + (iter % 4 + 1))));
-            row.add(BorderLayout.CENTER, new Label(labels[iter], "MeLegend"));
+            Container row = new Container(new BorderLayout(), "MeLegendRow");
+            row.add(BorderLayout.WEST, BorderLayout.north(swatch(color("MeChartSlice"
+                    + (iter % 4 + 1)))));
+            Container words = new Container(BoxLayout.y());
+            com.codename1.components.SpanLabel part = new com.codename1.components.SpanLabel(
+                    labels[iter]);
+            part.setUIID("Container");
+            part.setTextUIID("MeLegend");
+            words.add(part);
             Label share = new Label(shares[iter], "MeLegendValue");
             share.setShouldLocalize(false);
-            row.add(BorderLayout.EAST, share);
+            words.add(share);
+            row.add(BorderLayout.CENTER, words);
             legend.add(row);
         }
         Container box = new Container(new BorderLayout(), "MeChartBox");

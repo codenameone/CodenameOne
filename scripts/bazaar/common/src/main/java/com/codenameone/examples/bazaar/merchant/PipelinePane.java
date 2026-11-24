@@ -23,6 +23,7 @@ import com.codename1.kanban.KanbanCard;
 import com.codename1.kanban.KanbanColumn;
 import com.codename1.kanban.KanbanLane;
 import com.codename1.ui.Button;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -142,10 +143,120 @@ final class PipelinePane extends MerchantPane {
                 board.addKanbanListener(new Listener());
                 root(board);
             }
-            board.setModel(Pipelines.model(columns, System.currentTimeMillis(), words));
+            fly(Pipelines.model(columns, System.currentTimeMillis(), words));
             return;
         }
         phone();
+    }
+
+    /// Shows `next` on the board, and every card that changed column on the
+    /// way flies there: a picture of the card as it was slides from its old
+    /// place to its new one while the column counts change under it. A board
+    /// that moves by itself (an order paid, packed, shipped by the carrier)
+    /// has to show the move, or a card simply vanishes from one column.
+    private void fly(com.codename1.kanban.KanbanModel next) {
+        com.codename1.kanban.KanbanModel was = board.getModel();
+        java.util.Map<String, int[]> from = new java.util.HashMap<String, int[]>();
+        java.util.Map<String, String> columnOf = new java.util.HashMap<String, String>();
+        com.codename1.ui.Image picture = null;
+        if (was != null && board.getWidth() > 0 && movingFrom == null) {
+            List<com.codename1.kanban.KanbanColumn> cols = was.getColumns();
+            for (int c = 0; c < cols.size(); c++) {
+                List<KanbanCard> cards = was.getCards(cols.get(c), null);
+                for (int iter = 0; cards != null && iter < cards.size(); iter++) {
+                    int[] r = board.getCardBounds(cards.get(iter));
+                    if (r != null) {
+                        from.put(cards.get(iter).getId(), r);
+                        columnOf.put(cards.get(iter).getId(), cols.get(c).getId());
+                    }
+                }
+            }
+            if (!from.isEmpty()) {
+                picture = board.toImage(board.getWidth(), board.getHeight());
+            }
+        }
+        board.setModel(next);
+        if (picture == null) {
+            return;
+        }
+        final List<Flight> flights = new ArrayList<Flight>();
+        List<com.codename1.kanban.KanbanColumn> cols = next.getColumns();
+        for (int c = 0; c < cols.size(); c++) {
+            List<KanbanCard> cards = next.getCards(cols.get(c), null);
+            for (int iter = 0; cards != null && iter < cards.size(); iter++) {
+                String id = cards.get(iter).getId();
+                String old = columnOf.get(id);
+                if (old == null || old.equals(cols.get(c).getId())) {
+                    continue;
+                }
+                int[] a = from.get(id);
+                int[] b = board.getCardBounds(cards.get(iter));
+                if (b == null || a[2] <= 0 || a[3] <= 0 || a[0] < 0 || a[1] < 0
+                        || a[0] + a[2] > picture.getWidth() || a[1] + a[3] > picture.getHeight()) {
+                    continue;
+                }
+                flights.add(new Flight(picture.subImage(a[0], a[1], a[2], a[3], true), a, b));
+            }
+        }
+        if (flights.isEmpty() || getComponentForm() == null) {
+            return;
+        }
+        final com.codename1.ui.Form form = getComponentForm();
+        final com.codename1.ui.Painter before = form.getGlassPane();
+        final long start = System.currentTimeMillis();
+        final int bx = board.getAbsoluteX() - form.getAbsoluteX();
+        final int by = board.getAbsoluteY() - form.getAbsoluteY();
+        form.setGlassPane((g, rect) -> {
+            if (before != null) {
+                before.paint(g, rect);
+            }
+            double t = Math.min(1, (System.currentTimeMillis() - start) / (double) FLIGHT_MILLIS);
+            double u = -2 * t + 2;
+            double e = t < 0.5 ? 4 * t * t * t : 1 - u * u * u / 2;
+            int lift = (int) (Math.sin(Math.PI * t) * CN.convertToPixels(4f));
+            int was2 = g.getAlpha();
+            for (int iter = 0; iter < flights.size(); iter++) {
+                Flight f = flights.get(iter);
+                int x = bx + f.from[0] + (int) ((f.to[0] - f.from[0]) * e);
+                int y = by + f.from[1] + (int) ((f.to[1] - f.from[1]) * e) - lift;
+                g.setAlpha(60);
+                g.setColor(0x000000);
+                g.fillRoundRect(x + 4, y + 8, f.from[2], f.from[3], 16, 16);
+                g.setAlpha(255);
+                g.drawImage(f.picture, x, y);
+            }
+            g.setAlpha(was2);
+        });
+        form.registerAnimated(new com.codename1.ui.animations.Animation() {
+            @Override
+            public boolean animate() {
+                if (System.currentTimeMillis() - start > FLIGHT_MILLIS) {
+                    form.deregisterAnimated(this);
+                    form.setGlassPane(before);
+                }
+                form.repaint();
+                return false;
+            }
+
+            @Override
+            public void paint(com.codename1.ui.Graphics g) {
+            }
+        });
+    }
+
+    private static final long FLIGHT_MILLIS = 750;
+
+    /// A card on its way from one column to another.
+    private static final class Flight {
+        final com.codename1.ui.Image picture;
+        final int[] from;
+        final int[] to;
+
+        Flight(com.codename1.ui.Image picture, int[] from, int[] to) {
+            this.picture = picture;
+            this.from = from;
+            this.to = to;
+        }
     }
 
     private void phone() {

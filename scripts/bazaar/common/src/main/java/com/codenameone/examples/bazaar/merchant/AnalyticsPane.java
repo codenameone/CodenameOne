@@ -31,7 +31,6 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.table.DataGrid;
 import com.codenameone.examples.bazaar.api.AnalyticsDto;
@@ -179,7 +178,7 @@ final class AnalyticsPane extends MerchantPane {
             return;
         }
         boolean wideNow = Layouts.wide();
-        Container page = MUi.page("analytics-page");
+        Container page = MUi.widePage("analytics-page");
 
         Container head = new Container(new BorderLayout());
         head.setUIID("MeAnalyticsHead");
@@ -210,24 +209,28 @@ final class AnalyticsPane extends MerchantPane {
 
         KpiDto now = data.current();
         KpiDto was = data.previous();
-        Container tiles = new Container(new GridLayout(wideNow ? 2 : 3, wideNow ? 4 : 2));
+        // Eight across on a monitor, four on a tablet, two on a phone: the
+        // grid counts the pane's own width, not the screen's.
+        Container tiles = DashGrid.of(30f, 8);
         tiles.setUIID("MeTiles");
-        tiles.add(kpi("Net sales", money(now.netSalesCents()), now.netSalesCents(),
-                was.netSalesCents(), false, "kpi-net"));
-        tiles.add(kpi("Orders", String.valueOf(now.orders()), now.orders(), was.orders(), false,
-                "kpi-orders"));
-        tiles.add(kpi("Average order", money(now.averageOrderCents()), now.averageOrderCents(),
-                was.averageOrderCents(), false, "kpi-aov"));
-        tiles.add(kpi("Customers", String.valueOf(now.customers()), now.customers(),
-                was.customers(), false, "kpi-customers"));
-        tiles.add(kpi("Conversion", Period.percent(now.conversionBp()), now.conversionBp(),
-                was.conversionBp(), false, "kpi-conversion"));
-        tiles.add(kpi("Returning customers", Period.percent(now.returningCustomerBp()),
-                now.returningCustomerBp(), was.returningCustomerBp(), false, "kpi-returning"));
-        tiles.add(kpi("Discounts", money(now.discountsCents()), now.discountsCents(),
-                was.discountsCents(), true, "kpi-discounts"));
-        tiles.add(kpi("Refunds", money(now.refundsCents()), now.refundsCents(),
-                was.refundsCents(), true, "kpi-refunds"));
+        Delight.Format cash = this::money;
+        Delight.Format count = String::valueOf;
+        Delight.Format bp = v -> Period.percent((int) v);
+        tiles.add(kpi("Net sales", cash, now.netSalesCents(), was.netSalesCents(), false,
+                "kpi-net"));
+        tiles.add(kpi("Orders", count, now.orders(), was.orders(), false, "kpi-orders"));
+        tiles.add(kpi("Average order", cash, now.averageOrderCents(), was.averageOrderCents(),
+                false, "kpi-aov"));
+        tiles.add(kpi("Customers", count, now.customers(), was.customers(), false,
+                "kpi-customers"));
+        tiles.add(kpi("Conversion", bp, now.conversionBp(), was.conversionBp(), false,
+                "kpi-conversion"));
+        tiles.add(kpi("Returning customers", bp, now.returningCustomerBp(),
+                was.returningCustomerBp(), false, "kpi-returning"));
+        tiles.add(kpi("Discounts", cash, now.discountsCents(), was.discountsCents(), true,
+                "kpi-discounts"));
+        tiles.add(kpi("Refunds", cash, now.refundsCents(), was.refundsCents(), true,
+                "kpi-refunds"));
         page.add(tiles);
 
         List<SeriesPointDto> daily = data.daily();
@@ -247,27 +250,26 @@ final class AnalyticsPane extends MerchantPane {
                 prior[iter] = before.daily().get(iter).salesCents();
             }
         }
-        Container charts = new Container(new GridLayout(1, wideNow ? 2 : 1));
-        if (!wideNow) {
-            charts.setLayout(BoxLayout.y());
-        }
-        charts.add(card("Sales by day", MCharts.line("chart-sales", labels, sales, prior)));
-        charts.add(card("Orders by day", MCharts.bars("chart-orders", labels, orders, MCharts.COUNT)));
+        // The trend gets the full width: thirty days of labels need it.
+        Container trend = DashGrid.of(150f, 2);
+        trend.add(card("Sales by day", MCharts.line("chart-sales", labels, sales, prior)));
+        trend.add(card("Orders by day", MCharts.bars("chart-orders", labels, orders,
+                MCharts.COUNT)));
+        page.add(trend);
+
+        // Three across on a monitor, two on a tablet, one on a phone.
+        Container charts = DashGrid.of(88f, 3);
+        charts.add(card("Sales by channel", channels(insights == null ? data.byChannel()
+                : Insights.withSales(insights.channels()))));
+        charts.add(card("Sales by location", locations(data.byLocation())));
+        charts.add(card("Conversion funnel", funnel(insights == null ? data.funnel()
+                : insights.funnel())));
         page.add(charts);
 
-        Container splits = new Container(wideNow ? new GridLayout(1, 2) : BoxLayout.y());
-        splits.add(card("Sales by channel", channels(insights == null ? data.byChannel()
-                : Insights.withSales(insights.channels()))));
-        splits.add(card("Sales by location", locations(data.byLocation())));
-        page.add(splits);
-
-        Container lower = new Container(wideNow ? new GridLayout(1, 2) : BoxLayout.y());
+        Container lower = DashGrid.of(150f, 2);
         lower.add(card("Top products", topProducts(data.topProducts(), wideNow)));
-        lower.add(card("Conversion funnel", funnel(insights == null ? data.funnel()
-                : insights.funnel())));
+        lower.add(card("Inventory value", inventory()));
         page.add(lower);
-
-        page.add(card("Inventory value", inventory()));
         root(page);
     }
 
@@ -279,8 +281,8 @@ final class AnalyticsPane extends MerchantPane {
         return card;
     }
 
-    private Container kpi(String caption, String value, long now, long was, boolean lowerIsBetter,
-            String name) {
+    private Container kpi(String caption, Delight.Format format, long now, long was,
+            boolean lowerIsBetter, String name) {
         Label delta = new Label(Lang.tr(Period.delta(now, was)),
                 now == was ? "MeDeltaFlat" : Period.good(now, was, lowerIsBetter) ? "MeDeltaUp"
                         : "MeDeltaDown");
@@ -289,7 +291,8 @@ final class AnalyticsPane extends MerchantPane {
             FontImage.setMaterialIcon(delta, now > was ? FontImage.MATERIAL_ARROW_UPWARD
                     : FontImage.MATERIAL_ARROW_DOWNWARD, 2.4f);
         }
-        return MUi.tile(value, Lang.tr(caption), delta, name);
+        return MUi.tile(Delight.counter(now, format, "MeTileValue"), Lang.tr(caption), delta,
+                name);
     }
 
     private Component channels(List<BreakdownDto> list) {
@@ -325,13 +328,22 @@ final class AnalyticsPane extends MerchantPane {
         }
         for (int iter = 0; iter < list.size(); iter++) {
             BreakdownDto b = list.get(iter);
-            Container row = new Container(new BorderLayout());
+            // The name has a line of its own and the figures sit after the
+            // bar: a name and its figures side by side were drawn over each
+            // other once the card was narrower than both.
+            Container row = new Container(BoxLayout.y());
             row.setUIID("MeBreakRow");
-            row.add(BorderLayout.WEST, Ui.plain(b.label() == null ? b.key() : b.label(), "SvRowTitle"));
+            com.codename1.components.SpanLabel name = new com.codename1.components.SpanLabel(
+                    b.label() == null ? b.key() : b.label());
+            name.setUIID("Container");
+            name.setTextUIID("SvRowTitle");
+            row.add(name);
+            Container bar = new Container(new BorderLayout());
+            bar.add(BorderLayout.CENTER, MCharts.meter(b.salesCents() / (double) top));
             Label v = Ui.plain(money(b.salesCents()) + Ui.DOT
-                    + Lang.tr("{0} orders", String.valueOf(b.orders())), "SvRowValue");
-            row.add(BorderLayout.EAST, v);
-            row.add(BorderLayout.SOUTH, MCharts.meter(b.salesCents() / (double) top));
+                    + Lang.tr("{0} orders", String.valueOf(b.orders())), "MeBreakValue");
+            bar.add(BorderLayout.EAST, v);
+            row.add(bar);
             box.add(row);
         }
         return box;
@@ -376,7 +388,7 @@ final class AnalyticsPane extends MerchantPane {
     }
 
     private Component inventory() {
-        Container tiles = new Container(new GridLayout(1, Layouts.wide() ? 4 : 2));
+        Container tiles = DashGrid.of(34f, 4);
         if (data.inventory() == null) {
             return tiles;
         }

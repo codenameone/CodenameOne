@@ -32,7 +32,6 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.table.DataGrid;
 import com.codenameone.examples.bazaar.api.CreditAdjustDto;
 import com.codenameone.examples.bazaar.api.CustomerDetailDto;
@@ -309,7 +308,7 @@ final class CustomersPane extends MerchantPane {
     // ------------------------------------------------------------ the detail
 
     private void open(CustomerDto c) {
-        final Container page = MUi.page("customer-detail");
+        final Container page = MUi.widePage("customer-detail");
         page.add(new com.codename1.appkit.Skeleton(4, "SvSkeleton"));
         pick(name(c), page);
         Api.customers().detail(MerchantState.storeId(), c.id(), Net.to(d -> detail(page, d),
@@ -320,7 +319,7 @@ final class CustomersPane extends MerchantPane {
         page.removeAll();
         final CustomerDto c = d.customer();
         page.add(Ui.person(name(c), c.email() == null ? c.username() : c.email(), null));
-        Container tiles = new Container(new GridLayout(1, wide ? 4 : 2));
+        Container tiles = DashGrid.of(40f, 4);
         tiles.setUIID("MeTiles");
         tiles.add(MUi.tile(MerchantState.money(d.lifetimeValueCents()), Lang.tr("Lifetime value"),
                 null, "customer-ltv"));

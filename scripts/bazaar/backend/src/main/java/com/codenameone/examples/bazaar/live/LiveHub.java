@@ -73,6 +73,15 @@ public class LiveHub {
         admins.remove(session);
     }
 
+    private final java.util.concurrent.atomic.AtomicLong changes =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    /// How many changes were published since the server started, for the
+    /// tests: a transition that should be heard and was not shows as no step.
+    public long changes() {
+        return changes.get();
+    }
+
     /// How many connections are open, for the tests.
     public synchronized int connections() {
         int total = 0;
@@ -99,6 +108,7 @@ public class LiveHub {
     /// Tells `users` and the admins that the `type` named `id` changed, and
     /// to what `state`. They read the thing itself over REST.
     public void changed(String type, String id, String state, List<String> users) {
+        changes.incrementAndGet();
         Map<String, Object> frame = new LinkedHashMap<String, Object>();
         frame.put("type", type);
         frame.put("id", id);

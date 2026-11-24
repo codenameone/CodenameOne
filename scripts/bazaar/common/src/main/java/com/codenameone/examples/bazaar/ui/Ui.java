@@ -214,6 +214,17 @@ public final class Ui {
         return page;
     }
 
+    /// A scrolling page for a dashboard: its content drawn across the whole
+    /// width up to `most` pixels, centred beyond that. A dashboard capped at a
+    /// form's column left most of a desktop window empty.
+    public static Container widePage(String uiid, int most) {
+        Column page = new Column();
+        page.most = most;
+        page.setUIID(uiid);
+        page.setScrollableY(true);
+        return page;
+    }
+
     public static Container card() {
         Container card = new Container(BoxLayout.y());
         card.setUIID("SvCard");

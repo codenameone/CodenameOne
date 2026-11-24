@@ -68,7 +68,7 @@ final class DiscountsPane extends MerchantPane {
     }
 
     private void fill(List<DiscountDto> list) {
-        Container page = MUi.page("discounts-list");
+        Container page = MUi.widePage("discounts-list");
         Container card = new Container(BoxLayout.y());
         card.setUIID("MeCard");
         for (final DiscountDto d : list) {

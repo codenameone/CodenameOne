@@ -3249,3 +3249,29 @@ PosMilestoneMeta { color: var(--text-muted); background-color: transparent; font
     PosMilestoneMeta { color: var(--text-muted-dark); }
 }
 /* ---- end REGISTER ROUND A ---- */
+/* ---- MERCHANT ROUND A ---- */
+MeBreakRow { background-color: transparent; padding: 1mm 0 1.2mm 0; margin: 0; }
+MeBreakValue { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0 0 0 2mm; margin: 0; }
+MeLegendRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
+MeGoalRing { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 1mm; margin: 0; }
+MeRingHole { color: var(--surface); }
+MeGoalDone { color: var(--success); }
+MeGoalCaption { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.3mm; padding: 0.8mm 0 0 0; margin: 0; }
+MeGoalValue { color: var(--text-muted); background-color: transparent; font-size: 2mm; padding: 0.2mm 0 0 0; margin: 0; }
+MeStreak { color: #c2410c; background-color: #fff3e8; border-radius: 3mm; font-family: "native:MainBold"; font-size: 2.2mm; padding: 1mm 2.4mm 1mm 2mm; margin: 1.6mm 0 0 0; }
+MeLiveToast { background-color: var(--surface); border: 1px solid var(--brand); border-radius: 3mm; padding: 2mm 3.4mm 2mm 1.6mm; margin: 0; }
+MeLiveToastTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0; margin: 0; }
+MeLiveToastDetail { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.4mm 0 0 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    MeBreakValue { color: var(--text-muted-dark); }
+    MeGoalRing { color: var(--text-dark); }
+    MeRingHole { color: var(--surface-dark); }
+    MeGoalDone { color: var(--success-dark); }
+    MeGoalCaption { color: var(--text-dark); }
+    MeGoalValue { color: var(--text-muted-dark); }
+    MeStreak { color: #fdba74; background-color: #3a2210; }
+    MeLiveToast { background-color: var(--surface-dark); border: 1px solid var(--brand-dark); }
+    MeLiveToastTitle { color: var(--text-dark); }
+    MeLiveToastDetail { color: var(--text-muted-dark); }
+}
+/* ---- end MERCHANT ROUND A ---- */

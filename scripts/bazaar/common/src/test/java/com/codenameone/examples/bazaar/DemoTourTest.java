@@ -1638,6 +1638,13 @@ private void screens() throws Exception {
 
     /// A press, a drag in `steps` moves and a release, a frame a step.
     protected void drag(final int x0, final int y0, final int x1, final int y1, int steps) {
+        drag(x0, y0, x1, y1, steps, false);
+    }
+
+    /// [#drag], resting the finger at the end before it lifts when `rest`,
+    /// which leaves no velocity to fling with.
+    protected void drag(final int x0, final int y0, final int x1, final int y1, int steps,
+            boolean rest) {
         final TouchOverlay overlay = JavaSEPort.instance.getTouchOverlay();
         onEdt(() -> {
             overlay.pressed(x0, y0);
@@ -1652,6 +1659,15 @@ private void screens() throws Exception {
                 Display.getInstance().getCurrent().pointerDragged(x, y);
             });
             waitFor(33);
+        }
+        if (rest) {
+            for (int i = 0; i < 4; i++) {
+                onEdt(() -> {
+                    overlay.dragged(x1, y1);
+                    Display.getInstance().getCurrent().pointerDragged(x1, y1);
+                });
+                waitFor(60);
+            }
         }
         com.codename1.ui.CN.callSerially(() -> {
             overlay.released(x1, y1);
