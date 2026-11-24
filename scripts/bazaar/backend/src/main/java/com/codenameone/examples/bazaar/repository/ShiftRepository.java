@@ -47,4 +47,14 @@ public interface ShiftRepository extends CrudRepository<Shift, String> {
     int addTotals(@Param("id") String id, @Param("cash") long cash, @Param("card") long card,
             @Param("other") long other, @Param("moves") long moves, @Param("drawer") long drawer,
             @Param("sales") int sales);
+
+    /// Closes an open shift in one statement, writing only the count, note and
+    /// status: a sale's addTotals landing meanwhile is kept, and of two
+    /// closes only one finds the shift still open. Answers the rows changed.
+    @Modifying(clearAutomatically = true)
+    @Query("update Shift s set s.countedCents = :counted, s.note = :note, "
+            + "s.status = :closed, s.closedAt = :at where s.id = :id and s.status = :open")
+    int close(@Param("id") String id, @Param("counted") long counted, @Param("note") String note,
+            @Param("closed") String closed, @Param("at") java.time.Instant at,
+            @Param("open") String open);
 }

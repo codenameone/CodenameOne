@@ -334,8 +334,8 @@ class PosTest {
 
     @Test
     void theToleranceIsAUnitOrOnePercent() {
-        assertEquals(100, com.codenameone.examples.bazaar.pos.PosSales.tolerance(1040));
-        assertEquals(100, com.codenameone.examples.bazaar.pos.PosSales.tolerance(0));
+        assertEquals(10, com.codenameone.examples.bazaar.pos.PosSales.tolerance(1040));
+        assertEquals(5, com.codenameone.examples.bazaar.pos.PosSales.tolerance(0));
         assertEquals(250, com.codenameone.examples.bazaar.pos.PosSales.tolerance(25000));
     }
 
@@ -363,8 +363,9 @@ class PosTest {
     @Test
     void aShortfallWithinRoundingIsAcceptedButAnUnpaidSaleIsNot() throws Exception {
         Till t = new Till("pos-short", 10);
-        // The register had no tax: $10.00 for a $10.40 sale, 40 cents short.
-        Map r = (Map) t.sync(t.sale("short", 1, card(1000))).get(0);
+        // Rounding per line: $10.35 for a $10.40 sale, 5 cents short, inside
+        // the 1% tolerance. A whole tax rate missing is not rounding.
+        Map r = (Map) t.sync(t.sale("short", 1, card(1035))).get(0);
         assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));
         assertTrue(eventKinds(r).contains("TOTAL_ADJUSTED"), eventKinds(r));
         Map refused = (Map) t.sync(t.sale("unpaid", 2, card(1000))).get(0);

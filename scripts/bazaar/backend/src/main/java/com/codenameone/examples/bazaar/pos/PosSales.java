@@ -258,12 +258,11 @@ public class PosSales {
     }
 
     /// How far a register's total may fall short of this server's before the
-    /// sale is refused: the larger of one currency unit (100 minor units) and
-    /// 1% of the total. A stale tax rate or a rounding rule applied per line
+    /// sale is refused: the larger of five minor units and 1% of the total. A stale tax rate or a rounding rule applied per line
     /// rather than per sale moves a total by cents, not by more than a
     /// percent; anything larger is a sale that was not paid for.
     public static long tolerance(long totalCents) {
-        return Math.max(100L, Math.max(0L, totalCents) / 100L);
+        return Math.max(5L, Math.max(0L, totalCents) / 100L);
     }
 
     private PosSaleResultDto sale(String username, String storeId, Register register,

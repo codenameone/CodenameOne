@@ -434,13 +434,16 @@ public class Pos {
         if (close == null || close.countedCents() < 0) {
             throw new ResponseStatusException(400, "Count the cash in the drawer");
         }
-        s.setCountedCents(close.countedCents());
+        String note = s.getNote();
         if (close.note() != null && close.note().trim().length() > 0) {
-            s.setNote(Codes.cut(close.note().trim(), 500));
+            note = Codes.cut(close.note().trim(), 500);
         }
-        s.setStatus(CLOSED);
-        s.setClosedAt(Instant.now());
-        shifts.save(s);
+        // one conditional UPDATE, never a save of the entity read above: a sale
+        // syncing meanwhile adds to the totals and must not be overwritten
+        if (shifts.close(s.getId(), close.countedCents(), note, CLOSED, Instant.now(), OPEN) == 0) {
+            throw new ResponseStatusException(409, "The shift is already closed");
+        }
+        s = shifts.findById(s.getId());
         return dto(s);
     }
 

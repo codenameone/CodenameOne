@@ -259,6 +259,7 @@ public class Translations {
     @Transactional(readOnly = true)
     public Map<String, String> originals(String storeId, String kind, String refId,
             String privacyText) throws IOException {
+        requireRef(storeId, kind, refId);
         Map<String, String> out = new HashMap<String, String>();
         if (PRODUCT.equals(kind)) {
             Product p = products.findById(refId);
