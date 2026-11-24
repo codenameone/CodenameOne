@@ -2201,7 +2201,29 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
-            ((NativeImage)image).deleteImage();
+            NativeImage img = (NativeImage)image;
+            NativeGraphics drawing = currentlyDrawingOn;
+            if (drawing != null && drawing.associatedImage == img) { //NOPMD CompareObjectsWithEquals - identity: is this image the open drawing target
+                // Disposed while still the open drawing target. The native side keeps an
+                // unretained pointer to it, and the next finishDrawingOnImage() -- run when
+                // anything else is drawn -- hands that pointer back and the callers store it
+                // in associatedImage.peer. That brought the peer deleteImage() releases back
+                // to life, and the finalizer released it a second time: -[GLUIImage release]
+                // sent to a deallocated instance from deleteNativePeer's main-queue block, a
+                // SIGSEGV inside CN1's own signal handler and a hung app. Close the session
+                // first. The screen's checkControl is the close the next screen draw would
+                // have made, so it also re-applies the screen clip and transform (#5171); the
+                // peer it writes back is still live and is released just below. Only this
+                // explicit dispose needs it: finalize() never sees the drawing target, which
+                // holds its image strongly.
+                if (globalGraphics != null) {
+                    globalGraphics.checkControl();
+                } else {
+                    img.peer = finishDrawingOnImage();
+                    currentlyDrawingOn = null;
+                }
+            }
+            img.deleteImage();
         }
     }
     
@@ -6385,6 +6407,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             localLlm = new IOSLocalLlmImpl();
         }
         return localLlm;
+    }
+
+    private com.codename1.impl.SystemLlmImpl systemLlm;
+
+    @Override
+    public com.codename1.impl.SystemLlmImpl createSystemLlmImpl() {
+        if (systemLlm == null && nativeInstance.cn1SystemLlmIsLinked()) {
+            systemLlm = new IOSSystemLlmImpl();
+        }
+        return systemLlm;
     }
 
     @Override

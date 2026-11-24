@@ -26,6 +26,7 @@ import com.codename1.backend.Config;
 import com.codename1.backend.HttpServer;
 import com.codename1.impl.backend.BackendAccess;
 import com.codename1.impl.backend.RequestSecurity;
+import java.util.ArrayList;
 import java.util.List;
 
 /// The security layer of one server: its chains, in order, and what the request
@@ -88,6 +89,70 @@ final class FilterChainEngine implements RequestSecurity {
             return next.route(request);
         }
         return run(chain, request, new Routing(next));
+    }
+
+    @Override
+    public HttpServer.Response serveAs(HttpServer.Request request, Object authentication,
+                                       Next next) throws Exception {
+        if (!(authentication instanceof Authentication)) {
+            throw new IllegalArgumentException("Not an Authentication: " + authentication);
+        }
+        Authentication who = (Authentication) authentication;
+        // The thread is this user for the dispatch, whatever the outer request
+        // was: the server's leave() puts the outer context back afterwards.
+        SecurityContextHolder.setContext(new SecurityContextImpl(who));
+        SecurityFilterChain chain = begin(request);
+        if (chain == null) {
+            if (SecurityExchange.of(request) != null) {
+                return Responses.status(400, "Bad Request");
+            }
+            return next.route(request);
+        }
+        // Of the framework's filters, authorization and nothing else. A sign-in
+        // filter would authenticate the request from its own headers -- and so
+        // replace the principal the caller vouched for -- the context filter
+        // would load or save a session, and CSRF guards a browser form, which
+        // an in-process call is not. The application's own filters all run:
+        // one added with addFilterBefore may be what enforces a tenant or a
+        // scope, and dropping it would serve what it exists to refuse.
+        // An application filter placed among the sign-in filters is itself a
+        // sign-in filter (addFilterBefore(jwt, UsernamePasswordAuthentication
+        // Filter.class)) and would replace the vouched principal or answer 401
+        // for a missing header: only those after the last framework
+        // authentication filter run, which is where a tenant or scope check sits.
+        List<SecurityFilter> all = chain.getFilters();
+        DefaultSecurityFilterChain declared = chain instanceof DefaultSecurityFilterChain
+                ? (DefaultSecurityFilterChain) chain : null;
+        int lastSignIn = -1;
+        for (int i = 0; i < all.size(); i++) {
+            SecurityFilter filter = all.get(i);
+            if ((declared == null || !declared.isApplicationFilter(filter))
+                    && filter.getClass().getName().endsWith("AuthenticationFilter")
+                    // Anonymous only fills a principal in when there is none, and
+                    // runs last: counting it would skip every filter added after
+                    // Basic or Bearer, where a tenant or audit filter sits.
+                    && !(filter instanceof AnonymousAuthenticationFilter)) {
+                lastSignIn = i;
+            }
+        }
+        List<SecurityFilter> authorization = new ArrayList<SecurityFilter>();
+        for (int i = 0; i < all.size(); i++) { // NOPMD ForLoopCanBeForeach - the position is the test
+            SecurityFilter filter = all.get(i);
+            if (filter instanceof AuthorizationFilter
+                    || (declared != null && i > lastSignIn && declared.isApplicationFilter(filter))) {
+                authorization.add(filter);
+            }
+        }
+        try {
+            return new VirtualFilterChain(authorization, new Routing(next)).doFilter(request);
+        } catch (AuthenticationException err) {
+            return Responses.status(401, "Unauthorized");
+        } catch (AccessDeniedException err) {
+            // Spring's ExceptionTranslationFilter: an anonymous or unauthenticated
+            // principal is told to sign in, anyone else is refused.
+            boolean signedIn = who.isAuthenticated() && !(who instanceof AnonymousAuthenticationToken);
+            return signedIn ? Responses.status(403, "Forbidden") : Responses.status(401, "Unauthorized");
+        }
     }
 
     /// The end of a chain for an HTTP request: the application's routers.
@@ -339,7 +404,7 @@ final class FilterChainEngine implements RequestSecurity {
     /// the third is the second without the slash a trailing dot segment
     /// leaves. A path with a NUL is also read as ending there.
     static List<String> readings(String path) {
-        List<String> out = new java.util.ArrayList<String>(6);
+        List<String> out = new ArrayList<String>(6);
         String decoded = decodeAll(path);
         addReadings(out, decoded);
         int nul = decoded.indexOf((char) 0);
@@ -367,7 +432,7 @@ final class FilterChainEngine implements RequestSecurity {
             }
         }
         add(out, plain.toString());
-        List<String> kept = new java.util.ArrayList<String>();
+        List<String> kept = new ArrayList<String>();
         boolean trailing = false;
         for (String segment : AntPathRequestMatcher.split(plain.toString())) {
             trailing = false;

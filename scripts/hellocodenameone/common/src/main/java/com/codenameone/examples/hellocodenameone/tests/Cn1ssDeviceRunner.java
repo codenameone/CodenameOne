@@ -124,6 +124,39 @@ import com.codenameone.examples.hellocodenameone.tests.charts.ChartScatterScreen
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartStackedBarScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTimeChartScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.ChartTransformScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2MixedScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DenseLabelsScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2CandlesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2WaterfallScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BoxplotScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2HeatmapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PieScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DoughnutScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GaugeScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2RadarScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2TreemapScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SunburstScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SankeyScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FunnelScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SparklinesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SharedTooltipScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BrushScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DataChangeAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2ZoomAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FlameGraphScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2LineStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BarStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PointStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FinancialStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2LinesGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BarsGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PointsGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FinancialGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PartsGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2HierarchyGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PartsDataChangeAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2LegendToggleAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -428,6 +461,40 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ChartCombinedXYScreenshotTest(),
             new ChartTransformScreenshotTest(),
             new ChartRotatedScreenshotTest(),
+            new MutableImageDisposeWhileDrawingTest(),
+            new Chart2MixedScreenshotTest(),
+            new Chart2DenseLabelsScreenshotTest(),
+            new Chart2CandlesScreenshotTest(),
+            new Chart2WaterfallScreenshotTest(),
+            new Chart2BoxplotScreenshotTest(),
+            new Chart2HeatmapScreenshotTest(),
+            new Chart2PieScreenshotTest(),
+            new Chart2DoughnutScreenshotTest(),
+            new Chart2GaugeScreenshotTest(),
+            new Chart2RadarScreenshotTest(),
+            new Chart2TreemapScreenshotTest(),
+            new Chart2SunburstScreenshotTest(),
+            new Chart2SankeyScreenshotTest(),
+            new Chart2FunnelScreenshotTest(),
+            new Chart2SparklinesScreenshotTest(),
+            new Chart2SharedTooltipScreenshotTest(),
+            new Chart2BrushScreenshotTest(),
+            new Chart2FlameGraphScreenshotTest(),
+            new Chart2LineStylesScreenshotTest(),
+            new Chart2BarStylesScreenshotTest(),
+            new Chart2PointStylesScreenshotTest(),
+            new Chart2FinancialStylesScreenshotTest(),
+            new Chart2GrowInAnimationScreenshotTest(),
+            new Chart2DataChangeAnimationScreenshotTest(),
+            new Chart2ZoomAnimationScreenshotTest(),
+            new Chart2LinesGrowInAnimationScreenshotTest(),
+            new Chart2BarsGrowInAnimationScreenshotTest(),
+            new Chart2PointsGrowInAnimationScreenshotTest(),
+            new Chart2FinancialGrowInAnimationScreenshotTest(),
+            new Chart2PartsGrowInAnimationScreenshotTest(),
+            new Chart2HierarchyGrowInAnimationScreenshotTest(),
+            new Chart2PartsDataChangeAnimationScreenshotTest(),
+            new Chart2LegendToggleAnimationScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),
@@ -606,6 +673,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VisionOnDeviceApiTest(),
             new LanguageOnDeviceApiTest(),
             new InferenceOnDeviceApiTest(),
+            // LlmClient.system(): proves the builders kept the Gemini Nano
+            // backend on Android and injected the Foundation Models bridge on
+            // iOS, and that status queries and an unsupported request settle.
+            new SystemLlmOnDeviceApiTest(),
             // Exercises com.codename1.ar end-to-end: the unsupported
             // contract on the CI platforms (none has an AR runtime) and a
             // full session round trip when a backend is present.

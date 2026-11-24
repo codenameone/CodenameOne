@@ -42,6 +42,9 @@ import com.codename1.ui.geom.Shape;
 /// layer.
 ///
 /// **DO NOT USE DIRECTLY**
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class Canvas {
 
     public com.codename1.ui.Graphics g;

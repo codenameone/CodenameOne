@@ -32,6 +32,9 @@ import java.util.List;
 public final class DefaultSecurityFilterChain implements SecurityFilterChain {
     private final RequestMatcher requestMatcher;
     private final List<SecurityFilter> filters;
+    /// The filters the application added itself (addFilterBefore and its
+    /// siblings), which an in-process dispatch keeps; see FilterChainEngine.
+    private List<SecurityFilter> applicationFilters = Collections.emptyList();
 
     public DefaultSecurityFilterChain(RequestMatcher requestMatcher, List<SecurityFilter> filters) {
         if (requestMatcher == null || filters == null) {
@@ -39,6 +42,20 @@ public final class DefaultSecurityFilterChain implements SecurityFilterChain {
         }
         this.requestMatcher = requestMatcher;
         this.filters = Collections.unmodifiableList(new ArrayList<SecurityFilter>(filters));
+    }
+
+    void setApplicationFilters(List<SecurityFilter> added) {
+        applicationFilters = new ArrayList<SecurityFilter>(added);
+    }
+
+    /// Whether the application added `filter` itself, by identity.
+    boolean isApplicationFilter(SecurityFilter filter) {
+        for (SecurityFilter added : applicationFilters) {
+            if (added == filter) { // NOPMD CompareObjectsWithEquals - identity: one filter instance may equal() another the configurer installed
+                return true;
+            }
+        }
+        return false;
     }
 
     public RequestMatcher getRequestMatcher() {

@@ -13,6 +13,7 @@
 /// limitations under the License.
 package com.codename1.charts.views;
 
+@Deprecated
 public class RangeStackedBarChart extends RangeBarChart {
     /// The chart type.
     public static final String TYPE = "RangeStackedBar";

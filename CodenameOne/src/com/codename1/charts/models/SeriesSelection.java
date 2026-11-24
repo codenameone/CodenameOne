@@ -13,6 +13,7 @@
 /// limitations under the License.
 package com.codename1.charts.models;
 
+@Deprecated
 public class SeriesSelection {
     private final int mSeriesIndex;
 

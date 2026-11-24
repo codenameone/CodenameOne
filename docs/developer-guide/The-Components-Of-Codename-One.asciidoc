@@ -2693,7 +2693,459 @@ https://developers.google.com/maps/documentation/places/
 image::img/map-loc.png[MapComponent with Google Location API,scaledwidth=25%]
 
 
-=== Chart Component
+=== Charts
+
+The `com.codename1.ui.chart` package draws interactive charts with the Codename One graphics pipeline, with no web view and no external library. A `Chart` is an ordinary component: add series to it, place it in a layout, and it handles the rest.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=modern-chart-first,indent=0]
+----
+
+.The first chart: two series sharing one category axis
+image::img/generated/chart-first.png["A bar chart of revenue by quarter with a dashed target line over it",scaledwidth=40%]
+
+==== The parts of a chart
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-anatomy,indent=0]
+----
+
+.The parts of a chart
+image::img/generated/chart-anatomy.png["A chart with its title, legend, axes, grid, a target line and an open tooltip",scaledwidth=40%]
+
+Reading the picture from top to bottom:
+
+* The **title** is the bold text at the top, set with `setTitle`.
+* The **legend** is the row of colored symbols with series names. It names each series, and tapping an entry hides or shows that series.
+* The **plot** is the area the data is drawn in, with light **grid lines** at each tick.
+* The **axes** run along the left and the bottom. Their **tick labels** are the numbers and the month names, and the **axis titles**, Units and Month, say what each axis measures.
+* The horizontal line marked "Target" is an **annotation**: a fixed mark behind the data.
+* The box over the May bar is the **tooltip** for the selected point.
+
+==== What the chart does for you
+
+* **Labels never cover each other.** Axis ticks use round steps chosen from the measured label width, so a long label means fewer ticks rather than overlapping text. Labels that still don't fit are dropped or shortened with an ellipsis, pie labels are spread into columns with leader lines, and the plot area shrinks to make room for the axes and legend. There are no margins to set by hand.
+* **Changes animate.** A chart grows in when it first appears, and every later change to the data -- new values, an added or removed series, a series hidden from the legend -- moves from the old picture to the new one. `setAnimationDuration(0)` turns this off.
+* **Common gestures work.** Drag to pan, pinch or use the mouse wheel to zoom, double tap to zoom in, and use `+`/`-` on a desktop. A category or time chart zooms along x only, so its values keep their scale; `setZoomMode` chooses x only or both axes for any chart. Tap or hover shows a tooltip that snaps to the nearest point, and tapping a legend entry hides or shows its series. With `setBrushEnabled(true)` a one finger drag selects an x range while the chart is at its full range; once zoomed, the same drag pans again. `setZoomEnabled(false)` makes a chart static.
+* **The keyboard reaches every point.** With the chart focused and tooltips on, the arrow keys step through the points of a series and move between series, a zoomed chart pans to keep the point in view, and each point is announced to the screen reader. With tooltips off (`TOOLTIP_NONE`) left and right pan a zoomed chart instead.
+* **Styling comes from the theme.** The `Chart` UIID sets the background, font and colors, and `ChartTheme` holds the series palette, which defaults to colors that color-blind readers can tell apart. The palette is derived from the `Chart` style, so a dark theme, or a theme that switches with the device's dark mode, gets the dark palette, and the chart picks up a theme change while it's showing. The foreground colors of the `ChartAxis`, `ChartGrid` and `ChartLegend` UIIDs, and the background and foreground of `ChartTooltip`, override the palette's colors for those parts.
+* **Text reads right to left in RTL locales.** The legend runs from the right, with each symbol after its text, and tooltips open toward the start of the line with their rows aligned right. The data axes keep their direction, because time and value still increase from left to right.
+
+.The same chart under a dark theme
+image::img/generated/chart-dark.png["A stacked area chart drawn in light colors on a dark background",scaledwidth=40%]
+
+==== Lines and areas
+
+Several series can share one chart and its axes. `LineSeries` draws straight segments by default; `setMarkers(true)` adds a dot at each point.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-line,indent=0]
+----
+
+.Two line series with markers
+image::img/generated/chart-line.png["Two lines of daily visits, one for the web and one for the app",scaledwidth=40%]
+
+`setMode(LineSeries.SPLINE)` draws a smooth curve that passes through every point and never overshoots it, so a curve between two equal values stays flat:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-spline,indent=0]
+----
+
+.A spline
+image::img/generated/chart-spline.png["A smooth temperature curve over one day",scaledwidth=40%]
+
+`setMode(LineSeries.STEP)` holds each value until the next one, for prices, plans and other values that change at a moment:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-step,indent=0]
+----
+
+.A step line
+image::img/generated/chart-step.png["A price that stays flat and jumps up twice",scaledwidth=40%]
+
+`setFilled(true)` fills under the line, and series with the same `setStackGroup` name are stacked on each other:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-stacked-area,indent=0]
+----
+
+.A stacked area chart
+image::img/generated/chart-stacked-area.png["Three filled areas stacked on each other, one per traffic source",scaledwidth=40%]
+
+==== Bars
+
+Bar series that share a chart stand side by side:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-grouped-bars,indent=0]
+----
+
+.Grouped bars
+image::img/generated/chart-grouped-bars.png["Pairs of bars, one for each year in each quarter",scaledwidth=40%]
+
+Give them the same stack group and they stack:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-stacked-bars,indent=0]
+----
+
+.Stacked bars
+image::img/generated/chart-stacked-bars.png["One bar per quarter split into online and store sales",scaledwidth=40%]
+
+`Chart.setRotated(true)` turns the whole chart on its side, which leaves room for long category names:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-horizontal-bars,indent=0]
+----
+
+.Horizontal bars
+image::img/generated/chart-horizontal-bars.png["Horizontal bars, one per programming language",scaledwidth=40%]
+
+`HistogramSeries` takes raw samples and counts them into bins:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-histogram,indent=0]
+----
+
+.A histogram
+image::img/generated/chart-histogram.png["Touching bars counting response times in twelve ranges",scaledwidth=40%]
+
+`WaterfallSeries` shows how a total is built up from gains and losses. Each step floats from where the last one ended, and a step marked as a total drops to zero:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-waterfall,indent=0]
+----
+
+.A waterfall
+image::img/generated/chart-waterfall.png["Floating bars going up for sales and down for costs, ending in a net total bar",scaledwidth=40%]
+
+==== Points, ranges and spread
+
+`ScatterSeries` draws a dot for each pair of values:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-scatter,indent=0]
+----
+
+.A scatter chart
+image::img/generated/chart-scatter.png["Dots of height against weight that rise together",scaledwidth=40%]
+
+A third array of sizes makes it a bubble chart:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-bubble,indent=0]
+----
+
+.A bubble chart
+image::img/generated/chart-bubble.png["Circles of different sizes placed by growth and margin",scaledwidth=40%]
+
+`RangeBarSeries` draws a bar from a low value to a high one:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-range-bars,indent=0]
+----
+
+.Range bars
+image::img/generated/chart-range-bars.png["Floating bars from each day's lowest to highest temperature",scaledwidth=40%]
+
+`ErrorBarSeries` marks each value with its error interval:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-error-bars,indent=0]
+----
+
+.Error bars
+image::img/generated/chart-error-bars.png["A dot per group with a vertical line through it showing its range",scaledwidth=40%]
+
+`BoxPlotSeries` summarizes a spread of values in five numbers: the whiskers are the minimum and maximum, the box runs between the quartiles and the line inside marks the median:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-box-plot,indent=0]
+----
+
+.A box plot
+image::img/generated/chart-box-plot.png["Four boxes with whiskers, one per day",scaledwidth=40%]
+
+`HeatmapSeries` colors each cell of a grid by its value, with a color scale beside it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-heatmap,indent=0]
+----
+
+.A heatmap
+image::img/generated/chart-heatmap.png["A grid of colored cells, darker where visits are higher",scaledwidth=40%]
+
+==== Financial charts
+
+`CandlestickSeries` draws one candle per period: the body runs from the opening price to the closing price, filled for a fall and hollow or green for a rise, and the thin wick shows the high and the low. `Indicators` derives moving averages and other indicators from the prices as ordinary series:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-candlestick,indent=0]
+----
+
+.Candles with a moving average
+image::img/generated/chart-candlestick.png["Price candles with a smooth average line through them",scaledwidth=40%]
+
+`setStyle(CandlestickSeries.OHLC_BARS)` draws the same prices as bars with a tick to the left for the open and one to the right for the close:
+
+.OHLC bars
+image::img/generated/chart-ohlc.png["The same prices drawn as vertical lines with small ticks on both sides",scaledwidth=40%]
+
+Heikin-Ashi candles average each period with the one before it, which smooths out noise so that a trend reads as a run of one color:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-candlestick;chart-heikin-ashi,indent=0]
+----
+
+.Heikin-Ashi candles
+image::img/generated/chart-heikin-ashi.png["Smoothed candles in longer runs of the same color",scaledwidth=40%]
+
+A price pane is usually paired with a volume pane under it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=modern-chart-financial,indent=0]
+----
+
+.A price pane over a volume pane
+image::img/generated/chart-financial.png["Candles in an upper chart and volume bars in a lower chart sharing the same dates",scaledwidth=40%]
+
+`syncWith` links two charts so that panning and zooming in one follow the other, which is how a price pane and a volume or RSI pane stay aligned. With `setTooltipMode(Chart.TOOLTIP_SHARED)` on both, the crosshair follows too. `SessionTimeAxis` places one candle per index so that weekends and holidays leave no gaps.
+
+==== Parts of a whole
+
+`PieSeries` divides a circle by share. Labels go outside with leader lines, and labels for thin slices are spread out so that they never overlap:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-pie,indent=0]
+----
+
+.A pie chart
+image::img/generated/chart-pie.png["A pie with two large slices and three thin ones, each with a label on a line",scaledwidth=40%]
+
+`setInnerRadius` makes a doughnut, with room for a total in the middle:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-doughnut,indent=0]
+----
+
+.A doughnut
+image::img/generated/chart-doughnut.png["A ring split into budget items with the total in the center",scaledwidth=40%]
+
+`FunnelSeries` shows how many items survive each stage of a process:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-funnel,indent=0]
+----
+
+.A funnel
+image::img/generated/chart-funnel.png["Four stacked bands getting narrower from visits down to paid users",scaledwidth=40%]
+
+==== Hierarchies
+
+`TreemapSeries`, `SunburstSeries` and `FlameGraphSeries` take a tree of `TreeNode` objects. A branch's value is the sum of its children, and a leaf whose value is negative, NaN or infinite counts as 0 in those sums. Tapping a branch drills into it, and tapping the breadcrumb or the center goes back up.
+
+A treemap divides a rectangle, each branch into the rectangles of its children:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-treemap,indent=0]
+----
+
+.A treemap
+image::img/generated/chart-treemap.png["A rectangle split into nested rectangles sized by holding value",scaledwidth=40%]
+
+A sunburst does the same in rings, with the root in the center:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-sunburst,indent=0]
+----
+
+.A sunburst
+image::img/generated/chart-sunburst.png["Rings of arcs around a center, the outer ring split into the inner ring's parts",scaledwidth=40%]
+
+A flame graph is how profilers show where time went. Each row is one level of calls, the root at the bottom, and a call's width is its share of its caller's time. Because a branch is the sum of its children, time a function spends in itself goes into a child of its own, named "self" here:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-flame-graph,indent=0]
+----
+
+.A flame graph
+image::img/generated/chart-flame-graph.png["Rows of warm colored blocks stacked upward from main, each split into the calls it made",scaledwidth=40%]
+
+`setInverted(true)` hangs the rows from the top instead, which some tools call an icicle chart:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-flame-graph;chart-icicle,indent=0]
+----
+
+.An icicle chart
+image::img/generated/chart-icicle.png["The same blocks with main at the top and calls hanging below it",scaledwidth=40%]
+
+==== Flows, gauges and radars
+
+`SankeySeries` takes links between named nodes, and draws each link as a band as wide as its value:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=modern-chart-sankey,indent=0]
+----
+
+.A Sankey diagram
+image::img/generated/chart-sankey.png["Bands flowing from energy sources through the grid to the places that use it",scaledwidth=40%]
+
+`GaugeSeries` shows one value on a dial, with colored bands for its ranges:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-gauge,indent=0]
+----
+
+.A gauge
+image::img/generated/chart-gauge.png["A half circle dial with green, orange and red bands and a needle at 72 percent",scaledwidth=40%]
+
+`RadarSeries` compares several measures at once, one spoke each:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-radar,indent=0]
+----
+
+.A radar chart
+image::img/generated/chart-radar.png["Two overlapping polygons on six spokes comparing two players",scaledwidth=40%]
+
+==== Sparklines
+
+For list rows and table cells, `Sparkline` is a small component that draws a trend line, area or bars with no axes and no interaction:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-sparkline,indent=0]
+----
+
+.Sparklines in a list
+image::img/generated/chart-sparkline.png["Three list rows, each with a small line, area or bar chart at its end",scaledwidth=40%]
+
+==== Axes
+
+`NumberAxis` is the default. `LogAxis` spaces powers of ten evenly, so growth over several orders of magnitude reads as a line rather than a flat start and a wall at the end:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-log-axis,indent=0]
+----
+
+.A log axis
+image::img/generated/chart-log-axis.png["A rising line on an axis marked 100, 1K, 10K, 100K and 1M at equal steps",scaledwidth=40%]
+
+A series can use a secondary Y axis on the right: give the chart one with `Chart.setSecondaryYAxis`, then call `setSecondaryAxis(true)` on each series that should use it:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-secondary-axis,indent=0]
+----
+
+.A secondary axis
+image::img/generated/chart-secondary-axis.png["Order bars measured on the left axis and a conversion line measured on the right one",scaledwidth=40%]
+
+`CategoryAxis` names each position. When the names don't fit side by side the chart labels every second, third or later position instead, so that no two names touch; every bar keeps its value label, and the tooltip names the rest:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-dense-labels,indent=0]
+----
+
+.Long category names
+image::img/generated/chart-dense-labels.png["Twelve bars with a value on top of each and every sixth city named under them",scaledwidth=40%]
+
+`TimeAxis` takes epoch milliseconds and picks ticks from seconds to years. Its labels use fixed patterns chosen by tick spacing (`HH:mm:ss`, `HH:mm`, `MMM d`, `MMM yyyy`, `yyyy`), always on a 24-hour clock, with month names from the platform's `SimpleDateFormat`; for labels in the device's own date order or clock, set a `ValueFormatter` with `setFormatter`, for example one that calls `L10NManager.formatDateShortStyle`.
+
+==== Legend, tooltips and loading
+
+The legend goes at the top by default. `setLegendPosition` moves it to the bottom or the right, or hides it with `LEGEND_NONE`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-line;chart-legend-right,indent=0]
+----
+
+.The legend on the right
+image::img/generated/chart-legend-right.png["A line chart with its series names listed to the right of the plot",scaledwidth=40%]
+
+A tooltip shows the values under the user's finger or pointer. In shared mode it lists every series at that position and draws a vertical crosshair; `showTooltipAtX(x)` places it from code:
+
+.A shared tooltip with its crosshair
+image::img/generated/chart-tooltip.png["A vertical line through Thursday and a box listing the web and app values there",scaledwidth=40%]
+
+`setLoading("Loading...")` shows that data is on the way: an empty chart shows the text, and a chart with data is dimmed under it. `setLoading(null)` removes it.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-grouped-bars;chart-loading,indent=0]
+----
+
+.A chart while it loads
+image::img/generated/chart-loading.png["A dimmed bar chart with the word Loading over it",scaledwidth=40%]
+
+==== Annotations
+
+`Annotation.valueLine`, `valueBand`, `xLine` and `xBand` mark targets, thresholds and periods behind the data:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-annotations,indent=0]
+----
+
+.A line, a value band and an x band
+image::img/generated/chart-annotations.png["A CPU line with a red alert line, a shaded normal range and a shaded deploy period",scaledwidth=40%]
+
+==== Live data
+
+`XYSeries.add` appends a point and animates it in. With `setMaxPoints(n)` the oldest point drops off as each new one arrives, which suits a sensor or price feed. `CandlestickSeries.updateLast` changes the last candle in place while its period is still open.
+
+A line with more points than about twice the plot's width in pixels draws only the highest and lowest point of each pixel column, so a long series stays fast and a single spike is never lost. That applies when the chart isn't rotated and the x values ascend; a rotated chart, or a series with unordered x values, draws every point. To also save memory, reduce the data before handing it over: `Downsample.lttb(x, y, 2000)` returns the indices of the points that keep the series' shape, and `Downsample.pick` extracts them.
+
+==== Selection, brushing and export
+
+`addSelectionListener` reports the point the user tapped. `setSelection(series, index)` selects a point from code and shows its tooltip, as a tap would, without calling the selection listeners; the arrow keys continue from it and a screen reader announces it. `addLegendListener` is told of every legend tap, and `setLegendToggles(false)` stops those taps from hiding series. With `setBrushEnabled(true)`, dragging across the plot selects a range of X values: `addRangeListener` receives it, and the chart zooms to it unless you call `setBrushZooms(false)`. `toImage(width, height)` renders the chart off-screen for sharing or for a report.
+
+==== Accessibility
+
+A chart describes itself to screen readers: unless you set your own accessibility text, it reads the title and a summary of each series. `toTable()` returns a `Table` with the same data, so that you can offer it next to the chart or instead of it.
+
+==== The older `com.codename1.charts` package
+
+The `com.codename1.charts` package and its `ChartComponent` are deprecated. They still work exactly as before, but they don't receive the features above. New code should use `com.codename1.ui.chart`.
+
+=== Chart Component (deprecated)
+
+This section describes the deprecated `com.codename1.charts` package, kept for existing applications.
+
 
 The `charts` package enables Codename One developers to add charts and visualizations to their apps without
 having to include external libraries or embedding web views. You also wanted to harness the new features in the

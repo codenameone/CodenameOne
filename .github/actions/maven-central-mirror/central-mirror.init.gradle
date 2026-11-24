@@ -23,7 +23,19 @@ def addMirror = { RepositoryHandler repos ->
 }
 
 beforeSettings { settings ->
-    addMirror(settings.pluginManagement.repositories)
+    // An EMPTY plugin repository list means "the Gradle Plugin Portal" -- Gradle applies
+    // that default only while nothing is declared. Adding the mirror to an empty list
+    // therefore silently removed the portal, and a build declaring no plugin
+    // repositories (Flutter's Android Gradle plugin, which applies kotlin-dsl, a
+    // portal-only plugin) failed with only the mirror searched. Re-add the portal
+    // explicitly after the mirror in that case; a settings script that declares its
+    // own repositories appends them after these.
+    def pluginRepos = settings.pluginManagement.repositories
+    boolean hadNone = pluginRepos.isEmpty()
+    addMirror(pluginRepos)
+    if (hadNone) {
+        pluginRepos.gradlePluginPortal()
+    }
     addMirror(settings.buildscript.repositories)
 }
 

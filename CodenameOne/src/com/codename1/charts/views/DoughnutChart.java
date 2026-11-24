@@ -33,6 +33,9 @@ import java.util.List;
 /// for representing hierarchical proportions. Construct the chart with the
 /// dataset and a `DefaultRenderer` and wrap it in a
 /// `com.codename1.charts.ChartComponent` to place it on screen.
+///
+/// @deprecated Use `PieSeries.setInnerRadius` in the `com.codename1.ui.chart` package; the `com.codename1.ui.chart` package replaces this one.
+@Deprecated
 public class DoughnutChart extends RoundChart {
     /// The series dataset.
     private final MultipleCategorySeries mDataset;

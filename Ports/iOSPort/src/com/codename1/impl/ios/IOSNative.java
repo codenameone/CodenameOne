@@ -780,6 +780,18 @@ public class IOSNative {
     native int cn1LlamaCompletionTokens(int handle);
     native float[] cn1LlamaEmbed(int handle, String text);
     native void cn1LlamaClose(int handle);
+    // Operating system language model (CN1SystemLlm.m, behind
+    // INCLUDE_CN1_SYSTEM_LLM, over the injected Swift bridge).
+    native boolean cn1SystemLlmIsLinked();
+    native String cn1SystemLlmProvider();
+    native int cn1SystemLlmStatus(int feature);
+    native String cn1SystemLlmStatusReason(int feature);
+    native boolean cn1SystemLlmDownload(int feature);
+    native int cn1SystemLlmStart(int feature, String[] roles, String[] contents, byte[] image,
+                                 int option, int maxTokens, float temperature, int seed);
+    native String cn1SystemLlmNext(int handle);
+    native String cn1SystemLlmLastError(int handle);
+    native void cn1SystemLlmClose(int handle);
 
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class

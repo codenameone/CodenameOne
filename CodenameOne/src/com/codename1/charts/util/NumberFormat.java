@@ -32,6 +32,9 @@ import com.codename1.ui.Display;
 /// #### Deprecated
 ///
 /// this is an internal implementation class
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class NumberFormat {
 
     static NumberFormat instance = new NumberFormat();
