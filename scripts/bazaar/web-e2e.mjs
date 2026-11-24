@@ -603,7 +603,8 @@ async function productControls() {
     await shop.waitForTimeout(3500);
     await tap(add);
     await wait('the guest cart on the server', stepSeconds, () => tokens.length > 0);
-    await tap(await wait('the rating row', stepSeconds, list => list.find(c => c.text === 'See reviews')));
+    await tap(await wait('the rating row', stepSeconds, list => list.find(c => c.text === 'See reviews'
+        || (typeof c.label === 'string' && c.label.indexOf('See reviews') >= 0))));
     await wait('the reviews list', stepSeconds, labelled('Write a review'));
     await shot('18-reviews');
     say('the rating opened every review of the product');
@@ -647,7 +648,10 @@ try {
   const shot = name => page.screenshot({ path: path.join(out, name + '.png') });
   const textOn = words => async () => (await screenText()).includes(words);
   const named = words => async () =>
-      (await components()).find(c => c.text === words || c.label === words);
+      // A tappable card reads its whole content as one label ("Little Clay
+      // Studio, Handmade ceramics for every day"), so its first part counts.
+      (await components()).find(c => c.text === words || c.label === words
+          || (typeof c.label === 'string' && c.label.startsWith(words + ', ')));
 
   // 1. No sign-in wall: the app opens on Discover, as a guest, with the
   //    platform's stores and the newest products across them.
@@ -681,8 +685,9 @@ try {
   const productCard = async () => {
     const all = await components();
     const heading = all.filter(c => c.text === 'New arrivals').sort((a, b) => b.y - a.y)[0];
-    return heading && all.find(c => c.role !== 'button' && c.y > heading.y + 60
-        && c.y < 780 && c.height > 15 && c.text && !c.text.startsWith('$'));
+    // A product card is one accessible button now, its label the whole card.
+    return heading && all.find(c => c.y > heading.y + 60 && c.y < 780 && c.height > 15
+        && (c.text || c.label) && !(c.text || c.label).startsWith('$'));
   };
   await click(await waitFor('a product card', stepSeconds, productCard));
   const add = await waitFor('the product page', stepSeconds, button('Add to cart'));
