@@ -61,7 +61,17 @@ final class PosSheet {
             @Override
             protected com.codename1.ui.geom.Dimension calcPreferredSize() {
                 if (wide) {
-                    return super.calcPreferredSize();
+                    // The side panel used to take its content's preferred
+                    // width, measured once when it opened. Bold titles and the
+                    // milestone headline measure narrower than they paint, so
+                    // they were cut at the right padding. The panel takes a
+                    // fixed share of the screen instead, wide enough for every
+                    // register panel, and never more than the screen leaves.
+                    com.codename1.ui.geom.Dimension w = super.calcPreferredSize();
+                    int dw = com.codename1.ui.CN.getDisplayWidth();
+                    int target = Math.max(com.codename1.ui.CN.convertToPixels(95), dw / 3);
+                    w.setWidth(Math.min(Math.max(w.getWidth(), target), dw / 2));
+                    return w;
                 }
                 // A phone sheet stops below the title bar: grown to the top of
                 // the screen it slid over the title and cut it in half. The
@@ -79,6 +89,19 @@ final class PosSheet {
                 return d;
             }
         };
+        // The bold title face paints wider than it measures, and the title
+        // sits at exactly its measured width: on a tablet "Sale complete"
+        // lost its last letter. A title of our own carries the slack.
+        com.codename1.ui.Label head = new com.codename1.ui.Label(title, "PosSheetTitle") {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+                d.setWidth(d.getWidth() + getStyle().getFont().getHeight());
+                return d;
+            }
+        };
+        head.setAlignment(Component.CENTER);
+        sheet.setTitleComponent(head);
         if (name != null) {
             sheet.setName(name);
         }

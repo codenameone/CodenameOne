@@ -3623,3 +3623,15 @@ PosVpChipNone { border: 1px solid var(--line); border-radius: var(--radius); }
     PosVpChipNone { border: 1px solid var(--line-dark); border-radius: var(--radius); }
 }
 /* ---- end POLISH ROUND E ---- */
+/* ---- POLISH ROUND F: register panel bounds ---- */
+/* The bold native face paints a little wider than it measures, so a bold
+   label sized to its text lost its last letter ("Sale complet", "today's
+   goa") and the grand total sat on the panel edge. A hair of padding on the
+   right gives the paint room. */
+PosMilestoneText { padding: 0 1mm 0 0; }
+PosGrand { padding: 1.5mm 1mm 1mm 0; }
+@media (prefers-color-scheme: dark) {
+    PosMilestoneText { padding: 0 1mm 0 0; }
+    PosGrand { padding: 1.5mm 1mm 1mm 0; }
+}
+/* ---- end POLISH ROUND F ---- */

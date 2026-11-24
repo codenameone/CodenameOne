@@ -73,8 +73,8 @@ final class OrdersPane extends MerchantPane {
                 .col(Lang.tr("Date"), o -> MUi.when(o.createdAt()))
                 .col(Lang.tr("Customer"), o -> customer(o))
                 .col(Lang.tr("Channel"), o -> Lang.tr(Words.of(o.channel())))
-                .col(Lang.tr("Payment"), o -> Lang.tr(Words.of(o.financial())))
-                .col(Lang.tr("Fulfilment"), o -> Lang.tr(Words.of(o.fulfilment())))
+                .col(Lang.tr("Payment"), o -> o.financial())
+                .col(Lang.tr("Fulfilment"), o -> o.fulfilment())
                 .col(Lang.tr("Items"), o -> Integer.valueOf(items(o)))
                 .col(Lang.tr("Total"), o -> Long.valueOf(o.totalCents()));
     }
@@ -133,8 +133,20 @@ final class OrdersPane extends MerchantPane {
             // the date was cut to "Nov ...". The customer column gives way.
             grid.getColumn(1).setWidthMM(27);
             grid.getColumn(2).setFlex(1);
+            // Every other column sized to what it shows, so the width left
+            // goes to the customer: a guest's e-mail address is long.
+            for (int c = 0; c < grid.getColumnCount(); c++) {
+                grid.getColumn(c).setFlex(c == 2 ? 1 : 0);
+            }
+            grid.getColumn(3).setWidthMM(36);
+            grid.getColumn(4).setWidthMM(24);
+            grid.getColumn(5).setWidthMM(36);
+            // Payment and fulfilment as the coloured pills the dashboard's
+            // recent orders use; the cells hold the status codes.
+            grid.getColumn(4).setRenderer(new StatusPill());
+            grid.getColumn(5).setRenderer(new StatusPill());
             grid.getColumn(6).setKind(GridColumn.Kind.NUMBER).setWidthMM(16);
-            grid.getColumn(7).setKind(GridColumn.Kind.NUMBER).setFormatter(new MoneyFormat());
+            grid.getColumn(7).setKind(GridColumn.Kind.NUMBER).setFormatter(new MoneyFormat()).setWidthMM(22);
             grid.addActionListener(e -> {
                 OrderDto o = rows.at(grid.getModelRow(grid.getSelectedRow()));
                 if (o != null) {
@@ -400,9 +412,53 @@ final class OrdersPane extends MerchantPane {
         }
     }
 
+    /// Beside the list on a tablet. On a desktop the table takes the whole
+    /// width, as Shopify's order list does, and an order opens over it with a
+    /// back arrow: split, the empty detail pane took half the window and the
+    /// table cut its customer, channel and fulfilment columns.
     @Override
     boolean splits() {
-        return true;
+        return !wide;
+    }
+
+    /// Paints a status code as a pill in the badge style [Words#badge]
+    /// picks for it, with its translated word.
+    static final class StatusPill implements com.codename1.ui.table.GridCellRenderer {
+        @Override
+        public void paint(com.codename1.ui.Graphics g, com.codename1.ui.table.GridCell cell,
+                int x, int y, int width, int height) {
+            Object v = cell.getValue();
+            if (v == null) {
+                return;
+            }
+            String code = v.toString();
+            String text = Lang.tr(Words.of(code));
+            com.codename1.ui.plaf.Style s = com.codename1.ui.plaf.UIManager.getInstance()
+                    .getComponentStyle(Words.badge(code));
+            com.codename1.ui.Font f = s.getFont();
+            int padX = Display.getInstance().convertToPixels(2f);
+            int w = Math.min(width - padX, f.stringWidth(text) + padX * 2);
+            int h = Math.min(height - 2, f.getHeight() + Display.getInstance().convertToPixels(1.2f));
+            int py = y + (height - h) / 2;
+            int px = x + padX / 2;
+            int alpha = g.getAlpha();
+            g.setColor(s.getBgColor());
+            g.setAlpha(alpha * (s.getBgTransparency() & 0xff) / 0xff);
+            g.fillRoundRect(px, py, w, h, h, h);
+            g.setAlpha(alpha);
+            g.setColor(s.getFgColor());
+            g.setFont(f);
+            g.drawString(text, px + padX, py + (h - f.getHeight()) / 2);
+        }
+
+        @Override
+        public int getPreferredWidth(com.codename1.ui.table.GridCell cell) {
+            Object v = cell.getValue();
+            String text = v == null ? "" : Lang.tr(Words.of(v.toString()));
+            com.codename1.ui.Font f = com.codename1.ui.plaf.UIManager.getInstance()
+                    .getComponentStyle(Words.badge(v == null ? "" : v.toString())).getFont();
+            return f.stringWidth(text) + Display.getInstance().convertToPixels(6f);
+        }
     }
 
     @Override
