@@ -212,7 +212,7 @@ probes don't, because a load balancer has no token to send.
 
 === Running it under systemd
 
-systemd starts the server at boot, restarts it if it exits, collects its output
+The systemd service manager starts the server at boot, restarts it if it exits, collects its output
 and stops it cleanly during a deployment:
 
 [source,text]

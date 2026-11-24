@@ -1,6 +1,6 @@
+[[signing-section-top-heading]]
 == Signing, certificates & provisioning
 
-[[signing-section-top-heading]]
 In this section you try to explain how to acquire certificates for the various platforms and how to set them up.
 
 The good news is that this is a "one time issue" and once it's done the work becomes easier (except for the case of iOS where a provisioning profile should be maintained).

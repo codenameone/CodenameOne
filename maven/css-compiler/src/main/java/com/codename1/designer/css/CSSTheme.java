@@ -3758,8 +3758,10 @@ public class CSSTheme {
             // file name so the theme references it by name; the runtime
             // com.codename1.generated.svg.SVGRegistry (when present) then
             // overrides the entry with the transcoded image during init().
+            // A Rive file (.riv) is the same: transcoded to a class, registered
+            // under its file name.
             if (endsWithIgnoreCase(fileName, ".svg") || endsWithIgnoreCase(fileName, ".json")
-                    || endsWithIgnoreCase(fileName, ".lottie")) {
+                    || endsWithIgnoreCase(fileName, ".lottie") || endsWithIgnoreCase(fileName, ".riv")) {
                 Image placeholder = registerSVGPlaceholder(fileName);
                 if (placeholder != null) {
                     loadedImages.put(url, placeholder);
@@ -4234,7 +4236,7 @@ public class CSSTheme {
         return (a << 24) | (getColorInt(value) & 0xffffff);
     }
 
-    /// Whether `url` names an SVG or Lottie asset, which the build-time
+    /// Whether `url` names an SVG, Lottie or Rive asset, which the build-time
     /// transcoders turn into classes. The compiler stores a placeholder for
     /// one, and paints it itself only into a generated image.
     private static boolean isVectorAsset(String url) {
@@ -4249,7 +4251,7 @@ public class CSSTheme {
         }
         String path = url.substring(0, end);
         return endsWithIgnoreCase(path, ".svg") || endsWithIgnoreCase(path, ".json")
-                || endsWithIgnoreCase(path, ".lottie");
+                || endsWithIgnoreCase(path, ".lottie") || endsWithIgnoreCase(path, ".riv");
     }
 
     /// The directory `url` names when it is a multi-image -- one PNG per
