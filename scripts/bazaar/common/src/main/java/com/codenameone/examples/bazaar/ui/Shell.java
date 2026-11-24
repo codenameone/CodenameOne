@@ -65,6 +65,10 @@ public final class Shell implements Nav.Home {
     private final Container side;
     private final Container tabs;
     private final Map<String, Button> entries = new HashMap<String, Button>();
+    /// The sidebar's groups: the entries under each lead, and the leads.
+    private final Map<String, Container> groups = new HashMap<String, Container>();
+    private final Map<String, Button> leads = new HashMap<String, Button>();
+    private Container sideList;
     private String open;
 
     /// @param mode one of `Nav.SHOP`, `Nav.MERCHANT`, `Nav.POS`, `Nav.ADMIN`
@@ -228,6 +232,7 @@ public final class Shell implements Nav.Home {
                 button.setUIID(picked ? "SvTabSelected" : "SvTab");
             }
         }
+        openGroup();
         Button more = entries.get(MORE);
         if (more != null && !inTabs) {
             more.setUIID("SvTabSelected");
@@ -239,6 +244,27 @@ public final class Shell implements Nav.Home {
         }
         if (side != null) {
             dress(side);
+        }
+    }
+
+    /// Opens the open section's group in the sidebar and closes the others.
+    /// A closed group's entries are out of the tree, not hidden, so nothing
+    /// can find or tap an entry that is not on the screen.
+    private void openGroup() {
+        if (sideList == null) {
+            return;
+        }
+        Section current = find(open);
+        String active = current == null ? "" : current.group();
+        for (Map.Entry<String, Container> g : groups.entrySet()) {
+            Container sub = g.getValue();
+            boolean show = g.getKey().equals(active) && sub.getComponentCount() > 0;
+            if (show && sub.getParent() == null) {
+                int at = sideList.getComponentIndex(leads.get(g.getKey()));
+                sideList.addComponent(at + 1, sub);
+            } else if (!show && sub.getParent() != null) {
+                sub.remove();
+            }
         }
     }
 
@@ -358,20 +384,35 @@ public final class Shell implements Nav.Home {
         who.add(Ui.plain(user == null ? "Welcome" : user.displayName(), "SvSideName"));
         who.add(Ui.plain(user == null ? "Browsing as a guest" : user.username(), "SvSideDetail"));
 
+        // Collapsed groups keep the list shorter than a laptop screen, so the
+        // scroll bar the desktop look turns on (Layouts.dressed) stays away.
         Container list = new Container(BoxLayout.y());
+        list.setUIID("SvSideList");
         list.setScrollableY(true);
         list.setScrollVisible(false);
-        String group = "";
+        // Shopify's sidebar: the first section of a group stands for it, and
+        // the rest of the group opens beneath it only while one of the group
+        // is showing (mark). A heading per group repeated the lead's own
+        // name, and every entry at once did not fit a laptop's height.
+        sideList = list;
         for (int iter = 0; iter < sections.size(); iter++) {
             final Section section = sections.get(iter);
-            if (section.group().length() > 0 && !section.group().equals(group)) {
-                list.add(Ui.label(section.group(), "SvSideLabel"));
-            }
-            group = section.group();
             Button entry = entry(section.icon(), section.title(), "nav-" + section.id(),
                     () -> show(section.id()));
             entries.put(section.id(), entry);
-            list.add(entry);
+            String group = section.group();
+            Container sub = group.length() == 0 ? null : groups.get(group);
+            if (group.length() > 0 && sub == null) {
+                list.add(entry);
+                Container more = new Container(BoxLayout.y());
+                more.setUIID("SvSideSub");
+                groups.put(group, more);
+                leads.put(group, entry);
+            } else if (sub != null) {
+                sub.add(entry);
+            } else {
+                list.add(entry);
+            }
         }
         List<String> modes = Nav.modes(user);
         if (modes.size() > 1) {

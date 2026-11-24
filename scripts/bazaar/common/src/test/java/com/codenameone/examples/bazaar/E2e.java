@@ -273,7 +273,20 @@ public abstract class E2e extends AbstractTest {
 
     /// Goes back, the way the arrow in the title bar does.
     protected void back() {
-        onEdt(() -> Display.getInstance().getCurrent().getBackCommand().actionPerformed(null));
+        // A wide screen's sheet or dialog has no back command: the NPE that
+        // threw on the EDT here stalled the desktop visual tour until its
+        // 20 minute limit. Close what is showing instead.
+        onEdt(() -> {
+            Form f = Display.getInstance().getCurrent();
+            com.codename1.ui.Sheet sheet = com.codename1.ui.Sheet.getCurrentSheet();
+            if (f != null && f.getBackCommand() != null) {
+                f.getBackCommand().actionPerformed(null);
+            } else if (sheet != null) {
+                sheet.back();
+            } else if (f instanceof com.codename1.ui.Dialog) {
+                ((com.codename1.ui.Dialog) f).dispose();
+            }
+        });
     }
 
     /// Signs out the way a home screen offers: the side panel's entry on a

@@ -3275,3 +3275,155 @@ MeLiveToastDetail { color: var(--text-muted); background-color: transparent; fon
     MeLiveToastDetail { color: var(--text-muted-dark); }
 }
 /* ---- end MERCHANT ROUND A ---- */
+
+/* ---- MERCHANT ROUND B -- desktop type scale, sidebar, grids, funnel ---- */
+/* A desktop is read from further away than a phone: the same millimetres
+   came out at 10-11px. One step up for every text style the back office
+   uses (mm sizes x1.2, the large figures x1.05), desktop only. */
+@media device-desktop {
+    SvHeroTitle { font-family: "native:MainBold"; font-size: 7.35mm; }
+    SvHeroText { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvTitle { font-family: "native:MainBold"; font-size: 4.62mm; }
+    SvHeading { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvText { font-family: "native:MainRegular"; font-size: 3.30mm; }
+    SvMuted { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvLabel { font-family: "native:MainBold"; font-size: 2.52mm; }
+    SvPrice { font-family: "native:MainBold"; font-size: 4.62mm; }
+    SvError { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvNotice { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvPrimary { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvSecondary { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvPairStart { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvPairEnd { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvFieldButton { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvDanger { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvLink { font-family: "native:MainBold"; font-size: 3.30mm; }
+    SvField { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvFieldHint { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvRowTitle { font-family: "native:MainBold"; font-size: 3.30mm; }
+    SvRowDetail { font-family: "native:MainRegular"; font-size: 2.88mm; }
+    SvRowValue { font-family: "native:MainBold"; font-size: 3.30mm; }
+    SvBadge { font-family: "native:MainBold"; font-size: 2.46mm; }
+    SvStatValue { font-family: "native:MainBold"; font-size: 4.68mm; }
+    SvStatLabel { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvChip { font-family: "native:MainBold"; font-size: 2.88mm; }
+    SvAvatar { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvAction { font-family: "native:MainRegular"; font-size: 2.64mm; }
+    SvFactLabel { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvFactValue { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvFactTotal { font-family: "native:MainBold"; font-size: 3.96mm; }
+    SvCalloutTitle { font-family: "native:MainBold"; font-size: 3.00mm; }
+    SvCalloutText { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvBannerTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvBannerText { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvAmount { font-family: "native:MainBold"; font-size: 7.35mm; }
+    SvChartAxis { font-family: "native:MainRegular"; font-size: 2.40mm; }
+    SvChartValue { font-family: "native:MainBold"; font-size: 4.41mm; }
+    SvAlert { font-family: "native:MainBold"; font-size: 3.12mm; }
+    SvCardBrand { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvCardNumber { font-family: "native:MainBold"; font-size: 4.44mm; }
+    SvCardSmall { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvStepLabel { font-family: "native:MainBold"; font-size: 2.64mm; }
+    SvModeBadge { font-family: "native:MainBold"; font-size: 2.52mm; }
+    SvSection { font-family: "native:MainBold"; font-size: 3.72mm; }
+    SvSegment { font-family: "native:MainBold"; font-size: 2.76mm; }
+    ToastBarMessage { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvSideName { font-family: "native:MainBold"; font-size: 3.66mm; }
+    SvSideDetail { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvSideLabel { font-family: "native:MainBold"; font-size: 2.58mm; }
+    SvSideItem { font-family: "native:MainRegular"; font-size: 3.36mm; }
+    SvPaneTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvDeskPaneTitle { font-family: "native:MainBold"; font-size: 3.84mm; }
+    SvDeskSideName { font-family: "native:MainBold"; font-size: 3.24mm; }
+    SvDeskSideDetail { font-family: "native:MainRegular"; font-size: 2.70mm; }
+    SvDeskSideLabel { font-family: "native:MainBold"; font-size: 2.58mm; }
+    SvDeskSideItem { font-family: "native:MainRegular"; font-size: 3.18mm; }
+    SvDeskAlert { font-family: "native:MainBold"; font-size: 3.12mm; }
+    SvDeskAlert.pressed { font-family: "native:MainBold"; font-size: 3.12mm; }
+    SvDeskRowTitle { font-family: "native:MainRegular"; font-size: 3.24mm; }
+    SvDeskRowDetail { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvDeskRowValue { font-family: "native:MainBold"; font-size: 3.18mm; }
+    SvDeskSection { font-family: "native:MainBold"; font-size: 3.36mm; }
+    SvDeskTitle { font-family: "native:MainBold"; font-size: 4.62mm; }
+    SvDeskHeading { font-family: "native:MainBold"; font-size: 3.84mm; }
+    SvDeskText { font-family: "native:MainRegular"; font-size: 3.18mm; }
+    SvDeskMuted { font-family: "native:MainRegular"; font-size: 2.88mm; }
+    SvDeskLabel { font-family: "native:MainRegular"; font-size: 2.88mm; }
+    SvDeskError { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvDeskNotice { font-family: "native:MainRegular"; font-size: 3.06mm; }
+    SvDeskFactLabel { font-family: "native:MainRegular"; font-size: 3.06mm; }
+    SvDeskFactValue { font-family: "native:MainRegular"; font-size: 3.06mm; }
+    SvDeskFactTotal { font-family: "native:MainBold"; font-size: 3.24mm; }
+    SvDeskAmount { font-family: "native:MainBold"; font-size: 6.72mm; }
+    SvDeskBannerTitle { font-family: "native:MainBold"; font-size: 3.66mm; }
+    SvDeskBannerText { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvDeskStatValue { font-family: "native:MainBold"; font-size: 4.51mm; }
+    SvDeskStatLabel { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvDeskChartValue { font-family: "native:MainBold"; font-size: 4.51mm; }
+    SvDeskChartAxis { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvProductName { font-family: "native:MainRegular"; font-size: 3.30mm; }
+    SvProductPrice { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvMutedSmall { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvMetaLine { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvQuantity { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvSearchField { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvSearchInput { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvSearchHint { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvTab { font-family: "native:MainRegular"; font-size: 2.46mm; }
+    SvTabSelected { font-family: "native:MainBold"; font-size: 2.46mm; }
+    SvSheetTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvStepText { font-family: "native:MainBold"; font-size: 2.52mm; }
+    SvStepTextTodo { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvDiscount { font-family: "native:MainRegular"; font-size: 3.30mm; }
+    SvTotal { font-family: "native:MainBold"; font-size: 4.20mm; }
+    MeTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    MeStore { font-family: "native:MainBold"; font-size: 3.36mm; }
+    MeTileValue { font-family: "native:MainBold"; font-size: 5.25mm; }
+    MeAccentName { font-family: "native:MainBold"; font-size: 4.20mm; }
+    MeAutoKind { font-family: "native:MainBold"; font-size: 2.40mm; }
+    MeAnalyticsRange { font-family: "native:MainBold"; font-size: 4.08mm; }
+    MeCardTitle { font-family: "native:MainBold"; font-size: 3.12mm; }
+    MeDeltaUp { font-family: "native:MainBold"; font-size: 2.52mm; }
+    MeDeltaDown { font-family: "native:MainBold"; font-size: 2.52mm; }
+    MeChipOn { font-family: "native:MainBold"; font-size: 2.64mm; }
+    MeCode { font-family: "native:MainLight"; font-size: 2.40mm; }
+    SvSectionFirst { font-family: "native:MainBold"; font-size: 3.72mm; }
+    MeGoalRing { font-family: "native:MainBold"; font-size: 4.08mm; }
+    MeGoalCaption { font-family: "native:MainBold"; font-size: 2.76mm; }
+    MeStreak { font-family: "native:MainBold"; font-size: 2.64mm; }
+    MeLiveToastTitle { font-family: "native:MainBold"; font-size: 3.12mm; }
+}
+
+SvSideList { background-color: transparent; padding: 0 0 2mm 0; margin: 0; }
+/* A group's entries under its lead (Shell.openGroup). */
+SvSideSub { background-color: transparent; padding: 0 0 0 5mm; margin: 0; }
+
+/* Grid headers read like the cards' own captions, not a tinted band. */
+DataGrid { background-color: transparent; border: none; padding: 0; margin: 0; }
+DataGridHeader { color: var(--text-muted); background-color: var(--surface-alt); border-bottom: 1px solid var(--line); font-family: "native:MainBold"; font-size: 2.2mm; padding: 1.4mm 2mm 1.4mm 2mm; margin: 0; }
+DataGridRow { color: var(--text); background-color: var(--surface); font-family: "native:MainRegular"; font-size: 2.45mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0; }
+DataGridRowAlt { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.45mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0; }
+DataGridLine { color: var(--line); background-color: var(--line); }
+
+/* The conversion funnel as labelled bars (AnalyticsPane.funnel). */
+MeFunnelRow { background-color: transparent; padding: 1mm 0 1.2mm 0; margin: 0; }
+MeFunnelLabel { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0 0 0.6mm 0; margin: 0; }
+MeFunnelValue { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.3mm; padding: 0 0 0.6mm 0; margin: 0; }
+
+@media device-desktop {
+    DataGridHeader { font-family: "native:MainBold"; font-size: 2.6mm; }
+    DataGridRow { font-family: "native:MainRegular"; font-size: 2.95mm; }
+    DataGridRowAlt { font-family: "native:MainRegular"; font-size: 2.95mm; }
+    MeFunnelLabel { font-family: "native:MainRegular"; font-size: 2.9mm; }
+    MeFunnelValue { font-family: "native:MainBold"; font-size: 2.75mm; }
+}
+
+@media (prefers-color-scheme: dark) {
+    DataGridHeader { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border-bottom: 1px solid var(--line-dark); }
+    DataGridRow { color: var(--text-dark); background-color: var(--surface-dark); }
+    DataGridRowAlt { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    DataGridLine { color: var(--line-dark); background-color: var(--line-dark); }
+    MeFunnelLabel { color: var(--text-dark); }
+    MeFunnelValue { color: var(--text-muted-dark); }
+}
+/* ---- end MERCHANT ROUND B ---- */

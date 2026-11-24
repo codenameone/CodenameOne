@@ -146,7 +146,8 @@ public class DemoPipeline {
         String[] stages = {"DELIVERED", "DELIVERED", SHIPPED, SHIPPED, SHIPPED, LABELLED,
             LABELLED, PACKED, PACKED, PLACED, PLACED, PLACED};
         for (int iter = 0; iter < stages.length; iter++) {
-            StoreOrder o = place(storeId, (stages.length - iter) * 47L * 60000L);
+            // Delivered parcels were ordered days ago, new ones this morning.
+            StoreOrder o = place(storeId, (stages.length - iter) * 4L * 3600000L);
             if (o == null) {
                 return false;
             }
@@ -179,12 +180,16 @@ public class DemoPipeline {
     }
 
     /// One step on the board of `storeId`; answers which kind it took. Every
-    /// third step is a new order, the rest move the oldest card of the
+    /// eighth step is a new order, the rest move the oldest card of the
     /// earliest stage that has one, latest stage first, so the board flows.
     public String step(String storeId) throws IOException {
         ticks++;
         String owner = DemoAccounts.MERCHANT;
-        if (ticks % 3 == 1) {
+        // One new order per eight ticks (40 seconds): each order takes three
+        // moves (pack, label, ship), so at one in three the unfulfilled pile
+        // only grew, and an order every 15 seconds put a month's takings into
+        // a quarter-hour demo.
+        if (ticks % 8 == 1) {
             StoreOrder o = place(storeId, 0);
             return o == null ? IDLE : PLACED;
         }
@@ -301,7 +306,8 @@ public class DemoPipeline {
         o.setLocationId(at == null ? "" : at.getId());
         List<OrderLine> made = new ArrayList<OrderLine>();
         long subtotal = 0;
-        for (int l = 0; l < 1 + n % 3; l++) {
+        // One item, now and then two: the store's usual basket.
+        for (int l = 0; l < 1 + (n % 4 == 3 ? 1 : 0); l++) {
             Variant v = stock.get((n * 5 + l * 3) % stock.size());
             OrderLine line = new OrderLine();
             line.setId(Ids.next());
@@ -311,7 +317,7 @@ public class DemoPipeline {
             line.setTitle(v.getTitle());
             line.setVariantTitle(v.getTitle());
             line.setSku(v.getSku());
-            line.setQuantity(1 + (n + l) % 2);
+            line.setQuantity(1);
             line.setPriceCents(v.getPriceCents());
             line.setLocationId(o.getLocationId());
             subtotal += v.getPriceCents() * line.getQuantity();

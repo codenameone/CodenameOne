@@ -252,6 +252,7 @@ public class DemoStores {
     private final ProductPhotoRepository gallery;
     private final ReviewRepository reviews;
     private final DemoFunnel funnel;
+    private final com.codenameone.examples.bazaar.repository.RefundRepository refunds;
 
     private static final String[] REVIEWERS = {"Maya", "Daniel", "Priya", "Tom", "Lena",
         "Omar", "Grace", "Kenji", "Sofia", "Ben", "Aisha", "Lucas"};
@@ -276,8 +277,10 @@ public class DemoStores {
             OrderLineRepository saleLines,
             com.codenameone.examples.bazaar.marketing.DemoMarketing marketing,
             PhotoRepository photos, ProductPhotoRepository gallery, ReviewRepository reviews,
-            DemoFunnel funnel) {
+            DemoFunnel funnel,
+            com.codenameone.examples.bazaar.repository.RefundRepository refunds) {
         this.funnel = funnel;
+        this.refunds = refunds;
         this.reviews = reviews;
         this.photos = photos;
         this.gallery = gallery;
@@ -394,64 +397,226 @@ public class DemoStores {
                 browse.add(p.getId());
             }
         }
+        boolean big = NORTHWIND.equals(store.getHandle());
         long day = 24L * 60 * 60 * 1000;
+        long now = System.currentTimeMillis();
+        long today = now / day;
+        // The same variant order on every run: the store's query has none.
+        stock = new ArrayList<Variant>(stock);
+        java.util.Collections.sort(stock, (x, y) -> x.getSku().compareTo(y.getSku()));
         int number = 1001;
-        for (int iter = 0; iter < 14; iter++) {
-            boolean pos = iter % 3 == 2 && !tills.isEmpty();
-            Instant at = Instant.now().minusMillis((28 - iter * 2) * day + iter * 3600_000L);
-            StoreOrder o = new StoreOrder();
-            o.setId(Ids.next());
-            o.setStoreId(store.getId());
-            o.setNumber(number++);
-            // client_id is unique; the id itself never collides.
-            o.setClientId(o.getId());
-            o.setChannel(pos ? Orders.POS : Orders.ONLINE);
-            o.setStatus(Orders.CLOSED);
-            o.setFinancial(Orders.PAID);
-            o.setFulfilment(Orders.FULFILLED);
-            o.setCurrency(store.getCurrency());
-            o.setEmail("customer" + (iter % 5) + "@example.com");
-            if (pos) {
-                Register till = tills.get(0);
-                o.setLocationId(till.getLocationId());
-                o.setRegisterId(till.getId());
-                o.setStaffUsername(cashier);
-            } else {
-                o.setShipName("Demo customer " + (iter % 5 + 1));
-                o.setShipCountry("US");
-            }
-            List<OrderLine> lines = new ArrayList<OrderLine>();
-            long subtotal = 0;
-            for (int l = 0; l < 1 + iter % 3; l++) {
-                Variant v = stock.get((iter * 7 + l * 3) % stock.size());
-                OrderLine line = new OrderLine();
-                line.setId(Ids.next());
-                line.setOrderId(o.getId());
-                line.setProductId(v.getProductId());
-                line.setVariantId(v.getId());
-                String title = titles.get(v.getProductId());
-                line.setTitle(title == null ? v.getTitle() : title);
-                line.setVariantTitle(v.getTitle());
-                line.setSku(v.getSku());
-                line.setQuantity(1 + l % 2);
-                line.setFulfilledQty(line.getQuantity());
-                line.setPriceCents(v.getPriceCents());
-                line.setLocationId(o.getLocationId());
-                subtotal += v.getPriceCents() * line.getQuantity();
-                lines.add(line);
-            }
-            o.setSubtotalCents(subtotal);
-            o.setTotalCents(subtotal);
-            o.setCreatedAt(at);
-            o.setUpdatedAt(at);
-            o.setClosedAt(at);
-            sales.insert(o);
-            saleLines.saveAll(lines);
-            if (!pos) {
-                // The views and carts the order came from (DemoFunnel).
-                funnel.behind(o, lines, browse, iter);
+        int serial = 0;
+        List<StoreOrder> made = new ArrayList<StoreOrder>();
+        List<OrderLine> madeLines = new ArrayList<OrderLine>();
+        List<Object[]> behind = new ArrayList<Object[]>();
+        List<com.codenameone.examples.bazaar.domain.Refund> madeRefunds =
+                new ArrayList<com.codenameone.examples.bazaar.domain.Refund>();
+        for (int ago = HISTORY_DAYS - 1; ago >= 0; ago--) {
+            long epochDay = today - ago;
+            int count = ordersOn(big, epochDay, ago);
+            for (int k = 0; k < count; k++) {
+                // Spread over the thirteen hours before this time of day,
+                // counted from now rather than from midnight: a seed made at
+                // 02:00 still has a morning of orders "today" and the charts
+                // look the same whatever the clock says.
+                long at = now - ago * day - 20 * 60_000L
+                        - (count - 1 - k) * (13 * 3600_000L) / count
+                        - (mix(number, 5) % 25) * 60_000L;
+                serial++;
+                boolean pos = !tills.isEmpty() && mix(serial, 1) % 10 < 3;
+                StoreOrder o = new StoreOrder();
+                o.setId(Ids.next());
+                o.setStoreId(store.getId());
+                o.setNumber(number++);
+                // client_id is unique; the id itself never collides.
+                o.setClientId(o.getId());
+                o.setChannel(pos ? Orders.POS : Orders.ONLINE);
+                o.setCurrency(store.getCurrency());
+                String[] who = SHOPPERS[shopper(serial)];
+                o.setEmail(who[2] + "@example.com");
+                if (mix(serial, 12) % 5 < 2) {
+                    // A first-time shopper: two in five orders, so about a
+                    // third of a month's customers have bought before.
+                    String[] last = SHOPPERS[mix(serial, 13) % SHOPPERS.length];
+                    who = new String[] {who[0], last[1], who[0] + "." + last[1] + serial};
+                    o.setEmail(asciiLower(who[2]) + "@example.com");
+                }
+                if (pos) {
+                    Register till = tills.get(serial % tills.size());
+                    o.setLocationId(till.getLocationId());
+                    o.setRegisterId(till.getId());
+                    o.setStaffUsername(cashier);
+                } else {
+                    o.setShipName(who[0] + " " + who[1]);
+                    o.setShipCountry("US");
+                }
+                List<OrderLine> lines = new ArrayList<OrderLine>();
+                long subtotal = 0;
+                int lineCount = 1 + (mix(serial, 2) % 3 == 0 ? 1 : 0)
+                        + (mix(serial, 3) % 7 == 0 ? 1 : 0);
+                for (int l = 0; l < lineCount; l++) {
+                    Variant v = stock.get(popular(serial * 3 + l, stock.size()));
+                    OrderLine line = new OrderLine();
+                    line.setId(Ids.next());
+                    line.setOrderId(o.getId());
+                    line.setProductId(v.getProductId());
+                    line.setVariantId(v.getId());
+                    String title = titles.get(v.getProductId());
+                    line.setTitle(title == null ? v.getTitle() : title);
+                    line.setVariantTitle(v.getTitle());
+                    line.setSku(v.getSku());
+                    line.setQuantity(mix(serial, 4 + l) % 5 == 0 ? 2 : 1);
+                    line.setPriceCents(v.getPriceCents());
+                    line.setLocationId(o.getLocationId());
+                    subtotal += v.getPriceCents() * line.getQuantity();
+                    lines.add(line);
+                }
+                long discount = 0;
+                if (!pos && mix(serial, 6) % 6 == 1) {
+                    discount = subtotal / 10;
+                    o.setDiscountCode("WELCOME10");
+                }
+                o.setSubtotalCents(subtotal);
+                o.setDiscountCents(discount);
+                o.setTotalCents(subtotal - discount);
+                o.setFinancial(Orders.PAID);
+                // Today's newest online orders are still waiting to be packed;
+                // everything older has gone out.
+                boolean waiting = !pos && ago == 0 && k * 2 >= count;
+                o.setStatus(waiting ? Orders.OPEN : Orders.CLOSED);
+                o.setFulfilment(waiting ? Orders.UNFULFILLED : Orders.FULFILLED);
+                for (int l = 0; l < lines.size(); l++) {
+                    lines.get(l).setFulfilledQty(waiting ? 0 : lines.get(l).getQuantity());
+                }
+                Instant when = Instant.ofEpochMilli(at);
+                o.setCreatedAt(when);
+                o.setUpdatedAt(when);
+                if (!waiting) {
+                    o.setClosedAt(when);
+                }
+                if (ago >= 3 && mix(serial, 7) % 31 == 4) {
+                    // A return: one line back, or now and then the whole order.
+                    boolean whole = mix(serial, 8) % 4 == 0;
+                    long back = whole ? o.getTotalCents()
+                            : Math.min(o.getTotalCents(), lines.get(0).getPriceCents());
+                    com.codenameone.examples.bazaar.domain.Refund r =
+                            new com.codenameone.examples.bazaar.domain.Refund();
+                    r.setId(Ids.next());
+                    r.setOrderId(o.getId());
+                    r.setAmountCents(back);
+                    r.setReason(whole ? "Changed their mind" : "Wrong size");
+                    r.setUsername(owner);
+                    r.setCreatedAt(when.plusMillis(2 * day));
+                    madeRefunds.add(r);
+                    o.setRefundedCents(back);
+                    o.setFinancial(whole ? Orders.REFUNDED : Orders.PARTIALLY_REFUNDED);
+                }
+                made.add(o);
+                madeLines.addAll(lines);
+                if (!pos && ago < FUNNEL_DAYS) {
+                    behind.add(new Object[] {o, lines, Integer.valueOf(serial)});
+                }
             }
         }
+        for (int iter = 0; iter < made.size(); iter++) {
+            sales.insert(made.get(iter));
+        }
+        saleLines.saveAll(madeLines);
+        for (int iter = 0; iter < madeRefunds.size(); iter++) {
+            refunds.insert(madeRefunds.get(iter));
+        }
+        for (int iter = 0; iter < behind.size(); iter++) {
+            Object[] f = behind.get(iter);
+            StoreOrder o = (StoreOrder) f[0];
+            List<OrderLine> ls = new ArrayList<OrderLine>();
+            for (int l = 0; l < madeLines.size(); l++) {
+                if (madeLines.get(l).getOrderId().equals(o.getId())) {
+                    ls.add(madeLines.get(l));
+                }
+            }
+            // The views and carts the order came from (DemoFunnel).
+            funnel.behind(o, ls, browse, ((Integer) f[2]).intValue());
+        }
+    }
+
+    /// `text` with ASCII capitals folded; names here are ASCII and the
+    /// locale must not fold them.
+    static String asciiLower(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        for (int iter = 0; iter < text.length(); iter++) {
+            char c = text.charAt(iter);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return out.toString();
+    }
+
+    /// Days of seeded order history.
+    static final int HISTORY_DAYS = 90;
+
+    /// The days the seeded funnel (views and carts) covers: the default
+    /// analytics period and the one it is compared with. Older orders have
+    /// none, which keeps the seed quick.
+    static final int FUNNEL_DAYS = 61;
+
+    /// Shoppers of the seeded history (first, last, mailbox); the first
+    /// dozen are regulars. Mailboxes are written out: no case folding.
+    private static final String[][] SHOPPERS = {
+        {"Ava", "Brooks", "ava.brooks"}, {"Liam", "Carter", "liam.carter"},
+        {"Mia", "Nguyen", "mia.nguyen"}, {"Noah", "Patel", "noah.patel"},
+        {"Emma", "Rossi", "emma.rossi"}, {"Ethan", "Kim", "ethan.kim"},
+        {"Zoe", "Martin", "zoe.martin"}, {"Owen", "Garcia", "owen.garcia"},
+        {"Chloe", "Silva", "chloe.silva"}, {"Leo", "Fischer", "leo.fischer"},
+        {"Ivy", "Cohen", "ivy.cohen"}, {"Jack", "Murphy", "jack.murphy"},
+        {"Nora", "Hughes", "nora.hughes"}, {"Eli", "Turner", "eli.turner"},
+        {"Ruby", "Walsh", "ruby.walsh"}, {"Finn", "Larsen", "finn.larsen"},
+        {"Hazel", "Price", "hazel.price"}, {"Theo", "Ward", "theo.ward"},
+        {"Lily", "Dubois", "lily.dubois"}, {"Max", "Novak", "max.novak"},
+        {"Stella", "Reyes", "stella.reyes"}, {"Sam", "Okafor", "sam.okafor"},
+        {"Clara", "Berg", "clara.berg"}, {"Hugo", "Lambert", "hugo.lambert"},
+        {"Iris", "Moreno", "iris.moreno"}, {"Felix", "Weber", "felix.weber"},
+        {"Alice", "Young", "alice.young"}, {"Oscar", "Ibrahim", "oscar.ibrahim"},
+        {"Julia", "Kowalski", "julia.kowalski"}, {"Miles", "Bennett", "miles.bennett"},
+        {"Elena", "Sato", "elena.sato"}, {"Caleb", "Shaw", "caleb.shaw"},
+        {"Freya", "Lund", "freya.lund"}, {"Adam", "Haddad", "adam.haddad"},
+        {"Rosa", "Ortiz", "rosa.ortiz"}, {"Jonah", "Reed", "jonah.reed"},
+        {"Lucy", "Tanaka", "lucy.tanaka"}, {"Ezra", "Klein", "ezra.klein"},
+        {"Maeve", "Doyle", "maeve.doyle"}, {"Ari", "Levi", "ari.levi"},
+        {"Tessa", "Moss", "tessa.moss"}, {"Diego", "Ramos", "diego.ramos"},
+        {"Nina", "Holm", "nina.holm"}, {"Paul", "Ferreira", "paul.ferreira"},
+        {"Sara", "Lindqvist", "sara.lindqvist"}, {"Kai", "Mendes", "kai.mendes"}
+    };
+
+    /// A cheap, deterministic scramble of `serial` for choice `salt`.
+    static int mix(int serial, int salt) {
+        int h = serial * 0x9E3779B1 + salt * 0x85EBCA77;
+        h ^= h >>> 15;
+        h *= 0x2C1B3C6D;
+        h ^= h >>> 12;
+        return h & 0x7fffffff;
+    }
+
+    /// Who placed order `serial`: half the orders come from twelve regulars.
+    static int shopper(int serial) {
+        int h = mix(serial, 9);
+        return h % 2 == 0 ? h / 2 % 12 : h / 2 % SHOPPERS.length;
+    }
+
+    /// A variant index skewed toward the front, so a few products lead.
+    static int popular(int seed, int size) {
+        int h = mix(seed, 10);
+        return h % 5 < 3 ? h / 5 % Math.max(1, size / 4) : h / 5 % size;
+    }
+
+    /// Orders placed on `epochDay`, `ago` days back: weekends busier, a gentle
+    /// growth across the window, and some day-to-day noise.
+    static int ordersOn(boolean big, long epochDay, int ago) {
+        // 1970-01-01 was a Thursday; 0 is Monday here.
+        int weekday = (int) ((epochDay + 3) % 7);
+        int[] shape = {90, 85, 95, 100, 115, 140, 120};
+        int base = big ? 7 : 3;
+        int growth = 100 - ago * 30 / HISTORY_DAYS;
+        int noise = 85 + mix((int) epochDay, 11) % 31;
+        return Math.max(1, base * shape[weekday] * growth / 100 * noise / 10000);
     }
 
     @Transactional(readOnly = true)
@@ -721,7 +886,8 @@ public class DemoStores {
                                 ? stock(serial, p, iter) : 0;
                         InventoryLevel level = Inventory.newLevel(store.getId(), v.getId(),
                                 places.get(p).getId(), onHand);
-                        level.setReorderPoint(p == 2 ? 0 : 4);
+                        // The pop-up and the backordered tent never alert.
+                        level.setReorderPoint(p == 2 || v.isAllowBackorder() ? 0 : 4);
                         levelRows.add(level);
                         if (onHand != 0) {
                             moveRows.add(Inventory.newMove(store.getId(), v.getId(),
@@ -846,17 +1012,17 @@ public class DemoStores {
 
     /// Opening stock: plenty at most places, a few low, a few gone.
     private static int stock(int serial, int place, int product) {
-        int roll = (serial * 31 + place * 17 + product * 7) % 23;
-        if (roll == 0 || roll == 11) {
+        int roll = (serial * 31 + place * 17 + product * 7) % 89;
+        if (roll == 0) {
             return 0;
         }
-        if (roll < 4) {
-            return roll;
+        if (roll < 3 && place < 2) {
+            return roll + 1;
         }
         if (place == 2) {
-            return roll % 6;
+            return 2 + roll % 6;
         }
-        return place == 0 ? 10 + roll * 2 : 4 + roll;
+        return place == 0 ? 18 + roll % 40 : 8 + roll % 16;
     }
 
     private static ProductOption option(Product product, String name, String[] values,

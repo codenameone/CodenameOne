@@ -257,18 +257,22 @@ final class AnalyticsPane extends MerchantPane {
                 MCharts.COUNT)));
         page.add(trend);
 
-        // Three across on a monitor, two on a tablet, one on a phone.
-        Container charts = DashGrid.of(88f, 3);
+        // Two across on a monitor and a tablet, one on a phone.
+        Container charts = DashGrid.of(120f, 2);
         charts.add(card("Sales by channel", channels(insights == null ? data.byChannel()
                 : Insights.withSales(insights.channels()))));
         charts.add(card("Sales by location", locations(data.byLocation())));
-        charts.add(card("Conversion funnel", funnel(insights == null ? data.funnel()
-                : insights.funnel())));
         page.add(charts);
 
+        // The long table beside a column of the two short cards, so neither
+        // side ends in a tall empty band.
         Container lower = DashGrid.of(150f, 2);
         lower.add(card("Top products", topProducts(data.topProducts(), wideNow)));
-        lower.add(card("Inventory value", inventory()));
+        Container side = new Container(BoxLayout.y());
+        side.add(card("Conversion funnel", funnel(insights == null ? data.funnel()
+                : insights.funnel())));
+        side.add(card("Inventory value", inventory()));
+        lower.add(side);
         page.add(lower);
         root(page);
     }
@@ -374,21 +378,60 @@ final class AnalyticsPane extends MerchantPane {
         return box;
     }
 
+    /// The funnel as one labelled, centred bar per step: the name and the
+    /// count with its share of the first step above, so no label is ever
+    /// drawn over a shape.
     private static Component funnel(List<FunnelStepDto> steps) {
         if (steps == null || steps.isEmpty()) {
             return Ui.text(Lang.tr("No carts in this period."), "SvMuted");
         }
-        String[] labels = new String[steps.size()];
-        int[] counts = new int[steps.size()];
+        Container box = new Container(BoxLayout.y());
+        box.setName("chart-funnel");
+        long first = Math.max(1, steps.get(0).count());
         for (int iter = 0; iter < steps.size(); iter++) {
-            labels[iter] = Lang.tr(steps.get(iter).label());
-            counts[iter] = steps.get(iter).count();
+            FunnelStepDto step = steps.get(iter);
+            Container row = new Container(BoxLayout.y());
+            row.setUIID("MeFunnelRow");
+            Container words = new Container(new BorderLayout());
+            words.add(BorderLayout.CENTER, Ui.plain(Lang.tr(step.label()), "MeFunnelLabel"));
+            Label value = Ui.plain(step.count() + Ui.DOT
+                    + Period.percent((int) (step.count() * 10000L / first)), "MeFunnelValue");
+            value.setShouldLocalize(false);
+            words.add(BorderLayout.EAST, value);
+            row.add(words);
+            row.add(funnelBar(step.count() / (double) first, iter));
+            box.add(row);
         }
-        return MCharts.funnel("chart-funnel", labels, counts);
+        return box;
+    }
+
+    /// A bar `share` of the row wide, centred, a shade lighter each step.
+    private static Component funnelBar(final double share, final int step) {
+        Component c = new Component() {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                return new com.codename1.ui.geom.Dimension(CN.convertToPixels(20f),
+                        CN.convertToPixels(2.6f));
+            }
+
+            @Override
+            public void paint(com.codename1.ui.Graphics g) {
+                int w = Math.max(getHeight(), (int) (getWidth() * Math.max(0, Math.min(1,
+                        share))));
+                int alpha = g.getAlpha();
+                g.setColor(MCharts.color("MeChartBar"));
+                g.setAlpha(Math.max(110, 255 - step * 40));
+                g.fillRoundRect(getX() + (getWidth() - w) / 2, getY(), w, getHeight(),
+                        getHeight() / 2, getHeight() / 2);
+                g.setAlpha(alpha);
+            }
+        };
+        c.setUIID("MeMeter");
+        return c;
     }
 
     private Component inventory() {
-        Container tiles = DashGrid.of(34f, 4);
+        Container tiles = DashGrid.of(34f, 2);
         if (data.inventory() == null) {
             return tiles;
         }

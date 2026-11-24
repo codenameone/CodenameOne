@@ -30,6 +30,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.CN;
 
 /// The seller's small rewards: numbers that count up, goal rings that fill,
@@ -252,7 +253,18 @@ final class Delight {
         }
         toast.add(BorderLayout.CENTER, words);
         final Container layer = form.getLayeredPane(Delight.class, true);
-        layer.setLayout(null);
+        // Codename One has no null layout (it threw here, so no toast ever
+        // showed); a layout that leaves its children where they are put.
+        layer.setLayout(new Layout() {
+            @Override
+            public void layoutContainer(Container parent) {
+            }
+
+            @Override
+            public Dimension getPreferredSize(Container parent) {
+                return new Dimension(0, 0);
+            }
+        });
         Dimension pref = toast.getPreferredSize();
         final int tw = Math.min(form.getWidth() - CN.convertToPixels(8f),
                 Math.max(pref.getWidth(), CN.convertToPixels(70f)));

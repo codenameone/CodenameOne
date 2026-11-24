@@ -872,6 +872,16 @@ private void screens() throws Exception {
         });
         signIn(MERCHANT, "home-merchant");
         pause(2000);
+        // The live board and the packing queue, which no other tour shoots.
+        go(MerchantSections.PIPELINE);
+        pause(4000);
+        visualShot("merchant-pipeline");
+        go(MerchantSections.FULFILMENT);
+        pause(2500);
+        visualShot("merchant-fulfilment");
+        go(Sections.PRODUCTS);
+        pause(2500);
+        visualShot("merchant-products");
         go(Sections.ORDERS);
         pause(2500);
         visualShot("merchant-orders");

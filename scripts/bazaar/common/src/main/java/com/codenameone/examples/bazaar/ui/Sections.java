@@ -58,28 +58,38 @@ public final class Sections {
     public static final String USERS = "users";
     public static final String PAYMENTS = "payments";
 
+    /// Sidebar headings of the merchant's sections.
+    public static final String ORDERS_GROUP = "Orders";
+    public static final String PRODUCTS_GROUP = "Products";
+    public static final String CUSTOMERS_GROUP = "Customers";
+    public static final String MARKETING_GROUP = "Marketing";
+    public static final String ANALYTICS_GROUP = "Analytics";
+    public static final String CHANNELS_GROUP = "Sales channels";
+    public static final String SETTINGS_GROUP = "Settings";
+
     private static final Map<String, List<Section>> BY_MODE = new HashMap<String, List<Section>>();
 
     static {
-        String store = "Store";
-        String grow = "Marketing";
-        String manage = "Manage";
         add(Nav.SHOP, HOME, "Home", "", FontImage.MATERIAL_STOREFRONT);
         add(Nav.SHOP, SEARCH, "Search", "", FontImage.MATERIAL_SEARCH);
         add(Nav.SHOP, CART, "Cart", "", FontImage.MATERIAL_SHOPPING_CART);
         add(Nav.SHOP, ORDERS, "Orders", "", FontImage.MATERIAL_RECEIPT_LONG);
         add(Nav.SHOP, ACCOUNT, "Account", "", FontImage.MATERIAL_PERSON);
 
-        add(Nav.MERCHANT, DASHBOARD, "Dashboard", store, FontImage.MATERIAL_INSIGHTS);
-        add(Nav.MERCHANT, ORDERS, "Orders", store, FontImage.MATERIAL_RECEIPT_LONG);
-        add(Nav.MERCHANT, PRODUCTS, "Products", store, FontImage.MATERIAL_SELL);
-        add(Nav.MERCHANT, INVENTORY, "Inventory", store, FontImage.MATERIAL_INVENTORY_2);
-        add(Nav.MERCHANT, CUSTOMERS, "Customers", store, FontImage.MATERIAL_GROUP);
-        add(Nav.MERCHANT, DISCOUNTS, "Discounts", grow, FontImage.MATERIAL_LOCAL_OFFER);
-        add(Nav.MERCHANT, ANALYTICS, "Analytics", grow, FontImage.MATERIAL_BAR_CHART);
-        add(Nav.MERCHANT, AUTOMATIONS, "Automations", grow, FontImage.MATERIAL_ACCOUNT_TREE);
-        add(Nav.MERCHANT, SETTINGS, "Store settings", manage, FontImage.MATERIAL_TUNE);
-        add(Nav.MERCHANT, POS, "Point of sale", manage, FontImage.MATERIAL_POINT_OF_SALE);
+        // The merchant's sidebar groups, in Shopify's order: what happens
+        // every day first, then catalog, people, growth, numbers, channels
+        // and setup (MerchantSections.ORDER). The first of a group leads it.
+        add(Nav.MERCHANT, DASHBOARD, "Home", "", FontImage.MATERIAL_HOME);
+        add(Nav.MERCHANT, ORDERS, "Orders", ORDERS_GROUP, FontImage.MATERIAL_RECEIPT_LONG);
+        add(Nav.MERCHANT, PRODUCTS, "Products", PRODUCTS_GROUP, FontImage.MATERIAL_SELL);
+        add(Nav.MERCHANT, INVENTORY, "Inventory", PRODUCTS_GROUP, FontImage.MATERIAL_INVENTORY_2);
+        add(Nav.MERCHANT, CUSTOMERS, "Customers", CUSTOMERS_GROUP, FontImage.MATERIAL_GROUP);
+        add(Nav.MERCHANT, DISCOUNTS, "Discounts", MARKETING_GROUP, FontImage.MATERIAL_LOCAL_OFFER);
+        add(Nav.MERCHANT, ANALYTICS, "Analytics", ANALYTICS_GROUP, FontImage.MATERIAL_BAR_CHART);
+        add(Nav.MERCHANT, AUTOMATIONS, "Automations", MARKETING_GROUP,
+                FontImage.MATERIAL_ACCOUNT_TREE);
+        add(Nav.MERCHANT, SETTINGS, "Store settings", SETTINGS_GROUP, FontImage.MATERIAL_TUNE);
+        add(Nav.MERCHANT, POS, "Point of sale", CHANNELS_GROUP, FontImage.MATERIAL_POINT_OF_SALE);
 
         add(Nav.POS, REGISTER, "Register", "", FontImage.MATERIAL_POINT_OF_SALE);
 
@@ -124,6 +134,30 @@ public final class Sections {
     }
 
     /// The sections of `mode`, in order: a copy, empty for an unknown mode.
+    /// Puts the sections of `mode` in the order of `ids`; any not named keep
+    /// their order after them. A heading is drawn where a group starts, so
+    /// the order is what keeps each heading to one appearance.
+    public static void order(String mode, String[] ids) {
+        List<Section> list = BY_MODE.get(mode);
+        if (list == null) {
+            return;
+        }
+        List<Section> sorted = new ArrayList<Section>();
+        for (int iter = 0; iter < ids.length; iter++) {
+            Section found = find(mode, ids[iter]);
+            if (found != null && !sorted.contains(found)) {
+                sorted.add(found);
+            }
+        }
+        for (int iter = 0; iter < list.size(); iter++) {
+            if (!sorted.contains(list.get(iter))) {
+                sorted.add(list.get(iter));
+            }
+        }
+        list.clear();
+        list.addAll(sorted);
+    }
+
     public static List<Section> of(String mode) {
         List<Section> list = BY_MODE.get(mode);
         return list == null ? new ArrayList<Section>() : new ArrayList<Section>(list);

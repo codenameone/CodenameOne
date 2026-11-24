@@ -145,7 +145,10 @@ public class Stock {
                     && !productId.equals(variant.getProductId())) {
                 continue;
             }
-            if (lowOnly && level.getOnHand() - level.getCommitted() > level.getReorderPoint()) {
+            // Low means at or under a reorder point someone set: a point of 0
+            // is "no alert here", not "alert when empty".
+            if (lowOnly && (level.getReorderPoint() <= 0
+                    || level.getOnHand() - level.getCommitted() > level.getReorderPoint())) {
                 continue;
             }
             out.add(names.level(level));

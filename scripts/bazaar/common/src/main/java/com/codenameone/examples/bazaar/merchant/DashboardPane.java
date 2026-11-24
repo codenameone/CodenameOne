@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.merchant;
 
 import com.codename1.appkit.Net;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BorderLayout;
@@ -204,7 +205,11 @@ final class DashboardPane extends MerchantPane {
             row.add(BorderLayout.CENTER, words);
             Container end = new Container(BoxLayout.y());
             end.add(Ui.plain(MerchantState.money(o.totalCents()), "SvRowValue"));
-            end.add(MUi.badge(o.fulfilment()));
+            // Payment and goods, as Shopify's order list shows them: "Paid"
+            // beside "Unfulfilled" is a new order, not a stuck one.
+            Container badges = new Container(new FlowLayout(Component.RIGHT));
+            badges.add(MUi.badge(o.financial())).add(MUi.badge(o.fulfilment()));
+            end.add(badges);
             row.add(BorderLayout.EAST, end);
             recent.add(Ui.tap(row, "recent-" + o.number(), e -> {
                 OrdersPane.open = o.id();

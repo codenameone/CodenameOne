@@ -196,14 +196,14 @@ public class Analytics {
         }
         long cartCount = number(carts.countCreated(storeId, start, end));
         long anonymous = number(carts.countAnonymous(storeId, start, end, ""));
+        long[] steps = monotonic(new long[] {number(views.countViews(storeId, start, end)),
+            cartCount, cartCount - anonymous, number(orders.countOnline(storeId, start, end,
+                Orders.CANCELLED, Orders.ONLINE))});
         List<FunnelStepDto> funnel = new ArrayList<FunnelStepDto>();
-        funnel.add(new FunnelStepDto("views", "Product views",
-                (int) number(views.countViews(storeId, start, end))));
-        funnel.add(new FunnelStepDto("carts", "Carts", (int) cartCount));
-        funnel.add(new FunnelStepDto("checkouts", "Reached checkout",
-                (int) (cartCount - anonymous)));
-        funnel.add(new FunnelStepDto("orders", "Ordered", (int) number(orders.countOnline(storeId,
-                start, end, Orders.CANCELLED, Orders.ONLINE))));
+        funnel.add(new FunnelStepDto("views", "Product views", (int) steps[0]));
+        funnel.add(new FunnelStepDto("carts", "Carts", (int) steps[1]));
+        funnel.add(new FunnelStepDto("checkouts", "Reached checkout", (int) steps[2]));
+        funnel.add(new FunnelStepDto("orders", "Ordered", (int) steps[3]));
         return new InsightsDto(p[0], p[1], channels, funnel, store.getCurrency());
     }
 
@@ -669,11 +669,24 @@ public class Analytics {
                 }
             }
         }
+        long[] steps = monotonic(new long[] {cartCount, checkout, online, fulfilled});
         List<FunnelStepDto> out = new ArrayList<FunnelStepDto>();
-        out.add(new FunnelStepDto("carts", "Carts", cartCount));
-        out.add(new FunnelStepDto("checkouts", "Reached checkout", checkout));
-        out.add(new FunnelStepDto("orders", "Ordered", online));
-        out.add(new FunnelStepDto("fulfilled", "Fulfilled", fulfilled));
+        out.add(new FunnelStepDto("carts", "Carts", (int) steps[0]));
+        out.add(new FunnelStepDto("checkouts", "Reached checkout", (int) steps[1]));
+        out.add(new FunnelStepDto("orders", "Ordered", (int) steps[2]));
+        out.add(new FunnelStepDto("fulfilled", "Fulfilled", (int) steps[3]));
         return out;
+    }
+
+    /// A funnel's steps, each raised to at least the step after it. Every
+    /// order went through checkout and every checkout had a cart, but not
+    /// every order left a cart behind: a draft, an API order or a cart that
+    /// fell outside the period. Without this an "Ordered" step could exceed
+    /// "Reached checkout", which no funnel can.
+    static long[] monotonic(long[] steps) {
+        for (int iter = steps.length - 2; iter >= 0; iter--) {
+            steps[iter] = Math.max(Math.max(0, steps[iter]), steps[iter + 1]);
+        }
+        return steps;
     }
 }
