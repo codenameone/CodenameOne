@@ -10,7 +10,7 @@ The `cn1app-archetype` is the basis for all Maven Codename One application proje
 The platform modules to generate. The default, `none`, is the minimal layout: the root `pom.xml` and the `common` module, and nothing else. `all` generates a module for each platform (`javase`, `android`, `ios`, `javascript`, `win` and `linux`), and a comma-separated list such as `javase,android` generates just those.
 
 `projectType`::
-`app` (the default), `app-with-backend`, which adds the `backend` module (see <<_server_side_backend,the backend chapter>>), `backend-only`, which generates a server on its own: a single module at the root with no application, or `command-line`, the same single module holding a `@Command` class instead of a controller, which `./mvnw cn1:backend-package` builds into a native executable for Linux, macOS or Windows.
+`app` (the default), `app-with-backend`, which adds the `backend` module (see <<_server_side_backend,the backend chapter>>), `backend-only`, which generates a server on its own: a single module at the root with no application, or `command-line`, the same single module holding a `@Command` class instead of a controller, which `./mvnw cn1:backend-package` builds into a native executable for Linux, macOS, or Windows.
 
 `language`::
 `java` (the default) or `kotlin`, which writes the main class in Kotlin under `common/src/main/kotlin`. Backend-only and command-line projects are Java only.
