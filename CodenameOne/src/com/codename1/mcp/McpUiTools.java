@@ -33,6 +33,7 @@ import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
@@ -43,6 +44,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /// Built in MCP tools that turn any Codename One application into an agent drivable
 /// surface with no application code. They wrap the portable accessibility semantics
@@ -168,6 +170,55 @@ final class McpUiTools {
                     }
                 }));
 
+        tools.add(new Tool("ui_clock_freeze",
+                "Freezes animation time. Motions, transitions, timers, tickers and caret blinks then move only "
+                        + "when ui_clock_advance or ui_clock_settle moves them, so screenshots never race an "
+                        + "animation and the same script gives the same pictures every run. Input timing (long "
+                        + "press, double tap, fling) is unaffected. Use this instead of sleeping.",
+                "{\"type\":\"object\",\"properties\":{}}",
+                new ToolHandler() {
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+                        return JSONParser.toJson(McpClock.freeze());
+                    }
+                }));
+
+        tools.add(new Tool("ui_clock_advance",
+                "Moves frozen animation time forward by ms, painting every 16 ms frame on the way, then returns "
+                        + "with the frame for the new time on screen. Use it to look at a point inside an "
+                        + "animation or to make a timer or dialog timeout fire.",
+                "{\"type\":\"object\",\"properties\":{\"ms\":{\"type\":\"integer\",\"description\":\"milliseconds of animation time to advance\"}},\"required\":[\"ms\"]}",
+                new ToolHandler() {
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+                        return JSONParser.toJson(McpClock.advance(longArg(parse(argumentsJson), "ms", 0)));
+                    }
+                }));
+
+        tools.add(new Tool("ui_clock_settle",
+                "Advances frozen animation time until no form transition is running and the screen stops "
+                        + "changing, or until maxMs (default 5000) of animation time has passed. Call it after "
+                        + "every tap that navigates or animates, then read the screen. Returns settled=false "
+                        + "when the limit was reached first (an endless animation such as a spinner).",
+                "{\"type\":\"object\",\"properties\":{\"maxMs\":{\"type\":\"integer\",\"description\":\"most animation time to spend, default 5000\"}}}",
+                new ToolHandler() {
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+                        return JSONParser.toJson(McpClock.settle(longArg(parse(argumentsJson), "maxMs", 5000)));
+                    }
+                }));
+
+        tools.add(new Tool("ui_clock_release",
+                "Returns animation time to the wall clock. Settle first: an animation started while time was "
+                        + "advanced ahead of the wall clock waits for the wall clock to catch up.",
+                "{\"type\":\"object\",\"properties\":{}}",
+                new ToolHandler() {
+                    @Override
+                    public String invoke(String argumentsJson) throws Exception {
+                        return JSONParser.toJson(McpClock.release());
+                    }
+                }));
+
         return tools;
     }
 
@@ -189,6 +240,7 @@ final class McpUiTools {
     static Map<String, Object> performAction(final long nodeId, final String actionId, final Object argument, final int windowId) {
         final Map<String, Object> outcome = new LinkedHashMap<String, Object>();
         final boolean[] complete = new boolean[1];
+        final Object lock = new Object();
         Runnable perform = new Runnable() {
             @Override
             public void run() {
@@ -219,17 +271,26 @@ final class McpUiTools {
                     outcome.put("success", Boolean.FALSE);
                     outcome.put("error", ex.toString());
                 } finally {
-                    complete[0] = true;
+                    synchronized (lock) {
+                        complete[0] = true;
+                    }
                 }
             }
         };
         final Display display = Display.getInstance();
         final Map<String, Object> out = new LinkedHashMap<String, Object>();
-        final Object lock = new Object();
         final boolean[] ready = new boolean[1];
+        // Set when the caller stopped waiting (frozen clock, see below). A snapshot that
+        // runs after that must not write into a map that was already returned.
+        final boolean[] abandoned = new boolean[1];
         final Runnable snapshot = new Runnable() {
             @Override
             public void run() {
+                synchronized (lock) {
+                    if (abandoned[0]) {
+                        return;
+                    }
+                }
                 try {
                     out.putAll(outcome);
                     out.put("pending", Boolean.valueOf(!complete[0]));
@@ -249,7 +310,9 @@ final class McpUiTools {
                     out.put("error", ex.toString());
                 } finally {
                     synchronized (lock) {
-                        ready[0] = true;
+                        if (!abandoned[0]) {
+                            ready[0] = true;
+                        }
                         lock.notifyAll();
                     }
                 }
@@ -271,10 +334,31 @@ final class McpUiTools {
                     action.run();
                 }
             });
+            // On a frozen clock an action that starts a form transition leaves the
+            // snapshot queued behind a transition that never ends, so the wait is
+            // bounded there and the action's own outcome is returned with advice.
+            boolean frozen = AnimationTime.isOverridden();
+            long deadline = System.currentTimeMillis() + FROZEN_EDT_WAIT_MS;
             synchronized (lock) {
                 while (!ready[0]) {
+                    long remaining = deadline - System.currentTimeMillis();
+                    if (frozen && remaining <= 0) {
+                        abandoned[0] = true;
+                        // Read only once the action is over: a modal action still
+                        // running writes its outcome later, on the EDT.
+                        if (complete[0]) {
+                            out.putAll(outcome);
+                        }
+                        out.put("pending", Boolean.valueOf(!complete[0]));
+                        if (!complete[0]) {
+                            out.put("success", null);
+                        }
+                        out.put("note", "A form transition is running and the clock is frozen; call "
+                                + "ui_clock_settle, then ui_snapshot.");
+                        break;
+                    }
                     try {
-                        lock.wait();
+                        lock.wait(frozen ? remaining : 0);
                     } catch (InterruptedException ex) {
                         throw new RuntimeException("Interrupted while waiting for UI action", ex);
                     }
@@ -321,11 +405,25 @@ final class McpUiTools {
         return holder[0];
     }
 
-    private static byte[] renderCurrentFormPng() {
+    /// The focused top level's pixels, for telling whether the screen still changes.
+    /// Null when nothing is showing. Unlike the PNG it needs no image encoder, which
+    /// not every platform has. Runs on the EDT.
+    static int[] currentFramePixels() {
+        final int[][] holder = new int[1][];
+        runOnEdt(new Runnable() {
+            @Override
+            public void run() {
+                Image image = renderCurrentForm();
+                holder[0] = image == null ? null : image.getRGB();
+            }
+        });
+        return holder[0];
+    }
+
+    private static Image renderCurrentForm() {
         TopLevelContainer top = Display.getInstance().getCurrentTopLevel();
         Component form = top == null ? null : top.asContainer();
-        ImageIO io = ImageIO.getImageIO();
-        if (form == null || io == null) {
+        if (form == null) {
             return null;
         }
         int w = form.getWidth();
@@ -336,6 +434,15 @@ final class McpUiTools {
         Image image = Image.createImage(w, h, 0xffffffff);
         Graphics g = image.getGraphics();
         form.paintComponent(g, true);
+        return image;
+    }
+
+    private static byte[] renderCurrentFormPng() {
+        ImageIO io = ImageIO.getImageIO();
+        Image image = io == null ? null : renderCurrentForm();
+        if (image == null) {
+            return null;
+        }
         try {
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             io.save(image, bo, ImageIO.FORMAT_PNG, 1);
@@ -398,10 +505,15 @@ final class McpUiTools {
         return AccessibilityManager.getInstance().getSnapshot(resolveWindow(windowId));
     }
 
+    /// How long a tool waits for the EDT while the agent clock is frozen.
+    private static final int FROZEN_EDT_WAIT_MS = 1500;
+
     private static void runOnEdt(final Runnable r) {
         Display display = Display.getInstance();
         if (display.isEdt()) {
             r.run();
+        } else if (AnimationTime.isOverridden()) {
+            runOnEdtWhileFrozen(display, r);
         } else {
             final RuntimeException[] error = new RuntimeException[1];
             display.callSeriallyAndWait(new Runnable() {
@@ -417,6 +529,46 @@ final class McpUiTools {
             if (error[0] != null) {
                 throw error[0];
             }
+        }
+    }
+
+    /// `runOnEdt` for a frozen clock, where waiting without a limit can hang for good.
+    ///
+    /// The EDT runs no serial calls while it paints a form transition, and a transition
+    /// on a frozen clock never ends -- so a tap that starts one, followed by a snapshot,
+    /// would block the snapshot forever. Instead the call is withdrawn after a while and
+    /// the client is told what to do. Withdrawn means it never runs: an action that ran
+    /// seconds later, after its caller had already been told it failed, would be worse
+    /// than the hang. The state is 0 queued, 1 running, 2 withdrawn, 3 done.
+    private static void runOnEdtWhileFrozen(Display display, final Runnable r) {
+        final AtomicInteger state = new AtomicInteger(0);
+        final RuntimeException[] error = new RuntimeException[1];
+        display.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (!state.compareAndSet(0, 1)) {
+                    return;
+                }
+                try {
+                    r.run();
+                } catch (RuntimeException ex) {
+                    error[0] = ex;
+                } finally {
+                    state.set(3);
+                }
+            }
+        });
+        long deadline = System.currentTimeMillis() + FROZEN_EDT_WAIT_MS;
+        while (state.get() != 3) {
+            boolean expired = System.currentTimeMillis() >= deadline || !McpClock.sleep(2);
+            if (expired && state.compareAndSet(0, 2)) {
+                throw new IllegalStateException("A form transition is running and the clock is frozen, so the "
+                        + "screen cannot be read or driven until it finishes. Call ui_clock_settle (or "
+                        + "ui_clock_advance), then try again.");
+            }
+        }
+        if (error[0] != null) {
+            throw error[0];
         }
     }
 

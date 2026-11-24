@@ -13,9 +13,13 @@ yourself in the background and talk to it with the bundled command-line client:
 ./mvnw cn1:agent &                 # Gradle: ./gradlew cn1Agent &   (Linux, no display: xvfb-run -a ./gradlew cn1Agent &)
 S=.agent-skills/codename-one/tools/Sim.java
 java $S wait                    # blocks until the first form answers
+java $S freeze                  # animation time now moves only when you move it
 java $S snapshot                # ui_snapshot
 java $S find "Email"            # ui_find by label
 java $S tap "Sign In"           # ui_activate, by label or node id
+java $S settle                  # run the transition/animations to rest, then read the screen
+java $S advance 300             # or look 300 ms into an animation, or make a timer fire
+java $S film target/anim.png 600 50   # right after a tap: the animation as a contact sheet
 java $S type "Email" alice@example.com   # ui_set_text
 java $S screenshot target/s.png # the current form as a PNG -- open it and look
 java $S record-start target/flow.mp4 ; java $S caption "Sign in" ; java $S record-stop
@@ -124,6 +128,7 @@ Every server publishes these, with no work from the app:
 | `ui_activate` | Tap or click a node (`nodeId` from a snapshot or a find). |
 | `ui_set_text` | Type into an editable node (`nodeId`, `text`). |
 | `ui_perform_action` | Any other action a node advertises: `longPress`, `increment`, `decrement`, `focus`, `expand`, `scrollForward`, and so on. |
+| `ui_clock_freeze` / `ui_clock_settle` / `ui_clock_advance` / `ui_clock_release` | The agent clock. Frozen, animation time (motions, transitions, `UITimer`, dialog timeouts, tickers, caret blink) moves only when you move it, so screenshots are deterministic and never race an animation. `settle` steps until no transition runs and the screen stops changing (`settled:false` means an endless animation hit `maxMs`). Input timing is unaffected. While frozen, a tool called during a transition answers "call ui_clock_settle" instead of waiting. |
 
 Every action runs on the Codename One EDT and returns whether it succeeded **plus a fresh snapshot**, so one call tells you what the screen became. The server also exposes a screenshot of the current form as an MCP image resource, which is worth reading when the semantic tree looks right and you suspect a layout or styling problem instead.
 

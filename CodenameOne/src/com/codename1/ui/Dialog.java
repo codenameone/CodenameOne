@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.components.InteractionDialog;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Transition;
@@ -1653,7 +1654,7 @@ public class Dialog extends Form implements AbstractDialog {
     /// - `time`: a milliseconds time used to dispose the dialog
     @Override
     public void setTimeout(long time) {
-        this.time = System.currentTimeMillis() + time;
+        this.time = AnimationTime.now() + time;
         super.registerAnimatedInternal(this);
         // Armed off the surface as well as on it. The registration above is polled from
         // animate(), which rides the animation loop of whatever is being painted -- and
@@ -1684,7 +1685,7 @@ public class Dialog extends Form implements AbstractDialog {
         }
         java.util.Timer clock = new java.util.Timer();
         clock.schedule(new TimeoutSchedule(new TimeoutClock(this)),
-                Math.max(0L, time - System.currentTimeMillis()));
+                Math.max(0L, time - AnimationTime.now()));
         timeoutClock = clock;
     }
 
@@ -3920,7 +3921,7 @@ public class Dialog extends Form implements AbstractDialog {
         if (!Display.getInstance().isEdt()) {
             return false;
         }
-        if (time != 0 && System.currentTimeMillis() >= time) {
+        if (time != 0 && AnimationTime.now() >= time) {
             time = 0;
             cancelTimeoutClock();
             dispose();

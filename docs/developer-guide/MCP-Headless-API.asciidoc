@@ -116,6 +116,20 @@ a blocking modal dialog, its nested event loop can return a snapshot with `pendi
 use subsequent calls to inspect and dismiss the dialog, then verify the resulting state. A pending
 response isn't confirmation that the original action completed successfully.
 
+==== The agent clock
+
+Animations make a screen a moving target: a screenshot taken after a tap may catch half a transition, and a script that sleeps to wait for one gives different pictures on a fast machine and a slow one. `ui_clock_freeze` stops animation time instead. Motions, form transitions, `UITimer`, dialog timeouts, tickers and the caret blink all read `AnimationTime`, so while it is frozen they move only when the agent moves them:
+
+* `ui_clock_settle` steps frame by frame until no transition is running and the screen stops changing, then returns. `maxMs` (5000 by default) bounds it, and `settled:false` reports an endless animation, such as a spinner, that reached the bound first.
+* `ui_clock_advance` with `{"ms": 300}` moves time forward by exactly that much, painting each 16 ms frame, to look at a point inside an animation or to make a timer fire.
+* `ui_clock_release` returns to the wall clock. Settle first: an animation started while time ran ahead of the wall clock waits for the wall clock to catch up.
+
+Input timing (long press, double tap, fling velocity) keeps reading the wall clock, so taps and drags behave as they do unfrozen. While the clock is frozen, a tool called during a form transition answers with advice to call `ui_clock_settle` instead of waiting for a transition that can't end. An action that starts one returns its outcome with a `note` saying the same.
+
+A typical frozen loop is `ui_clock_freeze` once, then `ui_activate`, `ui_clock_settle` and `ui_snapshot` for each step.
+
+In the simulator, `sim_record_film` films an animation the same way: called right after the tap that starts it, with `{"path": "/tmp/open.png", "overMs": 600, "everyMs": 50}`, it steps the frozen clock and writes one contact-sheet PNG of the frames as they were shown, form transitions included. Every run of the script produces the same sheet.
+
 === Publishing application tools
 
 An application publishes its own data and actions as MCP tools. A `Tool` has a name, a description, a JSON schema for its parameters, and a handler:
@@ -159,7 +173,7 @@ A typical script calls these tools in order:
 . `sim_tap` with the `nodeId` of the email field, found with `ui_find`.
 . `sim_keyboard_type` with `{"text": "ada@example.com"}`, then `sim_keyboard_key` with `{"key": "next"}`.
 . `sim_keyboard_type` with `{"text": "42"}`, then `sim_keyboard_key` with `{"key": "done"}`.
-. `sim_wait` with `{"ms": 800}` to let the last frame settle.
+. `sim_wait` with `{"ms": 800}` to hold the last frame for the viewer.
 . `sim_record_stop`, which returns the file's path and length.
 
 `sim_rotate` switches between portrait and landscape, and `sim_keyboard_state` reports whether the keyboard is showing, its height, the layout, and the screen size the application currently sees.

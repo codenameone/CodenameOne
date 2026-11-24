@@ -23,6 +23,11 @@
 ///
 ///   java Sim.java wait [timeoutSeconds]        block until the app answers
 ///   java Sim.java snapshot                     the screen as JSON (ui_snapshot)
+///   java Sim.java freeze                       freeze animation time (ui_clock_freeze)
+///   java Sim.java settle [maxMs]               run animations and transitions to rest (ui_clock_settle)
+///   java Sim.java advance <ms>                 move frozen animation time forward (ui_clock_advance)
+///   java Sim.java release                      back to the wall clock (ui_clock_release)
+///   java Sim.java film <out.png> [overMs] [everyMs]  frozen-clock contact sheet of an animation (sim_record_film)
 ///   java Sim.java find <label text>            nodes whose label contains the text
 ///   java Sim.java tap <nodeId | label text>    tap a node (first label match)
 ///   java Sim.java type <nodeId | label> <text> type into an editable node
@@ -126,6 +131,14 @@ public class Sim {
         switch (cmd) {
             case "wait" -> waitReady(args.size() > 1 ? Integer.parseInt(args.get(1)) : 180);
             case "snapshot" -> print(callTool("ui_snapshot", "{}"));
+            case "freeze" -> print(callTool("ui_clock_freeze", "{}"));
+            case "settle" -> print(callTool("ui_clock_settle", args.size() > 1
+                    ? "{\"maxMs\":" + Long.parseLong(args.get(1)) + "}" : "{}"));
+            case "advance" -> print(callTool("ui_clock_advance", "{\"ms\":" + Long.parseLong(need(args, 1)) + "}"));
+            case "release" -> print(callTool("ui_clock_release", "{}"));
+            case "film" -> print(callTool("sim_record_film", "{\"path\":" + q(need(args, 1))
+                    + (args.size() > 2 ? ",\"overMs\":" + Long.parseLong(args.get(2)) : "")
+                    + (args.size() > 3 ? ",\"everyMs\":" + Long.parseLong(args.get(3)) : "") + "}"));
             case "find" -> print(callTool("ui_find", "{\"label\":" + q(rest(args, 1)) + "}"));
             case "tap" -> print(callTool("ui_activate", "{\"nodeId\":" + resolveNode(need(args, 1)) + "}"));
             case "type" -> print(callTool("ui_set_text", "{\"nodeId\":" + resolveNode(need(args, 1))
@@ -148,7 +161,7 @@ public class Sim {
     }
 
     private static void usage() {
-        System.err.println("usage: java Sim.java [--port N] wait|snapshot|find|tap|type|screenshot|"
+        System.err.println("usage: java Sim.java [--port N] wait|snapshot|freeze|settle|advance|release|film|find|tap|type|screenshot|"
                 + "record-start|fold|caption|record-stop|tools|call|device-screenshot|device-record ...");
         System.err.println("See the comment at the top of Sim.java for every command.");
     }

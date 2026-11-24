@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
@@ -476,7 +477,7 @@ public class Tabs extends Container {
             // Not `b = true`: that asks the form to repaint the whole Tabs as well, so
             // every frame of the motion was painted twice.
             tabsContainer.repaint();
-            long elapsed = System.currentTimeMillis() - glassMotionStart;
+            long elapsed = AnimationTime.now() - glassMotionStart;
             if (glassGesture != null && glassGesture.getUpS() < 0 && elapsed > GLASS_MAX_PRESS_MS) {
                 // The release never reached us (listeners detached mid-press):
                 // let the lens settle rather than hold it lifted forever.
@@ -1864,7 +1865,7 @@ public class Tabs extends Container {
         if (gg == null || glassMotionStart < 0 || gg.getUpS() >= 0 || glassGesturePressX < 0) {
             return;
         }
-        float s = (System.currentTimeMillis() - glassMotionStart) / 1000f;
+        float s = (AnimationTime.now() - glassMotionStart) / 1000f;
         int rel = x - tabsContainer.getAbsoluteX();
         if (!gg.isScrubbing()) {
             if (Math.abs(rel - glassGesturePressX) < Display.getInstance().convertToPixels(1.5f)) {
@@ -1895,7 +1896,7 @@ public class Tabs extends Container {
         if (gg == null || glassMotionStart < 0 || gg.getUpS() >= 0) {
             return;
         }
-        float s = (System.currentTimeMillis() - glassMotionStart) / 1000f;
+        float s = (AnimationTime.now() - glassMotionStart) / 1000f;
         if (!gg.isScrubbing()) {
             gg.up(s);
             return;
@@ -1988,7 +1989,7 @@ public class Tabs extends Container {
         glassTouchY = glassPressY;
         glassPressX = -1;
         glassPressY = -1;
-        glassMotionStart = System.currentTimeMillis();
+        glassMotionStart = AnimationTime.now();
         TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             TopLevelSupport.registerAnimatedInternal(f, this);
@@ -2065,12 +2066,12 @@ public class Tabs extends Container {
             m = TabGlassMotion.at(glassTestElapsedMs, travelPt);
         } else if (glassMotionStart >= 0 && glassGesture != null) {
             float[] c = new float[1];
-            m = glassGesture.at((System.currentTimeMillis() - glassMotionStart) / 1000f, c);
+            m = glassGesture.at((AnimationTime.now() - glassMotionStart) / 1000f, c);
             if (glassGesture.isScrubbing()) {
                 gestureCentre = c[0] * f.ptPx;
             }
         } else if (glassMotionStart >= 0) {
-            m = TabGlassMotion.at(System.currentTimeMillis() - glassMotionStart, travelPt);
+            m = TabGlassMotion.at(AnimationTime.now() - glassMotionStart, travelPt);
         } else {
             m = TabGlassMotion.rest();
         }

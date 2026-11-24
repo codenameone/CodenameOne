@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.graph;
 
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.graph.DefaultGraphModel;
 import com.codename1.graph.GraphChangeListener;
 import com.codename1.graph.GraphEdge;
@@ -782,7 +783,7 @@ public class NodeGraph extends Container {
             animFrom.put(n.getId(), new double[]{n.getX(), n.getY()});
         }
         animTo = r;
-        animStart = System.currentTimeMillis();
+        animStart = AnimationTime.now();
         for (GraphEdge e : model.getEdges()) {
             // a route belongs to the old positions; edges go straight while moving
             e.setRoute(null);
@@ -3187,7 +3188,7 @@ public class NodeGraph extends Container {
     boolean tick() {
         boolean busy = false;
         if (animTo != null) {
-            float t = Math.min(1f, (System.currentTimeMillis() - animStart) / (float) LAYOUT_MS);
+            float t = Math.min(1f, (AnimationTime.now() - animStart) / (float) LAYOUT_MS);
             float e = 1 - (1 - t) * (1 - t) * (1 - t);
             for (GraphNode n : model.getNodes()) {
                 double[] a = animFrom.get(n.getId());
