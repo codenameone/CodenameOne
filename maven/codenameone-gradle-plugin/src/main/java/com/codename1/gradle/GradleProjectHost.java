@@ -251,13 +251,21 @@ final class GradleProjectHost implements ProjectHost {
     @Override
     public File getPortJar(String artifactId, String classifier) {
         File f = portJars.get(classifier == null ? artifactId : artifactId + ":" + classifier);
-        if (f == null && classifier == null && onDemandJars != null) {
-            // iterating resolves the configuration: this is the first and only time
+        if (f == null && classifier == null && onDemandJars != null
+                && com.codename1.maven.AppBuilder.SPELLCHECK_DICTIONARIES.equals(artifactId)) {
+            // Only for the artifact the configuration holds: iterating resolves it, and any other
+            // port jar a target looks up here must not make every build fetch the dictionaries.
+            // A repository without them is "not available", which the builder reports, not a
+            // failed build.
             List<String> wanted = Collections.singletonList(artifactId);
-            for (File candidate : onDemandJars) {
-                if (GradleHostFactory.portOf(candidate.getName(), wanted) != null) {
-                    return candidate;
+            try {
+                for (File candidate : onDemandJars) {
+                    if (GradleHostFactory.portOf(candidate.getName(), wanted) != null) {
+                        return candidate;
+                    }
                 }
+            } catch (RuntimeException unresolved) {
+                return null;
             }
         }
         return f != null ? f : getJar("com.codenameone", artifactId, classifier);
