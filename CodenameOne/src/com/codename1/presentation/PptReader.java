@@ -822,6 +822,9 @@ final class PptReader {
         return new Transition(kind, duration, direction, click, after);
     }
 
+    /// [MS-PPT] SlideShowSlideInfoAtom.effectDirection for cover, uncover, push and wipe: 0
+    /// left, 1 up, 2 right, 3 down -- the way the slide moves, as PPTX's dir does. The model
+    /// names where it comes from, so moving left is coming in from the right.
     private static String direction(int d) {
         switch (d) {
             case 0:
