@@ -50,6 +50,9 @@ public final class ProductArt {
     private static final Map<String, List<Label>> WAITING = new HashMap<String, List<Label>>();
     private static final Map<String, Image> PHOTOS = new HashMap<String, Image>();
     private static final List<String> PHOTO_ORDER = new ArrayList<String>();
+    /// Downloaded photos, by photo id, each size scaled from one of these.
+    private static final Map<String, EncodedImage> SOURCES = new HashMap<String, EncodedImage>();
+    private static final List<String> SOURCE_ORDER = new ArrayList<String>();
 
     private static final char[] ICONS = {
         FontImage.MATERIAL_LOCAL_CAFE, FontImage.MATERIAL_LOCAL_CAFE,
@@ -146,6 +149,12 @@ public final class ProductArt {
     }
 
     /// Puts the photo `photoId` on `label`, fetched once and cached.
+    ///
+    /// The download is cached by photo, not by size: a desktop register
+    /// lays its grid out again as the window settles or is resized, each
+    /// pass at another tile size, and keying the fetch by size downloaded
+    /// every photo once per pass -- the tiles sat on their drawn art for
+    /// most of a minute. Each size is scaled from the one download.
     public static void photo(Label label, final String photoId, final int width,
             final int height) {
         final String key = photoId + ":" + width + "x" + height;
@@ -154,32 +163,56 @@ public final class ProductArt {
             label.setIcon(ready);
             return;
         }
-        List<Label> waiting = WAITING.get(key);
+        EncodedImage source = SOURCES.get(photoId);
+        if (source != null) {
+            label.setIcon(sized(source, key, width, height));
+            return;
+        }
+        label.putClientProperty("photoSize", new int[] {width, height});
+        List<Label> waiting = WAITING.get(photoId);
         if (waiting != null) {
-            waiting.add(label);
+            if (!waiting.contains(label)) {
+                waiting.add(label);
+            }
             return;
         }
         waiting = new ArrayList<Label>();
         waiting.add(label);
-        WAITING.put(key, waiting);
+        WAITING.put(photoId, waiting);
         Api.catalog().photo(photoId, Net.to(photo -> {
-            List<Label> told = WAITING.remove(key);
+            List<Label> told = WAITING.remove(photoId);
             if (photo == null || photo.data() == null) {
                 return;
             }
             try {
                 byte[] bytes = Base64.decode(photo.data().getBytes("UTF-8"));
-                Image image = EncodedImage.create(bytes).fill(width, height);
-                remember(PHOTOS, PHOTO_ORDER, key, image);
+                EncodedImage decoded = EncodedImage.create(bytes);
+                SOURCES.put(photoId, decoded);
+                SOURCE_ORDER.add(photoId);
+                while (SOURCE_ORDER.size() > MOST) {
+                    SOURCES.remove(SOURCE_ORDER.remove(0));
+                }
                 for (int iter = 0; told != null && iter < told.size(); iter++) {
                     Label l = told.get(iter);
-                    l.setIcon(image);
+                    Object size = l.getClientProperty("photoSize");
+                    int w = size instanceof int[] ? ((int[]) size)[0] : width;
+                    int h = size instanceof int[] ? ((int[]) size)[1] : height;
+                    l.setIcon(sized(decoded, photoId + ":" + w + "x" + h, w, h));
                     l.repaint();
                 }
             } catch (java.io.IOException err) {
                 // Not an image after all: the drawn art stays.
             }
-        }, (status, message) -> WAITING.remove(key)));
+        }, (status, message) -> WAITING.remove(photoId)));
+    }
+
+    private static Image sized(EncodedImage source, String key, int width, int height) {
+        Image ready = PHOTOS.get(key);
+        if (ready == null) {
+            ready = source.fill(width, height);
+            remember(PHOTOS, PHOTO_ORDER, key, ready);
+        }
+        return ready;
     }
 
     /// Forgets every drawn picture: after a change between light and dark.

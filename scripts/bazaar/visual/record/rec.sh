@@ -28,8 +28,24 @@ printf '%s\n' '#!/bin/sh' "exec mvn -Dmaven.repo.local=$REPO \"\$@\"" >"$WRAP"
 chmod +x "$WRAP"
 export MVN="$WRAP"
 "$HERE/backend/server.sh" build --jvm >"$OUT/build.log" 2>&1
+# What the home directory holds before any app runs. The simulator keeps the
+# app's Storage there (session, open shift, the register's catalog snapshot),
+# and every run in this container shares it: without a reset the desktop
+# register started signed in to the previous run's server, showed its cached
+# catalog, and asked this server for photo ids it never issued -- so every
+# tile kept its drawn placeholder.
+# The app's Storage (~/.cn1) and any new plain directory are reset; the
+# build's own caches (UpdateCodenameOne.jar, ~/.codenameone) stay, or the
+# next run would try to download them with no network.
+HOME_BASE="$(ls -A "$HOME")"
 for run in $RUNS; do
   IFS=: read -r tour device skin <<<"$run"
+  for entry in $(ls "$HOME"); do
+    [ -d "$HOME/$entry" ] || continue
+    printf '%s\n' "$HOME_BASE" | grep -qxF "$entry" || rm -rf "${HOME:?}/$entry"
+  done
+  # ~/.cn1 is where the simulator keeps the app's Storage.
+  rm -rf "${HOME:?}/.cn1" "${HOME:?}/CodenameOneStorage"
   # A fresh database per run, so every tour starts from the seed.
   CN1_PROFILE=test "$HERE/backend/server.sh" run --jvm --prebuilt --port "$PORT" >"$OUT/server-$tour-$device.log" 2>&1 &
   SERVER=$!
