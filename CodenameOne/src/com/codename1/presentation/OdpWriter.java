@@ -37,9 +37,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 
@@ -69,7 +71,8 @@ final class OdpWriter {
             + " office:version=\"1.3\"";
     private static final int[] PALETTE = {0x4472c4, 0xed7d31, 0xa5a5a5, 0xffc000, 0x5b9bd5,
         0x70ad47};
-    private static final String[][] PRESETS = {{"rect", "rectangle"}, {"ellipse", "ellipse"},
+    /// Model geometry names and their ODF `draw:type` equivalents; `OdpReader` maps back.
+    static final String[][] PRESETS = {{"rect", "rectangle"}, {"ellipse", "ellipse"},
         {"roundRect", "round-rectangle"}, {"triangle", "isosceles-triangle"},
         {"rtTriangle", "right-triangle"}, {"diamond", "diamond"}, {"star5", "star5"},
         {"hexagon", "hexagon"}, {"octagon", "octagon"}, {"rightArrow", "right-arrow"},
@@ -115,6 +118,7 @@ final class OdpWriter {
     private final Map<Picture, String> media = new HashMap<Picture, String>();
     private final List<String[]> manifest = new ArrayList<String[]>();
     private final Map<String, String> xmlIds = new HashMap<String, String>();
+    private final Set<String> xmlIdsUsed = new HashSet<String>();
     private int objects;
 
     private OdpWriter(Presentation p, OutputStream out) {
@@ -562,10 +566,31 @@ final class OdpWriter {
         }
         String id = xmlIds.get(e.id);
         if (id == null) {
-            id = "id" + (xmlIds.size() + 1);
+            id = isNcName(e.id) && !xmlIdsUsed.contains(e.id) ? e.id : null;
+            int n = xmlIds.size() + 1;
+            while (id == null || xmlIdsUsed.contains(id)) {
+                id = "id" + n++;
+            }
             xmlIds.put(e.id, id);
+            xmlIdsUsed.add(id);
         }
         x.attr("xml:id", id).attr("draw:id", id);
+    }
+
+    /// True for an XML name without a colon, so a model id can be written as `xml:id`.
+    private static boolean isNcName(String s) {
+        if (s.length() == 0 || s.length() > 64) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean letter = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_';
+            boolean other = c >= '0' && c <= '9' || c == '-' || c == '.';
+            if (!letter && (i == 0 || !other)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void name(XmlOut x, SlideElement e) throws IOException {
@@ -739,10 +764,16 @@ final class OdpWriter {
         StringBuilder g = new StringBuilder(" draw:fill=\"none\"");
         stroke(g, p.line);
         Picture pic = p.picture;
-        if (p.isCropped() && pic != null && pic.width > 0 && pic.height > 0) {
-            g.append(attr("fo:clip", "rect(" + pt(p.cropTop * pic.height) + ", "
-                    + pt(p.cropRight * pic.width) + ", " + pt(p.cropBottom * pic.height) + ", "
-                    + pt(p.cropLeft * pic.width) + ")"));
+        // fo:clip is measured against the image's intrinsic size, which LibreOffice and
+        // OdpReader take from the image header; the declared size is only the fallback.
+        float[] size = pic == null || pic.isLinked() ? null : OdfText.imageSize(pic.data());
+        if (size == null && pic != null) {
+            size = new float[] {pic.width, pic.height};
+        }
+        if (p.isCropped() && size != null && size[0] > 0 && size[1] > 0) {
+            g.append(attr("fo:clip", "rect(" + pt(p.cropTop * size[1]) + ", "
+                    + pt(p.cropRight * size[0]) + ", " + pt(p.cropBottom * size[1]) + ", "
+                    + pt(p.cropLeft * size[0]) + ")"));
         }
         x.raw("<draw:frame").attr("draw:style-name", graphicStyle(g.toString()));
         name(x, p);

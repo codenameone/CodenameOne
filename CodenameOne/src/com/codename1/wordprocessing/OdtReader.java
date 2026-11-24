@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.impl.office.OdfText;
 import com.codename1.impl.office.ZipParts;
 import com.codename1.util.StringUtil;
 import com.codename1.impl.xml.XmlScanner;
@@ -437,91 +438,40 @@ final class OdtReader {
 
     /// A length in points from an ODF measure such as `2cm`, `12pt` or `0.5in`.
     static float length(String v, float fallback) {
-        if (v == null) {
-            return fallback;
-        }
-        String s = v.trim();
-        float scale = 1;
-        int cut = s.length();
-        if (s.endsWith("pt")) {
-            cut -= 2;
-        } else if (s.endsWith("cm")) {
-            cut -= 2;
-            scale = 72 / 2.54f;
-        } else if (s.endsWith("mm")) {
-            cut -= 2;
-            scale = 72 / 25.4f;
-        } else if (s.endsWith("in")) {
-            cut -= 2;
-            scale = 72;
-        } else if (s.endsWith("pc")) {
-            cut -= 2;
-            scale = 12;
-        } else if (s.endsWith("px")) {
-            cut -= 2;
-            scale = 0.75f;
-        }
-        try {
-            float f = Float.parseFloat(s.substring(0, cut)) * scale;
-            return Float.isNaN(f) || Float.isInfinite(f) ? fallback : f;
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
+        return OdfText.length(v, fallback);
     }
 
     private static void textProps(XmlScanner x, DocxReader.Props p) {
-        String font = x.attr("font-name");
-        if (font == null) {
-            font = x.attr("font-family");
-            if (font != null && font.length() > 1 && font.charAt(0) == '\'') {
-                font = font.substring(1, font.length() - 1);
-            }
+        OdfText.TextProps t = OdfText.TextProps.read(x);
+        if (t.font != null) {
+            p.font = t.font;
         }
-        if (font != null) {
-            p.font = font;
+        if (t.bold != null) {
+            p.bold = t.bold;
         }
-        String w = x.attr("fo:font-weight");
-        if (w != null) {
-            p.bold = Boolean.valueOf("bold".equals(w) || w.length() == 3 && w.charAt(0) >= '6');
+        if (t.italic != null) {
+            p.italic = t.italic;
         }
-        String st = x.attr("fo:font-style");
-        if (st != null) {
-            p.italic = Boolean.valueOf("italic".equals(st) || "oblique".equals(st));
+        if (t.underline != null) {
+            p.underline = t.underline;
         }
-        String u = x.attr("text-underline-style");
-        if (u != null) {
-            p.underline = Boolean.valueOf(!"none".equals(u));
+        if (t.strike != null) {
+            p.strike = t.strike;
         }
-        String l = x.attr("text-line-through-style");
-        if (l != null) {
-            p.strike = Boolean.valueOf(!"none".equals(l));
+        if (t.color != null) {
+            p.color = t.color;
         }
-        String color = x.attr("fo:color");
-        if (color != null && color.length() == 7 && color.charAt(0) == '#') {
-            p.color = Integer.valueOf(DocxReader.hex(color.substring(1), 0));
+        if (t.background != null) {
+            p.background = t.background;
         }
-        String bg = x.attr("fo:background-color");
-        if (bg != null) {
-            p.background = Integer.valueOf(bg.length() == 7 && bg.charAt(0) == '#'
-                    ? DocxReader.hex(bg.substring(1), TextStyle.NO_BACKGROUND)
-                    : TextStyle.NO_BACKGROUND);
+        if (t.size != null) {
+            p.size = t.size;
         }
-        String size = x.attr("fo:font-size");
-        if (size != null && !size.endsWith("%")) {
-            float f = length(size, 0);
-            if (f > 0 && f < 1638) {
-                p.size = Float.valueOf(f);
-            }
+        if (t.script != null) {
+            p.script = t.script;
         }
-        String pos = x.attr("text-position");
-        if (pos != null) {
-            p.script = pos.startsWith("super") || pos.length() > 0 && pos.charAt(0) >= '1'
-                    && pos.charAt(0) <= '9' ? TextStyle.SUPERSCRIPT : pos.startsWith("sub")
-                    || pos.startsWith("-") ? TextStyle.SUBSCRIPT : TextStyle.BASELINE;
-        }
-        String display = x.attr("text:display");
-        if ("none".equals(display)) {
-            p.hidden = Boolean.TRUE;
+        if (t.hidden != null) {
+            p.hidden = t.hidden;
         }
     }
 
