@@ -197,6 +197,11 @@ class SecureKeyboardTest extends UITestBase {
         f.show();
         // Straight after show(), as a show listener would: nothing is laid out yet.
         kb.show();
+        // The show is retried a serial call at a time (up to 50) until the form has a size, and
+        // when layout lands depends on the host: one flush is not enough on a slower runner.
+        for (int i = 0; i < 50 && !kb.isShowing(); i++) {
+            flushSerialCalls();
+        }
         flushSerialCalls();
         assertTrue(kb.isShowing(), "a show before layout is retried once the form has a size");
         assertEquals(f.getContentPane().getAbsoluteY() + f.getContentPane().getHeight(),

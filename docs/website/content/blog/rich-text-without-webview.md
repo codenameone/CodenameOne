@@ -55,9 +55,9 @@ You can also assemble content without markup:
 
 ```java
 RichTextComponent status = new RichTextComponent();
-status.append("Status: ", TextStyle.DEFAULT)
+status.append("Status: ", com.codename1.ui.editor.TextStyle.DEFAULT)
       .append("confirmed",
-              TextStyle.DEFAULT
+              com.codename1.ui.editor.TextStyle.DEFAULT
                       .withBold(true)
                       .withForeColor(0x1a7f37));
 ```

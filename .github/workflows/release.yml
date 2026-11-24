@@ -200,7 +200,7 @@ jobs:
           # this keeps the release green even if that rule is ever removed.
           set -e
           for artifact in codenameone-core codenameone-maven-plugin codenameone-annotation-processor \
-                          codenameone-platform-feature-catalog \
+                          codenameone-platform-feature-catalog codenameone-spellcheck-dictionaries \
                           codenameone-build-hint-catalog codenameone-build-hint-tools \
                           codenameone-cil-translator codenameone-unity-compat \
                           codenameone-rive-runtime codenameone-rive-transcoder \

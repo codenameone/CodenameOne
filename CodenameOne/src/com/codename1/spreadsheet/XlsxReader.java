@@ -22,6 +22,8 @@
  */
 package com.codename1.spreadsheet;
 
+import com.codename1.impl.xml.XmlOut;
+import com.codename1.impl.xml.XmlScanner;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;

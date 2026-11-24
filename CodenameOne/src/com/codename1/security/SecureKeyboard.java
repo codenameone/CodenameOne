@@ -384,6 +384,13 @@ public final class SecureKeyboard extends Component {
                     showDeferred = false;
                     return;
                 }
+                if (f.getContentPane().getHeight() <= 0 && f == CN.getCurrentForm() //NOPMD CompareObjectsWithEquals - same Form instance is the question
+                        && f.getWidth() > 0) {
+                    // The form is current and sized but its content was never laid out:
+                    // waiting for a paint cycle to do it raced the attempt budget on slow
+                    // hosts, so lay it out now.
+                    f.revalidate();
+                }
                 if (f.getContentPane().getHeight() > 0) {
                     showDeferred = false;
                     show();

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>codenameone-spellcheck-dictionaries</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <name>codenameone-spellcheck-dictionaries</name>
+    <description>
+        Hunspell dictionaries the build tools add to an application that uses
+        com.codename1.spellcheck.SpellChecker, one per language named by the
+        spellcheck.languages build hint. Resolved by the build tools on demand,
+        like a port, and never by a simulator run. Only dictionaries under
+        permissive licenses are shipped: the SCOWL-derived English ones; the
+        README of each, with its license, is under META-INF/licenses.
+    </description>
+</project>

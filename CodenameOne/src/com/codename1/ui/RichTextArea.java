@@ -57,7 +57,65 @@ import com.codename1.util.SuccessCallback;
 /// editor.getHtml(html -> Log.p("User wrote: " + html));
 /// ```
 public class RichTextArea extends AbstractEditorComponent {
+    private static final java.util.Map<String, ImageSource> IMAGE_SOURCES =
+            new java.util.HashMap<String, ImageSource>();
     private String placeholderText = "";
+
+    /// Supplies the picture for an inline image whose source uses a scheme of the application's
+    /// own, such as the `cn1-component:` sources `com.codename1.wordprocessing` uses to put a
+    /// live component's rendering in the text. The source is kept as it is when the content is
+    /// read back, so it can carry whatever the scheme needs.
+    public interface ImageSource {
+        /// The picture for a source.
+        ///
+        /// #### Parameters
+        ///
+        /// - `source`: the whole source, scheme included
+        ///
+        /// #### Returns
+        ///
+        /// the image, or null when there is none
+        Image load(String source);
+    }
+
+    /// Registers the image source for a scheme, for every rich text editor using the Codename
+    /// One text engine.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scheme`: the scheme without its colon, such as `cn1-component`
+    ///
+    /// - `source`: supplies the pictures, or null to remove the scheme
+    public static void setImageSource(String scheme, ImageSource source) {
+        synchronized (IMAGE_SOURCES) {
+            if (source == null) {
+                IMAGE_SOURCES.remove(scheme);
+            } else {
+                IMAGE_SOURCES.put(scheme, source);
+            }
+        }
+    }
+
+    /// The picture a registered image source gives a source string.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the image source string
+    ///
+    /// #### Returns
+    ///
+    /// the image, or null when no registered scheme matches
+    public static Image loadRegisteredImage(String source) {
+        int colon = source == null ? -1 : source.indexOf(':');
+        if (colon <= 0) {
+            return null;
+        }
+        ImageSource s;
+        synchronized (IMAGE_SOURCES) {
+            s = IMAGE_SOURCES.get(source.substring(0, colon));
+        }
+        return s == null ? null : s.load(source);
+    }
 
     /// Creates an empty rich text editor.
     public RichTextArea() {

@@ -3314,7 +3314,14 @@ public abstract class Executor {
                 public void run() {
                     try {
                         File s = hardenSourceJar(sourceZip, request);
-                        result[0] = build(s, request);
+                        File withDictionaries = SpellcheckDictionaries.inject(Executor.this, s, request);
+                        try {
+                            result[0] = build(withDictionaries, request);
+                        } finally {
+                            if (withDictionaries != s && !withDictionaries.delete()) {
+                                withDictionaries.deleteOnExit();
+                            }
+                        }
 
                     } catch (Throwable err) {
                         err.printStackTrace();
@@ -4463,6 +4470,33 @@ public abstract class Executor {
             return is;
         }
         return openPortResource(res);
+    }
+
+    /// Fetches an artifact the build needs only for some applications, by artifact id.
+    public interface OnDemandArtifacts {
+        /// The jar, or null when the host cannot produce it.
+        File resolve(String artifactId);
+    }
+
+    private OnDemandArtifacts onDemand;
+
+    /// How this build fetches an artifact only some applications need -- the spell
+    /// checking dictionaries -- after the build has seen that it needs it. A host that
+    /// sets none (the cloud builder) never fetches one.
+    public void setOnDemandArtifacts(OnDemandArtifacts value) {
+        onDemand = value;
+    }
+
+    /// Fetches `artifactId` through the host and adds it as a port jar.
+    ///
+    /// Returns false when the host has no way to fetch it, or could not.
+    boolean addOnDemandArtifact(String artifactId) {
+        File jar = onDemand == null ? null : onDemand.resolve(artifactId);
+        if (jar == null || !jar.isFile()) {
+            return false;
+        }
+        addPortJar(jar);
+        return true;
     }
 
     /// Attaches a port jar this build reads its platform out of -- `iOSPort.jar` and
