@@ -136,6 +136,11 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-rive-transcoder</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-android-res-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>

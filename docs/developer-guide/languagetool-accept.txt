@@ -925,6 +925,9 @@ worklet
 # PDF standard font names.
 Zapf
 Fieldline
+# Rive: the canvas a Rive file draws on.
+artboard
+artboards
 leaderstat
 Papercut
 Gochi
@@ -940,3 +943,6 @@ certbot
 Fargate
 Lightsail
 Linode
+Nominatim
+Planetiler
+Geofabrik

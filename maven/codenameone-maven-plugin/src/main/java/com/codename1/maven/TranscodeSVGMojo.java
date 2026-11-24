@@ -45,6 +45,11 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  *   <li>{@code src/main/svg/} -- {@code *.svg}</li>
  *   <li>{@code src/main/lottie/} -- {@code *.json}, {@code *.lottie}</li>
  *   <li>{@code src/main/css/} -- either of the above</li>
+ *   <li>{@code *.riv} in the same directories -- each translated into a
+ *       Rive file class in {@code com.codename1.generated.rive}
+ *       ({@code coin.riv} becomes {@code CoinRive}) and registered under its
+ *       file name like an SVG; the Rive runtime is copied into
+ *       {@code target/classes} at the plugin's version, never declared</li>
  * </ul>
  * Theme CSS keeps the natural {@code background: url(spinner.svg);}
  * reference for SVG, and the same {@code url(...)} syntax resolves
@@ -79,8 +84,18 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         // project whose pom never binds this mojo. See that class.
         // Parameters live on AbstractCN1Mojo so the self-repair and the
         // placeholder diagnostic resolve the same configuration this goal does.
+        SvgTranscodeRunner runner = newSvgTranscodeRunner();
         try {
-            newSvgTranscodeRunner().run();
+            // Before run(): the generated Rive classes compile against the
+            // runtime this puts into target/classes. This goal resolves no
+            // class path (ResolutionScope.NONE), so the one jar is resolved
+            // directly, at the plugin's own version.
+            if (!installRiveRuntime(runner)) {
+                throw new MojoExecutionException("Could not resolve the Rive runtime for this module's .riv files");
+            }
+            runner.run();
+        } catch (java.io.IOException ex) {
+            throw new MojoExecutionException("Could not install the Rive runtime: " + ex.getMessage(), ex);
         } catch (com.codename1.builders.BuildException ex) {
             throw new MojoExecutionException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }

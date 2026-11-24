@@ -12592,11 +12592,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             float[] colors = new float[stopCount * 4];
             for (int i = 0; i < stopCount; i++) {
                 int c = argb[i];
-                int a8 = (c >>> 24) & 0xff;
-                if (a8 == 0) {
-                    a8 = 0xff;
-                }
-                float a = a8 / 255f;
+                // stops are ARGB (Gradient's contract, CSSGradientParser
+                // writes `transparent` as 0x00000000): alpha 0 is a real
+                // transparent stop, never "opaque", or a fade to transparent
+                // paints solid on Metal while every other port fades it
+                float a = ((c >>> 24) & 0xff) / 255f;
                 colors[i * 4] = ((c >> 16) & 0xff) / 255f * a;
                 colors[i * 4 + 1] = ((c >> 8) & 0xff) / 255f * a;
                 colors[i * 4 + 2] = (c & 0xff) / 255f * a;

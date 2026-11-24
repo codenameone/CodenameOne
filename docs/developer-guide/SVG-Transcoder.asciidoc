@@ -268,6 +268,142 @@ For animations that need higher fidelity than the subset above, export
 the relevant frame as an SVG and use the SVG transcoder path directly
 -- the runtime classes are identical.
 
+=== Rive animations
+
+A Rive (`.riv`) file is an image, the same as an SVG or a Lottie file. Drop
+it next to `theme.css` and refer to it from the theme or from code:
+
+[source]
+----
+src/main/css/
+  theme.css
+  juice.riv        <-- Rive export
+----
+
+[source,css]
+----
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=svg-transcoder-css-004,indent=0]
+----
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SvgTranscoderJava004Snippet.java[tag=svg-transcoder-java-004,indent=0]
+----
+
+The image plays the first artboard of the file. It runs the artboard's
+first state machine, or its first animation when the artboard has no state
+machine, and it fits itself into whatever area it's drawn into, keeping
+its aspect ratio. Its own size is the artboard's size, taking one artboard
+unit as one density-independent pixel. `scaled(width, height)` returns a
+separate image of the same file in its initial state, so one file can play
+in several places without the copies affecting each other.
+
+==== Inputs, data and events
+
+A state machine is driven by its inputs, which are set by name through
+`Image`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SvgTranscoderJava004Snippet.java[tag=svg-transcoder-java-005,indent=0]
+----
+
+For a file that uses data binding, `setAnimationProperty` and
+`getAnimationProperty` read and write the view model bound to the
+artboard. A path addresses a property of a nested view model with `/`, as
+in the other Rive runtimes. A number is a `Number`, a string or an enum
+value a `String`, a boolean a `Boolean` and a color an `Integer` holding
+0xAARRGGBB; a null value fires a trigger property:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SvgTranscoderJava004Snippet.java[tag=svg-transcoder-java-006,indent=0]
+----
+
+Events fired by the file arrive at the listeners added with
+`addAnimationListener`, as `AnimationEvent` instances.
+`getProperties()` holds the custom properties of the event, and an "open
+URL" event has the type `AnimationEvent.TYPE_OPEN_URL`. Events the entry
+state reports before a listener is added are delivered to the first one:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SvgTranscoderJava004Snippet.java[tag=svg-transcoder-java-007,indent=0]
+----
+
+==== Touch
+
+Rive listeners react to touches by themselves, once the image receives
+them. Show the image in a `com.codename1.impl.rive.RiveView` and the view
+hands the pointer events that land on it to the image, fitted the way it
+draws; a drag on the view belongs to the animation, so it doesn't scroll
+the form. An image shown as an icon or a background is only drawn: it gets
+no pointer events unless the application calls `pointerPressed`,
+`pointerDragged` and `pointerReleased` on the image itself, in the image's
+pixel coordinates. `isInteractive()` is true while the state machine has
+listeners. Hover isn't delivered.
+
+==== Meshes on the GPU
+
+An artboard with image meshes draws through `Graphics` wherever it's drawn.
+In a `RiveView` on a platform with a GPU backend it renders on a GPU surface
+instead. The surface is a native peer, so a `Dialog` shown over the view
+appears under it: use an `InteractionDialog` placed away from the view.
+
+==== The clock
+
+The image plays from the moment it's shown. `setAnimationPlaying(false)`
+stops the clock on the current frame and `setAnimationPlaying(true)`
+resumes it, starting a one-shot animation that has finished over again.
+A paused image still reacts: an input, a property or a pointer event takes
+effect at once, at the paused time. `advanceAnimation(seconds)` moves time
+by hand, which together with pausing gives a frame that doesn't depend on
+the clock, for example in a screenshot test:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SvgTranscoderJava004Snippet.java[tag=svg-transcoder-java-008,indent=0]
+----
+
+==== Rive feature coverage
+
+|===
+| Feature | Status
+
+| Shapes, paths, parametric shapes, fills, strokes, linear and radial gradients | Supported
+| Clipping | Supported
+| Timeline animations, keyframes, interpolators | Supported
+| State machines: layers, transitions, conditions, blend states, listeners, events | Supported
+| Bones, skins, IK and the other constraints | Supported
+| Embedded images, meshes | Supported, drawn as image triangles
+| Nested artboards, trim paths, dashes | Supported
+| Text with embedded TrueType fonts | Supported: kerning, wrapping, alignment, overflow, modifier ranges. No OpenType CFF fonts, right-to-left text or ligatures, and fonts the file references without embedding them aren't loaded
+| Layouts | Flex layout, sizing to content, layout animation. No grid, stack or scrolling
+| Data binding | View models, two-way binds, converters, formulas, conditions, artboard lists
+| Audio events | Played through the media API
+| Scripting | Not supported
+|===
+
+The build step prints a warning for every type of object in a file that
+the runtime doesn't handle, by type name: types it has no class for, and
+types it builds but gives no behaviour yet (focus, grid, scroll physics,
+artboard transition conditions). A file that relies on a missing feature
+says so when it builds.
+
+==== How it works
+
+Rive can't be reduced to SVG the way Lottie is. A state machine blends
+several animations on one artboard while it runs, bones and meshes move
+geometry on every frame, and listeners respond to touches. Codename One
+therefore ships a runtime written in pure Java, translated from the open
+source Rive runtime. The build translates each `.riv` file into a Java
+class that builds the objects of the file directly, so nothing is parsed
+on the device, and registers it with the image registry the SVG images
+use. The generated class names only the runtime classes the file uses: an
+application with no `.riv` file doesn't carry the runtime, and one with a
+single simple animation carries only what that animation needs. The build
+adds the runtime by itself; it's not an API an application calls.
+
 === Troubleshooting
 
 `Resources.getImage("name.svg")` returns null or a 1×1 transparent PNG::

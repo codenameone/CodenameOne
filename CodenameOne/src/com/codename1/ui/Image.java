@@ -31,6 +31,7 @@ import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.AnimationEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.ImageIO;
@@ -47,6 +48,7 @@ public class Image implements ActionSource {
     private static boolean simdOptimizationsEnabled = Simd.get().isSupported();
     int transform;
     private EventDispatcher listeners;
+    private EventDispatcher animationListeners;
     private Object rgbCache;
     private Object image;
     private boolean opaqueTested = false;
@@ -2135,6 +2137,191 @@ public class Image implements ActionSource {
     /// true if a drawImage call is a required
     public boolean requiresDrawImage() {
         return getImage() == null;
+    }
+
+    // ------------------------------------------------- interactive animation
+
+    /// Whether this image reacts to pointer events, as an interactive Rive
+    /// animation whose state machine listens to the pointer does. Drawing an
+    /// image never routes input to it: a component that shows it (the Rive
+    /// module's view) or the application hands it pointer events through
+    /// [#pointerPressed(int, int)] and its siblings. Images are not
+    /// interactive by default.
+    ///
+    /// An interactive image is one animation however many places show it:
+    /// one instance shown twice at once shares its state (inputs, pointer
+    /// presses, playback).
+    ///
+    /// #### Returns
+    ///
+    /// true if the image wants pointer events
+    public boolean isInteractive() {
+        return false;
+    }
+
+    /// Delivers a pointer press to an interactive image. The coordinates are
+    /// relative to the top left corner of the image at its current pixel
+    /// size ([#getWidth()] by [#getHeight()]). Does nothing by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the X coordinate within the image
+    /// - `y`: the Y coordinate within the image
+    public void pointerPressed(int x, int y) {
+    }
+
+    /// Delivers a pointer drag to an interactive image, in the coordinates
+    /// of [#pointerPressed(int, int)]. Does nothing by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the X coordinate within the image
+    /// - `y`: the Y coordinate within the image
+    public void pointerDragged(int x, int y) {
+    }
+
+    /// Delivers a pointer release to an interactive image, in the
+    /// coordinates of [#pointerPressed(int, int)]. Does nothing by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the X coordinate within the image
+    /// - `y`: the Y coordinate within the image
+    public void pointerReleased(int x, int y) {
+    }
+
+    /// Sets a boolean input of an animation's state machine. Does nothing
+    /// when the image has no boolean input by that name, which is always the
+    /// case for an image that is not an interactive animation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the input's name
+    /// - `value`: the new value
+    public void setAnimationInput(String name, boolean value) {
+    }
+
+    /// Sets a number input of an animation's state machine. Does nothing
+    /// when the image has no number input by that name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the input's name
+    /// - `value`: the new value
+    public void setAnimationInput(String name, float value) {
+    }
+
+    /// Fires a trigger input of an animation's state machine; the next frame
+    /// consumes it. Does nothing when the image has no trigger by that name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the trigger's name
+    public void fireAnimationTrigger(String name) {
+    }
+
+    /// Sets a property of the data the animation is bound to (a Rive view
+    /// model). The path names nested data with "/", as in
+    /// `"settings/volume"`. The value is a `Number` for a number property, a
+    /// `String` for a string or the name of an enum value, a `Boolean` for a
+    /// boolean, and an `Integer` holding 0xAARRGGBB for a color. A null value
+    /// fires a trigger property. Does nothing when there is no property of
+    /// that kind at the path, and by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the property's path
+    /// - `value`: the new value
+    public void setAnimationProperty(String path, Object value) {
+    }
+
+    /// The value of a property of the data the animation is bound to, see
+    /// [#setAnimationProperty(String, Object)]: a `Float`, `String`,
+    /// `Boolean`, or an `Integer` color as 0xAARRGGBB.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the property's path
+    ///
+    /// #### Returns
+    ///
+    /// the value, or null when there is no such property (always, by default)
+    public Object getAnimationProperty(String path) {
+        return null;
+    }
+
+    /// Starts or pauses an animation's clock. A paused animation still
+    /// reacts to inputs, properties and pointer events, settling them at the
+    /// paused time. Does nothing by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `playing`: true to play, false to pause
+    public void setAnimationPlaying(boolean playing) {
+    }
+
+    /// Whether the animation's clock runs.
+    ///
+    /// #### Returns
+    ///
+    /// true while the animation plays; false by default
+    public boolean isAnimationPlaying() {
+        return false;
+    }
+
+    /// Moves the animation forward by `seconds`, as one frame of playback
+    /// does, whether or not it plays. Does nothing by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the time to advance by
+    public void advanceAnimation(float seconds) {
+    }
+
+    /// Adds a listener for the events an animation reports. It receives
+    /// `com.codename1.ui.events.AnimationEvent` instances on the EDT. An image
+    /// that reports no events never calls it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void addAnimationListener(ActionListener l) {
+        if (animationListeners == null) {
+            animationListeners = new EventDispatcher();
+        }
+        animationListeners.addListener(l);
+    }
+
+    /// Removes a listener added with [#addAnimationListener(ActionListener)].
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener
+    public void removeAnimationListener(ActionListener l) {
+        if (animationListeners != null) {
+            animationListeners.removeListener(l);
+        }
+    }
+
+    /// Whether any animation listener is registered.
+    ///
+    /// #### Returns
+    ///
+    /// true if [#fireAnimationEvent(AnimationEvent)] would reach a listener
+    protected boolean hasAnimationListeners() {
+        return animationListeners != null && animationListeners.hasListeners();
+    }
+
+    /// Delivers `e` to the animation listeners, for subclasses that report
+    /// events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: the event
+    protected void fireAnimationEvent(AnimationEvent e) {
+        if (animationListeners != null) {
+            animationListeners.fireActionEvent(e);
+        }
     }
 
     @Override
