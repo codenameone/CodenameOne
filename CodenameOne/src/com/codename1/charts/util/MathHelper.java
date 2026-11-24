@@ -22,6 +22,9 @@ import java.util.List;
 
 
 /// Utility class for math operations.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public final class MathHelper {
     /// A value that is used a null value.
     public static final double NULL_VALUE = -Double.MAX_VALUE + 1;

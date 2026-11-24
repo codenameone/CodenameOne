@@ -713,6 +713,36 @@ error, and `PRAGMA foreign_keys` reports whether they're on. Codename One's own 
 run reports both for every platform it covers.
 
 
+[[sql-server-databases]]
+==== Database servers
+
+The same `Database` API reaches PostgreSQL, MySQL and MariaDB, SQL Server and Oracle Database.
+That's for desktop tools that administer a database and for applications that work against more
+than one engine. Each engine is a class you construct: `PostgresDatabase`, `MySqlDatabase`,
+`SqlServerDatabase` or `OracleDatabase`. They speak the server's own wire protocol, so there's no
+driver to install, and only the engines your code names end up in your app.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/ServerDatabaseSnippets.java[tag=server-database-001,indent=0]
+----
+
+Things to know:
+
+* *Off the EDT*. Every call waits on the network, so each one throws on the EDT. Run them from a
+background thread, as above.
+* *Parameters are `?` on every engine*. PostgreSQL's `$1` form is produced for you.
+* *Rows are read whole*. A query returns once every row has arrived, so a cursor moves in both
+directions and `getCount()` is exact. Page large results in SQL with `LIMIT` or its equivalent.
+* *No TLS*. Codename One's sockets are plain TCP, so the password and every row cross the network
+unencrypted. The five-argument constructors connect that way; the seven-argument ones take
+`sslMode`, which must be `disable`, and refuse every other mode rather than downgrade it. Reach
+the server over a network you trust, or through a tunnel.
+* *Timeouts*. The timeout limits connecting and each wait for the server after it, so a query whose
+reply takes longer fails. Pass 0 to wait as long as the server takes. A direct connection from a phone to a
+production database is a poor design: put an API server between them.
+
+
 === Network manager & connection request
 
 One of the more common problems in Network programming is spawning a new thread to handle the network operations. In Codename One this is done seamlessly and becomes unessential thanks to the https://www.codenameone.com/javadoc/com/codename1/io/NetworkManager.html[NetworkManager].

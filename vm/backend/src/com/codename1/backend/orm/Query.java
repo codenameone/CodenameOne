@@ -22,7 +22,7 @@
  */
 package com.codename1.backend.orm;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -265,7 +265,9 @@ public final class Query<T> {
         }
         if (ordered) {
             out.append(order);
-            out.append(table.dialect.limit(limit, offset));
+            // SQL Server pages only an ordered select; told there is no ORDER
+            // BY, its dialect supplies ORDER BY (SELECT NULL).
+            out.append(table.dialect.limit(limit, offset, order.length() > 0));
         }
         return out.toString();
     }

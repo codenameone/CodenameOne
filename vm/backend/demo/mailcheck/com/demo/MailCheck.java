@@ -56,6 +56,12 @@ public class MailCheck {
     private static final String ACUTE = String.valueOf((char) 0xe9);
 
     public static void main(String[] args) throws Exception {
+        // A hand-written main has no generated wiring, so it registers the
+        // engines its URL may name itself.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         Mailers.register("smtp", new SmtpTransport.Factory());
         validation();
         capture();

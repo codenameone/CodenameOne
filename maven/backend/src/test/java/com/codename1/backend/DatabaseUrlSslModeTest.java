@@ -22,7 +22,7 @@
  */
 package com.codename1.backend;
 
-import com.codename1.backend.sql.SqlLimitsAccess;
+import com.codename1.db.sql.SqlLimitsAccess;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;

@@ -33,7 +33,7 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.util.LinkedHashMap;
 import java.util.List;
-import com.codename1.backend.sql.QueryRows;
+import com.codename1.db.sql.QueryRows;
 import java.util.Map;
 
 /// Java SE twin of Db, over JDBC.

@@ -114,8 +114,16 @@ this one.
 
 === Deploying it
 
-The musl build is a single static file, so the container that carries it can be
-empty:
+<<deployment>> walks a server from the package step to production on a rented
+Linux machine or a container platform, with HTTPS, a database, health checks and
+rollback. Two points from it belong here.
+
+`cn1:backend-package` builds for the machine it runs on, linked against that
+system's OpenSSL, nghttp2 and libcurl, so a server for Linux is packaged on
+Linux: a CI runner, a container, or the server itself.
+
+The fully static musl build is a single file with nothing underneath it, so the
+container that carries it can be empty:
 
 ----
 FROM scratch
@@ -123,11 +131,10 @@ COPY bench-linux-musl-arm64 /server
 ENTRYPOINT ["/server"]
 ----
 
-There is no base image to patch, because there is no base image. `cn1:backend-package`
-builds for the machine it runs on; the cross-compiled targets
-(`musl-x86_64`, `musl-arm64`, `glibc-x86_64`, `glibc-arm64`) are produced by
-`vm/backend/package.sh` in the Codename One repository, which drives one builder
-image per target.
+There is no base image to patch, because there is no base image. The
+cross-compiled targets (`musl-x86_64`, `musl-arm64`, `glibc-x86_64`, `glibc-arm64`) are
+produced by `vm/backend/package.sh` in the Codename One repository, which drives
+one builder image per target.
 
 For AWS Lambda, `LambdaRuntime` implements the custom runtime loop. The Lambda
 Runtime API is a plaintext poll over loopback, so it needs no listening socket and

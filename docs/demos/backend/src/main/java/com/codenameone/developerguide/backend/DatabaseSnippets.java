@@ -25,7 +25,7 @@ package com.codenameone.developerguide.backend;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.Transactions;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import java.io.IOException;
 import java.util.List;
 

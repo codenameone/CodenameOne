@@ -1,0 +1,5 @@
+# The x64 and arm64 legs share this golden and render one glyph of the chart
+# title differently: 3 pixels, channel delta 19, measured on capture run
+# 44609793127. Everything else is identical. Absorb that anti-aliasing only.
+maxChannelDelta=24
+maxMismatchPercent=0.1

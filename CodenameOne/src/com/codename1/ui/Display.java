@@ -8814,6 +8814,14 @@ public final class Display extends CN1Constants {
         return impl.createLocalLlmImpl();
     }
 
+    /// Returns the bridge behind `com.codename1.ai.SystemLlmClient`, or `null`
+    /// where none is linked.
+    ///
+    /// @hidden
+    public com.codename1.impl.SystemLlmImpl getSystemLlmBackend() {
+        return impl.createSystemLlmImpl();
+    }
+
     /// Creates a fresh backend for `com.codename1.ai.inference`.
     ///
     /// @hidden

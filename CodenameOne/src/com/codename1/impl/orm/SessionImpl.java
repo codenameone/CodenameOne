@@ -69,17 +69,55 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// statement or after [#clear].
     private String boundTenant;
     private static final String UNSCOPED_BINDING = "*";
+    /// SQL Server, whose foreign keys cannot be deferred, which pads trailing
+    /// spaces in every comparison and spells several types its own way. Its
+    /// answers are kept beside the other engines' in each method below, as
+    /// theirs are, rather than behind a hook per decision.
+    boolean sqlServer() {
+        return "sqlserver".equals(sql.dialect());
+    }
+    /// Oracle, which spells every integer NUMBER(p), stores '' as NULL and
+    /// takes no AS before a table alias.
+    boolean oracle() {
+        return "oracle".equals(sql.dialect());
+    }
+    /// A required text attribute whose column is nullable: on Oracle, which
+    /// stores "" as NULL, a NOT NULL column could never hold an empty string.
+    /// The session enforces "required" itself and reads NULL back as "".
+    private boolean looseText(Attribute a) {
+        return oracle() && a.kind == Attribute.TEXT && a.temporal == 0 && !a.nullable && !a.id && !a.generated;
+    }
+    /// Whether foreign keys are checked per statement and cannot be deferred to
+    /// commit, so a row must be written after the rows it references and a
+    /// required cycle cannot be written at all: MySQL and SQL Server.
+    private boolean immediateForeignKeys() {
+        return "mysql".equals(sql.dialect()) || sqlServer();
+    }
     String deleteFrom(String table, String alias) {
         // Older platform SQLite versions do not accept a DELETE target alias.
         if ("sqlite".equals(sql.dialect())) {
             return "DELETE FROM " + q(table);
         }
         // MariaDB before 11.6 needs the target alias before FROM.
-        String prefix = "mysql".equals(sql.dialect()) ? "DELETE " + alias + " FROM " : "DELETE FROM ";
+        if (oracle()) {
+            // Oracle takes no AS before a table alias.
+            return "DELETE FROM " + q(table) + " " + alias;
+        }
+        String prefix = "mysql".equals(sql.dialect()) || sqlServer() ? "DELETE " + alias + " FROM " : "DELETE FROM ";
         return prefix + q(table) + " AS " + alias;
     }
     String updateTable(String table, String alias) {
-        return "UPDATE " + q(table) + ("sqlite".equals(sql.dialect()) ? "" : " AS " + alias);
+        if (sqlServer()) {
+            // T-SQL takes no alias after UPDATE's table; the alias is updated
+            // and the table named in the FROM that [#updateFrom] adds.
+            return "UPDATE " + alias;
+        }
+        return "UPDATE " + q(table) + ("sqlite".equals(sql.dialect()) ? "" : oracle() ? " " + alias : " AS " + alias);
+    }
+    /// What follows an UPDATE's SET list, before its WHERE: SQL Server's FROM
+    /// naming the aliased table, nothing elsewhere.
+    String updateFrom(String table, String alias) {
+        return sqlServer() ? " FROM " + q(table) + " AS " + alias : "";
     }
     QueryImpl queryForMutation(EntityModel model) {
         return new QueryImpl(this, model, "sqlite".equals(sql.dialect()) ? q(model.table()) : nextAlias());
@@ -104,18 +142,210 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new IllegalArgumentException("Query exceeds the portable limit of 999 bound parameters");
         }
     }
+    /// Whether ORDER BY may name a selected expression by its position. Only
+    /// PostgreSQL needs it -- it sees two equal-valued parameters as different
+    /// expressions, so a grouped expression with a literal cannot be repeated
+    /// in ORDER BY -- and only there is it safe inside [#orderBy], which on
+    /// MySQL wraps the term in `(term IS NULL)`, where a position is a constant.
+    boolean ordersBySelectedPosition() {
+        return "postgresql".equals(sql.dialect());
+    }
     String integralSum(String expression) {
-        return "CAST(" + expression + " AS " + ("mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT") + ")";
+        return "CAST(" + expression + " AS " + integralType() + ")";
+    }
+    /// The 64-bit integer type of a CAST: MySQL's SIGNED, Oracle's NUMBER(19).
+    private String integralType() {
+        return "mysql".equals(sql.dialect()) ? "SIGNED" : oracle() ? "NUMBER(19)" : "BIGINT";
     }
     String functionName(String function) {
-        return "LENGTH".equals(function) && "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
+        if (!"LENGTH".equals(function)) {
+            return function;
+        }
+        if (sqlServer()) {
+            // LEN ignores trailing spaces. DATALENGTH counts the bytes of an
+            // NVARCHAR value, two per UTF-16 unit, which is String.length() --
+            // so the argument is converted first, or a VARCHAR column of a
+            // hand-written schema would count bytes. Both callers write
+            // `name(argument)`; lengthResult closes the two calls opened here
+            // and halves the result.
+            return "DATALENGTH(CONVERT(NVARCHAR(MAX), ";
+        }
+        return "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
+    }
+    /// JPQL CONCAT. `||` where it is concatenation; MySQL parses `||` as OR,
+    /// so it gets CONCAT(), which answers NULL for a NULL operand exactly as
+    /// `||` does. (PostgreSQL's own concat() skips NULLs, so it is not used.)
+    ///
+    /// SQL Server concatenates with `+`, NULL for a NULL operand like `||`.
+    /// Oracle's `||` skips a NULL operand, so it is spelled out: NULL when any
+    /// operand is NULL. (Oracle stores '' as NULL, so an empty operand is a
+    /// NULL one there; that is Oracle's, as everywhere else.)
+    String concat(String[] values) {
+        if (oracle()) {
+            StringBuilder test = new StringBuilder("(CASE WHEN ");
+            StringBuilder joined = new StringBuilder();
+            for (int i = 0; i < values.length; i++) {
+                test.append(i > 0 ? " OR " : "").append(values[i]).append(" IS NULL");
+                joined.append(i > 0 ? " || " : "").append(values[i]);
+            }
+            return test.append(" THEN NULL ELSE ").append(joined).append(" END)").toString();
+        }
+        if (sqlServer()) {
+            StringBuilder out = new StringBuilder("(");
+            for (int i = 0; i < values.length; i++) {
+                out.append(i > 0 ? " + " : "").append("CONVERT(NVARCHAR(MAX), ").append(values[i]).append(')');
+            }
+            return out.append(')').toString();
+        }
+        boolean mysql = "mysql".equals(sql.dialect());
+        StringBuilder out = new StringBuilder(mysql ? "CONCAT(" : "(");
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                out.append(mysql ? ", " : " || ");
+            }
+            out.append(values[i]);
+        }
+        return out.append(')').toString();
+    }
+    /// JPQL SUBSTRING(value, start[, length]), 1-based. PostgreSQL's substr
+    /// takes INTEGER positions, and a bound number is typed BIGINT.
+    ///
+    /// The dialects disagree outside the range JPQL defines: below 1 SQLite and
+    /// MySQL count from the end while PostgreSQL counts from before the first
+    /// character, and a negative length is an error on PostgreSQL alone. Both
+    /// are pinned here so every dialect gives one answer: a start below 1 is
+    /// the empty string, a negative length is 0. NULL stays NULL.
+    String substring(String value, String start, String length) {
+        boolean postgres = "postgresql".equals(sql.dialect());
+        // T-SQL spells it SUBSTRING and requires the length; the longest
+        // NVARCHAR(MAX) is 2^30 characters, so 2^31-1 means "to the end".
+        String name = sqlServer() ? "SUBSTRING(" : "SUBSTR(";
+        if (sqlServer() && length == null) {
+            length = "2147483647";
+        }
+        String from = position(start, postgres);
+        StringBuilder out = new StringBuilder("(CASE WHEN ").append(from).append(" < 1 THEN ").append(name)
+                .append(value).append(", 1, 0) ELSE ").append(name).append(value).append(", ").append(from);
+        if (length != null) {
+            String count = position(length, postgres);
+            out.append(", (CASE WHEN ").append(count).append(" < 0 THEN 0 ELSE ").append(count).append(" END)");
+        }
+        return out.append(") END)").toString();
+    }
+    /// JPQL LOCATE(search, value[, start]): the 1-based position of `search`
+    /// in `value` at or after `start`, 0 when it is not there. MySQL has it;
+    /// SQLite and PostgreSQL search with instr/strpos, which take no start.
+    String locate(String search, String value, String start) {
+        String dialect = sql.dialect();
+        if ("mysql".equals(dialect)) {
+            return "LOCATE(" + search + ", " + value + (start == null ? "" : ", " + start) + ")";
+        }
+        if (sqlServer() || oracle()) {
+            // CHARINDEX and INSTR both take a start: CHARINDEX reads one below
+            // 1 as 1, and INSTR searches backwards from a negative one, so a
+            // start below 1 is answered 0 here as MySQL's LOCATE does. Oracle's
+            // NUMBER and CHARINDEX's INT are cast to the 64-bit type.
+            String found = sqlServer()
+                    ? "CHARINDEX(" + search + ", " + value + (start == null ? "" : ", " + start) + ")"
+                    : "INSTR(" + value + ", " + search + (start == null ? "" : ", " + start) + ")";
+            if (start != null) {
+                found = "(CASE WHEN " + start + " < 1 THEN 0 ELSE " + found + " END)";
+            }
+            return "CAST(" + found + " AS " + integralType() + ")";
+        }
+        boolean postgres = "postgresql".equals(dialect);
+        if (start == null) {
+            return postgres ? "CAST(STRPOS(" + value + ", " + search + ") AS BIGINT)"
+                    : "instr(" + value + ", " + search + ")";
+        }
+        String from = position(start, postgres);
+        String tail = "SUBSTR(" + value + ", " + from + ")";
+        String found = postgres ? "STRPOS(" + tail + ", " + search + ")" : "instr(" + tail + ", " + search + ")";
+        // A start below 1 finds nothing, as MySQL's LOCATE answers; substr
+        // there would count from the end (SQLite) or from before the string
+        // (PostgreSQL) and report a position that is not one.
+        String located = "(CASE WHEN " + from + " < 1 THEN 0 WHEN " + found + " = 0 THEN 0 ELSE "
+                + found + " + " + from + " - 1 END)";
+        return postgres ? "CAST(" + located + " AS BIGINT)" : located;
+    }
+    private static String position(String value, boolean postgres) {
+        return postgres ? "CAST(" + value + " AS INTEGER)" : value;
+    }
+    /// FLOOR, CEILING and ROUND of a REAL operand, as a REAL. ROUND rounds half
+    /// away from zero on every dialect -- SQLite's round() does, and PostgreSQL
+    /// and MySQL do it for exact numerics, so the double goes through NUMERIC /
+    /// DECIMAL there rather than their round-half-even double paths. SQLite's
+    /// platform builds have no FLOOR or CEILING, so both are spelled with a
+    /// truncating cast.
+    ///
+    /// A double of magnitude 2^52 or more is already integral, and the paths
+    /// above cannot take it: SQLite's integer cast saturates at 2^63, MySQL's
+    /// DECIMAL(65,15) holds 50 integer digits, and PostgreSQL before 14 cannot
+    /// cast an infinity to NUMERIC. Such a value is answered as it is.
+    String roundingFunction(String function, String value, int digits) {
+        return "(CASE WHEN ABS(" + value + ") >= 4503599627370496.0 THEN " + value + " ELSE "
+                + rounding(function, value, digits) + " END)";
+    }
+    private String rounding(String function, String value, int digits) {
+        String dialect = sql.dialect();
+        if ("sqlite".equals(dialect)) {
+            if ("ROUND".equals(function)) {
+                return "round(" + value + ", " + digits + ")";
+            }
+            String truncated = "CAST(" + value + " AS INTEGER)";
+            boolean floor = "FLOOR".equals(function);
+            return "CAST((CASE WHEN " + value + (floor ? " < " : " > ") + truncated + " THEN " + truncated
+                    + (floor ? " - 1" : " + 1") + " ELSE " + truncated + " END) AS REAL)";
+        }
+        if (sqlServer() || oracle()) {
+            // Exact decimal rounding, half away from zero, as on the others:
+            // T-SQL's float ROUND and Oracle's BINARY_DOUBLE ROUND do not
+            // promise it. The guard above keeps every value under 2^52, which
+            // DECIMAL(38,15) and NUMBER hold exactly. Oracle spells CEILING
+            // as CEIL.
+            String back = sqlServer() ? "FLOAT(53)" : "BINARY_DOUBLE";
+            if ("ROUND".equals(function)) {
+                return "CAST(ROUND(CAST(" + value + " AS " + (sqlServer() ? "DECIMAL(38,15)" : "NUMBER")
+                        + "), " + digits + ") AS " + back + ")";
+            }
+            return "CAST(" + (oracle() && "CEILING".equals(function) ? "CEIL" : function)
+                    + "(" + value + ") AS " + back + ")";
+        }
+        if ("ROUND".equals(function)) {
+            if ("mysql".equals(dialect)) {
+                return "(1e0 * ROUND(CAST(" + value + " AS DECIMAL(65,15)), " + digits + "))";
+            }
+            return "CAST(ROUND(CAST(" + value + " AS NUMERIC), " + digits + ") AS DOUBLE PRECISION)";
+        }
+        String rounded = function + "(" + value + ")";
+        return "mysql".equals(dialect) ? "(1e0 * " + rounded + ")" : rounded;
+    }
+    /// JPQL SQRT; NULL for a negative argument on every dialect, where
+    /// PostgreSQL would otherwise fail the statement and the others answer
+    /// NULL. SQLite's sqrt() needs its math functions, which the backend's
+    /// SQLite has and a device's system SQLite may not.
+    String squareRoot(String value) {
+        return "(CASE WHEN " + value + " < 0 THEN NULL ELSE SQRT(" + value + ") END)";
     }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
         }
         if (kind == Attribute.REAL) {
+            if (sqlServer()) {
+                // REAL is single precision here.
+                return "CAST(" + value + " AS FLOAT(53))";
+            }
+            if (oracle()) {
+                return "CAST(" + value + " AS BINARY_DOUBLE)";
+            }
             return "mysql".equals(sql.dialect()) ? "(1e0 * " + value + ")" : "CAST(" + value + " AS REAL)";
+        }
+        if ("mysql".equals(sql.dialect()) && value.startsWith("/*cn1-bind-") && value.endsWith("*/?")
+                && value.indexOf("*/?") == value.length() - 3) {
+            // MySQL types a parameter it cannot infer, as in ABS(?), as DOUBLE,
+            // so an integral one is cast to keep the result integral.
+            return "CAST(" + value + " AS SIGNED)";
         }
         return value;
     }
@@ -126,6 +356,15 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             right = "NULLIF(" + right + ", 0)";
             if ("/".equals(op) && kind != Attribute.REAL && "mysql".equals(sql.dialect())) {
                 op = "DIV";
+            }
+            // Oracle's NUMBER division is exact and it has no % operator; TRUNC
+            // and MOD truncate toward zero, as Java does.
+            if (oracle() && kind != Attribute.REAL) {
+                return checkedArithmetic(("/".equals(op) ? "TRUNC(" + left + " / " + right + ")"
+                        : "MOD(" + left + ", " + right + ")"), kind);
+            }
+            if (oracle() && "%".equals(op)) {
+                return checkedArithmetic("MOD(" + left + ", " + right + ")", kind);
             }
         }
         return checkedArithmetic("(" + left + " " + op + " " + right + ")", kind);
@@ -152,29 +391,51 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                 || !keyColumn(model, index)) {
             return expression;
         }
-        String length = functionName("LENGTH") + "(" + expression + ")";
-        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : "TEXT";
+        String length = lengthOf(expression);
+        String textType = "mysql".equals(sql.dialect()) ? "CHAR" : sqlServer() ? "NVARCHAR(20)"
+                : oracle() ? "VARCHAR2(20)" : "TEXT";
         return "(CASE WHEN " + length + " > 255 THEN CAST(" + integralOverflow(length)
                 + " AS " + textType + ") ELSE " + expression + " END)";
+    }
+    /// The length of a text expression in UTF-16 units, trailing spaces counted.
+    String lengthOf(String expression) {
+        return lengthResult(functionName("LENGTH") + "(" + expression + ")");
+    }
+    /// A rendered LENGTH call as a count of UTF-16 units: SQL Server's
+    /// DATALENGTH counts two bytes per unit of an NVARCHAR value.
+    String lengthResult(String call) {
+        return sqlServer() ? "(" + call + ")) / 2)" : call;
+    }
+    /// The argument of AVG: SQL Server averages integers as integers and
+    /// truncates, so an integral argument is widened before the average.
+    String averageOperand(String expression, int kind) {
+        return sqlServer() && kind != Attribute.REAL ? "CAST(" + expression + " AS FLOAT(53))" : expression;
     }
     private String integralOverflow(String value) {
         if ("sqlite".equals(sql.dialect())) {
             return "abs(-9223372036854775808)";
         }
         // Depend on the row to avoid rejecting an unused branch during planning.
-        String type = "mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT";
+        String type = integralType();
         String signed = "CAST(" + value + " AS " + type + ")";
-        return "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
+        String sum = "(" + signed + " + CASE WHEN " + signed + " < 0 THEN CAST('-9223372036854775808' AS "
                 + type + ") ELSE CAST('9223372036854775807' AS " + type + ") END)";
+        // NUMBER arithmetic has 38 digits and does not overflow, and NUMBER(19)
+        // holds every 19-digit value, so the sum above (about 9.2E18) would
+        // FIT. Twenty digits narrowed to 19 is what raises ORA-01438.
+        return oracle() ? "CAST(ABS(" + signed + ") + 10000000000000000000 AS NUMBER(19))" : sum;
     }
     String checkedFloatAssignment(String expression) {
         String value = numericOperand(expression, Attribute.REAL);
         String magnitude = "ABS(" + value + ")";
         // Match Values.asFloat: reject finite overflow and rounding a nonzero
         // double to zero. Half the smallest float rounds to zero (ties to even).
-        String invalid = "(" + magnitude + " > 3.4028234663852886e38 AND " + magnitude
-                + " <= 1.7976931348623157e308) OR (" + magnitude + " > 0 AND " + magnitude
-                + " <= 7.006492321624085e-46)";
+        // Oracle reads an unsuffixed literal as NUMBER, whose range ends near
+        // 1E126 (ORA-01426); the d suffix makes it a BINARY_DOUBLE.
+        String d = oracle() ? "d" : "";
+        String invalid = "(" + magnitude + " > 3.4028234663852886e38" + d + " AND " + magnitude
+                + " <= 1.7976931348623157e308" + d + ") OR (" + magnitude + " > 0 AND " + magnitude
+                + " <= 7.006492321624085e-46" + d + ")";
         String sign = "(CASE WHEN " + value + " < 0 THEN -1 ELSE 1 END)";
         return "(CASE WHEN " + invalid + " THEN " + integralOverflow(sign) + " ELSE " + value + " END)";
     }
@@ -255,10 +516,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         this.sql = sql;
         this.models = new LinkedHashMap<String, EntityModel<?>>(models);
-        if ("mysql".equals(sql.dialect())) {
+        if (immediateForeignKeys()) {
             for (EntityModel model : this.models.values()) {
                 if (hasRequiredPath(model, model, new ArrayList<EntityModel>())) {
-                    throw new PersistenceException("MySQL/MariaDB does not support required relationship cycles: "
+                    throw new PersistenceException(sql.dialect() + " does not support required relationship cycles: "
                             + model.type().getName());
                 }
             }
@@ -521,7 +782,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         Object[] keyValues = model.keyValues(id);
         autoFlush();
         List<Object[]> rows =
-                read(select(model) + " WHERE " + keyCondition(model, null) + clause, keyValues, kinds(model));
+                read(locked(select(model) + " WHERE " + keyCondition(model, null), clause), keyValues, kinds(model));
         if (rows.isEmpty()) {
             return null;
         }
@@ -1203,7 +1464,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                 + "not " + a.declaredType + ": " + model.table() + "." + a.column);
                     }
                     statement.append(columnType(model, i)).append(collateClause(a))
-                            .append(a.nullable && !a.id ? "" : " NOT NULL");
+                            .append(a.nullable && !a.id || looseText(a) ? "" : " NOT NULL");
                 }
             }
             if (!attrs[model.idIndex()].generated) {
@@ -1399,6 +1660,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return "DATE";
         }
         String dialect = sql.dialect();
+        if ("sqlserver".equals(dialect)) {
+            // TIMESTAMP is a row version here, not a date.
+            return "DATETIME2(3)";
+        }
         return "postgresql".equals(dialect) ? "TIMESTAMP(3)" : "mysql".equals(dialect) ? "DATETIME(3)" : "TIMESTAMP";
     }
 
@@ -1512,6 +1777,9 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     private void validateTextKey(EntityModel model, int index, Object value) {
         Attribute attr = model.attributes()[index];
+        if (value == null && looseText(attr)) {
+            throw new PersistenceException("Required attribute is null: " + model.table() + "." + attr.column);
+        }
         if (attr.kind == Attribute.TEXT && attr.declaredType == null && value instanceof String
                 && ((String) value).length() > 255 && keyColumn(model, index)
                 && characterCount((String) value) > 255) {
@@ -1533,7 +1801,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String statement = "CONSTRAINT " + q(constraintName("fk", key.table, key.columns)) + " FOREIGN KEY (" +
                            quoted(key.columns) + ") REFERENCES " + q(key.target) + " (" + quoted(key.targetColumns) +
                            ")";
-        if (!"mysql".equals(sql.dialect())) {
+        if (!immediateForeignKeys()) {
             statement += " DEFERRABLE INITIALLY DEFERRED";
         }
         return statement;
@@ -1608,7 +1876,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.UNSUPPORTED, model.table(), attr.column,
                             "Primary key mismatch on " + name));
                 }
-                if (attr.nullable == required) {
+                if (attr.nullable == required && !(looseText(attr) && !required)) {
                     errors.add(new SchemaReport.Issue(SchemaReport.Kind.CONSTRAINT_MISMATCH, model.table(),
                             attr.column, (required ? "Unexpected NOT NULL on " : "Missing NOT NULL on ") + name));
                 }
@@ -1924,6 +2192,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // distinct strings can compare equal.
             return !collation.startsWith("nondeterministic ");
         }
+        if (sqlServer()) {
+            // Every collation pads trailing spaces in a comparison, a binary one
+            // included, so the collation cannot keep "a" and "a " apart; the
+            // ORM's own key columns are bounded and given a binary one, and the
+            // padding is the documented difference of this engine.
+            return collation.endsWith("_BIN2") || collation.endsWith("_BIN");
+        }
         if (!"mysql".equals(sql.dialect())) {
             return true;
         }
@@ -2111,7 +2386,8 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return false;
         }
         String token = firstTypeToken(type);
-        return "decimal".equals(token) || "numeric".equals(token) || "dec".equals(token) || "fixed".equals(token);
+        return "decimal".equals(token) || "numeric".equals(token) || "dec".equals(token) || "fixed".equals(token)
+                || "number".equals(token);
     }
     /// Whether a floating column keeps only single precision: PostgreSQL's
     /// REAL, FLOAT4 and FLOAT(1..24), and MySQL's FLOAT unless its precision
@@ -2138,7 +2414,10 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             // FLOAT(M,D) is single precision whatever M is.
             return "float".equals(token) && (precision < 0 || precision <= 24 || type.indexOf(',') >= 0);
         }
-        return false;
+        if (sqlServer()) {
+            return "real".equals(token) || "float".equals(token) && precision >= 1 && precision <= 24;
+        }
+        return oracle() && "binary_float".equals(token);
     }
     private boolean integerFits(String found, int kind, long minimum, long maximum) {
         if ("sqlite".equals(sql.dialect())) {
@@ -2225,6 +2504,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (open < 0 || close < 0 || token.indexOf("char") < 0) {
             return Integer.MAX_VALUE;
         }
+        if (oracle()) {
+            // VARCHAR2(255 CHAR): the unit follows the length.
+            int length = leadingNumber(type);
+            return length < 0 ? Integer.MAX_VALUE : length;
+        }
         try {
             return Integer.parseInt(type.substring(open + 1, close).trim());
         } catch (NumberFormatException e) {
@@ -2250,7 +2534,39 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         if (" bigint int8 bigserial serial8 ".contains(" " + token + " ")) {
             return 8;
         }
+        if ("number".equals(token)) {
+            // Oracle's NUMBER(p) holds p decimal digits, so each width is the
+            // fewest digits that hold its range: NUMBER(3) a TINYINT, (5) a
+            // SMALLINT, (10) an int, (19) a long -- what a schema written for
+            // the other engines becomes on Oracle.
+            // NUMBER(*,0) is the default precision, 38 digits.
+            int precision = type.replace(" ", "").indexOf("(*") >= 0 ? 38 : leadingNumber(type);
+            return precision <= 0 ? 0 : precision <= 3 ? 1 : precision <= 5 ? 2 : precision <= 8 ? 3
+                    : precision <= 10 ? 4 : precision <= 19 ? 8 : 9;
+        }
         return 0;
+    }
+    /// The first run of digits after the opening parenthesis, -1 when none:
+    /// 255 of `VARCHAR2(255 CHAR)`, 19 of `NUMBER(19,0)`.
+    private static int leadingNumber(String type) {
+        int open = type.indexOf('(');
+        if (open < 0) {
+            return -1;
+        }
+        int value = 0;
+        int digits = 0;
+        for (int i = open + 1; i < type.length(); i++) {
+            char c = type.charAt(i);
+            if (c == ' ' && digits == 0) {
+                continue;
+            }
+            if (c < '0' || c > '9' || digits >= 9) {
+                break;
+            }
+            value = value * 10 + (c - '0');
+            digits++;
+        }
+        return digits == 0 ? -1 : value;
     }
     private static String firstTypeToken(String type) {
         String[] tokens = split(asciiLower(type).replace('(', ' '), ' ');
@@ -2287,6 +2603,17 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
         if (" int integer tinyint smallint mediumint bigint int2 int4 int8 serial smallserial bigserial serial2 serial4 serial8 bool boolean ".contains(" " + token + " ")) {
             return 1;
+        }
+        if ("number".equals(token)) {
+            // Oracle: NUMBER(p) and NUMBER(p,0) are integers, a scale makes
+            // a decimal, and a bare NUMBER is a decimal of any precision.
+            int comma = name.indexOf(',');
+            boolean integral = name.indexOf('(') >= 0 && (comma < 0
+                    || name.substring(comma + 1).trim().startsWith("0"));
+            return integral ? 1 : 3;
+        }
+        if ("raw".equals(token)) {
+            return 4;
         }
         if ("sqlite".equals(sql.dialect()) && sqliteIntegerWord(name)) {
             // SQLite gives INTEGER affinity to a declaration containing INT, so
@@ -3168,8 +3495,181 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         requireTransaction();
         return sql.lockClause(mode);
     }
-    String limit(int count, int offset) {
-        return sql.limit(count, offset);
+    /// `statement` with the lock `clause` from [SqlAccess#lockClause] applied.
+    /// Everywhere but SQL Server that is a trailing FOR UPDATE / FOR SHARE.
+    /// SQL Server locks with a table hint, which is written after the table
+    /// it applies to, so it goes after the alias of the statement's first
+    /// table -- the root entity's, in every statement the ORM renders.
+    /// `statement` with its paging and its lock, in the order each engine
+    /// takes them: the clause after the paging everywhere (MySQL refuses
+    /// `FOR UPDATE LIMIT`), and on SQL Server the hint after the table. Oracle
+    /// refuses a lock on a row-limited query outright (ORA-02014); a caller that
+    /// can lock the rows one by one asks [#followOnLock] first.
+    String lockedPage(String statement, String clause, int count, int offset) {
+        String paging = limit(statement, count, offset);
+        if (sqlServer()) {
+            return locked(statement, clause) + paging;
+        }
+        if (clause.length() > 0 && paging.length() > 0 && oracle()) {
+            throw new PersistenceException("Oracle cannot lock the rows of a paged query (ORA-02014): "
+                    + "select the entities, or lock without setMaxResults/setFirstResult");
+        }
+        return statement + paging + clause;
+    }
+    /// Whether a paged, locked read must lock its rows after reading them, by
+    /// key, one statement each: Oracle's answer to ORA-02014, as Hibernate's
+    /// follow-on locking is.
+    boolean followOnLock(String clause, int count, int offset) {
+        return oracle() && clause.length() > 0 && sql.limit(count, offset).length() > 0;
+    }
+    String locked(String statement, String clause) {
+        if (clause.length() == 0 || !sqlServer()) {
+            return statement + clause;
+        }
+        int at = rootTableEnd(statement);
+        if (at < 0) {
+            throw new PersistenceException("SQL Server locks with a table hint after the table it applies to; "
+                    + "write WITH (UPDLOCK, ROWLOCK) in the native statement instead of passing a lock mode");
+        }
+        return statement.substring(0, at) + clause + statement.substring(at);
+    }
+    /// Where the first table reference of `statement`'s top-level FROM ends --
+    /// past its name and alias -- or -1 when it is not a plain table.
+    static int rootTableEnd(String statement) {
+        int depth = 0;
+        int length = statement.length();
+        for (int i = 0; i < length; i++) {
+            char c = statement.charAt(i);
+            if (c == '\'' || c == '"' || c == '[' || c == '`') {
+                i = quotedEnd(statement, i) - 1;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (depth == 0 && statement.regionMatches(true, i, "FROM", 0, 4)
+                    && (i == 0 || statement.charAt(i - 1) <= ' ')
+                    && i + 4 < length && statement.charAt(i + 4) <= ' ') {
+                int at = skipBlanks(statement, i + 4);
+                if (at >= length || statement.charAt(at) == '(') {
+                    return -1;
+                }
+                at = wordEnd(statement, at);
+                int alias = skipBlanks(statement, at);
+                if (statement.regionMatches(true, alias, "AS", 0, 2) && alias + 2 < length
+                        && statement.charAt(alias + 2) <= ' ') {
+                    alias = skipBlanks(statement, alias + 2);
+                }
+                int aliasEnd = wordEnd(statement, alias);
+                if (aliasEnd > alias && !keyword(statement.substring(alias, aliasEnd))) {
+                    return aliasEnd;
+                }
+                return at;
+            }
+        }
+        return -1;
+    }
+    private static final String CLAUSE_WORDS = " WHERE JOIN INNER LEFT RIGHT FULL CROSS ORDER GROUP HAVING UNION OFFSET ON ";
+    private static boolean keyword(String word) {
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z')) {
+                return false;
+            }
+        }
+        return CLAUSE_WORDS.indexOf(" " + asciiUpper(word) + " ") >= 0;
+    }
+    private static String asciiUpper(String word) {
+        StringBuilder out = new StringBuilder(word.length());
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return out.toString();
+    }
+    private static int skipBlanks(String text, int from) {
+        int at = from;
+        while (at < text.length() && text.charAt(at) <= ' ') {
+            at++;
+        }
+        return at;
+    }
+    /// The end of the possibly quoted, possibly dotted name at `from`.
+    private static int wordEnd(String text, int from) {
+        int at = from;
+        while (at < text.length()) {
+            char c = text.charAt(at);
+            if (c == '[' || c == '"' || c == '`') {
+                at = quotedEnd(text, at);
+            } else if (c <= ' ' || c == ',' || c == '(' || c == ')') {
+                break;
+            } else {
+                at++;
+            }
+        }
+        return at;
+    }
+    /// The index just past the quoted run opening at `from`; a doubled
+    /// closing character is part of the run.
+    private static int quotedEnd(String text, int from) {
+        char open = text.charAt(from);
+        char close = open == '[' ? ']' : open;
+        int at = from + 1;
+        while (at < text.length()) {
+            if (text.charAt(at) == close) {
+                if (at + 1 < text.length() && text.charAt(at + 1) == close) {
+                    at += 2;
+                    continue;
+                }
+                return at + 1;
+            }
+            at++;
+        }
+        return at;
+    }
+    /// The paging clause for `statement`. SQL Server pages only an ordered
+    /// result, so a statement with no ORDER BY of its own is given one that
+    /// orders nothing.
+    String limit(String statement, int count, int offset) {
+        String paging = sql.limit(count, offset);
+        if (paging.length() == 0 || !sqlServer() || hasTopLevelOrderBy(statement)) {
+            return paging;
+        }
+        return " ORDER BY (SELECT NULL)" + paging;
+    }
+    /// Whether `statement` ends in an ORDER BY of its own, outside any
+    /// parentheses, string literal or quoted identifier.
+    static boolean hasTopLevelOrderBy(String statement) {
+        int depth = 0;
+        boolean found = false;
+        int length = statement.length();
+        for (int i = 0; i < length; i++) {
+            char c = statement.charAt(i);
+            if (c == '\'' || c == '"' || c == '[' || c == '`') {
+                char close = c == '[' ? ']' : c;
+                i++;
+                while (i < length && !(statement.charAt(i) == close
+                        && !(i + 1 < length && statement.charAt(i + 1) == close))) {
+                    if (statement.charAt(i) == close) {
+                        i++;
+                    }
+                    i++;
+                }
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (depth == 0 && (c == 'O' || c == 'o') && statement.regionMatches(true, i, "ORDER", 0, 5)
+                    && (i == 0 || !Character.isLetterOrDigit(statement.charAt(i - 1)))) {
+                int j = i + 5;
+                while (j < length && statement.charAt(j) <= ' ') {
+                    j++;
+                }
+                if (j > i + 5 && statement.regionMatches(true, j, "BY", 0, 2)) {
+                    found = true;
+                }
+            }
+        }
+        return found;
     }
     /// The discriminator condition and the tenant condition of `model`, joined
     /// by `AND`; empty when the entity has neither. Every read goes through
@@ -3385,6 +3885,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         }
     }
     private <T> T hydrateInternal(EntityModel<T> model, Object[] values) {
+        if (oracle()) {
+            Attribute[] attrs = model.attributes();
+            for (int i = 0; i < attrs.length && i < values.length; i++) {
+                if (values[i] == null && looseText(attrs[i])) {
+                    values[i] = "";
+                }
+            }
+        }
         if (model.discriminatorIndex() >= 0) {
             Object tag = values[model.discriminatorIndex()];
             EntityModel selected = null;
@@ -3490,7 +3998,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
                                         model(model.relationships()[ri].target).idIndexes().length) {
                     Entry dependency = entries.get(model.relation(entry.entity, ri));
                     if (dependency != null && dependency.fresh &&
-                            (dependency.model.attributes()[dependency.model.idIndex()].generated || "mysql".equals(sql.dialect()))) {
+                            (dependency.model.attributes()[dependency.model.idIndex()].generated || immediateForeignKeys())) {
                         // MySQL also defers known keys until their rows exist.
                         // Required cycles are rejected when the session opens.
                         bound = null;
@@ -3504,7 +4012,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             args.add(bound);
         }
         String statement = args.isEmpty()
-                                   ? sql.insertDefaults(q(model.table()))
+                                   ? sql.insertDefaults(q(model.table()), q(attrs[model.idIndex()].column))
                                    : "INSERT INTO " + q(model.table()) + " (" + cols + ") VALUES (" + marks + ")";
         int id = model.idIndex();
         if (attrs[id].generated) {
@@ -3748,7 +4256,7 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return;
         }
         if (entry.deleting) {
-            if ("sqlite".equals(sql.dialect()) || "postgresql".equals(sql.dialect())) {
+            if (!immediateForeignKeys()) {
                 return;
             }
             throw new PersistenceException("Cyclic non-nullable delete dependencies");

@@ -15,6 +15,9 @@ package com.codename1.charts.models;
 
 
 /// A class to encapsulate the definition of a point.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public final class Point {
     /// The X axis coordinate value.
     private float mX;

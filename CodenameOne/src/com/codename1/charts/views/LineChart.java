@@ -33,6 +33,9 @@ import java.util.List;
 /// appearance via an `XYMultipleSeriesRenderer`. The chart is commonly
 /// wrapped in a `com.codename1.charts.ChartComponent` before being added
 /// to a Codename One form.
+///
+/// @deprecated Use `com.codename1.ui.chart.series.LineSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
+@Deprecated
 public class LineChart extends XYChart {
     /// The constant to identify this chart type.
     public static final String TYPE = "Line";

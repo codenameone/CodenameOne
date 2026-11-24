@@ -153,12 +153,18 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // Mac Catalyst build, which has no slice), so the glue never names a symbol
 // the link lacks.
 //#define INCLUDE_CN1_WHISPER
+// INCLUDE_CN1_SYSTEM_LLM compiles CN1SystemLlm.m over the Swift
+// CN1SystemLanguageModel bridge to Apple's Foundation Models. The builder
+// enables it, and copies the Swift file into the app target, only for an app
+// that uses SystemLlmClient.
+//#define INCLUDE_CN1_SYSTEM_LLM
 #if TARGET_OS_WATCH || TARGET_OS_TV
 #undef INCLUDE_CN1_VISION
 #undef INCLUDE_CN1_LANGUAGE
 #undef INCLUDE_CN1_INFERENCE
 #undef INCLUDE_CN1_LLAMA
 #undef INCLUDE_CN1_WHISPER
+#undef INCLUDE_CN1_SYSTEM_LLM
 #endif
 
 // CN1_USE_CARPLAY gates the Apple CarPlay native bridge

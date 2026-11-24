@@ -16602,6 +16602,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return localLlm;
     }
 
+    private com.codename1.impl.SystemLlmImpl systemLlm;
+    private boolean systemLlmProbed;
+
+    @Override
+    public com.codename1.impl.SystemLlmImpl createSystemLlmImpl() {
+        // Gemini Nano through ML Kit GenAI. The class is in the app only when
+        // the builder kept it (the app uses SystemLlmClient), and ML Kit GenAI
+        // needs API 26; below that the class may be present but never loads.
+        if (!systemLlmProbed) {
+            systemLlmProbed = true;
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                systemLlm = (com.codename1.impl.SystemLlmImpl) createOptionalAiBackend(
+                        "com.codename1.impl.android.ai.AndroidSystemLlmImpl");
+            }
+        }
+        return systemLlm;
+    }
+
     @Override
     public com.codename1.impl.LanguageImpl createLanguageImpl() {
         return (com.codename1.impl.LanguageImpl) createOptionalAiBackend(

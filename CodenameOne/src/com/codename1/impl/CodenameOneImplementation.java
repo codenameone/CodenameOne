@@ -8912,6 +8912,13 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Factory for the bridge behind `com.codename1.ai.SystemLlmClient`, the
+    /// operating system's own language model. Returns `null` unless the port
+    /// has the bridge linked in.
+    public SystemLlmImpl createSystemLlmImpl() {
+        return null;
+    }
+
     /// Factory for built-in on-device language services.
     public LanguageImpl createLanguageImpl() {
         return null;

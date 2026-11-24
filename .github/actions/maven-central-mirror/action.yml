@@ -1,5 +1,5 @@
 name: Maven Central mirror
-description: Install ~/.m2/settings.xml so Maven resolves from Google's copy of Central first and Central second.
+description: Install ~/.m2/settings.xml and a ~/.gradle init script so Maven and Gradle resolve from Google's copy of Central first and Central second.
 
 # Every job that checks out this repository runs this after its checkout, and again
 # after any actions/setup-java (which writes a settings.xml of its own; this merges into
@@ -37,4 +37,16 @@ runs:
             exit 1
           fi
           "$py" "$GITHUB_ACTION_PATH/install.py" "$GITHUB_ACTION_PATH/settings.xml" "$dest"
+        done
+    - name: Install the Gradle init script with the Central mirror
+      shell: bash
+      run: |
+        # Gradle never reads ~/.m2/settings.xml; see central-mirror.init.gradle.
+        homes="${GRADLE_USER_HOME:-$HOME/.gradle}"
+        pw=$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)
+        if [ -z "${GRADLE_USER_HOME:-}" ] && [ -n "$pw" ] && [ "$pw" != "$HOME" ]; then homes="$homes $pw/.gradle"; fi
+        for g in $homes; do
+          mkdir -p "$g/init.d"
+          cp "$GITHUB_ACTION_PATH/central-mirror.init.gradle" "$g/init.d/central-mirror.init.gradle"
+          echo "Installed $g/init.d/central-mirror.init.gradle"
         done

@@ -201,3 +201,7 @@ The TOML file is edited as text rather than parsed and written back. Only the li
 A configuration the editor can't make sense of is left untouched, and the reason is logged. That covers a file that isn't valid TOML, and the shapes it won't rewrite: the server declared through a dotted key or an inline table, `mcp_servers` declared as an array of tables, or the same server declared twice. Losing a Codex configuration is a worse outcome than not registering.
 
 The host reads its configuration at startup, so a host that's already running needs a restart before the new server appears.
+
+=== Beyond the running application
+
+The tools in this chapter serve one running application, on your machine or a device attached to it. Cloud builds, signing, push setup and store submission are served by a second MCP server, the build console at `https://cloud.codenameone.com/api/v1/mcp`, which every generated project already names in its `.mcp.json`. See <<buildcloud-mcp>>.

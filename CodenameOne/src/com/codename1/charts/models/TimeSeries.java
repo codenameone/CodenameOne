@@ -16,6 +16,9 @@ package com.codename1.charts.models;
 import java.util.Date;
 
 /// A series for the date / time charts.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class TimeSeries extends XYSeries {
 
     /// Builds a new date / time series.

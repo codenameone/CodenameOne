@@ -22,7 +22,7 @@
  */
 package com.codename1.backend;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.impl.migration.MigrationRegistry;
 import com.codename1.migration.JavaMigration;
 import com.codename1.migration.MigrateResult;
@@ -79,7 +79,7 @@ class MigrationsTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void registeredLibraryTablesNeedNoNamingConvention(String engine) throws Exception {
         DataSource pool = open(engine);
         Migrations.register(MigrationSet.builder("library")
@@ -93,7 +93,7 @@ class MigrationsTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void preexistingSchemaIsRefusedBeforeLibraryMigrations(String engine) throws Exception {
         DataSource pool = open(engine);
         pool.execute("CREATE TABLE mig_existing (id INT)", null);
@@ -193,7 +193,7 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void historyNamesReserveSpaceForTheGeneratedIndexAndLock(String engine) throws Exception {
         DataSource pool = open(engine);
         String name = "history_" + new String(new char[45]).replace('\0', 'x');
@@ -213,7 +213,7 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void migratesRecordsAndIsThenANoOp(String engine) throws Exception {
         DataSource pool = open(engine);
         MigrateResult result = Migrations.of(pool, notes().build()).migrate();
@@ -295,7 +295,7 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void processesStartingTogetherApplyEachMigrationOnce(String engine) throws Exception {
         final DataSource first = open(engine);
         // A second pool is a second process as far as the database can tell.
@@ -347,7 +347,7 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void anExistingSchemaIsRefusedThenAdoptedAtTheBaseline(String engine) throws Exception {
         DataSource pool = open(engine);
         // Framework tables do not make a database "somebody's schema".
@@ -369,7 +369,7 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void librarySetsKeepTheirOwnHistoryAndJavaMigrationsRun(String engine) throws Exception {
         DataSource pool = open(engine);
         final String[] seen = new String[1];
@@ -400,7 +400,7 @@ class MigrationsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void cleanDropsEverythingOnlyWhenEnabled(String engine) throws Exception {
         DataSource pool = open(engine);
         Migrations.of(pool, notes().build()).migrate();

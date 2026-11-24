@@ -25,6 +25,7 @@ package com.codename1.builders;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import com.codename1.build.shared.PlatformFeatureCatalog;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
@@ -507,6 +508,23 @@ public class MacOSNativeBuilder extends Executor {
         }
         log("Camera " + (cn1CameraEnabled ? "enabled" : "disabled"));
 
+        // Apple's Foundation Models for SystemLlmClient: the Swift bridge goes
+        // beside the port natives, where the translator puts every .swift into
+        // the app target, and the define turns on CN1SystemLlm.m's glue.
+        systemLlmEnabled = usesSystemLlm(classesDir, buildinRes);
+        if (systemLlmEnabled) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            try {
+                replaceInFile(controllerHeader, "//#define INCLUDE_CN1_SYSTEM_LLM",
+                        "#define INCLUDE_CN1_SYSTEM_LLM");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable the system language model in "
+                        + "CodenameOne_GLViewController.h", ex);
+            }
+            SystemLlmInjector.injectApple(this, nativeSources);
+        }
+        log("System language model " + (systemLlmEnabled ? "enabled" : "disabled"));
+
         if (appReviewEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
             if (!controllerHeader.exists()) {
@@ -771,6 +789,9 @@ public class MacOSNativeBuilder extends Executor {
 
         attachEntitlementsToProject(distDir, appName, hints);
         applyDeploymentTargetToProject(distDir, appName, hints);
+        if (systemLlmEnabled) {
+            applySwiftSettingsToProject(distDir, appName);
+        }
         // Both of these are otherwise applied only as xcodebuild command-line
         // overrides in buildChannel(), which mac-source never reaches -- so the
         // exported project ignored the hint entirely. Written here, before the
@@ -1304,6 +1325,65 @@ public class MacOSNativeBuilder extends Executor {
             // a build over a cosmetic patch that did not apply.
             log("Could not name the entitlements in the generated Xcode project ("
                     + ex + "); sign with CODE_SIGN_ENTITLEMENTS set by hand.");
+        }
+    }
+
+    /// The app uses `SystemLlmClient`; set while the native sources are staged.
+    private boolean systemLlmEnabled;
+
+    /// Whether the application, or a cn1lib it carries, uses the operating
+    /// system's language model (`PlatformFeatureCatalog.isSystemLlmUse`).
+    private boolean usesSystemLlm(File classesDir, File buildinRes) throws BuildException {
+        final boolean[] found = {false};
+        Executor.ClassScanner scanner = new Executor.ClassScanner() {
+            @Override
+            public void usesClass(String cls) {
+            }
+
+            @Override
+            public void implementsInterface(String cls, String iface) {
+            }
+
+            @Override
+            public void usesClassMethod(String cls, String method) {
+                if (PlatformFeatureCatalog.isSystemLlmUse(cls, method)) {
+                    found[0] = true;
+                }
+            }
+        };
+        try {
+            scanClassesForPermissions(classesDir, scanner);
+            scanClassesForPermissions(buildinRes, scanner);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan the application for the system "
+                    + "language model", ex);
+        }
+        return found[0];
+    }
+
+    /// Gives the generated project the Swift settings the injected
+    /// Foundation Models bridge needs. The template is pure Objective-C and
+    /// names no `SWIFT_VERSION`, without which xcodebuild refuses a `.swift`
+    /// source outright. Written beside every `MACOSX_DEPLOYMENT_TARGET`, which
+    /// the template sets once per build configuration.
+    private void applySwiftSettingsToProject(File distDir, String appName) throws BuildException {
+        File pbxproj = new File(new File(distDir, appName + ".xcodeproj"), "project.pbxproj");
+        try {
+            String body = readFileToString(pbxproj);
+            if (body.indexOf("SWIFT_VERSION") >= 0) {
+                return;
+            }
+            java.util.Set<String> found = deploymentTargetAssignments(body);
+            if (found.isEmpty()) {
+                throw new BuildException("Could not add SWIFT_VERSION to the generated Xcode "
+                        + "project: it names no MACOSX_DEPLOYMENT_TARGET to anchor it to");
+            }
+            for (String literal : found) {
+                replaceInFile(pbxproj, literal, literal + "\n\t\t\t\tSWIFT_VERSION = 5.0;");
+            }
+        } catch (IOException ex) {
+            throw new BuildException("Failed to add the Swift settings to the generated Xcode "
+                    + "project", ex);
         }
     }
 

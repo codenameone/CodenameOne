@@ -25,7 +25,7 @@ package com.codename1.impl.orm;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Database;
 import com.codename1.backend.DataSource;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.orm.session.LockMode;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -101,6 +101,14 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             return SessionImpl.sqliteColumns(query("PRAGMA table_info(" + quote(table) + ")", new Object[0], new int[6]),
                     createSql instanceof String ? (String) createSql : null, collations);
         }
+        if ("sqlserver".equals(dialect())) {
+            return query(SQLSERVER_DESCRIBE, new Object[]{quote(table)}, new int[8]);
+        }
+        if ("oracle".equals(dialect())) {
+            // The name as Dialect.quote stores it: upper case.
+            String name = quote(table);
+            return query(ORACLE_DESCRIBE, new Object[]{name.substring(1, name.length() - 1)}, new int[8]);
+        }
         boolean mysql = "mysql".equals(dialect());
         // PostgreSQL: the schema an unqualified name resolves to through the
         // whole search_path, which is the table the ORM's SQL actually reads.
@@ -146,6 +154,55 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
                 new int[8]);
     }
 
+    /// SQL Server's columns, read from the catalog views rather than
+    /// INFORMATION_SCHEMA, which has no identity or computed flag. The type is
+    /// spelled the way the other engines' describes spell theirs -- lower case,
+    /// the length in characters (sys.columns counts NVARCHAR in bytes) and
+    /// `max` for an unbounded one -- so SessionImpl's type families read it
+    /// unchanged. An IDENTITY column refuses an explicit value, so it is both
+    /// generated and read only, as PostgreSQL's GENERATED ALWAYS is.
+    private static final String SQLSERVER_DESCRIBE = "SELECT c.name, CASE"
+            + " WHEN t.name IN ('nvarchar','nchar') THEN t.name + '(' + CASE WHEN c.max_length = -1 THEN 'max' ELSE CAST(c.max_length / 2 AS VARCHAR(10)) END + ')'"
+            + " WHEN t.name IN ('varchar','char','varbinary','binary') THEN t.name + '(' + CASE WHEN c.max_length = -1 THEN 'max' ELSE CAST(c.max_length AS VARCHAR(10)) END + ')'"
+            + " WHEN t.name IN ('decimal','numeric') THEN t.name + '(' + CAST(c.precision AS VARCHAR(10)) + ',' + CAST(c.scale AS VARCHAR(10)) + ')'"
+            + " WHEN t.name = 'float' THEN 'float(' + CAST(c.precision AS VARCHAR(10)) + ')'"
+            + " WHEN t.name IN ('datetime2','time','datetimeoffset') THEN t.name + '(' + CAST(c.scale AS VARCHAR(10)) + ')'"
+            + " ELSE t.name END AS column_type,"
+            + " CASE WHEN c.is_nullable = 0 THEN 1 ELSE 0 END AS required,"
+            + " CASE WHEN EXISTS (SELECT 1 FROM sys.index_columns ic INNER JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id"
+            + " WHERE i.is_primary_key = 1 AND ic.object_id = c.object_id AND ic.column_id = c.column_id) THEN 1 ELSE 0 END AS primary_key,"
+            + " CASE WHEN c.default_object_id <> 0 OR c.is_identity = 1 OR c.is_computed = 1 THEN 1 ELSE 0 END AS filled,"
+            + " c.collation_name,"
+            + " CASE WHEN c.is_identity = 1 THEN 1 ELSE 0 END AS key_generated,"
+            + " CASE WHEN c.is_identity = 1 OR c.is_computed = 1 THEN 1 ELSE 0 END AS read_only"
+            + " FROM sys.columns c INNER JOIN sys.types t ON t.user_type_id = c.system_type_id"
+            + " WHERE c.object_id = OBJECT_ID(?) ORDER BY c.column_id";
+
+    /// Oracle's columns from USER_TAB_COLUMNS, in the schema the session reads.
+    /// The type keeps Oracle's spelling (`number(19)`, `varchar2(255 char)`,
+    /// `timestamp(3)`), lower case; SessionImpl's families read NUMBER by its
+    /// scale. A column with no NOT NULL is reported as not required, and an
+    /// IDENTITY column is generated but takes an explicit value (BY DEFAULT),
+    /// so it is not read only unless it is GENERATED ALWAYS.
+    private static final String ORACLE_DESCRIBE = "SELECT LOWER(c.column_name), CASE"
+            + " WHEN c.data_type IN ('VARCHAR2','NVARCHAR2','CHAR','NCHAR') THEN LOWER(c.data_type) || '(' || c.char_length || ' char)'"
+            + " WHEN c.data_type = 'NUMBER' AND c.data_precision IS NULL AND c.data_scale = 0 THEN 'number(38)'"
+            + " WHEN c.data_type = 'NUMBER' AND c.data_precision IS NULL THEN 'number'"
+            + " WHEN c.data_type = 'NUMBER' AND c.data_scale = 0 THEN 'number(' || c.data_precision || ')'"
+            + " WHEN c.data_type = 'NUMBER' THEN 'number(' || c.data_precision || ',' || c.data_scale || ')'"
+            + " WHEN c.data_type = 'RAW' THEN 'raw(' || c.data_length || ')'"
+            + " ELSE LOWER(c.data_type) END,"
+            + " CASE WHEN c.nullable = 'N' THEN 1 ELSE 0 END,"
+            + " CASE WHEN EXISTS (SELECT 1 FROM user_constraints k INNER JOIN user_cons_columns kc"
+            + " ON kc.constraint_name = k.constraint_name AND kc.table_name = k.table_name"
+            + " WHERE k.constraint_type = 'P' AND k.table_name = c.table_name AND kc.column_name = c.column_name) THEN 1 ELSE 0 END,"
+            + " CASE WHEN c.data_default IS NOT NULL OR c.identity_column = 'YES' OR c.virtual_column = 'YES' THEN 1 ELSE 0 END,"
+            + " c.collation,"
+            + " CASE WHEN c.identity_column = 'YES' THEN 1 ELSE 0 END,"
+            + " CASE WHEN c.virtual_column = 'YES' OR EXISTS (SELECT 1 FROM user_tab_identity_cols i"
+            + " WHERE i.table_name = c.table_name AND i.column_name = c.column_name AND i.generation_type = 'ALWAYS') THEN 1 ELSE 0 END"
+            + " FROM user_tab_cols c WHERE c.table_name = ? AND c.hidden_column = 'NO' ORDER BY c.column_id";
+
     @Override
     public String quote(String name) {
         return dialect.quote(name);
@@ -167,8 +224,8 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
     }
 
     @Override
-    public String insertDefaults(String table) {
-        return dialect.insertDefaults(table);
+    public String insertDefaults(String table, String keyColumn) {
+        return dialect.insertDefaults(table, keyColumn);
     }
 
     @Override
@@ -178,7 +235,13 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
 
     @Override
     public String likePattern(String pattern, String escape) {
-        return escape == null ? dialect.likePattern(pattern) : SqlPatterns.normalize(pattern, escape, "sqlite".equals(dialect()));
+        if (escape == null) {
+            return dialect.likePattern(pattern);
+        }
+        String normalized = SqlPatterns.normalize(pattern, escape, "sqlite".equals(dialect()));
+        // normalize escapes with '!' only before ! % _; SQL Server also reads
+        // '[' as a wildcard, so it gets the same escape.
+        return normalized != null && "sqlserver".equals(dialect()) ? normalized.replace("[", "![") : normalized;
     }
 
     @Override
@@ -194,7 +257,15 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
         if ("sqlite".equals(dialect.getName())) {
             throw new UnsupportedOperationException("SQLite does not support pessimistic row locks");
         }
-        if (mode == LockMode.PESSIMISTIC_WRITE) {
+        if ("sqlserver".equals(dialect.getName())) {
+            // Table hints, which SessionImpl.locked writes after the table.
+            // UPDLOCK is held to the end of the transaction and excludes other
+            // writers and lockers; HOLDLOCK keeps a shared lock as long, which
+            // is what FOR SHARE means elsewhere.
+            return mode == LockMode.PESSIMISTIC_WRITE ? " WITH (UPDLOCK, ROWLOCK)" : " WITH (HOLDLOCK, ROWLOCK)";
+        }
+        // Oracle has no shared row lock: FOR UPDATE is the only lock it takes.
+        if (mode == LockMode.PESSIMISTIC_WRITE || "oracle".equals(dialect.getName())) {
             return " FOR UPDATE";
         }
         return "mysql".equals(dialect.getName()) ? " LOCK IN SHARE MODE" : " FOR SHARE";
@@ -244,7 +315,7 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
     public List<Object[]> query(String sql, Object[] params, int[] kinds) throws IOException {
         Database db = connection();
         try {
-            com.codename1.backend.sql.QueryRows rows = (com.codename1.backend.sql.QueryRows) db.query(sql, params);
+            com.codename1.db.sql.QueryRows rows = (com.codename1.db.sql.QueryRows) db.query(sql, params);
             if (rows.getColumnCount() != kinds.length) {
                 throw new IOException("Unexpected SQL projection width");
             }
@@ -297,12 +368,56 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
             execute("CREATE SEQUENCE IF NOT EXISTS " + quote(name) + " START WITH 1", new Object[0]);
             return;
         }
+        if ("oracle".equals(dialect.getName())) {
+            // 19c has no IF NOT EXISTS: an anonymous block swallows ORA-00955
+            // ("name is already used"), which is the race-free form too.
+            if (strategy == 2) {
+                execute(oracleIgnoringExisting("CREATE SEQUENCE " + quote(name) + " START WITH 1"), new Object[0]);
+                return;
+            }
+            execute(oracleIgnoringExisting("CREATE TABLE cn1_orm_sequences (sequence_name "
+                    + dialect.assignedKeyColumn(Dialect.TEXT) + ", next_value "
+                    + dialect.columnType(Dialect.BIGINT) + " NOT NULL)"), new Object[0]);
+            try {
+                execute("MERGE INTO cn1_orm_sequences s USING (SELECT ? AS n FROM DUAL) v ON (s.sequence_name = v.n)"
+                        + " WHEN NOT MATCHED THEN INSERT (sequence_name,next_value) VALUES (v.n,0)", new Object[]{name});
+            } catch (com.codename1.backend.DataIntegrityViolationException err) {
+                // Two processes seeding the same generator: Oracle's MERGE is
+                // not atomic, and the loser's ORA-00001 means the row exists.
+                if (err.getMessage() == null || err.getMessage().indexOf("ORA-00001") < 0) {
+                    throw err;
+                }
+            }
+            return;
+        }
+        boolean sqlServer = "sqlserver".equals(dialect.getName());
+        if (strategy == 2 && sqlServer) {
+            // 2714 is the sequence a concurrent first call created between
+            // the check and the CREATE.
+            execute("BEGIN TRY IF OBJECT_ID(?, 'SO') IS NULL EXEC('CREATE SEQUENCE ' + ?  + ' AS BIGINT START WITH 1'); "
+                    + "END TRY BEGIN CATCH IF ERROR_NUMBER() <> 2714 THROW; END CATCH",
+                    new Object[]{quote(name), quote(name)});
+            return;
+        }
         execute("CREATE TABLE IF NOT EXISTS cn1_orm_sequences (sequence_name " + dialect.assignedKeyColumn(Dialect.TEXT) + ", next_value " + dialect.columnType(Dialect.BIGINT) + " NOT NULL)", new Object[0]);
+        if (sqlServer) {
+            execute("INSERT INTO cn1_orm_sequences WITH (HOLDLOCK) (sequence_name,next_value) SELECT ?,0 "
+                    + "WHERE NOT EXISTS (SELECT 1 FROM cn1_orm_sequences WITH (UPDLOCK, HOLDLOCK) WHERE sequence_name = ?)",
+                    new Object[]{name, name});
+            return;
+        }
         String sql = "INSERT " + ("mysql".equals(dialect.getName()) ? "IGNORE " : "") + "INTO cn1_orm_sequences (sequence_name,next_value) VALUES (?,0)";
         if (!"mysql".equals(dialect.getName())) {
             sql += " ON CONFLICT (sequence_name) DO NOTHING";
         }
         execute(sql, new Object[]{name});
+    }
+
+    /// A DDL statement run so that ORA-00955, the object already existing,
+    /// is not an error.
+    static String oracleIgnoringExisting(String ddl) {
+        return "BEGIN EXECUTE IMMEDIATE '" + ddl.replace("'", "''")
+                + "'; EXCEPTION WHEN OTHERS THEN IF SQLCODE <> -955 THEN RAISE; END IF; END;";
     }
 
     @Override
@@ -323,6 +438,12 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
         }
         if (strategy == 2 && "postgresql".equals(dialect.getName())) {
             return query("SELECT nextval(CAST(? AS regclass))", new Object[]{quote(name)}, new int[]{Dialect.BIGINT}).get(0)[0];
+        }
+        if (strategy == 2 && "sqlserver".equals(dialect.getName())) {
+            return query("SELECT NEXT VALUE FOR " + quote(name), new Object[0], new int[]{Dialect.BIGINT}).get(0)[0];
+        }
+        if (strategy == 2 && "oracle".equals(dialect.getName())) {
+            return query("SELECT " + quote(name) + ".NEXTVAL FROM DUAL", new Object[0], new int[]{Dialect.BIGINT}).get(0)[0];
         }
         long max = kind == Dialect.INTEGER ? Integer.MAX_VALUE : Long.MAX_VALUE;
         if (execute("UPDATE cn1_orm_sequences SET next_value = next_value + 1 WHERE sequence_name = ? AND next_value < ?", new Object[]{name, Long.valueOf(max)}) != 1) {

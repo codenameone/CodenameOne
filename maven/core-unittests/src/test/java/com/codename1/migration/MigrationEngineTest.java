@@ -349,6 +349,24 @@ class MigrationEngineTest {
     }
 
     @Test
+    void anEngineScriptReplacesTheCommonOneThereOnly() throws IOException {
+        MigrationSet set = MigrationSet.builder("default")
+                .sql("1", "t", "COMMON")
+                .sql("1", "t", "oracle", "ORA")
+                .build();
+        FakeMigrationTarget ora = new FakeMigrationTarget();
+        ora.dialect = "oracle";
+        migrator(ora, set).migrate();
+        // The history table's DDL comes first on this dialect; the migration
+        // itself ran its Oracle script and not the common one.
+        assertTrue(ora.statements.contains("ORA"), ora.statements.toString());
+        assertFalse(ora.statements.contains("COMMON"), ora.statements.toString());
+        FakeMigrationTarget lite = new FakeMigrationTarget();
+        migrator(lite, set).migrate();
+        assertEquals("[COMMON]", lite.statements.toString());
+    }
+
+    @Test
     void duplicateVersionsAreRefusedBeforeAnythingRuns() {
         MigrationSet set = MigrationSet.builder("default").sql("1", "a", "A").sql("1.0", "b", "B").build();
         FakeMigrationTarget target = new FakeMigrationTarget();

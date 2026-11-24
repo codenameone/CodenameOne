@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// A series for the range category charts like the range bar.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class RangeCategorySeries extends CategorySeries {
     /// The series values.
     private final List<Double> mMaxValues = new ArrayList<Double>();

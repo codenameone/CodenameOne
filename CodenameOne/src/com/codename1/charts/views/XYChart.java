@@ -44,6 +44,9 @@ import java.util.SortedMap;
 
 
 /// The XY chart rendering class.
+///
+/// @deprecated Use `com.codename1.ui.chart.Chart` with `XYSeries` subclasses; the `com.codename1.ui.chart` package replaces this one.
+@Deprecated
 public abstract class XYChart extends AbstractChart {
     /// The calculated range.
     private final HashMap<Integer, double[]> mCalcRange = new HashMap<Integer, double[]>();

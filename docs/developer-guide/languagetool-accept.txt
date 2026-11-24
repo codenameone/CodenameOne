@@ -930,3 +930,13 @@ Papercut
 Gochi
 Pillow
 ffmpeg
+treemap
+Treemap
+sparklines
+Sparklines
+Vultr
+OVHcloud
+certbot
+Fargate
+Lightsail
+Linode

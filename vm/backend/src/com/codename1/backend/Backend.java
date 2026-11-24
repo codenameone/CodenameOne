@@ -272,6 +272,55 @@ public final class Backend {
         return sessions;
     }
 
+    /// The backend this process is running, or null when none has started or
+    /// the last one stopped. One process runs one backend.
+    ///
+    /// @return the running backend, or null
+    public static synchronized Backend running() {
+        return processLive != null && !processLive.isStopped() ? processLive : null;
+    }
+
+    /// Answers `request` in process as `authentication`, a principal the caller
+    /// has already established -- an MCP tool running an API endpoint as the
+    /// MCP client's user, say (issue 6310).
+    ///
+    /// The security chain that claims the request runs its **authorization**
+    /// rules for that principal, and the routers answer it with that principal
+    /// in the [com.codename1.backend.security.SecurityContextHolder], so
+    /// method security sees it too. Nothing authenticates: the request's own
+    /// `Authorization` header and cookies are not read, no session is loaded,
+    /// created or saved, and CSRF is not checked. A refusal is a plain 401 (an
+    /// anonymous or unauthenticated principal) or 403, never a login redirect.
+    /// The server's own routes -- MCP, management -- are not reachable this way.
+    ///
+    /// It may be called from inside a request: the calling thread's security
+    /// context, current request and tracing are what they were afterwards.
+    ///
+    /// ```java
+    /// HttpServer.Response r = Backend.running().dispatch(
+    ///         HttpServer.Request.of("GET", "/api/v2/apps/7", headers, null), auth);
+    /// String route = r.getMatchedRoute(); // "/api/v2/apps/{id}"
+    /// ```
+    ///
+    /// @param request the request to answer
+    /// @param authentication who it is answered as
+    /// @return the response; [HttpServer.Response#getMatchedRoute] names the
+    ///         route template that answered, or is null when none matched
+    /// @throws Exception what a handler threw and nothing handled -- with an
+    ///         error route declared, the application's error page answers
+    ///         such a failure instead, as it does over the wire
+    public HttpServer.Response dispatch(HttpServer.Request request,
+            com.codename1.backend.security.Authentication authentication) throws Exception {
+        if (request == null || authentication == null) {
+            throw new IllegalArgumentException("request/authentication is null");
+        }
+        Serving chain = serving;
+        if (chain == null) {
+            throw new IllegalStateException("This server is not serving");
+        }
+        return chain.dispatchAs(request, authentication);
+    }
+
     /// Answers `request` as the listener would -- sessions, scoped beans, tracing
     /// and metrics included -- on the calling thread, without a socket. A request
     /// no handler answers is a 404, as on the wire.
@@ -985,26 +1034,275 @@ public final class Backend {
             return cors;
         }
 
+        /// `cn1.server.error.path`: where a request nothing served is dispatched,
+        /// or null when that is off. Set once, before the server starts.
+        String errorPath;
+
         @Override
         public HttpServer.Response route(HttpServer.Request request) throws Exception {
+            if (errorPath == null) {
+                return routeChain(request);
+            }
+            HttpServer.Response response;
+            try {
+                response = routeChain(request);
+            } catch (Exception err) {
+                if (securityFailure(err)) {
+                    // The security layer answers these (401, 403, the login
+                    // page), as Spring Security's ExceptionTranslationFilter does
+                    // before any error dispatch.
+                    throw err;
+                }
+                if (request.getAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_STATUS_CODE) != null) {
+                    // The error page itself failed (serving a 404): its failure
+                    // is not a second error to dispatch.
+                    throw err;
+                }
+                // An exception escaping a handler goes to the error route with
+                // its status, as Spring Boot forwards it to its error controller
+                // (issue 6310). Here rather than in the listener, so the page
+                // runs inside the security chain, the request scope and the
+                // session bracket, and reaches dispatch() callers too.
+                int status = 500;
+                String message = "Internal Server Error";
+                if (err instanceof ResponseStatusException) { // NOPMD AvoidInstanceofChecksInCatchClause - one catch must take every exception to the error route; the status comes from this one kind
+                    status = ((ResponseStatusException) err).getStatus();
+                    String reason = ((ResponseStatusException) err).getReason();
+                    message = reason == null ? message : reason;
+                }
+                request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_EXCEPTION, err);
+                HttpServer.Response page;
+                try {
+                    page = errorPage(request, status, message, true);
+                } catch (Exception pageErr) {
+                    // The original failure is rethrown below; the page's own is
+                    // logged here or nobody could find out the page is broken.
+                    HttpServer.handlerFailed(pageErr);
+                    page = null;
+                }
+                if (page == null) {
+                    // No page, or a failing one, never hides the original
+                    // failure; the listener logs and records it, so the
+                    // attribute must not make the request log record it too.
+                    request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_EXCEPTION, null);
+                    throw err;
+                }
+                if (status >= 500) {
+                    // What the listener would have logged had it seen the throw;
+                    // handle() records it in the request log from the attribute.
+                    HttpServer.handlerFailed(err);
+                }
+                return page;
+            }
+            if (response != null && response.frameworkError) {
+                // Read before the dispatch: the answer is the connection's pooled
+                // Response, which the error route's own respond() re-points.
+                int status = response.getStatus();
+                String message = new String(response.body, "UTF-8");
+                HttpServer.Response page = errorPage(request, status, message, true);
+                if (page != null) {
+                    return page;
+                }
+                // No error route took it: the router's own answer, rebuilt in
+                // case a route that declined still re-pointed the pooled one.
+                return request.frameworkError(status, message);
+            }
+            return response;
+        }
+
+        private HttpServer.Response routeChain(HttpServer.Request request) throws Exception {
             HttpServer.Response response = null;
+            // Whether what the chain produced is only "nothing here": no answer,
+            // or a static directory's 404 for a file that is not there.
+            boolean unserved = false;
             for (int i = 0 ; response == null && i < chain.length ; i++) {
                 response = chain[i].handle(request);
-                if (response != null && notFound != null && response.getStatus() == 404
+                if (response != null && response.getStatus() == 404
                         && chain[i] instanceof StaticFiles) {
-                    // A file that is not there is a path nothing serves, and the
-                    // application's NoHandlerFoundException handler answers it --
-                    // not the directory's plain-text 404 (issue 6240).
-                    HttpServer.Response own = notFound.notFound(request);
-                    if (own != null) {
-                        response = own;
+                    unserved = true;
+                    if (notFound != null) {
+                        // A file that is not there is a path nothing serves, and the
+                        // application's NoHandlerFoundException handler answers it --
+                        // not the directory's plain-text 404 (issue 6240).
+                        HttpServer.Response own = notFound.notFound(request);
+                        if (own != null) {
+                            response = own;
+                            unserved = false;
+                        }
                     }
                 }
             }
-            if (response == null && notFound != null) {
-                response = notFound.notFound(request);
+            if (response == null) {
+                unserved = true;
+                if (notFound != null) {
+                    response = notFound.notFound(request);
+                    unserved = response == null;
+                }
+            }
+            if (unserved && errorPath != null) {
+                HttpServer.Response page = null;
+                try {
+                    page = errorPage(request, 404, "Not Found", false);
+                } catch (Exception pageErr) {
+                    // A broken error page is logged, and the path is still
+                    // answered as the 404 it is rather than as the page's 500.
+                    HttpServer.handlerFailed(pageErr);
+                }
+                if (page != null) {
+                    response = page;
+                }
             }
             return response;
+        }
+
+        /// The application's error route's answer for `request`, which would
+        /// otherwise be answered `status`; null when no route serves the error
+        /// path. The request itself is pointed at that path for the dispatch --
+        /// not a copy, so the page sees the request's session and scoped beans --
+        /// and carries the [com.codename1.backend.web.RequestDispatcher]
+        /// attributes, as Spring Boot forwards to its error controller (issue
+        /// 6310). Only the routers are asked: a static file named like the
+        /// error path is not an error page.
+        /// Whether `err`, or anything it wraps, is the security layer's to answer.
+        private static boolean securityFailure(Throwable err) {
+            for (int depth = 0 ; err != null && depth < 16 ; depth++) {
+                if (err instanceof com.codename1.backend.security.AccessDeniedException
+                        || err instanceof com.codename1.backend.security.AuthenticationException) {
+                    return true;
+                }
+                err = err.getCause();
+            }
+            return false;
+        }
+
+        /// @param controllersOnly ask only the generated routers -- an error
+        ///     route a controller declares -- never a hand-written handler. A
+        ///     router's own refusal or a thrown exception is an answer the
+        ///     application already had; only a declared error route takes it
+        ///     over, never a catch-all handler that happens to match the path.
+        private HttpServer.Response errorPage(HttpServer.Request request, int status,
+                                              String message, boolean controllersOnly) throws Exception {
+            String target = request.getTarget();
+            int query = target == null ? -1 : target.indexOf('?');
+            String path = query < 0 ? target : target.substring(0, query);
+            if (errorPath.equals(path)) {
+                // The error route itself is missing a method or failed to match:
+                // dispatching again would loop.
+                return null;
+            }
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_STATUS_CODE,
+                    Integer.valueOf(status));
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_REQUEST_URI, path);
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_MESSAGE, message);
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_METHOD,
+                    request.getMethod());
+            Object[] saved = request.retarget(errorPath);
+            // The error route is not the request's route: a dispatch-as-user
+            // capture must report no match, not the error page's template.
+            Object previousCapture = Tracing.beginRouteCapture(new String[1]);
+            HttpServer.Response page = null;
+            String method = request.getMethod();
+            try {
+                page = errorRoute(request, controllersOnly);
+                if (page == null && !"GET".equals(method)) {
+                    // The error route keeps the failed request's method, as a
+                    // servlet forward does -- but the usual declaration is
+                    // @GetMapping("/error"), which a POST that failed would then
+                    // miss and leave the bare error standing. So it is asked
+                    // once more as a GET.
+                    request.remethod("GET");
+                    page = errorRoute(request, controllersOnly);
+                }
+            } finally {
+                request.remethod(method);
+                Tracing.endRouteCapture(previousCapture);
+                request.restoreTarget(saved);
+            }
+            if (page != null && page.getStatus() == 200) {
+                // A page that set no status of its own keeps the one the request
+                // earned, as a servlet error dispatch keeps the sendError status.
+                // A copy: a handler may answer every request with one object.
+                page = page.withHeaders(page.extraHeaders);
+                page.status = status;
+            }
+            return page;
+        }
+
+        private HttpServer.Response errorRoute(HttpServer.Request request, boolean controllersOnly)
+                throws Exception {
+            for (HttpServer.Handler handler : chain) {
+                if (!(handler instanceof StaticFiles) && (!controllersOnly
+                        || handler instanceof com.codename1.backend.web.ControllerHooks.Invocation)) {
+                    HttpServer.Response page = handler.handle(request);
+                    if (page != null) {
+                        return page;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// See [Backend#dispatch(HttpServer.Request,
+        /// com.codename1.backend.security.Authentication)]. Not [#handle]: that
+        /// tries the server's own routes first and stores sessions afterwards.
+        HttpServer.Response dispatchAs(HttpServer.Request request, Object authentication)
+                throws Exception {
+            if (security == null) {
+                throw new IllegalStateException("This server has no SecurityFilterChain, so "
+                        + "there is no principal to dispatch as");
+            }
+            request.sessions = sessions;
+            // The headers may be a client's, Cookie included: nothing of a
+            // session it names is read or written here (see dispatch()).
+            request.ignoreSessionCookie();
+            String[] route = new String[1];
+            Object previousCapture = Tracing.beginRouteCapture(route);
+            Object previousTasks = Tasks.enter(tasks);
+            // The same session bracket as any request: a session the handler
+            // touches is this request's while it runs, and is released after.
+            Object previousServing = HttpSession.enterRequest(request);
+            Object previousSecurity = security.enter();
+            Object previous = null;
+            if (track) {
+                previous = CURRENT_REQUEST.get();
+                CURRENT_REQUEST.set(request);
+            }
+            HttpServer.Response response = null;
+            try {
+                try {
+                    response = security.serveAs(request, authentication, this);
+                } catch (ResponseStatusException chosen) {
+                    response = HttpServer.Response.text(chosen.getStatus(), chosen.getReason());
+                }
+                if (response == null) {
+                    response = HttpServer.Response.text(404, "Not Found");
+                }
+                // A copy: a handler may answer every request with one object, and
+                // the route is written into it.
+                response = response.withHeaders(response.extraHeaders);
+                response.matchedRoute = route[0];
+                return response;
+            } finally {
+                try {
+                    endRequestBeans(request, response);
+                } finally {
+                    try {
+                        sessions.leave(request);
+                    } finally {
+                        // A session the handler touched is never stored: nothing
+                        // was signed in, and the caller's own request owns its
+                        // session.
+                        request.forgetSession();
+                        if (track) {
+                            CURRENT_REQUEST.set(previous);
+                        }
+                        security.leave(previousSecurity);
+                        HttpSession.leaveRequest(previousServing);
+                    }
+                    Tasks.leave(previousTasks);
+                    Tracing.endRouteCapture(previousCapture);
+                }
+            }
         }
 
         /// A WebSocket handshake, put to the chain that guards its path. It
@@ -1323,8 +1621,13 @@ public final class Backend {
                 }
                 // Null is a 404 from here, which is what a
                 // router answers for a path it does not route.
+                // An exception the error route answered is still the
+                // handler's failure, and the log says so.
+                Object handled = request.getAttribute(
+                        com.codename1.backend.web.RequestDispatcher.ERROR_EXCEPTION);
                 requestLog.record(request, response == null ? 404
-                        : response.getStatus(), startedMillis, null);
+                        : response.getStatus(), startedMillis,
+                        handled instanceof Throwable ? (Throwable) handled : null);
                 status = response == null ? 404 : response.getStatus();
                 return response;
             } finally {
@@ -2367,6 +2670,8 @@ public final class Backend {
                         cors, Compression.fromConfig(config));
                 serving.forwarded = ForwardedHeaders.fromConfig(config);
                 serving.notFound = notFoundHooks;
+                String errorPath = config.get(Config.ERROR_PATH, "/error");
+                serving.errorPath = errorPath == null || errorPath.length() == 0 ? null : errorPath;
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;

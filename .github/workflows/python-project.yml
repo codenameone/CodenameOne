@@ -29,6 +29,7 @@ on:
       - 'scripts/python-samples/**'
       - 'scripts/python-backend/**'
       - 'vm/backend/src/**'
+      - 'CodenameOne/src/com/codename1/db/sql/**'
       - '.github/workflows/python-project.yml'
   push:
     branches: [ master ]
@@ -45,6 +46,7 @@ on:
       - 'scripts/python-samples/**'
       - 'scripts/python-backend/**'
       - 'vm/backend/src/**'
+      - 'CodenameOne/src/com/codename1/db/sql/**'
       - '.github/workflows/python-project.yml'
 
 concurrency:

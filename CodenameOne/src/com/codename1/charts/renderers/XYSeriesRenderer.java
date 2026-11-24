@@ -24,6 +24,9 @@ import java.util.List;
 
 
 /// A renderer for the XY type series.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class XYSeriesRenderer extends SimpleSeriesRenderer { // PMD Fix: UnnecessarySemicolon cleaned extra delimiter
     /// If the chart should be filled outside its line.
     private final List<FillOutsideLine> mFillBelowLine = new ArrayList<FillOutsideLine>();

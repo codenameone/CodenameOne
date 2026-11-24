@@ -35,6 +35,9 @@ import java.util.List;
 /// Combine this chart with a `DefaultRenderer` to control colours, labels
 /// and gradients. The resulting `PieChart` can be embedded in a form via a
 /// `com.codename1.charts.ChartComponent`.
+///
+/// @deprecated Use `com.codename1.ui.chart.series.PieSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
+@Deprecated
 public class PieChart extends RoundChart {
     /// Handles returning values when tapping on PieChart.
     private final PieMapper mPieMapper;

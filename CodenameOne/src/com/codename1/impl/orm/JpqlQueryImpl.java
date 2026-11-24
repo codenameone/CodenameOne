@@ -61,6 +61,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean found = false;
         for (Object binding : plan.bindings) {
             if (binding instanceof Parameter && ((Parameter) binding).name.equals(name)
+                    || binding instanceof NullTest && ((NullTest) binding).name.equals(name)
                     || binding instanceof LikeBinding && ((LikeBinding) binding).uses(name)) {
                 found = true;
             }
@@ -114,9 +115,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         if (max == 0) {
             return result;
         }
-        List<Object[]> rows = session.read(bound.sql + session.limit(max, offset) + session.lockClause(lock), bound.args, plan.kinds);
+        String clause = session.lockClause(lock);
+        boolean followOn = plan.entity != null && session.followOnLock(clause, max, offset);
+        List<Object[]> rows = session.read(session.lockedPage(bound.sql, followOn ? "" : clause, max, offset),
+                bound.args, plan.kinds);
         if (plan.entity != null) {
             List entities = session.hydrateAll(plan.entity, rows, plan.fetches);
+            if (followOn) {
+                for (Object entity : entities) {
+                    session.lock(entity, lock);
+                }
+            }
             for (Object entity : entities) {
                 result.add(checked(entity));
             }
@@ -203,6 +212,16 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             throw new IllegalStateException("Query has no SQL plan");
         }
         List<Object> values = new ArrayList<Object>();
+        clockMillis = System.currentTimeMillis();
+        // SQL Server matches a GROUP BY term against the SELECT list by its
+        // text, and @p1 and @p2 are different text even when equal; a named
+        // parameter repeated there reuses the first occurrence's @p name.
+        Map<String, Integer> reused = session.sqlServer() ? new LinkedHashMap<String, Integer>() : null;
+        // Oracle matches the same way, but positional binds cannot share a
+        // name, so a value repeated in a GROUP BY statement is written into
+        // the text as a literal at every occurrence (numbers and strings only).
+        Map<String, Integer> repeated = session.oracle() && template.indexOf(" GROUP BY ") >= 0
+                ? repeatedValues(template) : null;
         // Render each occurrence separately: dialect ordering and checked
         // arithmetic can repeat expressions containing the same bound value.
         StringBuilder statement = new StringBuilder();
@@ -216,10 +235,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             position = end + 3;
             statement.append("?");
             if (binding instanceof LiteralBinding && ((LiteralBinding) binding).value == null
-                    && ((LiteralBinding) binding).query == null) {
+                    && ((LiteralBinding) binding).clock == 0 && ((LiteralBinding) binding).query == null) {
                 // Keep untyped, unmapped NULL valid in COUNT(NULL) and similar SQL.
                 statement.setLength(statement.length() - 1);
                 statement.append("NULL");
+            } else if (binding instanceof NullTest) {
+                NullTest test = (NullTest) binding;
+                if (!parameters.containsKey(test.name)) {
+                    throw new IllegalArgumentException("Unbound named parameter: " + test.name);
+                }
+                boolean isNull = parameters.get(test.name) == null;
+                values.add(Long.valueOf(isNull != test.not ? 1 : 0));
             } else if (binding instanceof LikeBinding) {
                 LikeBinding like = (LikeBinding) binding;
                 Object pattern = boundValue(like.pattern);
@@ -252,24 +278,139 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         count++;
                     }
                     statement.setLength(statement.length() - 1);
-                    statement.append(count == 0 ? "SELECT NULL WHERE 1=0" : SessionImpl.placeholders(count));
+                    // Oracle before 23ai has no SELECT without FROM.
+                    statement.append(count == 0 ? (session.oracle() ? "SELECT NULL FROM DUAL WHERE 1=0" : "SELECT NULL WHERE 1=0")
+                            : SessionImpl.placeholders(count));
                 } else {
                     if (value instanceof Iterable || value instanceof Object[]) {
                         throw new IllegalArgumentException("Collection parameter requires IN: " + parameter.name);
                     }
-                    values.add(parameter.convert(value));
+                    Object converted = parameter.convert(value);
+                    String literal = repeated == null || converted == null ? null
+                            : oracleLiteral(repeated, ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted, converted);
+                    if (literal != null) {
+                        statement.setLength(statement.length() - 1);
+                        statement.append(literal);
+                        continue;
+                    }
+                    // Each occurrence converts for its own context, so only an
+                    // occurrence that converts to the same value shares a name.
+                    String key = reused == null || converted == null ? null
+                            : ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted;
+                    Integer slot = key == null ? null : reused.get(key);
+                    if (slot != null) {
+                        statement.setLength(statement.length() - 1);
+                        statement.append("@p").append(slot.intValue());
+                        continue;
+                    }
+                    values.add(converted);
+                    if (key != null) {
+                        reused.put(key, Integer.valueOf(values.size()));
+                    }
                 }
             } else {
-                values.add(boundValue(binding));
+                Object value = boundValue(binding);
+                // An equal literal repeated is reused the same way, by value.
+                String key = reused != null && binding instanceof LiteralBinding && value != null
+                        ? "'" + value.getClass().getName() + ":" + value : null;
+                Integer slot = key == null ? null : reused.get(key);
+                if (slot != null) {
+                    statement.setLength(statement.length() - 1);
+                    statement.append("@p").append(slot.intValue());
+                    continue;
+                }
+                String literal = repeated != null && binding instanceof LiteralBinding && value != null
+                        ? oracleLiteral(repeated, "'" + value.getClass().getName() + ":" + value, value) : null;
+                if (literal != null) {
+                    statement.setLength(statement.length() - 1);
+                    statement.append(literal);
+                    continue;
+                }
+                values.add(value);
+                if (key != null) {
+                    reused.put(key, Integer.valueOf(values.size()));
+                }
             }
         }
         SessionImpl.checkParameterCount(values.size());
         statement.append(template.substring(position));
         return new Bound(statement.toString(), values.toArray());
     }
+    /// The clock CURRENT_* reads, taken once per rendering of the statement.
+    private long clockMillis;
+    /// How often each plain parameter or literal value occurs in `template`,
+    /// keyed as [#arguments()] keys them -- for values that occur inside the
+    /// GROUP BY clause only. A value repeated elsewhere (the null-aware text
+    /// comparison writes each parameter twice) keeps its bind.
+    private Map<String, Integer> repeatedValues(String template) {
+        Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
+        java.util.Set<String> grouped = new java.util.HashSet<String>();
+        int groupStart = template.lastIndexOf(" GROUP BY ");
+        int groupEnd = template.length();
+        for (String next : new String[]{" HAVING ", " ORDER BY ", " OFFSET ", " FETCH FIRST "}) {
+            int at = template.indexOf(next, groupStart);
+            if (at >= 0 && at < groupEnd) {
+                groupEnd = at;
+            }
+        }
+        int position = 0;
+        int start;
+        while ((start = template.indexOf("/*cn1-bind-", position)) >= 0) {
+            int end = template.indexOf("*/?", start);
+            position = end + 3;
+            Object binding = plan.bindings.get(Integer.parseInt(template.substring(start + 11, end)));
+            String key = null;
+            if (binding instanceof Parameter && ((Parameter) binding).marker == null
+                    && parameters.containsKey(((Parameter) binding).name)) {
+                Parameter parameter = (Parameter) binding;
+                Object converted = parameter.convert(parameters.get(parameter.name));
+                key = converted == null ? null
+                        : ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted;
+            } else if (binding instanceof LiteralBinding) {
+                Object value = boundValue(binding);
+                key = value == null ? null : "'" + value.getClass().getName() + ":" + value;
+            }
+            if (key != null && start > groupStart && start < groupEnd) {
+                grouped.add(key);
+            }
+            if (key != null) {
+                Integer count = counts.get(key);
+                counts.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+            }
+        }
+        counts.keySet().retainAll(grouped);
+        return counts;
+    }
+    /// `value` as Oracle literal text when it occurs more than once, else null.
+    /// Integral numbers and strings only; a string doubles its quotes, which is
+    /// the whole of Oracle's literal escaping.
+    private static String oracleLiteral(Map<String, Integer> repeated, String key, Object value) {
+        Integer count = repeated.get(key);
+        if (count == null || count.intValue() < 2) {
+            return null;
+        }
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return "(" + value + ")";
+        }
+        // A literal is capped at 4000 bytes (ORA-01704); a longer value keeps
+        // its bind, and Oracle then refuses the grouping by name.
+        if (value instanceof String && ((String) value).length() <= 1000 && ((String) value).indexOf('\0') < 0) {
+            String text = (String) value;
+            StringBuilder quoted = new StringBuilder(text.length() + 3).append("N'");
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                quoted.append(c);
+                if (c == '\'') {
+                    quoted.append('\'');
+                }
+            }
+            return quoted.append('\'').toString();
+        }
+        return null;
+    }
     private Object boundValue(Object binding) {
         if (binding instanceof LiteralBinding) {
-            return ((LiteralBinding) binding).convert();
+            return ((LiteralBinding) binding).convert(clockMillis);
         }
         if (!(binding instanceof Parameter)) {
             return binding;
@@ -281,14 +422,54 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         return parameter.convert(parameters.get(parameter.name));
     }
     private static final class LiteralBinding {
+        static final int DATE = 1;
+        static final int TIMESTAMP = 3;
         final Object value;
         QueryImpl query;
         String field;
+        /// Nonzero for CURRENT_DATE/TIME/TIMESTAMP, read at each execution.
+        int clock;
         LiteralBinding(Object value) {
             this.value = value;
         }
-        Object convert() {
-            return query == null ? Values.storage(value) : query.parameter(field, value);
+        Object convert(long clockMillis) {
+            Object bound = clock == 0 ? value : now(clockMillis);
+            return query == null ? Values.storage(bound) : query.parameter(field, bound);
+        }
+        /// The clock in the Java type of the field it is compared with, which
+        /// is what that field's converter accepts: a java.time type by its
+        /// mapping, otherwise a Date (a `@Temporal` field, or a long of epoch
+        /// milliseconds once Values.storage has unwrapped it). Every form is
+        /// derived from ONE reading per execution, so two occurrences in a
+        /// statement never see different instants, and in UTC, the zone every
+        /// temporal converter here stores in.
+        private Object now(long millis) {
+            String mapping = query == null ? "" : query.mapping(field);
+            String type = mapping.substring(mapping.lastIndexOf(':') + 1);
+            long day = 86400000L;
+            long days = millis >= 0 ? millis / day : (millis - day + 1) / day;
+            long ofDay = millis - days * day;
+            if ("java.time.LocalDate".equals(type)) {
+                return java.time.LocalDate.ofEpochDay(days);
+            }
+            if ("java.time.LocalDateTime".equals(type)) {
+                return java.time.LocalDateTime.of(java.time.LocalDate.ofEpochDay(days),
+                        java.time.LocalTime.ofNanoOfDay(clock == DATE ? 0 : ofDay * 1000000L));
+            }
+            long at = clock == DATE ? days * day : millis;
+            if ("java.time.Instant".equals(type)) {
+                return java.time.Instant.ofEpochMilli(at);
+            }
+            return new java.util.Date(at);
+        }
+    }
+    /// `:name IS [NOT] NULL`, answered from the bound value; see compare().
+    private static final class NullTest {
+        final String name;
+        final boolean not;
+        NullTest(String name, boolean not) {
+            this.name = name;
+            this.not = not;
         }
     }
     private static final class LikeBinding {
@@ -480,7 +661,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (attribute.nullable && root.model.required(index)) {
                         requireNonNull(value);
                     }
-                    if (attribute.kind == Attribute.INTEGER) {
+                    // Oracle's NUMBER arithmetic never overflows 64 bits, and
+                    // NUMBER(19) stores 9223372036854775808, so a BIGINT is
+                    // range checked there too; elsewhere the arithmetic throws.
+                    if (attribute.kind == Attribute.INTEGER
+                            || attribute.kind == Attribute.BIGINT && attribute.temporal == 0 && session.oracle()) {
                         value.sql = session.checkedIntegralAssignment(value.sql,
                                 root.model.minimumIntegralValue(index), root.model.maximumIntegralValue(index));
                     }
@@ -496,7 +681,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
                 }
                 plan.sql = session.updateTable(root.model.table(), root.rootAlias) + " SET " + assignments +
-                           where;
+                           session.updateFrom(root.model.table(), root.rootAlias) + where;
                 refuseImplicitBulkJoins();
                 return plan;
             }
@@ -671,7 +856,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                             selectedPositions.append(i + 1);
                         }
                     }
-                    terms.append(selectedPositions.length() == 0 ? term.sql : selectedPositions.toString());
+                    // SQL Server and Oracle have no positions in GROUP BY; each is given the
+                    // expression, whose parameters arguments() names alike.
+                    terms.append(selectedPositions.length() == 0 || session.sqlServer() || session.oracle() ? term.sql
+                            : selectedPositions.toString());
                 } while (take(","));
                 group = " GROUP BY " + terms;
             }
@@ -698,7 +886,21 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (ascending) {
                         take("ASC");
                     }
-                    String rendered = session.orderBy(term.sql, ascending, sqlKind(term));
+                    String sorted = term.sql;
+                    if (!termBindings.isEmpty() && term.kind != Attribute.TEXT
+                            && session.ordersBySelectedPosition()) {
+                        // As for GROUP BY: a selected expression carrying a
+                        // parameter is named by its position, or PostgreSQL
+                        // reads `group by floor(x / 3) order by floor(x / 3)`
+                        // as ordering by an ungrouped column.
+                        for (int i = 0; i < selections.size(); i++) {
+                            if (sameExpression(term, selections.get(i))) {
+                                sorted = String.valueOf(i + 1);
+                                break;
+                            }
+                        }
+                    }
+                    String rendered = session.orderBy(sorted, ascending, sqlKind(term));
                     out.append(rendered);
                 } while (take(","));
                 order = " ORDER BY " + out;
@@ -731,6 +933,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         kinds.add(Integer.valueOf(a.kind));
                     }
                 } else {
+                    if (expr.literalBinding != null && expr.literalBinding.clock != 0) {
+                        // A clock takes its Java type from the field it is
+                        // compared with; selected alone it has none, and would
+                        // come back as raw epoch milliseconds.
+                        throw error("CURRENT_DATE and CURRENT_TIMESTAMP cannot be selected; compare them with a field");
+                    }
                     projection.append(" AS cn1_scalar_").append(kinds.size());
                     validateProjection(expr);
                     kinds.add(Integer.valueOf(expr.kind));
@@ -851,6 +1059,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             Expr left = add();
             if (take("IS")) {
+                if (left.kind < 0 && left.parameter != null && left.parameter.marker == null) {
+                    // A bare parameter has no storage kind to type "? IS NULL"
+                    // with -- PostgreSQL refuses an untyped parameter there -- but
+                    // its value is known before the statement runs. So the test is
+                    // answered then and bound as a 1 or a 0: the optional filter
+                    // and null-safe compare-and-set idiom (issue 6310).
+                    boolean not = take("NOT");
+                    expect("NULL");
+                    Expr flag = new Expr(session.numericOperand(bind(new NullTest(left.parameter.name, not)),
+                            Attribute.BIGINT), Attribute.BIGINT);
+                    return node("(" + flag.sql + " = 1)", Attribute.BOOLEAN, flag);
+                }
                 if (left.kind < 0) {
                     throw error("IS NULL requires a known operand storage kind");
                 }
@@ -984,7 +1204,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 bindType(left, right);
                 bindType(right, left);
                 if (left.kind == Attribute.BOOLEAN || right.kind == Attribute.BOOLEAN) {
-                    return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);
+                    return node("(" + comparable(left) + " " + op + " " + comparable(right) + ")", Attribute.BOOLEAN, left, right);
                 }
                 if (numericKind(left.kind) && numericKind(right.kind)
                         && (left.kind == Attribute.REAL || right.kind == Attribute.REAL)) {
@@ -995,9 +1215,47 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     return node("(" + session.orderValue(left.sql, sqlKind(left, right.temporal)) + " " + op + " "
                             + session.orderValue(right.sql, sqlKind(right, left.temporal)) + ")", Attribute.BOOLEAN, left, right);
                 }
+                if (session.oracle()) {
+                    // Oracle stores '' as NULL, so `x <> ''` is never true and
+                    // `x = ''` never matches there; the empty string IS the null.
+                    Expr column = emptyText(right) ? left : emptyText(left) ? right : null;
+                    if (column != null) {
+                        return node("(" + column.sql + ("=".equals(op) ? " IS NULL)" : " IS NOT NULL)"),
+                                Attribute.BOOLEAN, column);
+                    }
+                    // A bound "" reaches Oracle as NULL too, so a text parameter
+                    // compares null-aware: "" matches the '' Oracle keeps as
+                    // NULL. On Oracle a null and an empty parameter are therefore
+                    // the same value, as they are in VARCHAR2 itself. Each
+                    // repeated marker binds the same value again (bind rendering
+                    // handles every occurrence separately).
+                    // A parameter's own kind is only known from the side it is
+                    // compared with, so the text side decides.
+                    if (left.entity == null && right.entity == null
+                            && !left.temporal && !right.temporal
+                            && (left.kind == Attribute.TEXT && right.parameter != null
+                                || right.kind == Attribute.TEXT && left.parameter != null)) {
+                        Expr text = left.kind == Attribute.TEXT && right.parameter != null ? left : right;
+                        String l = left.sql;
+                        String r = right.sql;
+                        // `<> 'bob'` keeps a NULL row only on a REQUIRED text
+                        // attribute, where NULL can only be the stored ''. A
+                        // nullable column's NULL may be a real null, which every
+                        // engine leaves out of `<>`; there the row is left out.
+                        String sql = "=".equals(op)
+                                ? "(" + l + " = " + r + " OR (" + l + " IS NULL AND " + r + " IS NULL))"
+                                : "(" + l + " <> " + r
+                                        + (text.nonNull ? " OR (" + l + " IS NULL AND " + r + " IS NOT NULL)" : "")
+                                        + " OR (" + l + " IS NOT NULL AND " + r + " IS NULL))";
+                        return node(sql, Attribute.BOOLEAN, left, right);
+                    }
+                }
                 return binary(left, op, right, Attribute.BOOLEAN);
             }
             return left;
+        }
+        private boolean emptyText(Expr e) {
+            return e.literal && "".equals(e.literalValue);
         }
         private Expr add() {
             Expr left = multiply();
@@ -1049,7 +1307,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     String left = operand.sql;
                     String right = test.sql;
                     if (operand.kind == Attribute.BOOLEAN || test.kind == Attribute.BOOLEAN) {
-                        left = condition(operand); right = condition(test);
+                        left = comparable(operand); right = comparable(test);
                     } else if (numericKind(operand.kind) && numericKind(test.kind)
                             && (operand.kind == Attribute.REAL || test.kind == Attribute.REAL)) {
                         left = session.numericOperand(left, Attribute.REAL);
@@ -1157,6 +1415,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if ("NULL".equalsIgnoreCase(token)) {
                 return literal(-1, null);
             }
+            if ("CURRENT_DATE".equalsIgnoreCase(token)) {
+                return clock(LiteralBinding.DATE);
+            }
+            if ("CURRENT_TIME".equalsIgnoreCase(token)) {
+                // No mapped type stores a bare time of day (no LocalTime
+                // converter, and a Date is an instant), so nothing could compare
+                // with it meaningfully: refused rather than read as a timestamp.
+                throw error("CURRENT_TIME is not supported: no entity field type holds a time of day");
+            }
+            if ("CURRENT_TIMESTAMP".equalsIgnoreCase(token)) {
+                return clock(LiteralBinding.TIMESTAMP);
+            }
             if ("TRUE".equalsIgnoreCase(token) || "FALSE".equalsIgnoreCase(token)) {
                 return literal(Attribute.BOOLEAN, Boolean.valueOf("TRUE".equalsIgnoreCase(token)));
             }
@@ -1185,6 +1455,22 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (take("(")) {
                 String function = upper(token);
+                if ("CEIL".equals(function)) {
+                    function = "CEILING";
+                } else if ("SUBSTR".equals(function)) {
+                    function = "SUBSTRING";
+                }
+                if ("SIZE".equals(function)) {
+                    return size();
+                }
+                if (" CONCAT SUBSTRING LOCATE MOD FLOOR CEILING ROUND SQRT ".contains(" " + function + " ")) {
+                    List<Expr> args = new ArrayList<Expr>();
+                    do {
+                        args.add(expression());
+                    } while (take(","));
+                    expect(")");
+                    return scalarFunction(function, args);
+                }
                 if (!(" COUNT SUM AVG MIN MAX LOWER UPPER LENGTH ABS COALESCE NULLIF TRIM ".contains(
                             " " + function + " "))) {
                     throw error("Unsupported function: " + token);
@@ -1215,8 +1501,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         sql.append(arg.query.rootAlias)
                                 .append('.')
                                 .append(session.q(arg.entity.attributes()[arg.entity.idIndex()].column));
+                    } else if (session.sqlServer() && arg.literal && arg.literalValue == null) {
+                        // SQL Server refuses an untyped NULL as an aggregate's operand.
+                        sql.append("CAST(").append(arg.sql).append(" AS INT)");
                     } else {
-                        sql.append(arg.sql);
+                        sql.append("AVG".equals(function) ? session.averageOperand(arg.sql, arg.kind) : arg.sql);
                     }
                 }
                 if ("NULLIF".equals(function)) {
@@ -1233,6 +1522,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     result.sql = session.integralSum(result.sql);
                 } else if ("AVG".equals(function)) {
                     result.sql = session.numericOperand(result.sql, Attribute.REAL);
+                } else if ("LENGTH".equals(function)) {
+                    result.sql = session.lengthResult(result.sql);
                 }
                 result.nonNull = "COUNT".equals(function);
                 result.coalesce = "COALESCE".equals(function);
@@ -1324,6 +1615,121 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 throw error("Association-valued scalar projections are not supported; select an explicit target field");
             }
         }
+        /// CONCAT, SUBSTRING, LOCATE, MOD, FLOOR, CEILING and ROUND (issue 6310):
+        /// the JPQL string and numeric functions beyond the original set, plus
+        /// the Hibernate FLOOR/CEILING/ROUND. Each is rendered per dialect by the
+        /// session, because the three databases spell several of them
+        /// differently -- MySQL's `||` is OR, SQLite has no LOCATE and, on the
+        /// platform builds, no FLOOR or CEILING -- and must answer the same.
+        private Expr scalarFunction(String function, List<Expr> args) {
+            int size = args.size();
+            for (Expr arg : args) {
+                if (arg.entity != null) {
+                    throw error("Entity argument requires COUNT");
+                }
+            }
+            String[] sql = new String[size];
+            for (int i = 0; i < size; i++) {
+                sql[i] = args.get(i).sql;
+            }
+            Expr result;
+            if ("CONCAT".equals(function)) {
+                if (size < 2) {
+                    throw error("Invalid argument count for CONCAT");
+                }
+                for (Expr arg : args) {
+                    requireText(arg, function);
+                }
+                result = new Expr(session.concat(sql), Attribute.TEXT);
+            } else if ("SUBSTRING".equals(function)) {
+                if (size != 2 && size != 3) {
+                    throw error("Invalid argument count for SUBSTRING");
+                }
+                requireText(args.get(0), function);
+                for (int i = 1; i < size; i++) {
+                    requireIntegral(args.get(i), function);
+                }
+                result = new Expr(session.substring(sql[0], sql[1], size == 3 ? sql[2] : null), Attribute.TEXT);
+            } else if ("LOCATE".equals(function)) {
+                if (size != 2 && size != 3) {
+                    throw error("Invalid argument count for LOCATE");
+                }
+                requireText(args.get(0), function);
+                requireText(args.get(1), function);
+                if (size == 3) {
+                    requireIntegral(args.get(2), function);
+                }
+                result = new Expr(session.locate(sql[0], sql[1], size == 3 ? sql[2] : null), Attribute.BIGINT);
+            } else if ("MOD".equals(function)) {
+                if (size != 2) {
+                    throw error("Invalid argument count for MOD");
+                }
+                // The remainder operator under its JPQL name: integral operands,
+                // and a zero divisor answers NULL on every dialect.
+                return arithmetic(args.get(0), "%", args.get(1));
+            } else if ("SQRT".equals(function)) {
+                if (size != 1) {
+                    throw error("Invalid argument count for SQRT");
+                }
+                Expr value = args.get(0);
+                requireNumeric(value, false);
+                if (value.kind < 0) {
+                    requireKind(value, Attribute.REAL);
+                }
+                result = new Expr(session.squareRoot(session.numericOperand(value.sql, Attribute.REAL)),
+                        Attribute.REAL);
+                result.numericOperands = true;
+            } else {
+                boolean round = "ROUND".equals(function);
+                if (round ? size != 1 && size != 2 : size != 1) {
+                    throw error("Invalid argument count for " + function);
+                }
+                Expr value = args.get(0);
+                requireNumeric(value, false);
+                int digits = 0;
+                if (size == 2) {
+                    Expr places = args.get(1);
+                    if (!places.literal || !(places.literalValue instanceof Long)) {
+                        throw error("ROUND takes an integer literal number of decimal places");
+                    }
+                    long requested = ((Long) places.literalValue).longValue();
+                    if (requested < 0 || requested > 15) {
+                        throw error("ROUND takes between 0 and 15 decimal places");
+                    }
+                    digits = (int) requested;
+                }
+                if (value.kind == Attribute.INTEGER || value.kind == Attribute.BIGINT) {
+                    // Already integral: integer division in JPQL truncates, so
+                    // FLOOR(a / b) over integers is the quotient on every dialect,
+                    // and MySQL's DIV keeps it integral rather than DECIMAL.
+                    result = new Expr(value.sql, Attribute.BIGINT);
+                } else {
+                    // A parameter without a declared kind binds as a double here.
+                    requireKind(value, Attribute.REAL);
+                    result = new Expr(session.roundingFunction(function, session.numericOperand(value.sql,
+                            Attribute.REAL), digits), Attribute.REAL);
+                }
+                result.numericOperands = true;
+            }
+            result.nullPreserving = true;
+            result.children.addAll(args);
+            return result;
+        }
+        private void requireText(Expr arg, String function) {
+            requireKind(arg, Attribute.TEXT);
+            if (arg.kind >= 0 && arg.temporal) {
+                throw error("Invalid operand type for " + function);
+            }
+        }
+        private void requireIntegral(Expr arg, String function) {
+            if (arg.kind == Attribute.REAL) {
+                throw error(function + " requires integral positions");
+            }
+            requireNumeric(arg, true);
+            if (arg.kind < 0) {
+                requireKind(arg, Attribute.BIGINT);
+            }
+        }
         private void validateFunction(String function, List<Expr> args, boolean distinct) {
             boolean aggregate = " COUNT SUM AVG MIN MAX ".contains(" " + function + " ");
             int size = args.size();
@@ -1375,6 +1781,45 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     }
                 }
             }
+        }
+        /// `SIZE(alias.path)`, the opening parenthesis already taken.
+        private Expr size() {
+            StringBuilder path = new StringBuilder(word());
+            while (take(".")) {
+                path.append('.').append(word());
+            }
+            expect(")");
+            String full = path.toString();
+            int dot = full.indexOf('.');
+            Alias alias = dot < 0 ? null : aliases.get(full.substring(0, dot));
+            if (alias == null) {
+                throw error("SIZE requires a collection path: " + full);
+            }
+            String sql;
+            try {
+                sql = alias.query.size(alias.field(full.substring(dot + 1)));
+            } catch (IllegalArgumentException invalid) {
+                IllegalArgumentException located = error(invalid.getMessage());
+                located.initCause(invalid);
+                throw located;
+            }
+            Expr result = new Expr(sql, Attribute.BIGINT);
+            result.nonNull = true;
+            return result;
+        }
+        /// CURRENT_DATE, CURRENT_TIME or CURRENT_TIMESTAMP: the clock read when
+        /// the query runs, bound in the storage of whatever it is compared with
+        /// (issue 6310). Bound rather than rendered as the database's own
+        /// function because the three databases store a temporal field in
+        /// three different forms here -- ISO text, epoch milliseconds, epoch
+        /// days -- and only the field's converter knows which.
+        private Expr clock(int which) {
+            LiteralBinding binding = new LiteralBinding(null);
+            binding.clock = which;
+            Expr result = new Expr(bind(binding), -1);
+            result.literalBinding = binding;
+            result.nonNull = true;
+            return result;
         }
         private Expr literal(int kind, Object value) {
             LiteralBinding binding = new LiteralBinding(value);
@@ -1437,7 +1882,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 return allowParameters || value.parameter.nonNull;
             }
             if (value.literal) {
-                return value.literalBinding.convert() != null;
+                return value.literalBinding.convert(0L) != null;
             }
             if (value.nonNull) {
                 return true;
@@ -1476,7 +1921,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private void requireNonNull(Expr value) {
             if (value.parameter != null) {
                 value.parameter.nonNull = true;
-            } else if (!value.literal || value.literalBinding.convert() == null) {
+            } else if (value.literalBinding != null && value.literalBinding.clock != 0) {
+                // CURRENT_DATE / CURRENT_TIMESTAMP: never null.
+                return;
+            } else if (!value.literal || value.literalBinding.convert(0L) == null) {
                 throw error("Bulk assignment to a required subtype attribute needs a non-null literal or parameter");
             }
         }
@@ -1503,7 +1951,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Expr selected = null;
             String mapping = null;
             for (Expr arg : args) {
-                if (arg.literal || arg.parameter != null) {
+                if (arg.literal || arg.parameter != null || arg.literalBinding != null) {
                     continue;
                 }
                 String current = arg.projectionQuery == null ? ""
@@ -1667,7 +2115,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return value;
         }
         private boolean flexibleMapping(Expr value) {
-            if (value.literal || value.parameter != null) {
+            // A clock binding (CURRENT_*) is bound in the mapping of what it
+            // meets, as a literal or parameter is.
+            if (value.literal || value.parameter != null || value.literalBinding != null) {
                 return true;
             }
             if (value.projectionQuery != null || value.query != null || !value.numericOperands
@@ -1709,6 +2159,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 value.parameter.logical = true;
             }
             return value.predicate ? value.sql : "(" + value.sql + " <> 0)";
+        }
+        /// A boolean as an operand of a comparison. T-SQL has no boolean values,
+        /// and neither has Oracle before 23ai, so a predicate cannot be compared
+        /// with another there; it is turned into 1 or 0 first.
+        private String comparable(Expr value) {
+            String predicate = condition(value);
+            return session.sqlServer() || session.oracle()
+                    ? "(CASE WHEN " + predicate + " THEN 1 ELSE 0 END)" : predicate;
         }
         private Expr logical(Expr left, String op, Expr right) {
             return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);

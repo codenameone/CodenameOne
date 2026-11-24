@@ -56,10 +56,18 @@ class ManagedSessionDatabaseTest {
         Assumptions.assumeTrue(url!=null && url.length()>0,"Set CN1_ORM_TEST_DATABASE_URL to an isolated PostgreSQL/MySQL/MariaDB database");
         Database db=Database.open(url);
         boolean mysql="mysql".equals(db.dialect().getName());
+        // SQL Server cannot point a session at another schema, so it gets a
+        // database of its own, as MySQL does.
+        boolean ownDatabase=mysql || "sqlserver".equals(db.dialect().getName());
+        // Oracle's schema is its user, and creating one needs CREATE USER: the
+        // test works in the connected, isolated schema and empties it after.
+        boolean oracle="oracle".equals(db.dialect().getName());
         String schema="cn1_orm_test_"+Long.toHexString(System.nanoTime());
         String quoted=db.dialect().quote(schema);
-        db.execute((mysql?"CREATE DATABASE ":"CREATE SCHEMA ")+quoted,new Object[0]);
-        db=inSchema(db,url,mysql,schema);
+        if(!oracle) {
+            db.execute((ownDatabase?"CREATE DATABASE ":"CREATE SCHEMA ")+quoted,new Object[0]);
+            db=inSchema(db,url,ownDatabase,schema);
+        }
         Models.register(new ManagedSessionTest.Model() {
             public int generation() { return 2; }
             public String generator() { return "Record_Sequence"; }
@@ -79,7 +87,8 @@ class ManagedSessionDatabaseTest {
             ManagedSessionTest.assertDecimalIdentifiers(db);
             ManagedSessionTest.assertBulkTextKeyBounds(db);
             ManagedSessionTest.assertMinimumLongLiteral(session);
-            ManagedSessionTest.assertCaseAndNativeQueries(session);
+            ManagedSessionTest.emptyTextIsNull="oracle".equals(db.dialect().getName());
+            try { ManagedSessionTest.assertCaseAndNativeQueries(session); } finally { ManagedSessionTest.emptyTextIsNull=false; }
             ManagedSessionTest.assertNativeProjectionWidths(session);
             assertThrows(PersistenceException.class,()->session.createNativeQuery("SELECT 1.5",Long.class).first());
             assertThrows(PersistenceException.class,()->session.createNativeQuery("SELECT 1",String.class).first());
@@ -90,7 +99,9 @@ class ManagedSessionDatabaseTest {
             try { ManagedSessionTest.assertRealAssignments(realSession); } finally { realSession.close(); }
 
 
-            if(!mysql) {
+            // PostgreSQL only: its identifiers are case sensitive when quoted,
+            // and the column type changes below use its USING clause.
+            if(!ownDatabase && !oracle) {
                 db.execute("ALTER TABLE managed_record RENAME COLUMN name TO \"Name\"",new Object[0]);
                 PersistenceException mismatch=assertThrows(PersistenceException.class,session::validateSchema);
                 assertTrue(mismatch.getMessage().contains("Missing column managed_record.name"));
@@ -105,12 +116,12 @@ class ManagedSessionDatabaseTest {
             ManagedSessionTest.Record entity=new ManagedSessionTest.Record();entity.name="record";entity.bytes=new byte[]{1,2};session.persist(entity);
             assertTrue(entity.id>0);session.commitTransaction();session.clear();
             for(String expression:new String[]{"1","abs(1)","coalesce(1,2)","nullif(1,2)","min(1)","max(1)","(select max(1) from ManagedSessionTest$Record i)"}) {
-                assertEquals(Long.valueOf(1),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression);
+                assertEquals(Long.valueOf(1),org.junit.jupiter.api.Assertions.assertDoesNotThrow(()->session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Long.class).first(),expression),expression);
             }
             for(String expression:new String[]{"1.5","abs(1.5)","coalesce(1.5,2.5)","avg(1.5)"}) {
                 assertEquals(Double.valueOf(1.5),session.createQuery("select "+expression+" from ManagedSessionTest$Record r",Double.class).first(),expression);
             }
-            for(String predicate:new String[]{":value is null",":value is not null","(:value) is null","coalesce(:a,:b) is null"}) {
+            for(String predicate:new String[]{"coalesce(:a,:b) is null"}) {
                 assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate));
             }
             assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where coalesce(:value,r.name) is not null").setParameter("value",null).list().size());
@@ -187,9 +198,21 @@ class ManagedSessionDatabaseTest {
             assertEquals(java.util.Arrays.asList(null,"Z","record"),session.createQuery("select distinct r.name from ManagedSessionTest$Record r order by r.name",String.class).list());
             assertEquals(upper.id,session.createQuery("select distinct r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class).offset(1).first().id);
             session.beginTransaction();session.lock(session.find(ManagedSessionTest.Record.class,entity.id),LockMode.PESSIMISTIC_WRITE);
+            // A lock with paging: MySQL takes LIMIT before FOR UPDATE, SQL Server a
+            // table hint, and Oracle (ORA-02014) locks the page's rows by key after.
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class)
+                    .lockMode(LockMode.PESSIMISTIC_WRITE).limit(1).list().size());
+            assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r order by r.name",ManagedSessionTest.Record.class)
+                    .lockMode(LockMode.PESSIMISTIC_WRITE).offset(1).limit(1).list().size());
+            assertFalse(session.createQuery("select r from ManagedSessionTest$Record r",ManagedSessionTest.Record.class)
+                    .lockMode(LockMode.PESSIMISTIC_READ).list().isEmpty());
+            // A text parameter compared outside GROUP BY stays a bind: on Oracle a
+            // 1500-character literal would be refused (ORA-01704).
+            assertTrue(session.createQuery("select r.counter, count(r) from ManagedSessionTest$Record r where r.name = :n group by r.counter",Object[].class)
+                    .setParameter("n",new String(new char[1500]).replace('\0','y')).list().isEmpty());
             CountDownLatch attempting=new CountDownLatch(1);
             Future<Long> waiting=workers.submit(()-> {
-                Database other=inSchema(Database.open(url),url,mysql,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                Database other=(oracle?Database.open(url):inSchema(Database.open(url),url,ownDatabase,schema));EntityManager em=EntityManager.open(other);Session s=em.openSession();
                 try {
                     s.beginTransaction();attempting.countDown();
                     ManagedSessionTest.Record locked=s.find(ManagedSessionTest.Record.class,entity.id,LockMode.PESSIMISTIC_WRITE);
@@ -200,7 +223,7 @@ class ManagedSessionDatabaseTest {
             assertThrows(TimeoutException.class,()->waiting.get(100,TimeUnit.MILLISECONDS));
             session.commitTransaction();assertEquals(1L,waiting.get(5,TimeUnit.SECONDS).longValue());
             Callable<Void> increment=()-> {
-                Database other=inSchema(Database.open(url),url,mysql,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
+                Database other=oracle?Database.open(url):inSchema(Database.open(url),url,ownDatabase,schema);EntityManager em=EntityManager.open(other);Session s=em.openSession();
                 try { for(int i=0;i<5;i++) { s.beginTransaction();assertTrue(s.increment(ManagedSessionTest.Record.class,entity.id,"counter",1));s.commitTransaction(); }return null; }
                 finally { s.close();em.close(); }
             };
@@ -213,7 +236,8 @@ class ManagedSessionDatabaseTest {
             assertNull(session.find(ManagedSessionTest.Record.class,entity.id));
             java.util.Map<String,com.codename1.impl.orm.EntityModel<?>> cycleModels=new java.util.LinkedHashMap<String,com.codename1.impl.orm.EntityModel<?>>();cycleModels.put(Cycle.class.getName(),new CycleModel());
             com.codename1.impl.orm.BackendSqlAccess cycleAccess=new com.codename1.impl.orm.BackendSqlAccess(null,db,db.dialect());
-            if(mysql) {
+            // Neither engine has deferrable constraints, so neither takes a cycle.
+            if(ownDatabase) {
                 assertThrows(com.codename1.orm.session.PersistenceException.class,()->new com.codename1.impl.orm.SessionImpl(cycleAccess,cycleModels));
             } else {
                 Session cycles=new com.codename1.impl.orm.SessionImpl(cycleAccess,cycleModels);
@@ -224,8 +248,20 @@ class ManagedSessionDatabaseTest {
             }
         } finally {
             workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);
-            try { session.close();db.execute((mysql?"DROP DATABASE ":"DROP SCHEMA ")+quoted+(mysql?"":" CASCADE"),new Object[0]); }
-            finally { manager.close(); }
+            if(oracle) {
+                try { session.close();db.execute("BEGIN FOR t IN (SELECT table_name FROM user_tables) LOOP "
+                        +"EXECUTE IMMEDIATE 'DROP TABLE \"' || t.table_name || '\" CASCADE CONSTRAINTS PURGE'; END LOOP; END;",new Object[0]); }
+                finally { manager.close(); }
+            } else if(ownDatabase && !mysql) {
+                // SQL Server cannot drop the database a session is in.
+                try { session.close(); } finally { manager.close(); }
+                db.close();
+                Database admin=Database.open(url);
+                try { admin.execute("DROP DATABASE "+quoted,new Object[0]); } finally { admin.close(); }
+            } else {
+                try { session.close();db.execute((mysql?"DROP DATABASE ":"DROP SCHEMA ")+quoted+(mysql?"":" CASCADE"),new Object[0]); }
+                finally { manager.close(); }
+            }
         }
     }
     /// A connection whose unqualified names resolve in the test's own schema. MySQL

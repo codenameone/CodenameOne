@@ -86,6 +86,7 @@ public class OrmAnnotationProcessorTest {
             + "@Lock(com.codename1.orm.session.LockMode.PESSIMISTIC_READ) @Query(\"select e from repositories.Note e where e.name=:name\") List<Note> lockedByName(@Param(\"name\") String name); "
             + "@Query(\"select sum(case when e.score>=:floor then 1 else 0 end) from repositories.Note e\") Long qualified(@Param(\"floor\") long floor); "
             + "@Query(\"select max(e.score) from repositories.Note e where e.name='other'\") java.util.Optional<Long> highest(); "
+            + "@Query(\"select count(e) from repositories.Note e where sqrt(e.score) > 1 and e.score < current_timestamp and e.score >= current_date\") Long recentRoots(); "
             + "@Query(\"select e.name, count(e) from repositories.Note e group by e.name\") List<Object[]> countsByName(); "
             + "@Query(\"select coalesce(sum(e.score),0), count(e) from repositories.Note e where e.name=:name\") Object[] totals(@Param(\"name\") String name); "
             + "@Query(\"select e.name, e.score from repositories.Note e where e.name=:name order by e.score desc\") java.util.Optional<Object[]> best(@Param(\"name\") String name); "
@@ -170,6 +171,43 @@ public class OrmAnnotationProcessorTest {
         finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
     }
 
+    /// CURRENT_DATE and CURRENT_TIMESTAMP bind in the storage of the field they
+    /// meet -- an Instant, a LocalDate, a LocalDateTime, a @Temporal Date of
+    /// either kind -- in a comparison and in a bulk assignment (issue 6310).
+    @Test
+    public void currentDateAndTimestampBindInEachFieldsStorage() throws Exception {
+        currentClock(false);
+        currentClock(true);
+    }
+    private void currentClock(boolean backend) throws Exception {
+        File classes=tmp.newFolder();
+        Map<String,String> sources=new java.util.LinkedHashMap<String,String>();
+        sources.put("clock.Stamp","package clock; import com.codename1.annotations.*; import com.codename1.annotations.db.*; @Entity public class Stamp { @Id public long id; public String name; public java.time.Instant at; public java.time.LocalDate day; public java.time.LocalDateTime local; "
+            + "@Temporal(TemporalType.TIMESTAMP) public java.util.Date ts; @Temporal(TemporalType.DATE) public java.util.Date d; }");
+        sources.put("clock.Check","package clock; import com.codename1.orm.session.*; public class Check { "
+            + "static void ok(boolean b,String m) { if(!b) throw new AssertionError(m); } "
+            + "static Stamp stamp(String name,long offset) { long t=System.currentTimeMillis()+offset; Stamp x=new Stamp(); x.name=name; x.at=java.time.Instant.ofEpochMilli(t); "
+            + "x.day=java.time.LocalDate.ofEpochDay(Math.floorDiv(t,86400000L)); x.local=java.time.LocalDateTime.ofEpochSecond(t/1000,0,java.time.ZoneOffset.UTC); x.ts=new java.util.Date(t); x.d=new java.util.Date(t); return x; } "
+            + "public static void run(Session s) { s.createTables(); s.beginTransaction(); s.persist(stamp(\"past\",-2*86400000L)); s.persist(stamp(\"future\",2*86400000L)); s.commitTransaction(); s.clear(); "
+            + "for(String f:new String[]{\"at < current_timestamp\",\"day < current_date\",\"local < current_timestamp\",\"ts < current_timestamp\",\"d < current_date\",\"local < current_date\",\"at >= current_date and at < current_timestamp\"}) { "
+            + "java.util.List<Stamp> hit=s.createQuery(\"select x from clock.Stamp x where x.\"+f.replace(\" and \",\" and x.\"),Stamp.class).list(); "
+            + "ok(f.contains(\">=\") ? hit.isEmpty() : hit.size()==1 && \"past\".equals(hit.get(0).name),f+\" \"+hit.size()); } "
+            + "s.beginTransaction(); int n=s.createQuery(\"update clock.Stamp x set x.at = current_timestamp, x.day = current_date, x.ts = current_timestamp where x.name = 'past'\").executeUpdate(); s.commitTransaction(); s.clear(); ok(n==1,\"updated \"+n); "
+            + "Stamp past=s.createQuery(\"select x from clock.Stamp x where x.name = 'past'\",Stamp.class).first(); long now=System.currentTimeMillis(); "
+            + "ok(Math.abs(past.at.toEpochMilli()-now)<60000,\"instant \"+past.at); ok(Math.abs(past.ts.getTime()-now)<60000,\"date \"+past.ts); "
+            + "ok(past.day.toEpochDay()==Math.floorDiv(now,86400000L),\"day \"+past.day); } }");
+        JavaSourceCompiler.compile(sources,classes,Arrays.asList(testClassesDir()));
+        ProcessorContext ctx=runProcessor(classes,backend ? backendClasspath() : Collections.<String>emptyList());assertFalse(ctx.getErrors().toString(),ctx.hasErrors());
+        java.net.URLClassLoader loader=new java.net.URLClassLoader(new URL[]{classes.toURI().toURL()},getClass().getClassLoader());
+        loader.loadClass(backend ? "cn1app.BackendDaoBootstrap" : "cn1app.DaoBootstrap").newInstance();
+        com.codename1.backend.orm.EntityManager server=backend ? com.codename1.backend.orm.EntityManager.open(com.codename1.backend.Database.open(":memory:")) : null;
+        com.codename1.orm.EntityManager client=backend ? null : com.codename1.orm.EntityManager.open(new com.codename1.impl.javase.SEDatabase(java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")));
+        com.codename1.orm.session.Session session=backend ? server.openSession() : client.openSession();
+        try { loader.loadClass("clock.Check").getMethod("run",com.codename1.orm.session.Session.class).invoke(null,session); }
+        catch(java.lang.reflect.InvocationTargetException e) { throw new AssertionError((backend?"backend: ":"client: ")+e.getCause(),e.getCause()); }
+        finally { session.close();if(server!=null)server.close();if(client!=null)client.close();loader.close(); }
+    }
+
     /// A JPQL @Query the runtime parser rejects fails the build, naming the method,
     /// instead of failing the first request that reaches it.
     @Test
@@ -182,6 +220,8 @@ public class OrmAnnotationProcessorTest {
                 + "@Query(\"select i from Item i where i.nmae = :n\") List<Item> typo(@Param(\"n\") String n); "
                 + "@Query(\"select i from Nothing i\") List<Item> entity(); "
                 + "@Query(\"select i from Item i right join Item j on i.id = j.id\") List<Item> rightJoin(); "
+                + "@Query(\"select count(i) from Item i where i.id < current_time\") Long atTime(); "
+                + "@Query(\"select size(i.name) from Item i\") List<Long> sized(); "
                 + "@Query(\"select i from Item i\") List<String> wrongType(); "
                 + "@Query(\"select i.name, i.id from Item i\") List<String> wrongArity(); "
                 + "@Query(\"select i.name from Item i\") List<Item> scalarAsEntity(); "
@@ -193,6 +233,8 @@ public class OrmAnnotationProcessorTest {
             assertTrue(errors,errors.contains("badjpql.Items.typo: JPQL rejected"));
             assertTrue(errors,errors.contains("badjpql.Items.entity: JPQL rejected"));
             assertTrue(errors,errors.contains("badjpql.Items.rightJoin: JPQL rejected"));
+            assertTrue(errors,errors.contains("badjpql.Items.atTime: JPQL rejected"));
+            assertTrue(errors,errors.contains("badjpql.Items.sized: JPQL rejected"));
             sources.clear();
             sources.put("badjpql.Loose","package badjpql; import com.codename1.orm.repository.*; public interface Loose extends CrudRepository<Item,Long> { @Query(\"select i from Item i\") java.util.List<Item> all(); }");
             JavaSourceCompiler.compile(sources,classes,Arrays.asList(classes,testClassesDir()));
@@ -572,6 +614,9 @@ public class OrmAnnotationProcessorTest {
             + "ok(back.lines().size()==1 && \"l1\".equals(back.lines().get(0).label()),\"to-many \"+back.lines()); "
             + "ok(back.lines().get(0).purchase().get()==back,\"back reference resolves to the managed copy\"); "
             + "ok(back.tags().contains(\"x\"),\"element collection\"); "
+            // JPQL SIZE over the mappedBy foreign key and the element collection (issue 6310).
+            + "Object[] sizes=(Object[])s.createQuery(\"select size(p.lines), size(p.tags) from shop.Purchase p\").list().get(0); "
+            + "ok(Long.valueOf(1).equals(sizes[0]) && Long.valueOf(1).equals(sizes[1]),\"SIZE \"+Arrays.asList(sizes)); "
             + "ok(back.customer().equals(Ref.of(s.find(Customer.class,bobId))),\"refs are equal by target\"); "
             + "s.clear(); Purchase cold=s.find(Purchase.class,p.id()); s.clear(); boolean refused=false; "
             + "try { cold.customer().get(); } catch(LazyInitializationException expected) { refused=true; } "
@@ -3558,11 +3603,11 @@ public class OrmAnnotationProcessorTest {
         List<String> statements=new ArrayList<String>();
         com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(
                 getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
-                    if(method.getName().equals("quote")) return com.codename1.backend.sql.Dialect.POSTGRES.quote((String)args[0]);
+                    if(method.getName().equals("quote")) return com.codename1.db.sql.Dialect.POSTGRES.quote((String)args[0]);
                     if(method.getName().equals("dialect")) return "postgresql";
-                    if(method.getName().equals("orderBy")) return com.codename1.backend.sql.Dialect.POSTGRES.orderBy((String)args[0],(Boolean)args[1],((Integer)args[2])==com.codename1.impl.orm.Attribute.TEXT);
-                    if(method.getName().equals("orderValue")) return com.codename1.backend.sql.Dialect.POSTGRES.comparison((String)args[0],((Integer)args[1])==com.codename1.impl.orm.Attribute.TEXT);
-                    if(method.getName().equals("limit")) return com.codename1.backend.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
+                    if(method.getName().equals("orderBy")) return com.codename1.db.sql.Dialect.POSTGRES.orderBy((String)args[0],(Boolean)args[1],((Integer)args[2])==com.codename1.impl.orm.Attribute.TEXT);
+                    if(method.getName().equals("orderValue")) return com.codename1.db.sql.Dialect.POSTGRES.comparison((String)args[0],((Integer)args[1])==com.codename1.impl.orm.Attribute.TEXT);
+                    if(method.getName().equals("limit")) return com.codename1.db.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
                     if(method.getName().equals("query")) { statements.add((String)args[0]);return Collections.emptyList(); }
                     if(method.getName().equals("close")) return null;
                     throw new AssertionError("Unexpected SQL adapter operation: "+method.getName());
