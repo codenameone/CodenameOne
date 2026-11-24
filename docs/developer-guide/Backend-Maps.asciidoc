@@ -30,8 +30,7 @@ the whole planet:
 
 [source,bash]
 ----
-pmtiles extract https://build.protomaps.com/20261120.pmtiles monaco.pmtiles \
-    --bbox=7.40,43.72,7.44,43.76 --maxzoom=15
+include::../demos/common/src/main/snippets/developer-guide/backend-maps.sh[tag=backend-maps-bash-001,indent=0]
 ----
 
 Any PMTiles version 3 archive works, for example one you build yourself with
@@ -45,8 +44,7 @@ use https://osmcode.org/osmium-tool/[osmium]:
 
 [source,bash]
 ----
-osmium extract --bbox=7.40,43.72,7.44,43.76 europe-latest.osm.pbf -o monaco.osm.pbf
-osmium cat some-lz4-extract.osm.pbf -o zlib.osm.pbf
+include::../demos/common/src/main/snippets/developer-guide/backend-maps.sh[tag=backend-maps-bash-002,indent=0]
 ----
 
 The extract is read once, before the server starts, and held in memory. Load
@@ -62,12 +60,7 @@ them, so put them before any catch-all:
 
 [source,java,role=cn1-no-try]
 ----
-OsmExtract town = OsmExtract.load("/data/monaco.osm.pbf");
-Backend.builder()
-        .handler(new MapTiles("/data/monaco.pmtiles", "/tiles"))
-        .handler(new OsmRouting(town, "/osrm"))
-        .handler(new OsmGeocoding(town, "/geo"))
-        .start();
+include::../demos/backend/src/main/java/com/codenameone/developerguide/backend/maps/MapServer.java[tag=backend-maps-server,indent=0]
 ----
 
 This server now answers:
@@ -102,18 +95,7 @@ On the client, point each service at your server:
 
 [source,java,role=cn1-no-try]
 ----
-String server = "https://maps.example.com";
-MapView map = new MapView(new MvtTileSource(server + "/tiles/tiles.json", 0, 15));
-Routing.setService(new OsrmRouteService(server + "/osrm"));
-NominatimGeocoder geocoder = new NominatimGeocoder(server + "/geo");
-geocoder.search("casino", 5, new GeocodeCallback() {
-    public void placesFound(List<Place> places) {
-        // show the results
-    }
-    public void geocodeFailed(String message, Throwable error) {
-        // tell the user
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BackendMapsClientSnippet.java[tag=backend-maps-client,indent=0]
 ----
 
 A URL without a `{z}` token is read as TileJSON, so the zoom range and the

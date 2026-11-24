@@ -48,7 +48,7 @@ import java.util.Map;
 /// geocoder.search("main street 12", 5, new GeocodeCallback() {
 ///     public void placesFound(List places) {
 ///         Place best = (Place) places.get(0);
-///         map.setCameraPosition(best.getLocation(), 16);
+///         Log.p(best.getDisplayName() + " at " + best.getLocation());
 ///     }
 ///     public void geocodeFailed(String message, Throwable error) {
 ///         Log.p(message);

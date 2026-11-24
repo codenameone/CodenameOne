@@ -73,17 +73,7 @@ https://nominatim.org[Nominatim] API that OpenStreetMap's own search uses:
 
 [source,java,role=cn1-no-try]
 ----
-NominatimGeocoder geocoder = new NominatimGeocoder();
-geocoder.search("10 Downing Street, London", 5, new GeocodeCallback() {
-    public void placesFound(List<Place> places) {
-        if (!places.isEmpty()) {
-            map.moveCamera(places.get(0).getLocation(), 17);
-        }
-    }
-    public void geocodeFailed(String message, Throwable error) {
-        ToastBar.showErrorMessage(message);
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MapsGeocodeSnippet.java[tag=maps-geocode,indent=0]
 ----
 
 `reverse(LatLng, callback)` answers the address at a point. Each `Place` carries
