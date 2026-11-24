@@ -34,17 +34,9 @@ import com.codename1.ui.Graphics;
 /// landed on. `EditorView` and the word processing `DocumentView` share it, so both editors
 /// look and behave the same under a finger.
 ///
-/// ```java
-/// TouchSelection chrome = new TouchSelection(host);
-/// // in longPointerPress, after selecting a word:
-/// chrome.setShown(true);
-/// // in paint, after the content:
-/// if (hasSelection()) {
-///     chrome.paint(g, this);
-/// }
-/// // in pointerPressed, before anything else:
-/// int hit = chrome.press(this, x, y);
-/// ```
+/// The host shows the chrome with `setShown(true)` after a long press selects a word, calls
+/// `paint` after painting its content while a selection exists, and hands every press to
+/// `press` before handling it itself.
 public final class TouchSelection {
     /// `press` hit nothing; the chrome was dismissed.
     public static final int MISSED = 0;
