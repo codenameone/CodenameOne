@@ -145,7 +145,7 @@ final class SellScreen {
         Container cart = cartPanel();
         if (PosUi.wide()) {
             root.add(BorderLayout.CENTER, products);
-            cart.setPreferredW(Math.max(CN.convertToPixels(90), CN.getDisplayWidth() * 2 / 5));
+            cart.setPreferredW(cartWidth());
             root.add(BorderLayout.EAST, cart);
         } else {
             root.add(BorderLayout.CENTER, products);
@@ -218,7 +218,7 @@ final class SellScreen {
         }
         List<String> ids = collection.length() == 0 ? null : PosState.collections().get(collection);
         List<List<PosItemDto>> products = Snapshot.products(Snapshot.filter(c.items(), query, ids));
-        int width = PosUi.wide() ? CN.getDisplayWidth() * 3 / 5 : CN.getDisplayWidth();
+        int width = PosUi.wide() ? CN.getDisplayWidth() - cartWidth() : CN.getDisplayWidth();
         int cols = Layouts.columns(width, 30f, 6);
         grid.setLayout(new GridLayout(Math.max(1, (products.size() + cols - 1) / cols), cols));
         int side = tileSide(width, cols);
@@ -258,7 +258,7 @@ final class SellScreen {
     /// The smart grid: a tile per product, variant or collection the store
     /// placed, in its order; a tile whose target left the catalog is skipped.
     private void fillHome(PosCatalogDto c, List<GridTileDto> tiles) {
-        int width = PosUi.wide() ? CN.getDisplayWidth() * 3 / 5 : CN.getDisplayWidth();
+        int width = PosUi.wide() ? CN.getDisplayWidth() - cartWidth() : CN.getDisplayWidth();
         int cols = Layouts.columns(width, 30f, 6);
         int side = tileSide(width, cols);
         List<Component> shown = new ArrayList<Component>();
@@ -1014,5 +1014,13 @@ final class SellScreen {
         }
         ParkedPane.parkCurrent();
         refocus();
+    }
+
+    /// The cart panel's width beside the grid: two fifths of the screen, at
+    /// least 90mm where the screen is wide and 64mm on an upright tablet,
+    /// where 90mm would leave the grid a single column.
+    private static int cartWidth() {
+        int min = CN.convertToPixels(Layouts.wide() ? 90 : 64);
+        return Math.max(min, CN.getDisplayWidth() * 2 / 5);
     }
 }

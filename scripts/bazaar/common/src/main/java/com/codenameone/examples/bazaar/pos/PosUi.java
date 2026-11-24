@@ -39,9 +39,12 @@ final class PosUi {
     private PosUi() {
     }
 
-    /// Whether the register is laid out side by side (tablet, desktop).
+    /// Whether the register is laid out side by side: the product grid beside
+    /// the cart, sheets as side panels. True from a tablet held upright
+    /// ([Layouts#split()]), like the merchant panes, not only on a tablet on
+    /// its side; a phone keeps the bottom sheets.
     static boolean wide() {
-        return Layouts.wide();
+        return Layouts.split();
     }
 
     static Label label(String text, String uiid) {
