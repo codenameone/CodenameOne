@@ -22,8 +22,8 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.util.StringUtil;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -433,41 +433,41 @@ final class DocReader {
         }
         body += sectPr(sects.get(sects.size() - 1));
         parts.put("word/document.xml",
-                utf8(xmlDecl() + "<w:document" + NS + "><w:body>" + body + "</w:body></w:document>"));
-        parts.put("word/styles.xml", utf8(stylesXml()));
+                StringUtil.getBytes(xmlDecl() + "<w:document" + NS + "><w:body>" + body + "</w:body></w:document>"));
+        parts.put("word/styles.xml", StringUtil.getBytes(stylesXml()));
         rel("styles", "styles.xml");
         override("/word/styles.xml", CT + "styles+xml");
         if (numbering != null) {
-            parts.put("word/numbering.xml", utf8(numbering));
+            parts.put("word/numbering.xml", StringUtil.getBytes(numbering));
             rel("numbering", "numbering.xml");
             override("/word/numbering.xml", CT + "numbering+xml");
         }
         if (footnotes != null) {
-            parts.put("word/footnotes.xml", utf8(footnotes));
+            parts.put("word/footnotes.xml", StringUtil.getBytes(footnotes));
             rel("footnotes", "footnotes.xml");
             override("/word/footnotes.xml", CT + "footnotes+xml");
         }
         if (endnotes != null) {
-            parts.put("word/endnotes.xml", utf8(endnotes));
+            parts.put("word/endnotes.xml", StringUtil.getBytes(endnotes));
             rel("endnotes", "endnotes.xml");
             override("/word/endnotes.xml", CT + "endnotes+xml");
         }
         if (comments != null) {
-            parts.put("word/comments.xml", utf8(comments));
+            parts.put("word/comments.xml", StringUtil.getBytes(comments));
             rel("comments", "comments.xml");
             override("/word/comments.xml", CT + "comments+xml");
         }
         parts.put("word/_rels/document.xml.rels",
-                utf8(xmlDecl()
+                StringUtil.getBytes(xmlDecl()
                         + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
                         + rels + "</Relationships>"));
         parts.put("_rels/.rels",
-                utf8(xmlDecl()
+                StringUtil.getBytes(xmlDecl()
                         + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
                         + "<Relationship Id=\"rId1\" Type=\"" + REL
                         + "officeDocument\" Target=\"word/document.xml\"/></Relationships>"));
         parts.put("[Content_Types].xml",
-                utf8(xmlDecl() + "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
+                StringUtil.getBytes(xmlDecl() + "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">"
                         + ("<Default Extension=\"rels\" "
                            + "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>")
                         + "<Default Extension=\"xml\" ContentType=\"application/xml\"/>"
@@ -478,14 +478,6 @@ final class DocReader {
                         + "<Override PartName=\"/word/document.xml\" ContentType=\"" + CT + "document.main+xml\"/>"
                         + types + "</Types>"));
         return parts;
-    }
-
-    private static byte[] utf8(String s) {
-        try {
-            return s.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException ex) {
-            throw new IllegalStateException("UTF-8 is not supported"); //NOPMD PreserveStackTrace - UTF-8 always exists
-        }
     }
 
     private static String xmlDecl() {

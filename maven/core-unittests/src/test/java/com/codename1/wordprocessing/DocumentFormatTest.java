@@ -171,7 +171,34 @@ class DocumentFormatTest extends UITestBase {
         Table t = (Table) d.get(1);
         assertEquals(2, t.span(0, 0).rows);
         assertEquals("z", t.cellText(1, 1));
-        assertEquals("remote", ((Paragraph) d.get(2)).plainText());
+        Picture remote = (Picture) d.get(2);
+        assertTrue(remote.isLinked());
+        assertEquals("http://example.com/a.png", remote.source);
+        assertEquals("remote", remote.description);
+    }
+
+    @Test
+    void linkedPicturesKeepTheirUrl() throws IOException {
+        Document d = read("![logo](https://example.com/l.png)\n\nA [![i](a.png)](https://x.org) b",
+                Document.Format.MARKDOWN);
+        Picture block = (Picture) d.get(0);
+        assertEquals("https://example.com/l.png", block.source);
+        Paragraph p = (Paragraph) d.get(1);
+        Picture inline = (Picture) p.text.objectAt(2);
+        assertEquals("a.png", inline.source);
+        assertEquals("https://x.org", p.text.styleAt(2).link);
+        for (Document.Format f : new Document.Format[] {Document.Format.MARKDOWN,
+                Document.Format.HTML, Document.Format.NATIVE}) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            d.write(out, f);
+            Document back = Document.read(new ByteArrayInputStream(out.toByteArray()), f);
+            assertEquals("https://example.com/l.png", ((Picture) back.get(0)).source, f.name());
+        }
+        // formats that only embed bytes skip a linked picture without failing
+        assertTrue(RichTextDocuments.writeRtf(d).startsWith("{\\rtf1"));
+        ByteArrayOutputStream docx = new ByteArrayOutputStream();
+        d.write(docx, Document.Format.DOCX);
+        assertTrue(docx.size() > 0);
     }
 
     @Test

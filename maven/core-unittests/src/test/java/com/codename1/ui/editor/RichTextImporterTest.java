@@ -167,6 +167,25 @@ class RichTextImporterTest extends UITestBase {
     }
 
     @Test
+    void rtfKeepsSpacesBetweenStyledRunsAndWideCharacters() {
+        HtmlImporter.Result r = parse("{\\rtf1\\ansi {\\b a} {\\i b} \u0416}", RichTextFormat.RTF);
+        assertEquals("a b \u0416", r.getText());
+        assertTrue(r.getStyles().get(0).isBold());
+        assertTrue(r.getStyles().get(2).isItalic());
+    }
+
+    @Test
+    void markdownHeadingsAreNotBoldTextAndCodeBlocksSurvive() {
+        HtmlImporter.Result r = parse("# Head\n\n```\nx = 1\n```\n\n> q", RichTextFormat.MARKDOWN);
+        assertFalse(r.getStyles().get(0).isBold());
+        assertEquals(RichBlocks.PRE, r.getBlocks().get(1).type);
+        assertEquals(RichBlocks.BLOCKQUOTE, r.getBlocks().get(2).type);
+        String back = serialize(r, RichTextFormat.MARKDOWN);
+        assertTrue(back.startsWith("# Head"), back);
+        assertTrue(back.contains("x = 1"), back);
+    }
+
+    @Test
     void lightweightFormatsRoundTripEscapesAndLinkedImages() {
         String markdownSource = "[![image](logo.png)](https://example.com) and literal \\*asterisk\\*";
         HtmlImporter.Result markdown = RichTextImporter.parse(markdownSource, RichTextFormat.MARKDOWN);
@@ -174,7 +193,9 @@ class RichTextImporterTest extends UITestBase {
         assertTrue(image >= 0);
         assertEquals("logo.png", markdown.getImageSources().get(image));
         assertEquals("https://example.com", markdown.getLinks().get(image));
-        assertEquals(markdownSource, serialize(markdown, RichTextFormat.MARKDOWN));
+        // the editor keeps no alternative text, so the image comes back without one
+        assertEquals("[![](logo.png)](https://example.com) and literal \\*asterisk\\*",
+                serialize(markdown, RichTextFormat.MARKDOWN));
 
         String asciidocSource = "https://example.com[image:logo.png[]] and literal \\*asterisk\\*";
         HtmlImporter.Result asciidoc = RichTextImporter.parse(asciidocSource, RichTextFormat.ASCIIDOC);

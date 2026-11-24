@@ -24,6 +24,7 @@ package com.codename1.spellcheck;
 
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
+import com.codename1.ui.editor.WordCharacters;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -317,16 +318,17 @@ public abstract class SpellChecker {
     }
 
     static boolean letter(char c) {
-        return Character.isLetter(c);
+        // CLDC's Character has no Unicode categories; this table is the same on every port
+        return c != '_' && (c < '0' || c > '9') && WordCharacters.isWordCharacter(c);
     }
 
     private static String trimmed(String word) {
         int a = 0;
         int b = word.length();
-        while (a < b && !Character.isLetterOrDigit(word.charAt(a))) {
+        while (a < b && !letterOrDigit(word.charAt(a))) {
             a++;
         }
-        while (b > a && !Character.isLetterOrDigit(word.charAt(b - 1))) {
+        while (b > a && !letterOrDigit(word.charAt(b - 1))) {
             b--;
         }
         return word.substring(a, b);
@@ -437,7 +439,11 @@ public abstract class SpellChecker {
     }
 
     private static boolean wordChar(char c) {
-        return Character.isLetterOrDigit(c) || c == '\'' || c == '\u2019' || c == '-';
+        return letterOrDigit(c) || c == '\'' || c == '\u2019' || c == '-';
+    }
+
+    private static boolean letterOrDigit(char c) {
+        return c != '_' && WordCharacters.isWordCharacter(c);
     }
 
     /// The words of a text as `{start, end}` pairs, apostrophes and hyphens at either end
@@ -465,10 +471,10 @@ public abstract class SpellChecker {
             }
             int a = i;
             int b = j;
-            while (a < b && !Character.isLetterOrDigit(text.charAt(a))) {
+            while (a < b && !letterOrDigit(text.charAt(a))) {
                 a++;
             }
-            while (b > a && !Character.isLetterOrDigit(text.charAt(b - 1))) {
+            while (b > a && !letterOrDigit(text.charAt(b - 1))) {
                 b--;
             }
             if (a < b) {

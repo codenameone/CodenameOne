@@ -141,7 +141,7 @@ public final class GrammarChecker {
 
     static boolean alpha(String w) {
         for (int i = 0; i < w.length(); i++) {
-            if (!Character.isLetter(w.charAt(i))) {
+            if (!SpellChecker.letter(w.charAt(i))) {
                 return false;
             }
         }
@@ -195,7 +195,7 @@ public final class GrammarChecker {
                 if (("a".equals(w0) || "A".equals(w0)) && vowel && !consonantSound(w1)) {
                     out.add(issue(x[0], x[1], "Use \"an\" before a vowel sound",
                             "A".equals(w0) ? "An" : "an"));
-                } else if (("an".equals(w0) || "An".equals(w0)) && Character.isLetter(c1)
+                } else if (("an".equals(w0) || "An".equals(w0)) && SpellChecker.letter(c1)
                         && "aeiouAEIOUhH".indexOf(c1) < 0
                         && !HunspellDictionary.upper(w1).equals(w1)) {
                     out.add(issue(x[0], x[1], "Use \"a\" before a consonant sound",

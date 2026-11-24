@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.util.StringUtil;
 import com.codename1.impl.xml.XmlScanner;
 
 import java.io.ByteArrayInputStream;
@@ -103,7 +104,7 @@ final class OdtReader {
     private Document read() throws IOException {
         byte[] mime = parts.get("mimetype");
         if (mime != null) {
-            String m = new String(mime, "UTF-8").trim();
+            String m = StringUtil.newString(mime).trim();
             if (!m.startsWith("application/vnd.oasis.opendocument.text")) {
                 throw new IOException("Not an OpenDocument text file: " + m);
             }

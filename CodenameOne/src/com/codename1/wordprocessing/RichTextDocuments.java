@@ -25,6 +25,9 @@ package com.codename1.wordprocessing;
 import com.codename1.ui.RichTextArea;
 import com.codename1.util.SuccessCallback;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
 /// Moves content between a `RichTextArea` and a `Document`, so the light editor and the paged
 /// one can work on the same text.
 ///
@@ -83,6 +86,113 @@ public final class RichTextDocuments {
     /// the document
     public static Document fromHtml(String html) {
         return HtmlFormat.read(html == null ? "" : html);
+    }
+
+    /// Reads Markdown. Unlike `Document.read`, this reaches no other format's code, so an
+    /// application that only exchanges Markdown with a rich text editor carries no DOCX, ODT
+    /// or PDF support.
+    ///
+    /// #### Parameters
+    ///
+    /// - `markdown`: the source
+    ///
+    /// #### Returns
+    ///
+    /// the document
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the source nests too deeply for the thread's stack
+    public static Document readMarkdown(String markdown) throws IOException {
+        try {
+            return MarkdownFormat.read(markdown == null ? "" : markdown);
+        } catch (OutOfMemoryError ex) {
+            throw ex;
+        } catch (VirtualMachineError ex) {
+            throw tooDeep(ex);
+        }
+    }
+
+    /// Writes Markdown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the document
+    ///
+    /// #### Returns
+    ///
+    /// the Markdown
+    public static String writeMarkdown(Document d) {
+        return MarkdownFormat.write(d);
+    }
+
+    /// Reads RTF from a string, as a clipboard gives it. Characters above U+00FF, which RTF
+    /// spells with escapes, are kept: each becomes the backslash-u control word that says it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtf`: the source
+    ///
+    /// #### Returns
+    ///
+    /// the document
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the source is not RTF or nests too deeply for the thread's stack
+    public static Document readRtf(String rtf) throws IOException {
+        String value = rtf == null ? "" : rtf;
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x100) {
+                bytes.write(c);
+            } else {
+                byte[] escape = Ids.ascii("\\u" + (int) (short) c + "?");
+                bytes.write(escape, 0, escape.length);
+            }
+        }
+        try {
+            return RtfReader.read(bytes.toByteArray());
+        } catch (OutOfMemoryError ex) {
+            throw ex;
+        } catch (VirtualMachineError ex) {
+            throw tooDeep(ex);
+        }
+    }
+
+    /// Writes RTF.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the document
+    ///
+    /// #### Returns
+    ///
+    /// the RTF, which is 7-bit
+    public static String writeRtf(Document d) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            RtfWriter.write(d, out);
+        } catch (IOException ex) {
+            // a ByteArrayOutputStream does not fail
+            throw new IllegalStateException(ex.toString()); //NOPMD PreserveStackTrace - CLDC has no cause constructor
+        }
+        // RTF is 7-bit: each byte is one character, so no charset is involved
+        byte[] b = out.toByteArray();
+        char[] c = new char[b.length];
+        for (int i = 0; i < b.length; i++) {
+            c[i] = (char) (b[i] & 0xff);
+        }
+        return new String(c);
+    }
+
+    private static IOException tooDeep(VirtualMachineError ex) {
+        // a stack overflow: StackOverflowError is not in the CLDC library the core compiles
+        // against, and out of memory is rethrown before this
+        IOException e = new IOException("The document is nested too deeply: " + ex);
+        e.initCause(ex);
+        return e;
     }
 
     /// Reads a rich text editor's content as a document. The editor answers asynchronously.

@@ -475,8 +475,19 @@ final class HtmlFormat {
 
     private static Picture picture(Element e, Reader r) {
         String src = e.getAttribute("src");
-        if (src == null || !src.startsWith("data:")) {
+        if (src == null || src.trim().length() == 0) {
             return null;
+        }
+        float w = dimension(e, "width");
+        float h = dimension(e, "height");
+        if (w <= 0) {
+            w = h > 0 ? h : 144;
+        }
+        if (h <= 0) {
+            h = w;
+        }
+        if (!src.startsWith("data:")) {
+            return Picture.linked(r.next('i'), src.trim(), w, h, e.getAttribute("alt"));
         }
         int comma = src.indexOf(',');
         int semi = src.indexOf(";base64");
@@ -487,16 +498,7 @@ final class HtmlFormat {
         if (data == null || data.length == 0) {
             return null;
         }
-        String mime = src.substring(5, semi);
-        float w = dimension(e, "width");
-        float h = dimension(e, "height");
-        if (w <= 0) {
-            w = h > 0 ? h : 144;
-        }
-        if (h <= 0) {
-            h = w;
-        }
-        return new Picture(r.next('i'), data, mime, w, h, e.getAttribute("alt"));
+        return new Picture(r.next('i'), data, src.substring(5, semi), w, h, e.getAttribute("alt"));
     }
 
     /// An image that stands for an embedded component: one with `data-cn1-component`, or a
@@ -782,10 +784,10 @@ final class HtmlFormat {
             }
             if (s.color != TextStyle.DEFAULT.color && (s.link.length() == 0
                     || s.color != 0x1a5fb4)) {
-                css.append("color:").append(hex(s.color)).append(';');
+                css.append("color:").append("#" + Ids.hex(s.color)).append(';');
             }
             if (s.background != TextStyle.NO_BACKGROUND) {
-                css.append("background-color:").append(hex(s.background)).append(';');
+                css.append("background-color:").append("#" + Ids.hex(s.background)).append(';');
             }
             if (css.length() > 0) {
                 b.append("<span style=\"").append(css).append("\">");
@@ -829,11 +831,6 @@ final class HtmlFormat {
                 b.append("</").append(close.get(k)).append('>');
             }
         }
-    }
-
-    private static String hex(int rgb) {
-        String h = Integer.toHexString(0x1000000 | rgb & 0xffffff);
-        return "#" + h.substring(1);
     }
 
     private static void table(StringBuilder b, Table t, List<Note> notes) {
@@ -893,8 +890,14 @@ final class HtmlFormat {
     }
 
     private static void picture(StringBuilder b, Picture p) {
-        b.append("<img src=\"data:").append(p.mimeType).append(";base64,")
-                .append(Base64.encodeNoNewline(p.data())).append("\" style=\"width:")
+        b.append("<img src=\"");
+        if (p.isLinked()) {
+            escape(b, p.source);
+        } else {
+            b.append("data:").append(p.mimeType).append(";base64,")
+                    .append(Base64.encodeNoNewline(p.data()));
+        }
+        b.append("\" style=\"width:")
                 .append(Ids.fmt(p.width)).append("pt;height:").append(Ids.fmt(p.height))
                 .append("pt\" alt=\"");
         escape(b, p.description);

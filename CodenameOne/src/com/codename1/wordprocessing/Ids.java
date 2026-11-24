@@ -64,6 +64,11 @@ final class Ids {
         return out;
     }
 
+    /// Six lowercase hex digits for an RGB color.
+    static String hex(int rgb) {
+        return Integer.toHexString(0x1000000 | rgb & 0xffffff).substring(1);
+    }
+
     static String fmt(float f) {
         if (f == (int) f) {
             return String.valueOf((int) f);

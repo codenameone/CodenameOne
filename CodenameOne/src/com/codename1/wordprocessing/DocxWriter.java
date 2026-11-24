@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.util.StringUtil;
 import com.codename1.io.zip.ZipArchiveOutputStream;
 
 import java.io.IOException;
@@ -161,7 +162,7 @@ final class DocxWriter {
 
     private static void entry(ZipArchiveOutputStream zip, String name, String content)
             throws IOException {
-        byte[] b = content.getBytes("UTF-8");
+        byte[] b = StringUtil.getBytes(content);
         zip.putNextEntry(new ZipEntry(name));
         zip.write(b, 0, b.length);
         zip.closeEntry();
@@ -710,10 +711,10 @@ final class DocxWriter {
         if (s.strike) {
             b.append("<w:strike/>");
         }
-        b.append("<w:color w:val=\"").append(hex(s.color)).append("\"/>");
+        b.append("<w:color w:val=\"").append(Ids.hex(s.color)).append("\"/>");
         b.append("<w:sz w:val=\"").append(Math.max(2, Math.round(s.size * 2))).append("\"/>");
         if (s.background != TextStyle.NO_BACKGROUND) {
-            b.append("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"").append(hex(s.background))
+            b.append("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"").append(Ids.hex(s.background))
                     .append("\"/>");
         }
         if (s.underline) {
@@ -723,14 +724,6 @@ final class DocxWriter {
             b.append("<w:vertAlign w:val=\"").append(s.script).append("\"/>");
         }
         b.append("</w:rPr>");
-    }
-
-    private static String hex(int rgb) {
-        String h = Integer.toHexString(rgb & 0xffffff);
-        while (h.length() < 6) {
-            h = "0" + h;
-        }
-        return h;
     }
 
     private void inlineObject(StringBuilder b, Inline o, TextStyle style) {
@@ -798,6 +791,13 @@ final class DocxWriter {
     }
 
     private void drawing(StringBuilder b, Picture p) {
+        if (p.isLinked()) {
+            // a linked picture has no bytes to embed; its alternative text stands in for it
+            b.append("<w:t xml:space=\"preserve\">");
+            esc(b, p.description);
+            b.append("</w:t>");
+            return;
+        }
         String ext = "image/png".equals(p.mimeType) ? "png" : "image/jpeg".equals(p.mimeType)
                 ? "jpeg" : "image/gif".equals(p.mimeType) ? "gif" : "bin";
         String id = "rIdM" + mediaData.size();

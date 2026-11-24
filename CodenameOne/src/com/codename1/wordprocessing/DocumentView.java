@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.spellcheck.ProofIssue;
@@ -32,11 +33,15 @@ import com.codename1.ui.Image;
 import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.TextInputClient;
 import com.codename1.ui.TextInputConfig;
+import com.codename1.ui.TextInputGeometry;
 import com.codename1.ui.TextInputState;
+import com.codename1.ui.editor.TouchSelection;
+import com.codename1.ui.editor.WordCharacters;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.util.EventDispatcher;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +66,8 @@ import java.util.Map;
 /// A tap places the caret, a drag or a double tap selects, and typing, Backspace, Delete and
 /// Enter edit through the model, which gives undo for free. Pinch or Control and the wheel
 /// zooms; by default a page is fitted to the view's width when it would not fit.
-public class DocumentView extends ScrollSurface implements TextInputClient {
+public class DocumentView extends ScrollSurface implements TextInputClient,
+        TextInputClient.CompositionCancellation, TextInputGeometry.Provider {
     private static final int DESK = 0xe3e6ea;
     /// The desk in dark mode. The pages stay white, as a word processor keeps them, so the
     /// document looks the same printed as on screen.
@@ -88,6 +94,45 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     private TextPosition caret;
     private TextPosition anchor;
     private Object inputHandle;
+    private boolean touchEdit;
+    private final TouchSelection touchChrome = new TouchSelection(new TouchSelection.Host() {
+        @Override
+        public int[] edgeRect(boolean start) {
+            TextPosition[] sel = getSelection();
+            TextPosition at = sel == null ? caret : sel[start ? 0 : 1];
+            float[] r = at == null ? null : getLayout().caretRect(at);
+            if (r == null) {
+                return new int[] {0, 0, 1};
+            }
+            float scale = getScale();
+            return new int[] {pageLeft((int) r[0]) - getOffsetX() + Math.round(r[1] * scale),
+                pageTop((int) r[0]) - getOffsetY() + Math.round(r[2] * scale),
+                Math.max(1, Math.round(r[3] * scale))};
+        }
+
+        @Override
+        public boolean canEdit() {
+            return editable;
+        }
+
+        @Override
+        public void toolbarAction(int action) {
+            if (action == TouchSelection.COPY) {
+                copySelection();
+            } else if (action == TouchSelection.CUT) {
+                cutSelection();
+            } else if (action == TouchSelection.PASTE) {
+                pasteClipboard();
+            } else {
+                selectAll();
+            }
+        }
+
+        @Override
+        public Font chromeFont() {
+            return getStyle().getFont();
+        }
+    });
     private boolean caretOn = true;
     private long lastBlink;
     private final ScreenMeasurer screenFonts = new ScreenMeasurer();
@@ -300,6 +345,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     ///
     /// - `to`: where the caret is
     public void setSelection(TextPosition from, TextPosition to) {
+        if (from == null || from.equals(to)) {
+            touchChrome.setShown(false);
+        }
         anchor = from;
         caret = to;
         caretOn = true;
@@ -571,7 +619,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         paintTexts.clear();
         paintOrder = null;
         if (!model.getDocument().comments.isEmpty()) {
-            paintOrder = new java.util.ArrayList<String>();
+            paintOrder = new ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, paintOrder);
         }
         // null when the platform cannot tell
@@ -679,7 +727,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     private void paintPicture(Graphics g, Picture p, int x, int y, int w, int h) {
         String key = p.id + ":" + p.dataLength() + ":" + p.hashCode();
         Image img = images.get(key);
-        if (img == null && !images.containsKey(key)) {
+        if (img == null && !images.containsKey(key) && !p.isLinked()) {
             try {
                 img = EncodedImage.create(p.data());
             } catch (RuntimeException e) {
@@ -851,7 +899,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     ///
     /// the comments, empty when there is no caret
     public List<Comment> getCommentsAtCaret() {
-        return caret == null ? new java.util.ArrayList<Comment>() : model.commentsAt(caret);
+        return caret == null ? new ArrayList<Comment>() : model.commentsAt(caret);
     }
 
     /// Adds a review comment over the selection, by the model's author.
@@ -903,7 +951,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     private void paintSelection(Graphics g, DocumentLayout l, int page, TextPosition[] sel,
             int left, int top, float scale) {
-        List<String> order = new java.util.ArrayList<String>();
+        List<String> order = new ArrayList<String>();
         DocumentModel.collectIds(model.getDocument().blocks, order);
         int a = order.indexOf(sel[0].paragraphId);
         int b = order.indexOf(sel[1].paragraphId);
@@ -964,6 +1012,11 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     @Override
     protected void tapped(int x, int y, boolean doubleTap) {
+        if (getSelection() != null
+                && touchChrome.press(this, x + getAbsoluteX(), y + getAbsoluteY())
+                != TouchSelection.MISSED) {
+            return;
+        }
         TextPosition p = positionAt(x, y);
         if (p == null) {
             return;
@@ -988,10 +1041,10 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         String t = para.text.plainText();
         int a = Math.min(p.offset, t.length());
         int b = a;
-        while (a > 0 && Character.isLetterOrDigit(t.charAt(a - 1))) {
+        while (a > 0 && WordCharacters.isWordCharacter(t.charAt(a - 1))) {
             a--;
         }
-        while (b < t.length() && Character.isLetterOrDigit(t.charAt(b))) {
+        while (b < t.length() && WordCharacters.isWordCharacter(t.charAt(b))) {
             b++;
         }
         setSelection(new TextPosition(p.paragraphId, a), new TextPosition(p.paragraphId, b));
@@ -999,7 +1052,22 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     @Override
     protected boolean editStarted(int x, int y, EditTrigger trigger) {
+        touchEdit = trigger != EditTrigger.DRAG;
         if (trigger == EditTrigger.HANDLE_DRAG) {
+            // a finger drag pans unless it starts on a selection handle
+            TextPosition[] sel = getSelection();
+            int hit = sel == null ? TouchSelection.MISSED
+                    : touchChrome.press(this, x + getAbsoluteX(), y + getAbsoluteY());
+            if (hit == TouchSelection.START_HANDLE) {
+                anchor = sel[1];
+                caret = sel[0];
+                return true;
+            }
+            if (hit == TouchSelection.END_HANDLE) {
+                anchor = sel[0];
+                caret = sel[1];
+                return true;
+            }
             return false;
         }
         TextPosition p = positionAt(x, y);
@@ -1024,6 +1092,10 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     @Override
     protected void editEnded(boolean committed) {
+        if (touchEdit) {
+            touchChrome.setShown(getSelection() != null);
+            repaint();
+        }
         if (editable) {
             startInput();
         }
@@ -1053,6 +1125,193 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     protected void focusLost() {
         super.focusLost();
         stopInput();
+    }
+
+    /// Paints the view, then the touch selection handles and toolbar over it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`: the graphics
+    @Override
+    public void paint(Graphics g) {
+        super.paint(g);
+        if (getSelection() != null) {
+            touchChrome.paint(g, this);
+        }
+    }
+
+    // ------------------------------------------------------------------ clipboard
+
+    /// Copies the selection to the clipboard as plain text, HTML, RTF and Markdown, so it
+    /// pastes with its formatting into a word processor, a browser or a text editor alike.
+    public void copySelection() {
+        Document d = selectionDocument();
+        if (d == null) {
+            return;
+        }
+        ClipboardContent content = new ClipboardContent()
+                .setData(ClipboardContent.MIME_TEXT, d.plainText())
+                .setData(ClipboardContent.MIME_HTML, HtmlFormat.write(d, false))
+                .setData(ClipboardContent.MIME_RTF, RichTextDocuments.writeRtf(d))
+                .setData(ClipboardContent.MIME_MARKDOWN, RichTextDocuments.writeMarkdown(d));
+        Display.getInstance().copyToClipboard(content);
+    }
+
+    /// Copies the selection to the clipboard and deletes it.
+    public void cutSelection() {
+        if (editable && getSelection() != null) {
+            copySelection();
+            setCaret(deleteSelection());
+        }
+    }
+
+    /// Pastes the clipboard over the selection, keeping formatting when the clipboard holds
+    /// HTML, RTF or Markdown.
+    public void pasteClipboard() {
+        if (!editable || caret == null) {
+            return;
+        }
+        Display display = Display.getInstance();
+        ClipboardContent content = display.getClipboardContent();
+        String text = null;
+        Document d = null;
+        if (content != null) {
+            String mime = content.findPreferredMimeType(new String[] {ClipboardContent.MIME_HTML,
+                    ClipboardContent.MIME_RTF, ClipboardContent.MIME_MARKDOWN,
+                    ClipboardContent.MIME_TEXT});
+            String value = mime == null ? null : content.getText(mime);
+            if (value != null) {
+                try {
+                    if (ClipboardContent.MIME_HTML.equals(mime)) {
+                        d = HtmlFormat.read(value);
+                    } else if (ClipboardContent.MIME_RTF.equals(mime)) {
+                        d = RichTextDocuments.readRtf(value);
+                    } else if (ClipboardContent.MIME_MARKDOWN.equals(mime)) {
+                        d = RichTextDocuments.readMarkdown(value);
+                    } else {
+                        text = value;
+                    }
+                } catch (java.io.IOException ex) {
+                    text = content.getText(ClipboardContent.MIME_TEXT);
+                }
+            }
+        } else {
+            Object data = display.getPasteDataFromClipboard();
+            if (data instanceof String) {
+                text = (String) data;
+            }
+        }
+        if (d != null) {
+            insertDocument(d);
+        } else if (text != null && text.length() > 0) {
+            typeText(text);
+        }
+    }
+
+    /// Selects the whole document.
+    public void selectAll() {
+        Paragraph first = null;
+        Paragraph last = null;
+        for (int i = 0; i < model.size(); i++) {
+            Block b = model.getBlock(i);
+            if (b instanceof Paragraph) {
+                if (first == null) {
+                    first = (Paragraph) b;
+                }
+                last = (Paragraph) b;
+            }
+        }
+        if (first != null) {
+            setSelection(new TextPosition(first.id, 0), new TextPosition(last.id,
+                    last.text.length()));
+        }
+    }
+
+    private int topIndex(String id) {
+        for (int i = 0; i < model.size(); i++) {
+            if (id.equals(model.getBlock(i).id())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// The selection as a document of its own, for the clipboard.
+    private Document selectionDocument() {
+        TextPosition[] sel = getSelection();
+        Paragraph first = sel == null ? null : model.findParagraph(sel[0].paragraphId);
+        Paragraph last = sel == null ? null : model.findParagraph(sel[1].paragraphId);
+        if (first == null || last == null) {
+            return null;
+        }
+        List<Block> out = new ArrayList<Block>();
+        if (first.id.equals(last.id)) {
+            out.add(first.withText(first.text.substring(sel[0].offset, sel[1].offset)));
+        } else {
+            int a = topIndex(first.id);
+            int b = topIndex(last.id);
+            out.add(first.withText(first.text.substring(sel[0].offset, first.text.length())));
+            // inside a table only the two ends are paragraphs of the body
+            for (int i = a + 1; a >= 0 && b > a && i < b; i++) {
+                out.add(model.getBlock(i));
+            }
+            out.add(last.withText(last.text.substring(0, sel[1].offset)));
+        }
+        return new Document(out, null, "", 1);
+    }
+
+    /// Inserts a pasted document at the caret: its first paragraph joins the text before the
+    /// caret, its last the text after it, and the paragraphs between keep their own style.
+    private void insertDocument(Document d) {
+        List<Paragraph> paras = new ArrayList<Paragraph>();
+        for (int i = 0; i < d.size(); i++) {
+            Block b = d.get(i);
+            if (b instanceof Paragraph) {
+                paras.add((Paragraph) b);
+            } else if (b instanceof Picture) {
+                paras.add(new Paragraph("x", RichText.of((Picture) b, TextStyle.DEFAULT)));
+            } else if (b instanceof Table) {
+                Table t = (Table) b;
+                for (int r = 0; r < t.rows(); r++) {
+                    StringBuilder row = new StringBuilder();
+                    for (int c = 0; c < t.columns(); c++) {
+                        row.append(c > 0 ? "\t" : "").append(t.cellText(r, c).replace('\n', ' '));
+                    }
+                    paras.add(new Paragraph("x", RichText.of(row.toString())));
+                }
+            }
+        }
+        if (paras.isEmpty()) {
+            return;
+        }
+        model.beginGroup();
+        try {
+            TextPosition at = deleteSelection();
+            Paragraph target = model.findParagraph(at.paragraphId);
+            if (paras.size() == 1 || topIndex(at.paragraphId) < 0) {
+                // one paragraph, or a table cell, which holds no block of its own: as text
+                RichText ins = paras.get(0).text;
+                for (int i = 1; i < paras.size(); i++) {
+                    ins = ins.append(RichText.of(" ")).append(paras.get(i).text);
+                }
+                model.replaceParagraph(target.withText(target.text.insert(at.offset, ins)));
+                setCaret(new TextPosition(target.id, at.offset + ins.length()));
+                return;
+            }
+            TextPosition second = model.splitParagraph(at);
+            target = model.findParagraph(at.paragraphId);
+            model.replaceParagraph(target.withText(target.text.append(paras.get(0).text)));
+            int index = topIndex(second.paragraphId);
+            for (int i = 1; i < paras.size() - 1; i++) {
+                model.insertBlock(index++, paras.get(i).withId(model.newId('p')));
+            }
+            Paragraph after = model.findParagraph(second.paragraphId);
+            RichText tail = paras.get(paras.size() - 1).text;
+            model.replaceParagraph(after.withText(tail.append(after.text)));
+            setCaret(new TextPosition(after.id, tail.length()));
+        } finally {
+            model.endGroup();
+        }
     }
 
     // ------------------------------------------------------------------ editing
@@ -1136,7 +1395,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             boolean kept = after != null && after.text.length() == p.text.length();
             setCaret(kept ? new TextPosition(at.paragraphId, at.offset + n) : at);
         } else if (p != null) {
-            List<String> ids = new java.util.ArrayList<String>();
+            List<String> ids = new ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, ids);
             int i = ids.indexOf(p.id);
             if (i >= 0 && i + 1 < ids.size()) {
@@ -1169,7 +1428,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         } else if (!forward && caret.offset > 0) {
             next = new TextPosition(p.id, caret.offset - 1);
         } else {
-            List<String> ids = new java.util.ArrayList<String>();
+            List<String> ids = new ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, ids);
             int i = ids.indexOf(p.id) + (forward ? 1 : -1);
             if (i < 0 || i >= ids.size()) {
@@ -1355,6 +1614,18 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             case TextInputClient.KEY_TAB:
                 typeText("\t");
                 break;
+            case TextInputClient.KEY_COPY:
+                copySelection();
+                break;
+            case TextInputClient.KEY_CUT:
+                cutSelection();
+                break;
+            case TextInputClient.KEY_PASTE:
+                pasteClipboard();
+                break;
+            case TextInputClient.KEY_SELECT_ALL:
+                selectAll();
+                break;
             default:
                 break;
         }
@@ -1423,6 +1694,22 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     @Override
     public void inputFocusLost() {
         inputHandle = null;
+    }
+
+    /// Nothing to undo: composing text is never inserted before it is committed.
+    @Override
+    public void cancelComposing() {
+        // nothing pending
+    }
+
+    /// The caret and selection rectangles the platform places its candidate window by.
+    ///
+    /// #### Returns
+    ///
+    /// the snapshot
+    @Override
+    public TextInputGeometry getGeometrySnapshot() {
+        return TextInputGeometry.capture(this);
     }
 
     /// The length of the caret's paragraph.

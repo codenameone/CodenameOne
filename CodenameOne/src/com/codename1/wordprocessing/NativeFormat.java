@@ -223,7 +223,12 @@ final class NativeFormat {
                 .attr("height", Ids.fmt(p.height)).attr("align", p.align)
                 .attr("wrap", p.wrap).attr("offsetY", Ids.fmt(p.offsetY))
                 .attr("distance", Ids.fmt(p.distance))
-                .attr("alt", p.description).attr("type", p.mimeType).raw(">");
+                .attr("alt", p.description).attr("type", p.mimeType);
+        if (p.isLinked()) {
+            x.attr("source", p.source).raw("/>");
+            return;
+        }
+        x.raw(">");
         x.raw(Base64.encodeNoNewline(p.data()));
         x.raw("</picture>");
     }
@@ -645,6 +650,7 @@ final class NativeFormat {
         String align = x.attr("align");
         float offsetY = (float) x.doubleAttr("offsetY", 0);
         float distance = (float) x.doubleAttr("distance", 9);
+        String source = x.attr("source");
         StringBuilder data = new StringBuilder();
         for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
             if (ev == XmlScanner.EOF) {
@@ -656,6 +662,11 @@ final class NativeFormat {
                 // A text box's story; not part of this model.
                 x.skipElement();
             }
+        }
+        if (source != null && source.length() > 0) {
+            return Float.isNaN(w) || Float.isNaN(h) || w <= 0 || h <= 0 ? null
+                    : Picture.linked(id, source, w, h, alt).withWrap(wrap, align, offsetY,
+                            distance);
         }
         byte[] bytes = Base64.decode(data.toString().trim().getBytes("US-ASCII"));
         if (bytes == null || bytes.length == 0 || Float.isNaN(w) || Float.isNaN(h) || w <= 0

@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.util.StringUtil;
 import com.codename1.io.zip.ZipArchiveOutputStream;
 
 import java.io.IOException;
@@ -160,7 +161,7 @@ final class OdtWriter {
         content.append(body).append("</office:text></office:body></office:document-content>");
 
         ZipArchiveOutputStream zip = new ZipArchiveOutputStream(out);
-        byte[] mime = MIME.getBytes("UTF-8");
+        byte[] mime = StringUtil.getBytes(MIME);
         ZipEntry first = new ZipEntry("mimetype");
         first.setMethod(ZipArchiveOutputStream.STORED);
         first.setSize(mime.length);
@@ -191,7 +192,7 @@ final class OdtWriter {
 
     private static void entry(ZipArchiveOutputStream zip, String name, String content)
             throws IOException {
-        byte[] b = content.getBytes("UTF-8");
+        byte[] b = StringUtil.getBytes(content);
         zip.putNextEntry(new ZipEntry(name));
         zip.write(b, 0, b.length);
         zip.closeEntry();
@@ -378,7 +379,7 @@ final class OdtWriter {
         }
         DocxWriter.esc(b, font.indexOf(' ') >= 0 ? "'" + font + "'" : font);
         b.append("\" fo:font-size=\"").append(pt(s.size)).append("\" fo:color=\"#")
-                .append(hex(s.color)).append("\" fo:font-weight=\"")
+                .append(Ids.hex(s.color)).append("\" fo:font-weight=\"")
                 .append(s.bold ? "bold" : "normal").append("\" fo:font-style=\"")
                 .append(s.italic ? "italic" : "normal").append('"');
         if (s.underline) {
@@ -389,7 +390,7 @@ final class OdtWriter {
             b.append(" style:text-line-through-style=\"solid\"");
         }
         if (s.background != TextStyle.NO_BACKGROUND) {
-            b.append(" fo:background-color=\"#").append(hex(s.background)).append('"');
+            b.append(" fo:background-color=\"#").append(Ids.hex(s.background)).append('"');
         }
         if (TextStyle.SUPERSCRIPT.equals(s.script)) {
             b.append(" style:text-position=\"super 58%\"");
@@ -397,14 +398,6 @@ final class OdtWriter {
             b.append(" style:text-position=\"sub 58%\"");
         }
         b.append("/></style:style>");
-    }
-
-    private static String hex(int rgb) {
-        String h = Integer.toHexString(rgb & 0xffffff);
-        while (h.length() < 6) {
-            h = "0" + h;
-        }
-        return h;
     }
 
     private String textStyleName(TextStyle s) {
@@ -859,6 +852,11 @@ final class OdtWriter {
     }
 
     private void frame(StringBuilder b, Picture p) {
+        if (p.isLinked()) {
+            // a linked picture has no bytes to embed; its alternative text stands in for it
+            DocxWriter.esc(b, p.description);
+            return;
+        }
         String ext = "image/png".equals(p.mimeType) ? "png" : "image/jpeg".equals(p.mimeType)
                 ? "jpg" : "image/gif".equals(p.mimeType) ? "gif" : "bin";
         String name = "Pictures/image" + pictureNames.size() + "." + ext;

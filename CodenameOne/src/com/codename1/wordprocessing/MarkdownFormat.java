@@ -77,7 +77,7 @@ final class MarkdownFormat {
                         .withSize(HtmlFormat.headingSize(hashes));
                 out.add(new Paragraph(ids.next('p'), "Heading" + hashes, Paragraph.LEFT,
                         Paragraph.NO_LIST, 0, 0, 12, 6, 0, 1.15f, false, true,
-                        inline(text, base)));
+                        inline(text, base, ids)));
                 i++;
                 continue;
             }
@@ -136,7 +136,7 @@ final class MarkdownFormat {
                 }
                 out.add(new Paragraph(ids.next('p'), "Normal", Paragraph.LEFT, kind,
                         Math.min(8, item[0] / 2), item[1] == 1 ? item[3] : 0, 0, 2, 0, 1.15f,
-                        false, false, inline(text.toString(), TextStyle.DEFAULT)));
+                        false, false, inline(text.toString(), TextStyle.DEFAULT, ids)));
                 continue;
             }
             Picture pic = para.length() == 0 ? imageOnly(trimmed, ids) : null;
@@ -210,7 +210,7 @@ final class MarkdownFormat {
             return;
         }
         trimHardBreak(para);
-        out.add(new Paragraph(ids.next('p'), inline(para.toString(), TextStyle.DEFAULT)));
+        out.add(new Paragraph(ids.next('p'), inline(para.toString(), TextStyle.DEFAULT, ids)));
         para.setLength(0);
     }
 
@@ -219,7 +219,7 @@ final class MarkdownFormat {
             return;
         }
         out.add(new Paragraph(ids.next('p'), "Quote", Paragraph.LEFT, Paragraph.NO_LIST, 0, 0, 0,
-                8, 0, 1.15f, false, false, inline(q.toString(), TextStyle.DEFAULT)));
+                8, 0, 1.15f, false, false, inline(q.toString(), TextStyle.DEFAULT, ids)));
         q.setLength(0);
     }
 
@@ -344,7 +344,7 @@ final class MarkdownFormat {
                 for (String part : parts) {
                     TextStyle base = r == 0 ? TextStyle.DEFAULT.withBold(true) : TextStyle.DEFAULT;
                     cell.add(new Paragraph(ids.next('p'), "Normal", align, Paragraph.NO_LIST, 0, 0,
-                            0, 0, 0, 1.15f, false, false, inline(part, base)));
+                            0, 0, 0, 1.15f, false, false, inline(part, base, ids)));
                 }
                 row.add(cell);
             }
@@ -383,29 +383,18 @@ final class MarkdownFormat {
         if (space > 0) {
             src = src.substring(0, space);
         }
-        if (!src.startsWith("data:")) {
-            return null;
-        }
-        int comma = src.indexOf(',');
-        int semi = src.indexOf(";base64");
-        if (comma < 0 || semi < 0 || semi > comma) {
-            return null;
-        }
-        byte[] data = Base64.decode(Ids.ascii(src.substring(comma + 1)));
-        if (data == null || data.length == 0) {
-            return null;
-        }
-        return new Picture(ids.next('i'), data, src.substring(5, semi), 144, 144, alt);
+        return image(src, unescape(alt), ids);
     }
 
     /// Parses emphasis, code spans, links and escapes.
-    static RichText inline(String s, TextStyle base) {
+    static RichText inline(String s, TextStyle base, Ids ids) {
         RichText.Builder b = new RichText.Builder();
-        inline(s, 0, s.length(), base, b);
+        inline(s, 0, s.length(), base, b, ids);
         return b.build();
     }
 
-    private static void inline(String s, int from, int to, TextStyle style, RichText.Builder b) {
+    private static void inline(String s, int from, int to, TextStyle style, RichText.Builder b,
+            Ids ids) {
         StringBuilder plain = new StringBuilder();
         int i = from;
         while (i < to) {
@@ -430,7 +419,7 @@ final class MarkdownFormat {
                 if (end > i + 2 && end <= to - 2) {
                     b.append(plain.toString(), style);
                     plain.setLength(0);
-                    inline(s, i + 2, end, style.withBold(true), b);
+                    inline(s, i + 2, end, style.withBold(true), b, ids);
                     i = end + 2;
                     continue;
                 }
@@ -440,7 +429,7 @@ final class MarkdownFormat {
                 if (end > i + 2 && end <= to - 2) {
                     b.append(plain.toString(), style);
                     plain.setLength(0);
-                    inline(s, i + 2, end, style.withStrike(true), b);
+                    inline(s, i + 2, end, style.withStrike(true), b, ids);
                     i = end + 2;
                     continue;
                 }
@@ -450,25 +439,38 @@ final class MarkdownFormat {
                 if (end > i + 1) {
                     b.append(plain.toString(), style);
                     plain.setLength(0);
-                    inline(s, i + 1, end, style.withItalic(true), b);
+                    inline(s, i + 1, end, style.withItalic(true), b, ids);
                     i = end + 1;
                     continue;
                 }
             }
             if (c == '[' || c == '!' && i + 1 < to && s.charAt(i + 1) == '[') {
                 int open = c == '!' ? i + 1 : i;
-                int close = s.indexOf("](", open);
-                int paren = close < 0 ? -1 : s.indexOf(')', close + 2);
-                if (close > open && paren > 0 && paren < to) {
+                // brackets nest: the label of [![alt](img)](href) is itself an image
+                int close = matching(s, open, to, '[', ']');
+                int paren = close > open && close + 1 < to && s.charAt(close + 1) == '('
+                        ? matching(s, close + 1, to, '(', ')') : -1;
+                if (paren > 0) {
                     String label = s.substring(open + 1, close);
                     String href = s.substring(close + 2, paren).trim();
+                    int space = href.indexOf(' ');
+                    if (space > 0) {
+                        // a title: ![alt](url "title")
+                        href = href.substring(0, space);
+                    }
                     b.append(plain.toString(), style);
                     plain.setLength(0);
                     if (c == '!') {
-                        b.append(label, style);
+                        Picture pic = image(href, unescape(label), ids);
+                        if (pic != null) {
+                            b.append(pic, style);
+                        } else {
+                            b.append(unescape(label), style);
+                        }
                     } else {
                         inline(label, 0, label.length(),
-                                style.withLink(href).withUnderline(true).withColor(0x1a5fb4), b);
+                                style.withLink(href).withUnderline(true).withColor(0x1a5fb4), b,
+                                ids);
                     }
                     i = paren + 1;
                     continue;
@@ -486,6 +488,55 @@ final class MarkdownFormat {
             i++;
         }
         b.append(plain.toString(), style);
+    }
+
+    /// The index of the bracket closing the one at `open`, skipping escaped and nested pairs;
+    /// -1 when it is not closed before `to`.
+    private static int matching(String s, int open, int to, char opening, char closing) {
+        int depth = 0;
+        for (int i = open; i < to; i++) {
+            char c = s.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == opening) {
+                depth++;
+            } else if (c == closing) {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static String unescape(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length() && isPunct(s.charAt(i + 1))) {
+                c = s.charAt(++i);
+            }
+            b.append(c);
+        }
+        return b.toString();
+    }
+
+    /// An image: embedded when the URL is a base64 `data:` URL, linked otherwise.
+    private static Picture image(String src, String alt, Ids ids) {
+        if (src.startsWith("data:")) {
+            int comma = src.indexOf(',');
+            int semi = src.indexOf(";base64");
+            if (comma < 0 || semi < 0 || semi > comma) {
+                return null;
+            }
+            byte[] data = Base64.decode(Ids.ascii(src.substring(comma + 1)));
+            if (data == null || data.length == 0) {
+                return null;
+            }
+            return new Picture(ids.next('i'), data, src.substring(5, semi), 144, 144, alt);
+        }
+        return src.length() == 0 ? null : Picture.linked(ids.next('i'), src, 144, 144, alt);
     }
 
     private static int findSingle(String s, int from, int to, char c) {
@@ -617,6 +668,9 @@ final class MarkdownFormat {
                 if (pic != null) {
                     StringBuilder img = new StringBuilder();
                     picture(img, pic);
+                    if (s.link.length() > 0) {
+                        img.insert(0, '[').append("](").append(url(s.link)).append(')');
+                    }
                     b.append(img);
                 }
                 continue;
@@ -656,7 +710,7 @@ final class MarkdownFormat {
             }
             String core = open + trimmed + close;
             if (s.link.length() > 0) {
-                core = "[" + core + "](" + s.link.replace(" ", "%20").replace(")", "%29") + ")";
+                core = "[" + core + "](" + url(s.link) + ")";
             }
             b.append(lead).append(core).append(tail);
         }
@@ -719,7 +773,17 @@ final class MarkdownFormat {
     }
 
     private static void picture(StringBuilder b, Picture p) {
-        b.append("![").append(escape(p.description)).append("](data:").append(p.mimeType)
-                .append(";base64,").append(Base64.encodeNoNewline(p.data())).append(')');
+        b.append("![").append(escape(p.description)).append("](");
+        if (p.isLinked()) {
+            b.append(url(p.source));
+        } else {
+            b.append("data:").append(p.mimeType).append(";base64,")
+                    .append(Base64.encodeNoNewline(p.data()));
+        }
+        b.append(')');
+    }
+
+    private static String url(String u) {
+        return u.replace(" ", "%20").replace(")", "%29");
     }
 }

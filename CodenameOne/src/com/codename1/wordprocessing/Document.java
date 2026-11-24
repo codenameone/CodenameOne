@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.util.StringUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -594,10 +595,9 @@ public final class Document {
         } catch (OutOfMemoryError ex) {
             throw ex;
         } catch (VirtualMachineError ex) {
-            // StackOverflowError is not in the CLDC library the core compiles against; out of
-            // memory is rethrown above, so this is the stack overflow
-            // the readers bound their nesting; this is the backstop for a thread whose stack
-            // is smaller than those bounds assume
+            // A stack overflow (StackOverflowError is not in the CLDC library the core compiles
+            // against; out of memory is rethrown above). The readers bound their nesting; this is
+            // the backstop for a thread whose stack is smaller than those bounds assume
             IOException e = new IOException("The document is nested too deeply: " + ex);
             e.initCause(ex);
             throw e;
@@ -623,7 +623,7 @@ public final class Document {
         if (format == Format.PDF) {
             throw new IOException("Reading PDF is not supported");
         }
-        String text = new String(readAll(in), "UTF-8");
+        String text = StringUtil.newString(readAll(in));
         if (text.length() > 0 && text.charAt(0) == 0xfeff) {
             text = text.substring(1);
         }
@@ -678,7 +678,7 @@ public final class Document {
                 default:
                     throw new IOException("Unsupported format " + format);
             }
-            out.write(s.getBytes("UTF-8"));
+            out.write(StringUtil.getBytes(s));
         }
         out.flush();
     }

@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.util.StringUtil;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -34,7 +35,6 @@ import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -297,12 +297,7 @@ public final class EmbeddedComponents {
     ///
     /// the source: type, size in points and state
     public static String toSource(EmbeddedComponent e) {
-        String state;
-        try {
-            state = Base64.encodeNoNewline(e.state.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException err) {
-            state = "";
-        }
+        String state = Base64.encodeNoNewline(StringUtil.getBytes(e.state));
         return SCHEME + ":" + e.type + ";" + Ids.fmt(e.width) + "x" + Ids.fmt(e.height) + ";"
                 + state;
     }
@@ -332,11 +327,9 @@ public final class EmbeddedComponents {
             float w = Float.parseFloat(size.substring(0, x));
             float h = Float.parseFloat(size.substring(x + 1));
             byte[] st = Base64.decode(Ids.ascii(s.substring(b + 1)));
-            String state = st == null ? "" : new String(st, "UTF-8");
+            String state = st == null ? "" : StringUtil.newString(st);
             return new EmbeddedComponent(s.substring(0, a), state, w, h, null);
         } catch (RuntimeException err) {
-            return null;
-        } catch (UnsupportedEncodingException err) {
             return null;
         }
     }

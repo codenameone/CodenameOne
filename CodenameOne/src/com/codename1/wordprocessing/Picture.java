@@ -28,8 +28,14 @@ public final class Picture implements Block, Inline {
     /// The block id.
     public final String id;
 
-    /// The MIME type of `data()`, such as `image/png`.
+    /// The MIME type of `data()`, such as `image/png`; empty for a linked picture.
     public final String mimeType;
+
+    /// The URL a linked picture names, as Markdown's `![alt](url)` or HTML's `<img src>`
+    /// gives it; null for a picture that holds its own bytes. A linked picture has no bytes:
+    /// HTML, Markdown and `.cn1doc` write the URL back, while DOCX, ODT, RTF, a page view and
+    /// PDF export, which can only show an image they hold, leave its box empty or skip it.
+    public final String source;
 
     /// The displayed width in points.
     public final float width;
@@ -96,15 +102,43 @@ public final class Picture implements Block, Inline {
     /// - `description`: alternative text, or null
     public Picture(String id, byte[] data, String mimeType, float width, float height,
             String description) {
-        this(id, data, mimeType, width, height, description, INLINE, LEFT, 0, 9);
+        this(id, data, null, mimeType, width, height, description, INLINE, LEFT, 0, 9);
     }
 
-    private Picture(String id, byte[] data, String mimeType, float width, float height,
-            String description, String wrap, String align, float offsetY, float distance) {
+    /// A picture that names its image by URL instead of holding it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the block id
+    ///
+    /// - `source`: the image URL, not empty
+    ///
+    /// - `width`: the displayed width in points, greater than zero
+    ///
+    /// - `height`: the displayed height in points, greater than zero
+    ///
+    /// - `description`: alternative text, or null
+    ///
+    /// #### Returns
+    ///
+    /// the picture
+    public static Picture linked(String id, String source, float width, float height,
+            String description) {
+        if (source == null || source.length() == 0) {
+            throw new IllegalArgumentException("Picture source is required");
+        }
+        return new Picture(id, new byte[0], source, "", width, height, description, INLINE, LEFT,
+                0, 9);
+    }
+
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    private Picture(String id, byte[] data, String source, String mimeType, float width,
+            float height, String description, String wrap, String align, float offsetY,
+            float distance) {
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("Picture id is required");
         }
-        if (data == null || data.length == 0) {
+        if (source == null && (data == null || data.length == 0)) {
             throw new IllegalArgumentException("Picture data is required");
         }
         if (Float.isNaN(width) || Float.isNaN(height) || width <= 0 || height <= 0) {
@@ -112,9 +146,10 @@ public final class Picture implements Block, Inline {
         }
         this.id = id;
         this.data = copy(data);
+        this.source = source;
         // the type is read from files and written into markup (a data: URL, a content type):
         // anything but a plain token is replaced by what the bytes say
-        this.mimeType = isToken(mimeType) ? mimeType : sniff(data);
+        this.mimeType = source != null ? "" : isToken(mimeType) ? mimeType : sniff(data);
         this.width = width;
         this.height = height;
         this.description = description == null ? "" : description;
@@ -124,6 +159,15 @@ public final class Picture implements Block, Inline {
         // hostile values from a file must not push the picture off every page
         this.offsetY = Float.isNaN(offsetY) ? 0 : Math.max(-2000, Math.min(2000, offsetY));
         this.distance = Float.isNaN(distance) ? 0 : Math.max(0, Math.min(72, distance));
+    }
+
+    /// Whether the picture names its image by URL and holds no bytes.
+    ///
+    /// #### Returns
+    ///
+    /// true when `source` is set
+    public boolean isLinked() {
+        return source != null;
     }
 
     /// Whether the picture floats instead of sitting in a line.
@@ -151,7 +195,7 @@ public final class Picture implements Block, Inline {
     ///
     /// the copy
     public Picture withWrap(String wrapMode, String alignment, float offset, float gap) {
-        return new Picture(id, data, mimeType, width, height, description, wrapMode, alignment,
+        return new Picture(id, data, source, mimeType, width, height, description, wrapMode, alignment,
                 offset, gap);
     }
 
@@ -211,7 +255,7 @@ public final class Picture implements Block, Inline {
     ///
     /// #### Returns
     ///
-    /// a copy of the bytes
+    /// a copy of the bytes; empty for a linked picture
     public byte[] data() {
         return copy(data);
     }
@@ -237,11 +281,12 @@ public final class Picture implements Block, Inline {
     ///
     /// the copy
     public Picture withSize(float w, float h) {
-        return new Picture(id, data, mimeType, w, h, description, wrap, align, offsetY,
+        return new Picture(id, data, source, mimeType, w, h, description, wrap, align, offsetY,
                 distance);
     }
 
-    /// Two pictures are equal when their id, bytes, type, size, description and placement are.
+    /// Two pictures are equal when their id, bytes, source, type, size, description and placement
+    /// are.
     ///
     /// #### Parameters
     ///
@@ -262,7 +307,8 @@ public final class Picture implements Block, Inline {
         if (!id.equals(p.id) || !mimeType.equals(p.mimeType) || !description.equals(p.description)
                 || Float.floatToIntBits(width) != Float.floatToIntBits(p.width)
                 || Float.floatToIntBits(height) != Float.floatToIntBits(p.height)
-                || data.length != p.data.length || !wrap.equals(p.wrap) || !align.equals(p.align)
+                || data.length != p.data.length || !(source == null ? p.source == null : source.equals(p.source))
+                || !wrap.equals(p.wrap) || !align.equals(p.align)
                 || Float.floatToIntBits(offsetY) != Float.floatToIntBits(p.offsetY)
                 || Float.floatToIntBits(distance) != Float.floatToIntBits(p.distance)) {
             return false;
