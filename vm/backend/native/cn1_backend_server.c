@@ -1217,8 +1217,14 @@ extern JAVA_VOID com_codename1_backend_HttpServer_serveVirtual___int(CODENAME_ON
  * libcurl can have a second open while it races an IPv4 and an IPv6 connect. */
 #define CN1_BACKEND_VT_MAX_WAIT 8
 
+static JAVA_LONG cn1BackendVtSerial = 0;
+
 struct cn1BackendVtArg {
     JAVA_INT fd;
+    /* Never reused, unlike this struct's address: what Db's gate keys its owner
+       on, so a virtual thread freed by a stop while holding the gate cannot be
+       mistaken for a later one allocated at the same address. */
+    JAVA_LONG serial;
     /* For a background task's virtual thread: the key Tasks.runVirtual finds the
      * task by. The fd is then -1, which is how the host tells the two apart. */
     JAVA_LONG token;
@@ -1350,6 +1356,7 @@ JAVA_LONG com_codename1_backend_VirtualThread_createImpl___int_int_R_long(CODENA
     /* malloc, not calloc, so every field is said: a stale `waiting` would have
      * the host register descriptors this thread never asked for. */
     memset(a, 0, sizeof(struct cn1BackendVtArg));
+    a->serial = __atomic_add_fetch(&cn1BackendVtSerial, 1, __ATOMIC_RELAXED);
     a->fd = fd;
     a->token = 0;
     vt = cn1SpawnVirtualThread(cn1BackendVtBody, a, (size_t)stackBytes);
@@ -1378,6 +1385,7 @@ JAVA_LONG com_codename1_backend_VirtualThread_createTaskImpl___long_int_R_long(C
         return 0;
     }
     memset(a, 0, sizeof(struct cn1BackendVtArg));
+    a->serial = __atomic_add_fetch(&cn1BackendVtSerial, 1, __ATOMIC_RELAXED);
     a->fd = -1;
     a->token = token;
     vt = cn1SpawnVirtualThread(cn1BackendVtTaskBody, a, (size_t)stackBytes);
@@ -1700,6 +1708,17 @@ JAVA_BOOLEAN com_codename1_backend_VirtualThread_isVirtualImpl___R_boolean(CODEN
  * or 0 on a host or platform thread. A waiter gives it to its host to nap. */
 JAVA_LONG com_codename1_backend_VirtualThread_currentImpl___R_long(CODENAME_ONE_THREAD_STATE) {
     return (JAVA_LONG)(intptr_t)cn1VirtualThreadCurrent();
+}
+
+/* The current virtual thread's serial (see struct cn1BackendVtArg), or 0. */
+JAVA_LONG com_codename1_backend_VirtualThread_currentSerialImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+    struct cn1VirtualThread* vt = cn1VirtualThreadCurrent();
+    struct cn1BackendVtArg* a;
+    if(vt == 0) {
+        return 0;
+    }
+    a = (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
+    return a == 0 ? 0 : a->serial;
 }
 
 /*

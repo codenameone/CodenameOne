@@ -61,6 +61,8 @@ public final class FileIo {
         final long size;
         final long modified;
         final boolean directory;
+        /// Neither a directory nor a regular file: a FIFO, socket or device.
+        final boolean other;
         /// Whether the descriptor and the path agreed; see openRead.
         final boolean consistent;
         /// The file's identity as the PATH saw it, or null where unsupported.
@@ -87,6 +89,7 @@ public final class FileIo {
             long capturedSize = 0;
             long capturedModified = 0;
             boolean capturedDirectory = false;
+            boolean capturedOther = false;
             boolean capturedConsistent = false;
             Object capturedKey = null;
             long capturedIdentity = 0;
@@ -121,6 +124,7 @@ public final class FileIo {
                     Object inoValue = unix.get("ino");
                     capturedKey = unix.get("fileKey");
                     capturedDirectory = Boolean.TRUE.equals(unix.get("isDirectory"));
+                    capturedOther = Boolean.TRUE.equals(unix.get("isOther"));
                     if (modifiedValue instanceof FileTime) {
                         capturedModified = ((FileTime) modifiedValue).toMillis();
                     }
@@ -135,6 +139,7 @@ public final class FileIo {
                             BasicFileAttributes.class);
                     capturedModified = attributes.lastModifiedTime().toMillis();
                     capturedDirectory = attributes.isDirectory();
+                    capturedOther = attributes.isOther();
                     capturedKey = attributes.fileKey();
                     statedSize = attributes.size();
                     // The file key's hash is the next best identity available and
@@ -158,6 +163,7 @@ public final class FileIo {
             this.size = capturedSize;
             this.modified = capturedModified;
             this.directory = capturedDirectory;
+            this.other = capturedOther;
             this.consistent = capturedConsistent;
             this.fileKey = capturedKey;
         }
@@ -183,6 +189,13 @@ public final class FileIo {
             if (Files.isDirectory(p)) {
                 // A directory has no channel, but the caller stats it and retries
                 // at the index file, so it must still get a descriptor back.
+                return Descriptors.add(new OpenFile(null, p));
+            }
+            if (Files.exists(p) && !Files.isRegularFile(p)) {
+                // A FIFO, socket or device: no channel either. Opening a FIFO
+                // with no writer blocks until one appears, which the native twin
+                // refuses to do (O_NONBLOCK); stat reports it as 2 and
+                // StaticFiles answers 404.
                 return Descriptors.add(new OpenFile(null, p));
             }
             // Opened and stat'ed until the two AGREE. The size comes from the
@@ -341,7 +354,8 @@ public final class FileIo {
                 out[0] = sizeValue instanceof Number ? ((Number) sizeValue).longValue() : 0;
                 out[1] = modifiedValue instanceof FileTime
                         ? ((FileTime) modifiedValue).toMillis() : 0;
-                out[2] = Boolean.TRUE.equals(unix.get("isDirectory")) ? 1 : 0;
+                out[2] = Boolean.TRUE.equals(unix.get("isDirectory")) ? 1
+                        : Boolean.TRUE.equals(unix.get("isOther")) ? 2 : 0;
                 if (out.length > 3) {
                     out[3] = inoValue instanceof Number
                             ? ((Number) inoValue).longValue() : 0;
@@ -351,7 +365,7 @@ public final class FileIo {
                         BasicFileAttributes.class);
                 out[0] = a.size();
                 out[1] = a.lastModifiedTime().toMillis();
-                out[2] = a.isDirectory() ? 1 : 0;
+                out[2] = a.isDirectory() ? 1 : a.isOther() ? 2 : 0;
                 if (out.length > 3) {
                     Object key = a.fileKey();
                     out[3] = key == null ? 0 : key.hashCode();
@@ -372,7 +386,7 @@ public final class FileIo {
         // From the descriptor, so the metadata and the bytes describe one file.
         out[0] = file.size;
         out[1] = file.modified;
-        out[2] = file.directory ? 1 : 0;
+        out[2] = file.directory ? 1 : file.other ? 2 : 0;
         if (out.length > 3) {
             out[3] = file.identity;
         }

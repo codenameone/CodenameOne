@@ -357,7 +357,12 @@ JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STAT
     job.stmt = stmt;
     hint = cn1DbHintFor(stmt);
     CN1_YIELD_THREAD;
-    if(sqlite3_stmt_busy(stmt) && hint->stmt == stmt && hint->fast) {
+    /* Inline only for a READ-ONLY statement already part-way through its rows:
+       a write can meet a lock and sleep in the busy handler for the whole busy
+       timeout, holding every virtual thread on this host. A reader mid-iteration
+       holds its snapshot and does not wait on a lock. */
+    if(sqlite3_stmt_busy(stmt) && sqlite3_stmt_readonly(stmt)
+            && hint->stmt == stmt && hint->fast) {
         cn1DbStepJob(&job);
     } else {
         cn1BackendOffload(cn1DbStepJob, &job);

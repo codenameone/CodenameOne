@@ -127,6 +127,10 @@ int cn1BackendUringOpenat2(int dirFd, const char* path, void* how, size_t howSiz
 struct cn1OffloadSignal {
     int readFd;
     int writeFd;
+    /* 1 from hand-off until the wakeup write has RETURNED (atomics). The write
+       lands after `done`, so a signal back on the free list may still be about
+       to receive it; teardown closes only signals that are not busy. */
+    int busy;
     struct cn1OffloadSignal* next;
 };
 
@@ -134,7 +138,7 @@ struct cn1OffloadSignal {
 struct cn1OffloadJob {
     cn1OffloadFn fn;
     void* arg;
-    int writeFd;
+    struct cn1OffloadSignal* signal;
     int done;                       /* read and written with __atomic builtins */
     struct cn1OffloadJob* next;
 };
@@ -158,6 +162,7 @@ static void* cn1OffloadWorker(void* unused) {
     (void)unused;
     for(;;) {
         struct cn1OffloadJob* job;
+        struct cn1OffloadSignal* sig;
         int fd;
         pthread_mutex_lock(&cn1OffloadLock);
         while(cn1OffloadHead == 0) {
@@ -179,7 +184,8 @@ static void* cn1OffloadWorker(void* unused) {
          * through `job`. A late byte landing on a signal some other caller has
          * since taken is harmless: every waiter re-tests its own `done` flag.
          */
-        fd = job->writeFd;
+        sig = job->signal;
+        fd = sig->writeFd;
         __atomic_store_n(&job->done, 1, __ATOMIC_RELEASE);
 #ifdef CN1_OFFLOAD_EVENTFD
         {
@@ -199,6 +205,9 @@ static void* cn1OffloadWorker(void* unused) {
             /* EAGAIN means the pipe already holds a wakeup, which is all it needs. */
         }
 #endif
+        /* The signal is heap memory that outlives every caller, so this is safe
+           after `done`; only teardown reads it. */
+        __atomic_store_n(&sig->busy, 0, __ATOMIC_RELEASE);
     }
     return 0;
 }
@@ -239,6 +248,53 @@ static void cn1OffloadStart(void) {
     pthread_attr_destroy(&attr);
 }
 
+/*
+ * HOST TEARDOWN. Hosts are not permanent -- every server start makes new
+ * poller threads -- so a host's pooled signals and its io_uring are released
+ * when the thread exits, through a pthread key destructor. Anything that may
+ * still be written to is LEAKED, not closed: a busy signal (its wakeup write
+ * has not returned, and a closed descriptor number can already belong to
+ * someone's file) and a ring with an operation still in the kernel (it writes
+ * into a virtual thread's stack, which freeImpl leaks for the same reason).
+ */
+static pthread_once_t cn1OffloadKeyOnce = PTHREAD_ONCE_INIT;
+static pthread_key_t cn1OffloadKey;
+static int cn1OffloadKeyOk = 0;
+static void cn1UringHostExit(void);
+
+static void cn1OffloadHostExit(void* unused) {
+    struct cn1OffloadSignal* s = cn1OffloadFree;
+    struct cn1OffloadSignal* kept = 0;
+    (void)unused;
+    cn1UringHostExit();
+    while(s != 0) {
+        struct cn1OffloadSignal* next = s->next;
+        if(__atomic_load_n(&s->busy, __ATOMIC_ACQUIRE)) {
+            s->next = kept;
+            kept = s;
+        } else {
+            close(s->readFd);
+            if(s->writeFd != s->readFd) {
+                close(s->writeFd);
+            }
+            free(s);
+        }
+        s = next;
+    }
+    cn1OffloadFree = kept;
+}
+
+static void cn1OffloadKeyCreate(void) {
+    cn1OffloadKeyOk = pthread_key_create(&cn1OffloadKey, cn1OffloadHostExit) == 0;
+}
+
+static void cn1OffloadHostRegister(void) {
+    pthread_once(&cn1OffloadKeyOnce, cn1OffloadKeyCreate);
+    if(cn1OffloadKeyOk && pthread_getspecific(cn1OffloadKey) == 0) {
+        pthread_setspecific(cn1OffloadKey, (void*)1);
+    }
+}
+
 static struct cn1OffloadSignal* cn1OffloadTakeSignal(void) {
     struct cn1OffloadSignal* s = cn1OffloadFree;
     if(s != 0) {
@@ -272,7 +328,9 @@ static struct cn1OffloadSignal* cn1OffloadTakeSignal(void) {
         s->writeFd = fds[1];
     }
 #endif
+    s->busy = 0;
     s->next = 0;
+    cn1OffloadHostRegister();
     return s;
 }
 
@@ -315,7 +373,8 @@ void cn1BackendOffload(cn1OffloadFn fn, void* arg) {
     }
     job.fn = fn;
     job.arg = arg;
-    job.writeFd = signal->writeFd;
+    job.signal = signal;
+    __atomic_store_n(&signal->busy, 1, __ATOMIC_RELAXED);
     job.done = 0;
     job.next = 0;
     /* Counted before the hand-off: from here a pool thread may be writing into
@@ -416,6 +475,10 @@ struct cn1Uring {
     unsigned* cqTail;
     unsigned cqMask;
     struct io_uring_cqe* cqes;
+    void* ringBase;
+    size_t ringSize;
+    size_t sqesSize;
+    int inflight;                   /* operations submitted and not yet seen done */
     unsigned char supported[256];
 };
 
@@ -514,6 +577,9 @@ static struct cn1Uring* cn1UringSetup(int* err) {
         return 0;
     }
     u->fd = fd;
+    u->ringBase = ring;
+    u->ringSize = ringSize;
+    u->sqesSize = params.sq_entries * sizeof(struct io_uring_sqe);
     u->sqEntries = params.sq_entries;
     u->sqHead = (unsigned*)(ring + params.sq_off.head);
     u->sqTail = (unsigned*)(ring + params.sq_off.tail);
@@ -533,6 +599,9 @@ static struct cn1Uring* cn1UringForHost(void) {
         int err = 0;
         cn1UringHostTried = 1;
         cn1UringHost = cn1UringSetup(&err);
+        if(cn1UringHost != 0) {
+            cn1OffloadHostRegister();
+        }
         cn1UringAnnounce(cn1UringHost == 0 ? (err == 0 ? ENOSYS : err) : 0);
     }
     return cn1UringHost;
@@ -544,7 +613,12 @@ static void cn1UringReap(struct cn1Uring* u) {
     unsigned tail = __atomic_load_n(u->cqTail, __ATOMIC_ACQUIRE);
     while(head != tail) {
         struct io_uring_cqe* cqe = &u->cqes[head & u->cqMask];
-        if(cqe->user_data != 0) {
+        if((cqe->user_data & 1) != 0) {
+            /* The wakeup write finished: its signal may be closed at teardown. */
+            struct cn1OffloadSignal* sig =
+                    (struct cn1OffloadSignal*)(uintptr_t)(cqe->user_data & ~(uint64_t)1);
+            __atomic_store_n(&sig->busy, 0, __ATOMIC_RELEASE);
+        } else if(cqe->user_data != 0) {
             struct cn1UringJob* job = (struct cn1UringJob*)(uintptr_t)cqe->user_data;
             job->res = cqe->res;
             job->done = 1;
@@ -600,8 +674,11 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
     sqe->fd = signal->writeFd;
     sqe->addr = (uint64_t)(uintptr_t)&cn1UringOne;
     sqe->len = sizeof(cn1UringOne);
-    sqe->user_data = 0;
+    /* Tagged with the low bit (a malloc'd signal is aligned) so the reap can
+       tell it from a job and clear the signal's busy flag. */
+    sqe->user_data = (uint64_t)(uintptr_t)signal | 1;
     u->sqArray[(tail + 1) & u->sqMask] = (tail + 1) & u->sqMask;
+    __atomic_store_n(&signal->busy, 1, __ATOMIC_RELAXED);
 
     __atomic_store_n(u->sqTail, tail + 2, __ATOMIC_RELEASE);
     /* Counted before the kernel can touch this stack; see VirtualThread freeImpl. */
@@ -615,10 +692,12 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
     if(entered < 0 && __atomic_load_n(u->sqHead, __ATOMIC_ACQUIRE) == head) {
         /* The kernel took nothing, so nothing references the job: withdraw it. */
         __atomic_store_n(u->sqTail, tail, __ATOMIC_RELEASE);
+        __atomic_store_n(&signal->busy, 0, __ATOMIC_RELAXED);
         cn1BackendVtOffloading(-1);
         cn1OffloadReturnSignal(signal);
         return 0;
     }
+    u->inflight++;
     cn1UringReap(u);
     while(!job.done) {
         if(!cn1BackendVtWait(1, &signal->readFd, &events, CN1_URING_RECHECK_MILLIS)) {
@@ -631,9 +710,11 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
         cn1OffloadDrain(signal->readFd);
         cn1UringReap(u);
     }
+    u->inflight--;
     cn1BackendVtOffloading(-1);
     /* The wakeup write may still be on its way: a late byte in a pooled
-       descriptor is a spurious wakeup the next user already tolerates. */
+       descriptor is a spurious wakeup the next user already tolerates, and the
+       signal stays busy until its completion is reaped. */
     cn1OffloadReturnSignal(signal);
     if(job.res == -EINTR || job.res == -EAGAIN) {
         /* Nothing was transferred; let the pool's retrying call answer. */
@@ -692,7 +773,27 @@ int cn1BackendUringOpenat2(int dirFd, const char* path, void* how, size_t howSiz
     return cn1UringRun(&op, result);
 }
 
+static void cn1UringHostExit(void) {
+    struct cn1Uring* u = cn1UringHost;
+    if(u == 0) {
+        return;
+    }
+    cn1UringReap(u);
+    if(u->inflight != 0) {
+        /* An operation may still write into a parked thread's stack. */
+        return;
+    }
+    cn1UringHost = 0;
+    munmap(u->sqes, u->sqesSize);
+    munmap(u->ringBase, u->ringSize);
+    close(u->fd);
+    free(u);
+}
+
 #else /* !CN1_HAVE_URING */
+
+static void cn1UringHostExit(void) {
+}
 
 int cn1BackendUringRead(int fd, void* buf, size_t len, long long offset, long long* result) {
     (void)fd; (void)buf; (void)len; (void)offset; (void)result;

@@ -202,9 +202,12 @@ public final class Db {
     private boolean closePending;
 
     /// Who is asking: the virtual thread, or the platform thread. Not
-    /// Thread.currentThread() alone, which every virtual thread on a host shares.
+    /// Thread.currentThread() alone, which every virtual thread on a host shares,
+    /// and not the virtual thread's address, which a server stop can free while
+    /// it holds this gate and a later virtual thread can then reuse -- that one
+    /// would walk into a gate it never took, on a connection mid-transaction.
     private static Object caller() {
-        long virtual = VirtualThread.current();
+        long virtual = VirtualThread.currentSerial();
         return virtual != 0 ? (Object) Long.valueOf(virtual) : Thread.currentThread();
     }
 
