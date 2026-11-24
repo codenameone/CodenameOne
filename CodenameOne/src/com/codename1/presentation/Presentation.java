@@ -191,7 +191,8 @@ public final class Presentation {
     /// - `warnings`: what a reader could not convert, or null
     public Presentation(float width, float height, List<Slide> slides, Theme theme,
             String title, long nextId, List<String> warnings) {
-        if (!(width > 0) || !(height > 0) || width > 100000 || height > 100000) {
+        // !(width > 0) also refuses NaN, which width <= 0 lets through
+        if (!(width > 0) || !(height > 0) || width > 100000 || height > 100000) { // NOPMD LogicInversion
             throw new IllegalArgumentException("Bad slide size " + width + "x" + height);
         }
         this.width = width;
@@ -510,16 +511,21 @@ public final class Presentation {
 
     private static boolean contains(byte[] data, String s) {
         int n = s.length();
-        outer:
         for (int i = 0; i + n <= data.length; i++) {
-            for (int j = 0; j < n; j++) {
-                if (data[i + j] != s.charAt(j)) {
-                    continue outer;
-                }
+            if (matchesAt(data, i, s)) {
+                return true;
             }
-            return true;
         }
         return false;
+    }
+
+    private static boolean matchesAt(byte[] data, int at, String s) {
+        for (int j = 0; j < s.length(); j++) {
+            if (data[at + j] != s.charAt(j)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Writes the presentation.
@@ -581,7 +587,7 @@ public final class Presentation {
             return false;
         }
         Presentation p = (Presentation) o;
-        return width == p.width && height == p.height && slides.equals(p.slides)
+        return Float.floatToIntBits(width) == Float.floatToIntBits(p.width) && Float.floatToIntBits(height) == Float.floatToIntBits(p.height) && slides.equals(p.slides)
                 && theme.equals(p.theme) && (title == null ? p.title == null
                 : title.equals(p.title));
     }

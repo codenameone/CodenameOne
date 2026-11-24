@@ -75,6 +75,7 @@ public class SlideView extends Container {
     private final Canvas canvas = new Canvas();
     private final DocumentView notes;
     private final PresentationListener modelListener = new PresentationListener() {
+        @Override
         public void presentationChanged(PresentationModel m, Presentation before,
                 Presentation after) {
             if (slide >= after.slides.size()) {
@@ -113,6 +114,7 @@ public class SlideView extends Container {
         notes.setFitWidth(true);
         notes.setPreferredH(Display.getInstance().convertToPixels(22));
         notes.getModel().addDocumentListener(new DocumentListener() {
+            @Override
             public void documentChanged(DocumentModel m, Document before, Document after) {
                 if (syncingNotes || getSlideCount() == 0) {
                     return;
@@ -452,6 +454,7 @@ public class SlideView extends Container {
             dm.addDocumentListener(this);
         }
 
+        @Override
         public void documentChanged(DocumentModel m, Document before, Document after) {
             if (!grouped) {
                 model.beginGroup();
@@ -540,10 +543,11 @@ public class SlideView extends Container {
         float cx = e.x + e.width / 2;
         float cy = e.y + e.height / 2;
         double deg = Math.toDegrees(MathUtil.atan2(py - cy, px - cx)) + 90;
-        while (deg < 0) {
+        // atan2 answers -180..180, so one turn at most brings it into 0..360
+        if (deg < 0) {
             deg += 360;
         }
-        while (deg >= 360) {
+        if (deg >= 360) {
             deg -= 360;
         }
         double snap = Math.round(deg / 15) * 15.0;

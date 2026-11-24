@@ -205,8 +205,8 @@ public abstract class SlideElement {
     /// true when equal
     protected final boolean sameFrame(SlideElement e) {
         return id.equals(e.id) && (name == null ? e.name == null : name.equals(e.name))
-                && x == e.x && y == e.y && width == e.width && height == e.height
-                && rotation == e.rotation && flipH == e.flipH && flipV == e.flipV;
+                && Float.floatToIntBits(x) == Float.floatToIntBits(e.x) && Float.floatToIntBits(y) == Float.floatToIntBits(e.y) && Float.floatToIntBits(width) == Float.floatToIntBits(e.width) && Float.floatToIntBits(height) == Float.floatToIntBits(e.height)
+                && Float.floatToIntBits(rotation) == Float.floatToIntBits(e.rotation) && flipH == e.flipH && flipV == e.flipV;
     }
 
     /// A hash of the base fields.

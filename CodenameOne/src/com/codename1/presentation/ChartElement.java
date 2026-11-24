@@ -457,11 +457,11 @@ public final class ChartElement extends SlideElement {
     @Override
     public String plainText() {
         StringBuilder sb = new StringBuilder(title == null ? "" : title);
-        for (int i = 0; i < seriesNames.length; i++) {
+        for (String name : seriesNames) {
             if (sb.length() > 0) {
                 sb.append('\n');
             }
-            sb.append(seriesNames[i]);
+            sb.append(name);
         }
         return sb.toString();
     }

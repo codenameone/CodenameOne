@@ -150,7 +150,7 @@ public final class LineStyle {
             return false;
         }
         LineStyle l = (LineStyle) o;
-        return color == l.color && width == l.width && dash.equals(l.dash) && alpha == l.alpha
+        return color == l.color && Float.floatToIntBits(width) == Float.floatToIntBits(l.width) && dash.equals(l.dash) && Float.floatToIntBits(alpha) == Float.floatToIntBits(l.alpha)
                 && head.equals(l.head) && tail.equals(l.tail);
     }
 

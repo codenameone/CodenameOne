@@ -188,7 +188,7 @@ public final class SlideAnimation {
             return;
         }
         if (Build.APPEAR.equals(b.effect)) {
-            s.hidden = exit ? t >= 1 : false;
+            s.hidden = exit && t >= 1;
         } else if (Build.FADE.equals(b.effect)) {
             s.alpha = shown;
         } else if (Build.FLY.equals(b.effect)) {

@@ -273,8 +273,8 @@ public final class TextFrame {
             return false;
         }
         TextFrame f = (TextFrame) o;
-        return blocks.equals(f.blocks) && left == f.left && top == f.top && right == f.right
-                && bottom == f.bottom && anchor.equals(f.anchor) && autofit.equals(f.autofit)
+        return blocks.equals(f.blocks) && Float.floatToIntBits(left) == Float.floatToIntBits(f.left) && Float.floatToIntBits(top) == Float.floatToIntBits(f.top) && Float.floatToIntBits(right) == Float.floatToIntBits(f.right)
+                && Float.floatToIntBits(bottom) == Float.floatToIntBits(f.bottom) && anchor.equals(f.anchor) && autofit.equals(f.autofit)
                 && wrap == f.wrap;
     }
 

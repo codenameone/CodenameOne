@@ -52,10 +52,13 @@ public final class Theme {
     static final String[] NAMES = {"dk1", "lt1", "dk2", "lt2", "accent1", "accent2", "accent3",
         "accent4", "accent5", "accent6", "hlink", "folHlink"};
 
-    /// A neutral theme: dark slate on white, six distinguishable accents, Sans fonts.
-    public static final Theme DEFAULT = new Theme("Codename One", new int[] {0x1f2933,
+    /// The colors of the default theme, which also fill in a short color list.
+    private static final int[] DEFAULT_COLORS = {0x1f2933,
         0xffffff, 0x334e68, 0xf0f4f8, 0x2f6fde, 0xe8590c, 0x2b9348, 0xb5179e, 0xf2a900,
-        0x0b7285, 0x1c64f2, 0x7048e8}, "Sans", "Sans");
+        0x0b7285, 0x1c64f2, 0x7048e8};
+
+    /// A neutral theme: dark slate on white, six distinguishable accents, Sans fonts.
+    public static final Theme DEFAULT = new Theme("Codename One", DEFAULT_COLORS, "Sans", "Sans");
 
     /// The theme's name.
     public final String name;
@@ -85,7 +88,7 @@ public final class Theme {
         this.colors = new int[12];
         for (int i = 0; i < 12; i++) {
             this.colors[i] = colors != null && i < colors.length ? colors[i] & 0xffffff
-                    : DEFAULT == null ? 0 : DEFAULT.colors[i];
+                    : DEFAULT_COLORS[i];
         }
         this.majorFont = majorFont == null || majorFont.length() == 0 ? "Sans" : majorFont;
         this.minorFont = minorFont == null || minorFont.length() == 0 ? "Sans" : minorFont;

@@ -300,7 +300,8 @@ final class NativeSlidesFormat {
         }
         float w = (float) x.doubleAttr("width", Presentation.WIDE_WIDTH);
         float h = (float) x.doubleAttr("height", Presentation.WIDE_HEIGHT);
-        if (!(w > 0) || !(h > 0) || w > 100000 || h > 100000) {
+        // !(w > 0) also refuses NaN, which w <= 0 lets through
+        if (!(w > 0) || !(h > 0) || w > 100000 || h > 100000) { // NOPMD LogicInversion
             throw new IOException("Bad slide size");
         }
         String title = x.attr("title");
@@ -600,7 +601,8 @@ final class NativeSlidesFormat {
             }
             return new GroupElement(id, name, kids, ex, ey, ew, eh, rot, flipH, flipV);
         } catch (IllegalArgumentException e) {
-            throw new IOException("Damaged " + n + " " + id + ": " + e.getMessage());
+            // CLDC's IOException takes no cause; the message carries it
+            throw new IOException("Damaged " + n + " " + id + ": " + e.getMessage()); // NOPMD PreserveStackTrace
         }
     }
 

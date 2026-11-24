@@ -143,8 +143,8 @@ public final class Fill {
             return false;
         }
         Fill f = (Fill) o;
-        return kind == f.kind && color == f.color && color2 == f.color2 && angle == f.angle
-                && alpha == f.alpha && (picture == null ? f.picture == null
+        return kind == f.kind && color == f.color && color2 == f.color2 && Float.floatToIntBits(angle) == Float.floatToIntBits(f.angle)
+                && Float.floatToIntBits(alpha) == Float.floatToIntBits(f.alpha) && (picture == null ? f.picture == null
                 : picture.equals(f.picture));
     }
 

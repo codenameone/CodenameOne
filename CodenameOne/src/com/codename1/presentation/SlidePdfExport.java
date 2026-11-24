@@ -100,10 +100,12 @@ public final class SlidePdfExport {
             this.images = images;
         }
 
+        @Override
         public Measurer measurer() {
             return fonts;
         }
 
+        @Override
         public void push(float cx, float cy, float rotation, float dx, float dy, float scale,
                 float a, float[] clip) {
             c.save();
@@ -127,6 +129,7 @@ public final class SlidePdfExport {
             }
         }
 
+        @Override
         public void pop() {
             c.restore();
             depth--;
@@ -167,11 +170,13 @@ public final class SlidePdfExport {
             }
         }
 
+        @Override
         public void fill(GeneralPath p, int color, float a) {
             c.setFillColor(color).setFillAlpha(clamp(a * alpha));
             fillPath(p);
         }
 
+        @Override
         public void gradient(GeneralPath p, int from, int to, float angle, float a, float x,
                 float y, float w, float h) {
             // the PDF writer has no shading objects: bands of solid color under the shape's
@@ -190,6 +195,7 @@ public final class SlidePdfExport {
             c.restore();
         }
 
+        @Override
         public void stroke(GeneralPath p, LineStyle line) {
             c.setStrokeColor(line.color).setStrokeAlpha(clamp(line.alpha * alpha))
                     .setLineWidth(Math.max(0.25f, line.width)).setLineCap(1).setLineJoin(1);
@@ -222,6 +228,7 @@ public final class SlidePdfExport {
             return img;
         }
 
+        @Override
         public void picture(Picture p, float x, float y, float w, float h, float cl, float ct,
                 float cr, float cb, boolean flipH, boolean flipV, float a) {
             PdfImage img = image(p);
@@ -246,6 +253,7 @@ public final class SlidePdfExport {
             c.restore();
         }
 
+        @Override
         public void text(List<LayoutItem> items, Measurer m, float x, float y, float s) {
             c.save();
             c.translate(x, y);
@@ -257,6 +265,7 @@ public final class SlidePdfExport {
             c.restore();
         }
 
+        @Override
         public void chart(ChartElement chart, float x, float y, float w, float h) {
             int pw = Math.max(1, Math.round(w * CHART_SCALE));
             int ph = Math.max(1, Math.round(h * CHART_SCALE));

@@ -348,7 +348,7 @@ public class SlideRenderer {
     static TextBoxLayout textLayout(ShapeElement s, Measurer m, Map<Object, Object> cache) {
         Key k = new Key(s.text, new Key(Float.valueOf(s.width), Float.valueOf(s.height)));
         Object o = cache.get(k);
-        if (o instanceof TextBoxLayout && ((TextBoxLayout) o).layout.getMeasurer() == m) {
+        if (o instanceof TextBoxLayout && ((TextBoxLayout) o).layout.getMeasurer() == m) { // NOPMD CompareObjectsWithEquals - the same measurer instance
             return (TextBoxLayout) o;
         }
         TextBoxLayout t = TextBoxLayout.of(s.text, s.width, s.height, m);
@@ -507,10 +507,12 @@ public class SlideRenderer {
             return path.createTransformedShape(t);
         }
 
+        @Override
         public Measurer measurer() {
             return measurer;
         }
 
+        @Override
         public void push(float cx, float cy, float rotation, float dx, float dy, float s,
                 float a, float[] clip) {
             Transform before = null;
@@ -541,6 +543,7 @@ public class SlideRenderer {
             alpha *= a;
         }
 
+        @Override
         public void pop() {
             Object[] top = stack.remove(stack.size() - 1);
             if (Boolean.TRUE.equals(top[2])) {
@@ -556,6 +559,7 @@ public class SlideRenderer {
             g.setAlpha(Math.max(0, Math.min(255, Math.round(255 * a * alpha))));
         }
 
+        @Override
         public void fill(GeneralPath path, int color, float a) {
             g.setColor(color);
             alpha(a);
@@ -568,6 +572,7 @@ public class SlideRenderer {
             }
         }
 
+        @Override
         public void gradient(GeneralPath path, int from, int to, float angle, float a, float x,
                 float y, float w, float h) {
             if (!g.isShapeSupported()) {
@@ -586,6 +591,7 @@ public class SlideRenderer {
             g.setColor(from);
         }
 
+        @Override
         public void stroke(GeneralPath path, LineStyle line) {
             g.setColor(line.color);
             alpha(line.alpha);
@@ -607,6 +613,7 @@ public class SlideRenderer {
             g.drawShape(pixels(dashed(path, Math.max(1, on), Math.max(1, off))), st);
         }
 
+        @Override
         public void picture(Picture p, float x, float y, float w, float h, float cl, float ct,
                 float cr, float cb, boolean flipH, boolean flipV, float a) {
             Image img = painter.image(p);
@@ -630,12 +637,15 @@ public class SlideRenderer {
             g.popClip();
         }
 
+        @Override
         public void text(List<LayoutItem> items, Measurer m, float x, float y, float s) {
             alpha(1);
-            LayoutPainter lp = m == measurer ? painter : new LayoutPainter(m);
+            LayoutPainter lp = m == measurer ? painter // NOPMD CompareObjectsWithEquals - the same measurer instance
+                    : new LayoutPainter(m);
             lp.paint(g, items, px(x), py(y), scale * s);
         }
 
+        @Override
         public void chart(ChartElement c, float x, float y, float w, float h) {
             int pw = Math.max(1, Math.round(w * scale));
             int ph = Math.max(1, Math.round(h * scale));

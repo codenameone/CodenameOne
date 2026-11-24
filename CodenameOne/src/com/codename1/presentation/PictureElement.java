@@ -171,8 +171,8 @@ public final class PictureElement extends SlideElement {
             return false;
         }
         PictureElement p = (PictureElement) o;
-        return sameFrame(p) && picture.equals(p.picture) && cropLeft == p.cropLeft
-                && cropTop == p.cropTop && cropRight == p.cropRight && cropBottom == p.cropBottom
+        return sameFrame(p) && picture.equals(p.picture) && Float.floatToIntBits(cropLeft) == Float.floatToIntBits(p.cropLeft)
+                && Float.floatToIntBits(cropTop) == Float.floatToIntBits(p.cropTop) && Float.floatToIntBits(cropRight) == Float.floatToIntBits(p.cropRight) && Float.floatToIntBits(cropBottom) == Float.floatToIntBits(p.cropBottom)
                 && line.equals(p.line);
     }
 

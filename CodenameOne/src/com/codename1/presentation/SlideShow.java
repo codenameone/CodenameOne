@@ -441,13 +441,13 @@ public class SlideShow extends Container {
             renderer.paint(g, presentation, s, x, y, a[4], statesNow(s));
         }
         if (presenter) {
-            paintPresenter(g, a);
+            paintPresenter(g);
         }
         // the live charts
         super.paint(g);
     }
 
-    private void paintPresenter(Graphics g, float[] a) {
+    private void paintPresenter(Graphics g) {
         int left = getX() + Math.round(getWidth() * 0.64f) + 8;
         int w = getX() + getWidth() - left - 8;
         if (w < 20) {
