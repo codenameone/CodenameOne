@@ -1238,7 +1238,23 @@ struct cn1BackendVtArg {
     /* Relative, in milliseconds, or -1 for none. Relative because the host keeps
      * its deadlines on its own clock. */
     JAVA_LONG waitTimeout;
+    /*
+     * Non-zero while a job of this virtual thread's is on the native I/O pool
+     * (cn1_backend_offload.c). The job and the buffers it writes live on this
+     * virtual thread's stack, so freeing it before the job reports would let a
+     * pool thread write into freed memory. See freeImpl.
+     */
+    int offloading;
 };
+
+/* Brackets a cn1BackendOffload hand-off; called on the virtual thread itself. */
+void cn1BackendVtOffloading(int delta) {
+    struct cn1VirtualThread* vt = cn1VirtualThreadCurrent();
+    struct cn1BackendVtArg* a = vt == 0 ? 0 : (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
+    if(a != 0) {
+        a->offloading += delta;
+    }
+}
 
 /* The Java entry point a background task's virtual thread runs; named here for
  * the same reason serveVirtual is -- nothing in Java calls it. */
@@ -1583,7 +1599,22 @@ JAVA_INT com_codename1_backend_VirtualThread_descriptorImpl___long_R_int(CODENAM
 JAVA_VOID com_codename1_backend_VirtualThread_freeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     struct cn1VirtualThread* vt = (struct cn1VirtualThread*)(intptr_t)handle;
     struct ThreadLocalData* victim;
+    struct cn1BackendVtArg* offloadArg;
     if(vt == 0) {
+        return;
+    }
+    /*
+     * NEVER FREE ONE WHOSE JOB IS STILL ON THE I/O POOL. Only a server stop frees
+     * a virtual thread that has not finished (freeParkedVirtualThreads), and one
+     * parked in cn1BackendOffload has its job -- and the buffers the job writes --
+     * on the stack this would release. A pool thread finishing a query or a read
+     * after the stop would then write into freed memory. Leaking that one
+     * virtual thread, once, at shutdown, is the safe answer: nothing resumes it,
+     * and the job writes into memory that is still its own. Waiting for the job
+     * instead could hang the stop for ever on an open that never returns.
+     */
+    offloadArg = (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
+    if(offloadArg != 0 && offloadArg->offloading > 0) {
         return;
     }
     /*

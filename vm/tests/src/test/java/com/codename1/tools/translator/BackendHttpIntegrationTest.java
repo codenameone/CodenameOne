@@ -813,6 +813,183 @@ class BackendHttpIntegrationTest {
         }
     }
 
+    /*
+     * LOCAL I/O MUST NOT HOLD A VIRTUAL-THREAD HOST.
+     *
+     * A socket wait parks the virtual thread; a disk call or a SQLite step cannot
+     * (a regular file is always "ready" to the poller), so those run on the native
+     * I/O pool while the caller is parked (cn1_backend_offload.c). These tests are
+     * what stops that from quietly regressing. Each holds a blocking local call in
+     * flight on the single-host server and requires an unrelated /healthz on the
+     * same host to answer meanwhile. Any change that puts the host back under the
+     * call -- a native that stops offloading, a `synchronized` in Db (a pinned
+     * virtual thread cannot park), a DbPool that wait()s inside its monitor --
+     * makes /healthz wait for the slow call and fails here, rather than in
+     * production as "one slow query stalls every request".
+     *
+     * No timing threshold: /healthz must answer while the slow call is provably
+     * still unanswered.
+     */
+
+    @Test
+    @DisplayName("a FIFO in the static root is refused, not waited on")
+    void aFifoInTheStaticRootIsRefusedNotWaitedOn() throws Exception {
+        // require, not assume: a silent skip would let this guard go vacuous in CI.
+        BackendTestSupport.require(busyServer != null && busyPort != 0,
+                "the single-host server is not running");
+        // A FIFO with no writer. A plain open(2) of one blocks until a writer
+        // appears, which held a request -- and on the I/O pool a pool thread --
+        // for ever; four of them stopped every disk call in the process. The
+        // opens are O_NONBLOCK now and StaticFiles refuses anything that is not
+        // a regular file, so this must come back 404 at once, with no writer.
+        Path fifo = work.resolve("www").resolve("stalled.fifo");
+        Files.deleteIfExists(fifo);
+        Process mk = new ProcessBuilder("mkfifo", fifo.toString()).start();
+        BackendTestSupport.require(mk.waitFor(10, TimeUnit.SECONDS) && mk.exitValue() == 0,
+                "mkfifo is not available");
+        try {
+            String answer = getWithTimeout(busyPort, "/static/stalled.fifo", 8000);
+            assertTrue(answer != null && answer.startsWith("HTTP/1.1 404"),
+                    "a FIFO in the static root must be refused without waiting for a "
+                    + "writer; got: " + answer);
+            String health = getWithTimeout(busyPort, "/healthz", 8000);
+            assertTrue(health != null && health.startsWith("HTTP/1.1 200"),
+                    "/healthz after the FIFO request; got: " + health);
+        } finally {
+            // "rw" never blocks on a FIFO, so a server that did open it is
+            // released even if this test fails.
+            try (java.io.RandomAccessFile writer = new java.io.RandomAccessFile(fifo.toFile(), "rw")) {
+                writer.write("done".getBytes(StandardCharsets.UTF_8));
+            }
+            Files.deleteIfExists(fifo);
+        }
+    }
+
+    @Test
+    @DisplayName("slow SQLite queries do not hold the virtual-thread host")
+    void slowSqliteQueriesDoNotHoldTheHost() throws Exception {
+        BackendTestSupport.require(busyServer != null && busyPort != 0,
+                "the single-host server is not running");
+        // THREE queries against a pool of two (PetServer sizes it max(2,
+        // workers / 4)): two run on the I/O pool, and the third waits for a
+        // connection -- which must be a park too, not a wait() on the host.
+        // Each counts to 60 million, which takes SQLite seconds on any machine.
+        List<Socket> slow = new ArrayList<>();
+        try {
+            for (int i = 0; i < 3; i++) {
+                slow.add(sendGet(busyPort, "/slowquery?n=60000000"));
+            }
+            Thread.sleep(500);
+            String health = getWithTimeout(busyPort, "/healthz", 8000);
+            assertTrue(health != null && health.startsWith("HTTP/1.1 200"),
+                    "/healthz must be answered while SQLite queries run; got: " + health);
+            for (Socket s : slow) {
+                // /healthz came back while every query was still unanswered: the
+                // host served it in the middle of them. A build that blocks the
+                // host answers /healthz only after the queries, and fails above
+                // with a null response or here.
+                assertEquals(0, s.getInputStream().available(),
+                        "a slow query had already answered when /healthz did. Either the "
+                        + "host was held until the queries finished -- SQLite steps no "
+                        + "longer offloaded, Db synchronized again, or DbPool waiting "
+                        + "inside its monitor -- or the queries finished too fast to "
+                        + "prove anything (raise n)");
+            }
+            // And the queries themselves still answer correctly: 60M * (60M + 1) / 2.
+            for (Socket s : slow) {
+                s.setSoTimeout(120000);
+                String answer = readAll(s);
+                assertTrue(answer.startsWith("HTTP/1.1 200")
+                                && answer.contains("1800000030000000"),
+                        "the offloaded query must still return its result; got: " + answer);
+            }
+        } finally {
+            for (Socket s : slow) {
+                s.close();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("offloaded reads into a byte[] survive collections running meanwhile")
+    void offloadedReadsSurviveCollections() throws Exception {
+        BackendTestSupport.require(busyServer != null && busyPort != 0,
+                "the single-host server is not running");
+        // A pool thread writes into a byte[] that only the parked virtual
+        // thread's frame references. gcchurn collects continuously on the same
+        // host meanwhile, so a parked frame that the collector failed to scan
+        // shows up as "corrupt at", a short read or a dead server.
+        for (int round = 0; round < 3; round++) {
+            List<Socket> files = new ArrayList<>();
+            Socket churn = sendGet(busyPort, "/gcchurn?ms=400");
+            try {
+                for (int i = 0; i < 4; i++) {
+                    files.add(sendGet(busyPort, "/gcfile?kb=512"));
+                }
+                churn.setSoTimeout(60000);
+                String churned = readAll(churn);
+                assertTrue(churned.startsWith("HTTP/1.1 200"), "gcchurn: " + churned);
+                for (Socket f : files) {
+                    f.setSoTimeout(60000);
+                    String answer = readAll(f);
+                    assertTrue(answer.startsWith("HTTP/1.1 200") && answer.contains("ok 512"),
+                            "an offloaded write/pread must round-trip under GC; got: " + answer);
+                }
+            } finally {
+                churn.close();
+                for (Socket f : files) {
+                    f.close();
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a long SELECT returns every row through the mixed inline and pool steps")
+    void longSelectReturnsEveryRow() throws Exception {
+        BackendTestSupport.require(busyServer != null && busyPort != 0,
+                "the single-host server is not running");
+        // The first step of a statement goes to the I/O pool and later fast ones
+        // run inline (cn1_backend_db.c, stepImpl). Switching between the two
+        // paths mid-statement must not lose or repeat a row.
+        String answer = getWithTimeout(busyPort, "/rows?n=25000", 30000);
+        assertTrue(answer != null && answer.startsWith("HTTP/1.1 200"), "/rows: " + answer);
+        assertTrue(answer.trim().endsWith("\n25000"),
+                "expected 25000 rows; got: " + answer);
+    }
+
+    /** Opens a connection and sends a GET on it, leaving the answer unread. */
+    private static Socket sendGet(int port, String target) throws IOException {
+        Socket s = new Socket();
+        s.connect(new InetSocketAddress("127.0.0.1", port), 5000);
+        s.getOutputStream().write(("GET " + target + " HTTP/1.1\r\nHost: x\r\n"
+                + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+        s.getOutputStream().flush();
+        return s;
+    }
+
+    /** The whole response, or null if it did not complete within the timeout. */
+    private static String getWithTimeout(int port, String target, int timeoutMillis)
+            throws IOException {
+        try (Socket s = sendGet(port, target)) {
+            s.setSoTimeout(timeoutMillis);
+            return readAll(s);
+        } catch (java.net.SocketTimeoutException timedOut) {
+            return null;
+        }
+    }
+
+    private static String readAll(Socket s) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        InputStream in = s.getInputStream();
+        byte[] buffer = new byte[8192];
+        int n;
+        while ((n = in.read(buffer)) >= 0) {
+            out.write(buffer, 0, n);
+        }
+        return new String(out.toByteArray(), StandardCharsets.UTF_8);
+    }
+
     @Test
     @DisplayName("the packaged client talks to the packaged server")
     void theTranslatedClientDrivesTheServer() throws Exception {

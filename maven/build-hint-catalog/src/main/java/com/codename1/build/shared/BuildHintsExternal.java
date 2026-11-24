@@ -46,14 +46,6 @@ final class BuildHintsExternal {
     }
 
     static void register(List<Hint> h) {
-        h.add(new Hint("crashProtection.enabled")
-                .group(HintGroup.GENERAL)
-                .type(HintType.BOOLEAN)
-                .external()
-                .doc("true/false Default false. Read by the build service: when true, a release build "
-                        + "uploads its symbol bundle (dSYM, PDB, .debug or mapping.txt) to Crash Protection, "
-                        + "which needs a Pro or Enterprise plan. See the Crash Protection chapter."));
-
         String[] crashPlatforms = {"and", "ios", "mac", "linux", "win"};
         for (String p : crashPlatforms) {
             h.add(new Hint("crashProtection." + p + ".enabled")
