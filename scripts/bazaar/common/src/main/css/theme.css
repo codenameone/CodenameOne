@@ -3166,3 +3166,21 @@ PosTotalRowValue {
     PosCountTotal { color: var(--text-dark); background-color: transparent; }
 }
 /* ---- end REGISTER ROUND 8 (dark) ---- */
+/* APP ROUND 9: tablet checkout columns. A gutter between the address
+   column and the review, and the review as a card of its own. */
+SvCheckoutMain {
+    background-color: transparent;
+    padding: 0 3mm 0 0;
+    margin: 0;
+}
+SvCheckoutReview {
+    background-color: var(--surface-alt);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1mm 3.2mm 3.2mm 3.2mm;
+    margin: 1.2mm 0 0 3mm;
+}
+@media (prefers-color-scheme: dark) {
+    SvCheckoutReview { background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+}
+/* ---- end APP ROUND 9 ---- */

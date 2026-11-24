@@ -808,6 +808,20 @@ private void screens() throws Exception {
         go(Sections.INVENTORY);
         pause(2500);
         visualShot("merchant-inventory");
+        if (com.codenameone.examples.bazaar.ui.Layouts.split() && tap("inventory-count")) {
+            // Beside the list: the stock count opens in the detail pane with
+            // a back arrow over it, and Back returns the pane to what it held.
+            // (A level row asks in a dialog first, which the tour cannot
+            // answer, so the count is what is stacked here.)
+            pause(2000);
+            visualShot("merchant-stack-1");
+            if (tap("merchant-back")) {
+                pause(1500);
+                visualShot("merchant-stack-back");
+            } else {
+                log("screens: no back arrow over the stacked pane");
+            }
+        }
         go(Sections.DISCOUNTS);
         pause(2500);
         visualShot("merchant-discounts");
@@ -960,6 +974,31 @@ private void screens() throws Exception {
         go(Sections.USERS);
         pause(2500);
         visualShot("admin-users");
+        if (tapFirst("user-")) {
+            pause(2500);
+            visualShot("admin-user-detail");
+            if (!com.codenameone.examples.bazaar.ui.Layouts.split()) {
+                safeBack();
+                pause(1200);
+            }
+        }
+        if (com.codenameone.examples.bazaar.ui.Layouts.split()) {
+            go(Sections.STORES);
+            pause(2500);
+            visualShot("admin-stores-empty");
+        }
+        go(Sections.PAYMENTS);
+        pause(2500);
+        visualShot("admin-payments");
+        if (tapFirst("payment-")) {
+            pause(2500);
+            visualShot("admin-payment-detail");
+            if (!com.codenameone.examples.bazaar.ui.Layouts.split()) {
+                safeBack();
+                pause(1200);
+            }
+        }
+        visualShot("tour-done");
     }
 
     /// "-dark" while [#screens] runs dark, so both modes share one folder.

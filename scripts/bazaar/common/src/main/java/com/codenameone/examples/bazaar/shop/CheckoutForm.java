@@ -100,8 +100,17 @@ final class CheckoutForm {
         if (Layouts.split()) {
             Container split = new Container(new GridLayout(1, 2));
             Container left = new Container(BoxLayout.y());
+            // A gutter between the columns, and the review as a card of its
+            // own: it started right at the address fields' edge.
+            left.setUIID("SvCheckoutMain");
             left.add(addressBox).add(shippingBox).add(paymentBox);
-            split.add(left).add(reviewBox);
+            Container review = new Container(BoxLayout.y());
+            review.setUIID("SvCheckoutReview");
+            review.add(reviewBox);
+            // The card is as tall as what it holds, not the address column.
+            Container cell = new Container(new BorderLayout());
+            cell.add(BorderLayout.NORTH, review);
+            split.add(left).add(cell);
             page.add(steps).add(split);
         } else {
             page.add(steps).add(addressBox).add(shippingBox).add(paymentBox).add(reviewBox);

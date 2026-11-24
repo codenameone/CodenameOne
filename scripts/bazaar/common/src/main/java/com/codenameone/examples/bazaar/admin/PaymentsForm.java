@@ -56,6 +56,16 @@ public final class PaymentsForm {
         panes.detail("Receipt", "Receipt", page);
     }
 
+    /// An order id as a person reads it: a 32-character hex id ran to the
+    /// edge of the row and ended in an ellipsis, so the row shows its first
+    /// eight characters, which is what the receipt beside it starts with.
+    static String shortId(String id) {
+        if (id == null) {
+            return "";
+        }
+        return id.length() > 8 ? Lang.tr("Order") + " #" + id.substring(0, 8) : id;
+    }
+
     private static void fill(final Panes panes, Container list, List<ReceiptDto> payments) {
         list.removeAll();
         if (payments == null || payments.isEmpty()) {
@@ -69,12 +79,21 @@ public final class PaymentsForm {
             value.add(Ui.badge(ReceiptForm.status(payment.status()),
                     ReceiptForm.badge(payment.status())));
             String who = payment.customerUsername() == null ? "" : payment.customerUsername();
-            String how = "cash".equals(payment.status()) ? Lang.tr("Cash") : payment.methodLabel();
-            final Container picked = Ui.row("cash".equals(payment.status())
+            // The row is narrow beside the amount: the name before the "@"
+            // fits, and the receipt beside or behind it has the whole address.
+            int at = who.indexOf('@');
+            if (at > 0) {
+                who = who.substring(0, at);
+            }
+            // Cash or card is the row's icon, and the e-mail is the whole
+            // second line: with the method after it the address broke
+            // mid-word on a phone.
+            boolean cash = "cash".equals(payment.status())
+                    || "Cash".equalsIgnoreCase(payment.methodLabel());
+            final Container picked = Ui.row(cash
                     ? FontImage.MATERIAL_PAYMENTS : FontImage.MATERIAL_CREDIT_CARD,
-                    payment.orderId(),
-                    who + (who.length() > 0 && how != null && how.length() > 0 ? Ui.DOT : "")
-                            + (how == null ? "" : how), value);
+                    shortId(payment.orderId()),
+                    who.length() > 0 ? who : (cash ? Lang.tr("Cash") : payment.methodLabel()), value);
             list.add(Ui.tap(picked, "payment-" + iter, e -> {
                 panes.picked(picked);
                 open(panes, payment);

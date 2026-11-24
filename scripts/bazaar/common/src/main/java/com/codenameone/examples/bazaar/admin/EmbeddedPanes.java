@@ -46,6 +46,18 @@ final class EmbeddedPanes extends Panes {
     private final List<Form> screens = new ArrayList<Form>();
     private Runnable shown;
     private Component picked;
+    private final char noneIcon;
+    private final String noneTitle;
+    private final String noneText;
+
+    /// @param noneIcon the icon of the detail pane before a row is picked
+    /// @param noneTitle what it says then, as the merchant panes do: "Select a store"
+    /// @param noneText the line under it
+    EmbeddedPanes(char noneIcon, String noneTitle, String noneText) {
+        this.noneIcon = noneIcon;
+        this.noneTitle = noneTitle;
+        this.noneText = noneText;
+    }
 
     /// The section's content, for the shell to place.
     Container host() {
@@ -172,8 +184,7 @@ final class EmbeddedPanes extends Panes {
     private void showDetail() {
         detail.removeAll();
         if (open.isEmpty()) {
-            Container none = Ui.empty(FontImage.MATERIAL_TOUCH_APP, "Nothing selected",
-                    "Pick a row from the list to see it here.");
+            Container none = Ui.empty(noneIcon, noneTitle, noneText);
             none.setName("nothing");
             detail.add(BorderLayout.CENTER, none);
         } else {

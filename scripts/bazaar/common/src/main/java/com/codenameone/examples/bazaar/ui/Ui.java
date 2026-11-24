@@ -22,7 +22,6 @@ import com.codename1.appkit.Skeleton;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.components.Switch;
-import com.codename1.components.ToastBar;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -285,7 +284,18 @@ public final class Ui {
 
     /// A person, as the initials of their name in a circle.
     public static Label avatar(String name) {
-        Label avatar = new Label("", "SvAvatar");
+        Label avatar = new Label("", "SvAvatar") {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                // A circle as wide as the widest initials: "MO" and "CC"
+                // made circles of different widths, and the names beside
+                // them no longer lined up.
+                com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+                int side = Math.max(d.getHeight(), Math.max(d.getWidth(), CN.convertToPixels(9)));
+                return new com.codename1.ui.geom.Dimension(side, side);
+            }
+        };
+        avatar.getAllStyles().setAlignment(Component.CENTER);
         // Initials are not words: looking them up would translate "OK".
         avatar.setShouldLocalize(false);
         avatar.setText(initials(name));
@@ -726,7 +736,7 @@ public final class Ui {
     public static void fail(int status, String message) {
         // What the server says is the server's wording; what the app says of
         // its own is translated. Looking both up costs nothing.
-        ToastBar.showErrorMessage(Lang.tr(message));
+        toast(Lang.tr(message), true);
     }
 
     /// What a list's load ends with when it fails: the user is told, as with
@@ -756,7 +766,55 @@ public final class Ui {
     }
 
     public static void say(String message) {
-        ToastBar.showInfoMessage(Lang.tr(message));
+        toast(Lang.tr(message), false);
+    }
+
+    /// The toast on screen, so a new message replaces it rather than stacking.
+    private static Container toast;
+
+    /// What the app says in passing, over the foot of the screen, for a few
+    /// seconds. `ToastBar` measured its message before it had a width and
+    /// pinned that height, so a long message lost everything after its
+    /// second line; this one wraps the whole text, as tall as it needs.
+    private static void toast(String text, boolean error) {
+        Form f = CN.getCurrentForm();
+        if (f == null || text == null || text.length() == 0) {
+            return;
+        }
+        if (toast != null) {
+            toast.remove();
+        }
+        final Container box = new Container(new BorderLayout());
+        box.setUIID("ToastBar");
+        box.setName("toast");
+        if (error) {
+            Label icon = new Label("", "ToastBarMessage");
+            FontImage.setMaterialIcon(icon, FontImage.MATERIAL_ERROR_OUTLINE, 3.4f);
+            icon.getAllStyles().setPaddingRight(2);
+            box.add(BorderLayout.WEST, icon);
+        }
+        SpanLabel words = new SpanLabel(text, "Container");
+        words.setTextUIID("ToastBarMessage");
+        box.add(BorderLayout.CENTER, words);
+        box.getAllStyles().setBgTransparency(255);
+        final Container layer = f.getLayeredPane(Ui.class, true);
+        layer.add(box);
+        if (layer.getLayout() instanceof LayeredLayout) {
+            ((LayeredLayout) layer.getLayout()).setInsets(box, "auto 0 15mm 0");
+        }
+        toast = box;
+        box.setAccessibilityText(text);
+        layer.revalidate();
+        CN.setTimeout(text.length() > 80 ? 5000 : 3200, () -> {
+            if (toast == box) {
+                toast = null;
+            }
+            Container parent = box.getParent();
+            box.remove();
+            if (parent != null) {
+                parent.revalidate();
+            }
+        });
     }
 
     /// The server's currency, from the payment config; null until it is known.

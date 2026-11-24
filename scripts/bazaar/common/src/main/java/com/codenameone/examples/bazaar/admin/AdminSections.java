@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.admin;
 
 import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.Nav;
 import com.codenameone.examples.bazaar.ui.Sections;
@@ -37,17 +38,20 @@ public final class AdminSections {
     public static void install() {
         Sections.content(Nav.ADMIN, Sections.OVERVIEW, AdminSections::overview);
         Sections.content(Nav.ADMIN, Sections.USERS, () -> {
-            EmbeddedPanes panes = new EmbeddedPanes();
+            EmbeddedPanes panes = new EmbeddedPanes(FontImage.MATERIAL_PERSON, "Select a user",
+                    "Pick a user from the list to see them here.");
             UsersForm.show(panes, UsersForm.ALL);
             return panes.host();
         });
         Sections.content(Nav.ADMIN, Sections.STORES, () -> {
-            EmbeddedPanes panes = new EmbeddedPanes();
+            EmbeddedPanes panes = new EmbeddedPanes(FontImage.MATERIAL_STORE, "Select a store",
+                    "Pick a store from the list to see it here.");
             StoresForm.show(panes);
             return panes.host();
         });
         Sections.content(Nav.ADMIN, Sections.PAYMENTS, () -> {
-            EmbeddedPanes panes = new EmbeddedPanes();
+            EmbeddedPanes panes = new EmbeddedPanes(FontImage.MATERIAL_PAYMENTS, "Select a payout",
+                    "Pick a payout from the list to see it here.");
             PaymentsForm.show(panes);
             return panes.host();
         });

@@ -60,6 +60,21 @@ abstract class MerchantPane extends Container {
     /// Whether a detail opens beside the list instead of over it.
     private final boolean split = Layouts.split() && splits();
     private boolean loaded;
+    /// A tablet: a phone's tab bar and title bar, but room enough that the
+    /// section's actions and the store switcher sit in the title bar instead
+    /// of a row of their own under it, which was a near-empty strip.
+    private final boolean inTitle = Layouts.split() && !wide;
+    /// What the title bar shows on a tablet: the section's name, and its
+    /// actions at the end.
+    private final Container titleBox = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE)) {
+        @Override
+        protected Dimension calcPreferredSize() {
+            // The title bar centres what it is given at its own width; the
+            // whole width puts the actions at the end, not beside the title.
+            Dimension d = super.calcPreferredSize();
+            return new Dimension(CN.getDisplayWidth(), d.getHeight());
+        }
+    };
 
     MerchantPane(String title, String name) {
         super(new BorderLayout());
@@ -298,6 +313,24 @@ abstract class MerchantPane extends Container {
         // larger copy of the title under the toolbar said the same thing twice.
         bar.add(BorderLayout.WEST, start);
         Container end = new Container(BoxLayout.x());
+        if (inTitle) {
+            tools.remove();
+            end.add(tools);
+            Component sw = switcher();
+            if (sw != null) {
+                end.add(sw);
+            }
+            titleBox.removeAll();
+            titleBox.setUIID("Container");
+            titleBox.add(BorderLayout.CENTER, Ui.plain(Lang.tr(title), "Title"));
+            titleBox.add(BorderLayout.EAST, end);
+            // The bar is left only for a detail's back arrow and heading.
+            bar.setHidden(start.getComponentCount() == 0);
+            if (titleBox.getComponentForm() != null) {
+                titleBox.getComponentForm().getToolbar().revalidate();
+            }
+            return;
+        }
         // The tools outlive the bar: they are still inside the previous
         // repaint's container, which removeAll only took off the bar, and
         // adding them again while they have a parent throws. A store change
@@ -383,6 +416,17 @@ abstract class MerchantPane extends Container {
         super.initComponent();
         MerchantState.onStore(storeChanged);
         claim();
+        if (inTitle) {
+            // The shell names the section in the title bar after it adds the
+            // section, so the title goes in once that is done.
+            CN.callSerially(() -> {
+                Form f = getComponentForm();
+                if (f != null && f.getToolbar() != null && titleBox.getParent() == null) {
+                    f.getToolbar().setTitleComponent(titleBox);
+                    f.getToolbar().revalidate();
+                }
+            });
+        }
         if (!loaded) {
             loaded = true;
             MerchantState.whenReady(() -> {
