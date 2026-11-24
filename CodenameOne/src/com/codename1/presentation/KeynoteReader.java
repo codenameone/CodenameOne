@@ -71,6 +71,8 @@ final class KeynoteReader {
     private static final int T_SHAPE = 3004;
     private static final int T_IMAGE = 3005;
     private static final int T_SHAPE_STYLE = 3016;
+    private static final int T_TEXT_SHAPE_STYLE = 2025;
+    private static final int T_CONNECTION_LINE = 3009;
     private static final int T_PACKAGE_METADATA = 11006;
 
     private final Map<Long, Integer> types = new HashMap<Long, Integer>();
@@ -292,11 +294,13 @@ final class KeynoteReader {
                         width = wh[0];
                         height = wh[1];
                     }
-                } else if (show.field() == 1 && show.wireType() == Protobuf.BYTES) {
+                } else if (show.field() == 3 && show.wireType() == Protobuf.BYTES) {
+                    // KN.ShowArchive.slideTree; the tree's slides are field 2 (a flat list in
+                    // every current file; older ones nest children under each node)
                     Protobuf tree = show.message();
                     Set<Long> seen = new HashSet<Long>();
                     while (tree.next()) {
-                        if (tree.field() == 1) {
+                        if (tree.field() == 2 && tree.wireType() == Protobuf.BYTES) {
                             collectNodes(ref(tree), 0, seen, slideNodes);
                         }
                     }
@@ -386,7 +390,9 @@ final class KeynoteReader {
             long note = -1;
             while (s.next()) {
                 int f = s.field();
-                if (f == 5 || f == 6 || f == 8) {
+                // 5 title placeholder, 6 body placeholder, 7 the slide's own drawables (42
+                // repeats them in z-order)
+                if (f == 5 || f == 6 || f == 7) {
                     long r = ref(s);
                     if (r >= 0) {
                         refs.add(new long[] {r, f});
@@ -503,6 +509,10 @@ final class KeynoteReader {
         if (t == T_IMAGE) {
             return image(object(id, T_IMAGE));
         }
+        if (t == T_CONNECTION_LINE) {
+            Protobuf line = sub(object(id, T_CONNECTION_LINE), 1);
+            return line == null ? null : shape(line, null, null);
+        }
         if (t >= 0) {
             warn("Keynote object type " + t + " is not supported and was skipped");
         }
@@ -574,6 +584,7 @@ final class KeynoteReader {
         Protobuf drawable = empty();
         long style = -1;
         String geometry = "rect";
+        float[] ends = null;
         while (p.next()) {
             if (p.field() == 1 && p.wireType() == Protobuf.BYTES) {
                 drawable = p.message();
@@ -581,27 +592,100 @@ final class KeynoteReader {
                 style = ref(p);
             } else if (p.field() == 3 && p.wireType() == Protobuf.BYTES) {
                 geometry = pathGeometry(p.message());
+                ends = connectionEnds(p.message());
             }
         }
         float[] g = geometry(drawable);
-        Fill fill = null;
-        LineStyle line = null;
-        Protobuf st = object(style, T_SHAPE_STYLE);
-        Protobuf props = st == null ? null : sub(st, 11);
-        if (props != null) {
-            while (props.next()) {
-                if (props.field() == 1 && props.wireType() == Protobuf.BYTES) {
-                    Protobuf f = sub(props.message(), 1);
-                    if (f != null) {
-                        fill = Fill.solid(color(f));
+        boolean flipV = false;
+        if (ends != null) {
+            // a connection line: drawn corner to corner of its box, flipped when it rises
+            geometry = "line";
+            flipV = ends[1] > ends[3] == ends[0] < ends[2];
+        }
+        Object[] fl = new Object[2];
+        shapeStyle(style, fl, 0);
+        Fill fill = (Fill) fl[0];
+        LineStyle line = (LineStyle) fl[1];
+        return new ShapeElement(nextId("e"), null, geometry, g[0], g[1], g[2], g[3], g[4],
+                false, flipV, fill, line, text, role, null);
+    }
+
+    /// The fill and stroke of a shape style, taken from its parents where it sets none.
+    /// A `TSWP.ShapeStyleArchive` (2025, a text box's) wraps the `TSD.ShapeStyleArchive`
+    /// (3016) in field 1; the properties are field 11 of the latter and the parent style is
+    /// field 3 of its `TSS.StyleArchive` (field 1).
+    private void shapeStyle(long style, Object[] out, int depth) throws IOException {
+        if (style < 0 || depth > 16 || out[0] != null && out[1] != null) {
+            return;
+        }
+        int t = typeOf(style);
+        Protobuf st;
+        if (t == T_TEXT_SHAPE_STYLE) {
+            st = sub(object(style, T_TEXT_SHAPE_STYLE), 1);
+        } else if (t == T_SHAPE_STYLE) {
+            st = object(style, T_SHAPE_STYLE);
+        } else {
+            return;
+        }
+        if (st == null) {
+            return;
+        }
+        long parent = -1;
+        while (st.next()) {
+            if (st.field() == 1 && st.wireType() == Protobuf.BYTES) {
+                Protobuf base = st.message();
+                while (base.next()) {
+                    if (base.field() == 3 && base.wireType() == Protobuf.BYTES) {
+                        parent = ref(base);
                     }
-                } else if (props.field() == 2 && props.wireType() == Protobuf.BYTES) {
-                    line = stroke(props.message());
+                }
+            } else if (st.field() == 11 && st.wireType() == Protobuf.BYTES) {
+                Protobuf props = st.message();
+                while (props.next()) {
+                    if (props.field() == 1 && props.wireType() == Protobuf.BYTES
+                            && out[0] == null) {
+                        Protobuf f = sub(props.message(), 1);
+                        out[0] = f == null ? Fill.NO_FILL : Fill.solid(color(f));
+                    } else if (props.field() == 2 && props.wireType() == Protobuf.BYTES
+                            && out[1] == null) {
+                        out[1] = stroke(props.message());
+                    }
                 }
             }
         }
-        return new ShapeElement(nextId("e"), null, geometry, g[0], g[1], g[2], g[3], g[4],
-                false, false, fill, line, text, role, null);
+        shapeStyle(parent, out, depth + 1);
+    }
+
+    /// The first and last points of a connection line's path (field 7 of a
+    /// `TSD.PathSourceArchive`), or null for any other path.
+    private static float[] connectionEnds(Protobuf p) throws IOException {
+        Protobuf conn = sub(p, 7);
+        Protobuf path = conn == null ? null : sub(conn, 1);
+        Protobuf bezier = path == null ? null : sub(path, 3);
+        if (bezier == null) {
+            return null;
+        }
+        float[] r = null;
+        while (bezier.next()) {
+            if (bezier.field() == 1 && bezier.wireType() == Protobuf.BYTES) {
+                Protobuf el = bezier.message();
+                float[] last = null;
+                while (el.next()) {
+                    if (el.field() == 2 && el.wireType() == Protobuf.BYTES) {
+                        last = pair(el.message());
+                    }
+                }
+                if (last != null) {
+                    if (r == null) {
+                        r = new float[] {last[0], last[1], last[0], last[1]};
+                    } else {
+                        r[2] = last[0];
+                        r[3] = last[1];
+                    }
+                }
+            }
+        }
+        return r;
     }
 
     private static LineStyle stroke(Protobuf s) throws IOException {

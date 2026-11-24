@@ -182,11 +182,12 @@ class KeynoteReaderTest extends UITestBase {
     static Archive deck(int secondSlideType) {
         Archive a = new Archive();
         a.add(1, 1, new Pb().ref(2, 2));
-        a.add(2, 2, new Pb().m(1, new Pb().ref(1, 10)).m(4, pair(1920, 1080)));
+        // KN.ShowArchive: 3 the slide tree, whose field 2 lists the slide nodes; 4 the size
+        a.add(2, 2, new Pb().m(3, new Pb().ref(2, 11).ref(2, 12)).m(4, pair(1920, 1080)));
         a.add(10, 4, new Pb().ref(1, 11).ref(1, 12));
         a.add(11, 4, new Pb().ref(2, 21));
         a.add(12, 4, new Pb().ref(2, 22).v(4, 1));
-        a.add(21, 5, new Pb().ref(5, 31).ref(8, 32).ref(8, 33).ref(27, 40));
+        a.add(21, 5, new Pb().ref(5, 31).ref(7, 32).ref(7, 33).ref(27, 40));
         a.add(31, 7, new Pb().m(1, new Pb().m(1, new Pb().m(1, drawable(10, 20, 300, 50)))
                 .ref(2, 51)));
         a.add(51, 2001, new Pb().s(3, "Hello Keynote").m(8,
@@ -199,7 +200,7 @@ class KeynoteReaderTest extends UITestBase {
         a.add(33, 3005, new Pb().m(1, drawable(400, 300, 80, 40)).ref(11, 900));
         a.add(40, 15, new Pb().ref(1, 52));
         a.add(52, 2001, new Pb().s(3, "Speaker notes"));
-        a.add(22, secondSlideType, new Pb().ref(8, 34));
+        a.add(22, secondSlideType, new Pb().ref(7, 34));
         a.add(34, 2011, new Pb().m(1, new Pb().m(1, drawable(0, 0, 100, 100))).ref(2, 53));
         a.add(53, 2001, new Pb().s(3, "Second"));
         a.add(80, 11006, new Pb().m(3, new Pb().v(1, 900).s(3, "pic.png")));
@@ -279,17 +280,17 @@ class KeynoteReaderTest extends UITestBase {
     @Test
     void cyclesAndDeepNestingTerminate() throws IOException {
         Archive a = deck(5);
-        a.add(11, 4, new Pb().ref(2, 21).ref(1, 10).ref(1, 11));
+        a.add(11, 4, new Pb().ref(2, 21).ref(1, 12).ref(1, 11));
         Presentation p = read(pack(a, false));
         assertEquals(2, p.getSlides().size());
 
         Archive d = new Archive();
         d.add(1, 1, new Pb().ref(2, 2));
-        d.add(2, 2, new Pb().m(1, new Pb().ref(1, 1000)));
+        d.add(2, 2, new Pb().m(3, new Pb().ref(2, 1000)));
         for (int i = 0; i < 500; i++) {
             d.add(1000 + i, 4, new Pb().ref(1, 1001 + i).ref(2, 21));
         }
-        d.add(21, 5, new Pb().ref(8, 53));
+        d.add(21, 5, new Pb().ref(7, 53));
         d.add(53, 3004, new Pb().m(1, drawable(0, 0, 10, 10)));
         Presentation q = read(pack(d, false));
         assertTrue(q.getSlides().size() < 100);
