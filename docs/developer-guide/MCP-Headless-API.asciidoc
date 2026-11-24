@@ -130,6 +130,21 @@ A typical frozen loop is `ui_clock_freeze` once, then `ui_activate`, `ui_clock_s
 
 In the simulator, `sim_record_film` films an animation the same way: called right after the tap that starts it, with `{"path": "/tmp/open.png", "overMs": 600, "everyMs": 50}`, it steps the frozen clock and writes one contact-sheet PNG of the frames as they were shown, form transitions included. Each frame sits at the same point of the animation on every run, however fast the machine.
 
+=== Checking a screen: `sim_verify` and `cn1:verify`
+
+`sim_verify` with `{"dir": "target/cn1-verify"}` checks the screen the simulator shows under four conditions: light mode, dark mode, landscape, and the largest text size. For each one it applies the setting, settles the agent clock, takes a screenshot and reports:
+
+* `unlabeled-control`: something a user can activate that has no accessible label, so a screen reader announces nothing.
+* `zero-size-control`: something a user can activate that has no area.
+* `truncated-text`: a label narrower than its text, which it therefore cuts off.
+* `low-contrast`: text whose colour has less than 3:1 contrast with the solid background behind it. Image and gradient backgrounds aren't judged.
+* `overflows-parent` (a warning): a component that runs past a parent that can't scroll sideways.
+* `no-dark-theme` (a warning): dark mode draws exactly what light mode draws.
+
+The largest-text condition is skipped, and says so, when the application hasn't opted into larger text, because the setting would change nothing. The tool writes `report.json`, `report.html` and the screenshots into the directory, puts every setting back and leaves the clock as it found it.
+
+`mvn cn1:verify` runs the same check without an agent: it starts the simulator hidden, verifies the first form, writes `common/target/cn1-verify/report.html` and fails the build when the report has an error. Pass `-Dcn1.verify.failOnError=false` to only write the report. To check the other screens, navigate to each one in `cn1:agent` and call `sim_verify` there.
+
 === Publishing application tools
 
 An application publishes its own data and actions as MCP tools. A `Tool` has a name, a description, a JSON schema for its parameters, and a handler:

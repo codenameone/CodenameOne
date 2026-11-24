@@ -59,7 +59,29 @@ final class SimulatorMcpTools {
 
     static void register(JavaSEPort port, MCPServer server) {
         new SimulatorMcpTools(port).addAll(server);
+        registerVerify(port, server);
+        SimulatorVerifier.startIfRequested(port, server);
         SimulatorStyleTools.register(server);
+    }
+
+    private static void registerVerify(final JavaSEPort port, final MCPServer server) {
+        server.addTool(new Tool("sim_verify",
+                "Checks the current screen in light and dark mode, portrait and landscape, and at the largest "
+                        + "text size (when the app opts into larger text): unlabeled or zero-size controls, "
+                        + "truncated or overflowing text, and text contrast below 3:1. Writes report.json, "
+                        + "report.html and a screenshot per condition into dir, puts every setting back, and "
+                        + "returns the report. Leaves the clock as it found it.",
+                "{\"type\":\"object\",\"properties\":{\"dir\":{\"type\":\"string\","
+                        + "\"description\":\"directory for the report\"}},\"required\":[\"dir\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        String dir = str(parse(argumentsJson), "dir");
+                        if (dir == null || dir.length() == 0) {
+                            throw new IllegalArgumentException("dir is required");
+                        }
+                        return JSONParser.toJson(new SimulatorVerifier(port, server).verify(new java.io.File(dir)));
+                    }
+                }));
     }
 
     private void addAll(MCPServer server) {
