@@ -406,6 +406,9 @@ public class DemoTourTest extends E2e {
         }
         signIn(MERCHANT, "home-merchant");
         pause(2000);
+        // Signing in applies the account's saved theme; the run's mode wins.
+        visualTheme();
+        pause(1000);
         go(Sections.DASHBOARD);
         pause(3000);
         visualShot("merchant-dashboard" + mode);
@@ -573,6 +576,13 @@ public class DemoTourTest extends E2e {
                         pause(700);
                         visualShot("reg-variants-2" + mode);
                     }
+                    // Three of the first jacket: a sale big enough to cross
+                    // the first quarter of the shift's goal, so the receipt
+                    // shows its milestone.
+                    tap("pos-variant-plus");
+                    pause(300);
+                    tap("pos-variant-plus");
+                    pause(500);
                 }
                 tap("pos-variant-add");
                 // The photo is mid-flight into the cart for a moment.
@@ -667,6 +677,12 @@ public class DemoTourTest extends E2e {
                 }
                 pause(800);
                 visualShot("reg-receipt" + mode);
+                if (findByName("pos-milestone") != null) {
+                    pause(1200);
+                    visualShot("reg-milestone" + mode);
+                } else {
+                    log("visual-register: no milestone on the receipt");
+                }
                 scrollDown(1);
                 visualShot("reg-receipt-2" + mode);
                 pause(6000);
@@ -874,6 +890,8 @@ private void screens() throws Exception {
         });
         signIn(MERCHANT, "home-merchant");
         pause(2000);
+        visualTheme();
+        pause(1000);
         // The live board and the packing queue, which no other tour shoots.
         go(MerchantSections.PIPELINE);
         pause(4000);

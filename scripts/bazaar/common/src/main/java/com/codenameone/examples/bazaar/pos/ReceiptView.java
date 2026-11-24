@@ -76,6 +76,8 @@ final class ReceiptView {
             Label star = new Label(milestoneText(r.milestone), "PosMilestoneText");
             FontImage.setMaterialIcon(star, r.milestone >= 100 ? FontImage.MATERIAL_EMOJI_EVENTS
                     : FontImage.MATERIAL_AUTO_AWESOME, 3.6f);
+            // Air between the sparkle and the words; flush they read as one glyph.
+            star.setGap(com.codename1.ui.CN.convertToPixels(1.6f));
             m.add(star);
             m.add(PosUi.data(Lang.tr("{0} of {1} today", PosState.money(g.sold()),
                     PosState.money(g.target())), "PosMilestoneMeta"));

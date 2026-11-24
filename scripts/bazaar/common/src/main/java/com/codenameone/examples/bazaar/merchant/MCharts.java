@@ -221,6 +221,45 @@ final class MCharts {
     /// Shares of a whole in cents as a donut, with the legend beside it carrying
     /// each part's written share.
     static Component donut(String name, String[] labels, double[] values, String[] shares) {
+        return donut(name, labels, values, shares, null);
+    }
+
+    /// A donut with `total` written in its hole, sized to fill a half-width
+    /// card: the chart larger, and each part's name and share on one line
+    /// beside it, centred against the ring.
+    static Component donut(String name, String[] labels, double[] values, String[] shares,
+            String total) {
+        if (total == null) {
+            return smallDonut(name, labels, values, shares);
+        }
+        PieSeries pie = new PieSeries("").setInnerRadius(0.64f).setPadAngle(1.5f)
+                .setLabelMode(PieSeries.LABELS_NONE).setCenterText(total);
+        pie.setData(labels, values);
+        pie.setValueFormatter(MONEY);
+        Chart chart = chart(name, 46f);
+        chart.addSeries(pie);
+        chart.setPreferredW(CN.convertToPixels(46f));
+        Container legend = new Container(BoxLayout.yCenter());
+        for (int iter = 0; iter < labels.length; iter++) {
+            Container row = new Container(new BorderLayout(), "MeLegendWide");
+            row.add(BorderLayout.WEST, BorderLayout.centerAbsolute(swatch(color("MeChartSlice"
+                    + (iter % 4 + 1)))));
+            Label part = new Label(labels[iter], "MeLegendName");
+            part.setShouldLocalize(false);
+            row.add(BorderLayout.CENTER, part);
+            Label share = new Label(shares[iter], "MeLegendShare");
+            share.setShouldLocalize(false);
+            row.add(BorderLayout.EAST, share);
+            legend.add(row);
+        }
+        Container box = new Container(new BorderLayout(), "MeChartBox");
+        box.add(BorderLayout.WEST, chart);
+        box.add(BorderLayout.CENTER, legend);
+        return box;
+    }
+
+    private static Component smallDonut(String name, String[] labels, double[] values,
+            String[] shares) {
         PieSeries pie = new PieSeries("").setInnerRadius(0.62f).setPadAngle(1.5f)
                 .setLabelMode(PieSeries.LABELS_NONE);
         pie.setData(labels, values);

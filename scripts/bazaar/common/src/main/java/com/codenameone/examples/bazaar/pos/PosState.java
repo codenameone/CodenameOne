@@ -574,9 +574,31 @@ public final class PosState {
         }
         ShiftDto s = shift();
         if (s != null) {
+            String before = goal.shift();
             goal.begin(s.id(), s.cashSalesCents() + s.cardSalesCents() + s.otherSalesCents());
+            if (!before.equals(goal.shift())) {
+                // A new shift aims at what the register's recent shifts sold.
+                goal.target(ShiftGoal.targetFrom(ShiftGoal.parseHistory(readString(key("shift-history")))));
+                write(key("goal"), goal.save());
+            }
         }
         return goal;
+    }
+
+    /// Remembers what a closed shift sold, once per shift, keeping the last
+    /// few for the next shift's goal.
+    static void recordClosedShift(String shiftId, long soldCents) {
+        String done = readString(key("shift-history-last"));
+        if (shiftId != null && shiftId.equals(done)) {
+            return;
+        }
+        write(key("shift-history"), ShiftGoal.appendHistory(readString(key("shift-history")), soldCents));
+        write(key("shift-history-last"), shiftId == null ? "" : shiftId);
+    }
+
+    private static String readString(String name) {
+        Object o = read(name);
+        return o instanceof String ? (String) o : null;
     }
 
     /// Counts a finished sale toward the goal; answers the milestone it

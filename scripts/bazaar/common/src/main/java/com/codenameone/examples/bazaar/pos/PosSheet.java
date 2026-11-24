@@ -42,7 +42,25 @@ final class PosSheet {
     /// A new register panel titled `title` (already translated), named `name`
     /// for the tour and the tests. Fill its content pane and call `show()`.
     static Sheet open(String title, String name) {
-        Sheet sheet = new Sheet(null, title, "PosSheet");
+        Sheet sheet = PosUi.wide() ? new Sheet(null, title, "PosSheet") : new Sheet(null, title, "PosSheet") {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                // A phone sheet stops below the title bar: grown to the top of
+                // the screen it slid over the title and cut it in half. The
+                // tallest content scrolls inside it instead.
+                com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+                com.codename1.ui.Form f = com.codename1.ui.CN.getCurrentForm();
+                if (f != null && f.getTitleArea() != null) {
+                    Component t = f.getTitleArea();
+                    int max = f.getHeight() - (t.getAbsoluteY() + t.getHeight())
+                            - getStyle().getVerticalMargins();
+                    if (max > 0 && d.getHeight() > max) {
+                        d.setHeight(max);
+                    }
+                }
+                return d;
+            }
+        };
         if (name != null) {
             sheet.setName(name);
         }

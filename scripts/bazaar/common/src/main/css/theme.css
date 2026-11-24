@@ -3522,3 +3522,39 @@ ShopDropStreak { color: #c2410c; background-color: transparent; font-family: "na
     ShopDropStreak { color: #fdba74; }
 }
 /* ---- end SHOPPER ROUND A ---- */
+
+/* ---- POLISH ROUND C: register picker and tiles, goal row, dashboard goals, channel donut ---- */
+/* The goal row shares the scan row's and chips' surface: transparent, it
+   showed the form's own background as a strip between them in dark. */
+PosGoalRow { background-color: var(--surface); }
+MeStreakIcon { color: #ea580c; background-color: transparent; padding: 0; margin: 0; }
+MeStreakValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.2mm; padding: 0; margin: 0; }
+MeGoalNext { color: var(--text-muted); background-color: var(--surface-alt); border-radius: 3mm; font-size: 2.2mm; padding: 1mm 2.6mm 1mm 2mm; margin: 1mm 0 0 0; }
+MeLegendWide { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0 0 0 3mm; border-bottom: 1px solid var(--line); }
+MeLegendName { color: var(--text); background-color: transparent; font-size: 2.6mm; padding: 0 1mm 0 0; margin: 0; }
+MeLegendShare { color: var(--text-muted); background-color: transparent; font-size: 2.4mm; padding: 0 0 0 1mm; margin: 0; }
+PosMilestone { padding: 3.4mm 3.4mm 3.6mm 3.4mm; margin: 1mm 0 3mm 0; border: 1px solid var(--brand); }
+PosMilestoneText { font-size: 3.8mm; }
+@media (prefers-color-scheme: dark) {
+    PosGoalRow { background-color: var(--surface-dark); }
+    MeStreakIcon { color: #fb923c; }
+    MeStreakValue { color: var(--text-dark); }
+    MeGoalNext { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    MeLegendWide { border-bottom: 1px solid var(--line-dark); }
+    MeLegendName { color: var(--text-dark); }
+    MeLegendShare { color: var(--text-muted-dark); }
+    PosMilestone { border: 1px solid var(--brand-dark); }
+}
+/* POLISH ROUND C (desktop dark): the desktop sidebar drew its native light
+   chrome in a dark window, half its entries pale text on pale grey. In dark
+   it takes the app's own dark surface and text instead. */
+@media (prefers-color-scheme: dark) {
+    SvDeskSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    SvDeskSideName { color: var(--text-dark); }
+    SvDeskSideDetail { color: var(--text-muted-dark); }
+    SvDeskSideLabel { color: var(--text-muted-dark); }
+    SvDeskSideItem { color: var(--text-dark); }
+    SvDeskSideItem.pressed { background-color: var(--line-dark); }
+    SvSide { background-color: var(--surface-alt-dark); }
+}
+/* ---- end POLISH ROUND C ---- */

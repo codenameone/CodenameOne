@@ -82,9 +82,9 @@ public final class Sections {
         add(Nav.MERCHANT, DASHBOARD, "Home", "", FontImage.MATERIAL_HOME);
         add(Nav.MERCHANT, ORDERS, "Orders", ORDERS_GROUP, FontImage.MATERIAL_RECEIPT_LONG);
         add(Nav.MERCHANT, PRODUCTS, "Products", PRODUCTS_GROUP, FontImage.MATERIAL_SELL);
-        add(Nav.MERCHANT, INVENTORY, "Inventory", PRODUCTS_GROUP, FontImage.MATERIAL_INVENTORY_2);
+        add(Nav.MERCHANT, INVENTORY, "Inventory", "", FontImage.MATERIAL_INVENTORY_2);
         add(Nav.MERCHANT, CUSTOMERS, "Customers", CUSTOMERS_GROUP, FontImage.MATERIAL_GROUP);
-        add(Nav.MERCHANT, DISCOUNTS, "Discounts", MARKETING_GROUP, FontImage.MATERIAL_LOCAL_OFFER);
+        add(Nav.MERCHANT, DISCOUNTS, "Discounts", "", FontImage.MATERIAL_LOCAL_OFFER);
         add(Nav.MERCHANT, ANALYTICS, "Analytics", ANALYTICS_GROUP, FontImage.MATERIAL_BAR_CHART);
         add(Nav.MERCHANT, AUTOMATIONS, "Automations", MARKETING_GROUP,
                 FontImage.MATERIAL_ACCOUNT_TREE);

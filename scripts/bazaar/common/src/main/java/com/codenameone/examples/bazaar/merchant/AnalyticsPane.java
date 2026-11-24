@@ -317,7 +317,7 @@ final class AnalyticsPane extends MerchantPane {
             shares[iter] = money(b.salesCents()) + "  " + (total <= 0 ? "0%"
                     : Period.percent((int) (b.salesCents() * 10000L / total)));
         }
-        return MCharts.donut("chart-channels", labels, values, shares);
+        return MCharts.donut("chart-channels", labels, values, shares, money(total));
     }
 
     private Component locations(List<BreakdownDto> list) {

@@ -527,7 +527,18 @@ final class SellScreen {
         // a one-line title beside a two-line one used to cut off the price.
         name.getTextComponent().setRows(2);
         name.getTextComponent().setGrowByContent(false);
-        text.add(name);
+        // And held to exactly two lines whatever the span measures, so the
+        // prices across a row sit on one line even when only one name wraps.
+        Container nameBox = new Container(new BorderLayout()) {
+            @Override
+            protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+                com.codename1.ui.geom.Dimension d = super.calcPreferredSize();
+                d.setHeight(ts.getFont().getHeight() * 2 + ts.getVerticalPadding());
+                return d;
+            }
+        };
+        nameBox.add(BorderLayout.NORTH, name);
+        text.add(nameBox);
         long min = first.priceCents();
         long max = first.priceCents();
         int stock = 0;

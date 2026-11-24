@@ -88,9 +88,9 @@ public final class MerchantSections {
         String manage = Sections.SETTINGS_GROUP;
         Sections.content(Nav.MERCHANT, Sections.DASHBOARD, DashboardPane::new);
         Sections.content(Nav.MERCHANT, Sections.ORDERS, OrdersPane::new);
-        Sections.register(Nav.MERCHANT, new Section(PIPELINE, "Sales pipeline", store,
+        Sections.register(Nav.MERCHANT, new Section(PIPELINE, "Sales pipeline", "",
                 FontImage.MATERIAL_VIEW_KANBAN, PipelinePane::new));
-        Sections.register(Nav.MERCHANT, new Section(FULFILMENT, "Fulfilment", store,
+        Sections.register(Nav.MERCHANT, new Section(FULFILMENT, "Fulfilment", "",
                 FontImage.MATERIAL_LOCAL_SHIPPING,
                 FulfilmentPane::new));
         Sections.content(Nav.MERCHANT, Sections.PRODUCTS, ProductsPane::new);

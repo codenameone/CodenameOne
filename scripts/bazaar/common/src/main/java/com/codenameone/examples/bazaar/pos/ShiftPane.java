@@ -169,6 +169,9 @@ final class ShiftPane {
 
     private static void closedPage(Container page, final ShiftDto closed) {
         page.removeAll();
+        // What the shift sold sets the next one's goal (ShiftGoal.targetFrom).
+        PosState.recordClosedShift(closed.id(), closed.cashSalesCents() + closed.cardSalesCents()
+                + closed.otherSalesCents());
         page.add(PosUi.label("Shift closed", "PosTitle"));
         page.add(Ui.fact("Expected", PosState.money(closed.expectedCents())));
         page.add(Ui.fact("Counted", PosState.money(closed.countedCents())));

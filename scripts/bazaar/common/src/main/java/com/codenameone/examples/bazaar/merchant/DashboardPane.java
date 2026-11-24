@@ -232,16 +232,42 @@ final class DashboardPane extends MerchantPane {
         long day = SellerGoals.dailyGoal(cents);
         long week = SellerGoals.weeklyGoal(cents);
         long thisWeek = SellerGoals.week(cents);
-        Container rings = new Container(new GridLayout(1, 2));
-        rings.add(goal(Lang.tr("Daily goal"), cents[cents.length - 1], day, "goal-day"));
+        long todaySold = cents[cents.length - 1];
+        // The two rings and the streak side by side, centred in the card, and
+        // the next thing to aim for under them: rings over a lone streak
+        // chip left half the card empty.
+        Container rings = new Container(new GridLayout(1, 3));
+        rings.add(goal(Lang.tr("Daily goal"), todaySold, day, "goal-day"));
         rings.add(goal(Lang.tr("Weekly goal"), thisWeek, week, "goal-week"));
-        card.add(BorderLayout.CENTER, rings);
         int streak = SellerGoals.streak(cents);
-        Label s = new Label(streak == 1 ? Lang.tr("1-day selling streak")
-                : Lang.tr("{0}-day selling streak", String.valueOf(streak)), "MeStreak");
-        s.setName("goal-streak");
-        FontImage.setMaterialIcon(s, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, 3.2f);
-        card.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(s));
+        Container streakBox = new Container(BoxLayout.y());
+        Label flame = new Label("", "MeStreakIcon");
+        FontImage.setMaterialIcon(flame, FontImage.MATERIAL_LOCAL_FIRE_DEPARTMENT, 9f);
+        streakBox.add(FlowLayout.encloseCenter(flame));
+        Label days = new Label(String.valueOf(streak), "MeStreakValue");
+        days.setShouldLocalize(false);
+        days.setName("goal-streak");
+        streakBox.add(FlowLayout.encloseCenter(days));
+        streakBox.add(FlowLayout.encloseCenter(new Label(streak == 1 ? Lang.tr("Day selling streak")
+                : Lang.tr("Days selling streak"), "MeGoalCaption")));
+        rings.add(streakBox);
+        Container middle = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+        middle.add(BorderLayout.CENTER, rings);
+        card.add(BorderLayout.CENTER, middle);
+        String next;
+        if (todaySold < day) {
+            next = Lang.tr("{0} to go for today's goal", MerchantState.money(day - todaySold));
+        } else if (thisWeek < week) {
+            next = Lang.tr("Today's goal is met. {0} to go for the week",
+                    MerchantState.money(week - thisWeek));
+        } else {
+            next = Lang.tr("Both goals met. Every sale now is a bonus");
+        }
+        Label n = new Label(next, "MeGoalNext");
+        n.setShouldLocalize(false);
+        n.setName("goal-next");
+        FontImage.setMaterialIcon(n, FontImage.MATERIAL_FLAG, 2.8f);
+        card.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(n));
         return card;
     }
 

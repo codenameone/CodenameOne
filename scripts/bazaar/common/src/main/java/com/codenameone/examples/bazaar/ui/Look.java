@@ -47,6 +47,13 @@ public final class Look {
             UIManager.getInstance().setUseNativeFonts(true);
         }
         UIManager.getInstance().refreshTheme();
+        // Components already on screen keep the styles they were made with;
+        // a desktop sidebar built light stayed light in a window turned dark.
+        com.codename1.ui.Form current = CN.getCurrentForm();
+        if (current != null) {
+            current.refreshTheme(false);
+            current.revalidateLater();
+        }
     }
 
     /// Whether the app is drawn dark right now. A platform that cannot say is

@@ -124,7 +124,15 @@ final class VariantPicker {
         Container foot = new Container(BoxLayout.y());
         foot.setUIID("PosVpFoot");
         foot.add(add);
-        content.add(BorderLayout.SOUTH, foot);
+        if (PosUi.wide()) {
+            // Beside the cart the panel is the screen's full height; pinned
+            // to its foot the button left a hand's width of nothing under the
+            // quantity, so it follows the content there.
+            body.add(foot);
+        } else {
+            body.setScrollableY(true);
+            content.add(BorderLayout.SOUTH, foot);
+        }
         refresh();
         sheet.show();
     }

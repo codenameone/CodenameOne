@@ -480,18 +480,34 @@ public class DemoStores {
                 o.setDiscountCents(discount);
                 o.setTotalCents(subtotal - discount);
                 o.setFinancial(Orders.PAID);
-                // Today's newest online orders are still waiting to be packed;
-                // everything older has gone out.
-                boolean waiting = !pos && ago == 0 && k * 2 >= count;
-                o.setStatus(waiting ? Orders.OPEN : Orders.CLOSED);
-                o.setFulfilment(waiting ? Orders.UNFULFILLED : Orders.FULFILLED);
+                // Today's online orders are a working day's queue: the
+                // morning's have gone out, the latest wait to be packed, and
+                // one in four of the rest is part shipped. A list of nothing
+                // but "Fulfilled" read as a store with nothing to do.
+                int units = 0;
                 for (int l = 0; l < lines.size(); l++) {
-                    lines.get(l).setFulfilledQty(waiting ? 0 : lines.get(l).getQuantity());
+                    units += lines.get(l).getQuantity();
+                }
+                boolean dayQueue = !pos && ago == 0;
+                boolean waiting = dayQueue && k * 3 >= count;
+                boolean partial = dayQueue && !waiting && units > 1 && k * 3 >= count - count / 2
+                        || waiting && units > 1 && mix(serial, 9) % 4 == 0;
+                if (partial) {
+                    waiting = false;
+                }
+                o.setStatus(waiting || partial ? Orders.OPEN : Orders.CLOSED);
+                o.setFulfilment(partial ? Orders.PARTIAL
+                        : waiting ? Orders.UNFULFILLED : Orders.FULFILLED);
+                int sent = partial ? units / 2 : waiting ? 0 : units;
+                for (int l = 0; l < lines.size(); l++) {
+                    int q = Math.min(sent, lines.get(l).getQuantity());
+                    lines.get(l).setFulfilledQty(q);
+                    sent -= q;
                 }
                 Instant when = Instant.ofEpochMilli(at);
                 o.setCreatedAt(when);
                 o.setUpdatedAt(when);
-                if (!waiting) {
+                if (!waiting && !partial) {
                     o.setClosedAt(when);
                 }
                 if (ago >= 3 && mix(serial, 7) % 31 == 4) {

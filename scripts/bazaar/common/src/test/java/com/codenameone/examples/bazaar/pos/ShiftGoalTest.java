@@ -59,4 +59,19 @@ class ShiftGoalTest {
         assertEquals(250, back.permille());
         assertEquals(ShiftGoal.DEFAULT_TARGET, ShiftGoal.load("junk").target());
     }
+
+    @Test
+    void goalFollowsTrailingShifts() {
+        assertEquals(ShiftGoal.DEFAULT_TARGET, ShiftGoal.targetFrom(new long[0]));
+        // Average 83,742 cents rounds up to $850.
+        assertEquals(85000, ShiftGoal.targetFrom(new long[] {80000, 87484}));
+        assertEquals(ShiftGoal.FLOOR, ShiftGoal.targetFrom(new long[] {1200}));
+        String h = null;
+        for (int iter = 1; iter <= 7; iter++) {
+            h = ShiftGoal.appendHistory(h, iter * 10000L);
+        }
+        assertEquals("30000,40000,50000,60000,70000", h);
+        assertEquals(50000, ShiftGoal.targetFrom(ShiftGoal.parseHistory(h)));
+        assertEquals(2, ShiftGoal.parseHistory("100,x,200").length);
+    }
 }

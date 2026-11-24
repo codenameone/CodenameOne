@@ -146,8 +146,12 @@ public class DemoPipeline {
         String[] stages = {"DELIVERED", "DELIVERED", SHIPPED, SHIPPED, SHIPPED, LABELLED,
             LABELLED, PACKED, PACKED, PLACED, PLACED, PLACED};
         for (int iter = 0; iter < stages.length; iter++) {
-            // Delivered parcels were ordered days ago, new ones this morning.
-            StoreOrder o = place(storeId, (stages.length - iter) * 4L * 3600000L);
+            // Delivered parcels were ordered days ago; the rest came in
+            // through today, about one every 50 minutes, so the dashboard's
+            // recent orders read as a working day and not as a burst.
+            long ago = "DELIVERED".equals(stages[iter]) ? (stages.length - iter) * 4L * 3600000L
+                    : (stages.length - iter) * 50L * 60000L + (iter * 7L % 11) * 60000L;
+            StoreOrder o = place(storeId, ago);
             if (o == null) {
                 return false;
             }
@@ -179,17 +183,25 @@ public class DemoPipeline {
         return true;
     }
 
+    /// How old a new order is before the simulator packs it.
+    static final long PACK_AFTER_MILLIS = 8L * 60000L;
+
+    /// Ticks between two new orders.
+    static final int NEW_ORDER_TICKS = 30;
+
     /// One step on the board of `storeId`; answers which kind it took. Every
-    /// eighth step is a new order, the rest move the oldest card of the
-    /// earliest stage that has one, latest stage first, so the board flows.
+    /// [#NEW_ORDER_TICKS]th step is a new order, the rest move the oldest card
+    /// of the earliest stage that has one, latest stage first, so the board flows.
     public String step(String storeId) throws IOException {
         ticks++;
         String owner = DemoAccounts.MERCHANT;
         // One new order per eight ticks (40 seconds): each order takes three
         // moves (pack, label, ship), so at one in three the unfulfilled pile
         // only grew, and an order every 15 seconds put a month's takings into
-        // a quarter-hour demo.
-        if (ticks % 8 == 1) {
+        // a quarter-hour demo. One per thirty ticks (two and a half minutes)
+        // since: at one a minute the dashboard's recent orders were a row of
+        // orders a minute apart, every one already shipped.
+        if (ticks % NEW_ORDER_TICKS == 1) {
             StoreOrder o = place(storeId, 0);
             return o == null ? IDLE : PLACED;
         }
@@ -203,7 +215,12 @@ public class DemoPipeline {
                 List<Fulfillment> fs = fulfillments.findByOrderId(o.getId());
                 Fulfillment f = fs.isEmpty() ? null : fs.get(0);
                 try {
-                    if (wanted[w] == null && f == null && Orders.OPEN.equals(o.getStatus())) {
+                    // A new order waits a few minutes before it is packed, so
+                    // the recent orders show some still waiting rather than
+                    // every one shipped within a minute of arriving.
+                    boolean fresh = o.getCreatedAt() != null && System.currentTimeMillis()
+                            - o.getCreatedAt().toEpochMilli() < PACK_AFTER_MILLIS;
+                    if (wanted[w] == null && f == null && !fresh && Orders.OPEN.equals(o.getStatus())) {
                         packed(owner, storeId, o.getId());
                         return PACKED;
                     }

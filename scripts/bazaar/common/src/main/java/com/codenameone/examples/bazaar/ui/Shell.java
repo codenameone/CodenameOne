@@ -420,8 +420,12 @@ public final class Shell implements Nav.Home {
             for (String other : modes) {
                 if (!other.equals(mode)) {
                     final String to = other;
-                    list.add(entry(Nav.icon(to), Nav.label(to), "switch-" + to,
-                            () -> Nav.switchTo(to)));
+                    // The merchant's own "Point of sale" section manages the
+                    // registers; switching to the till is opening one, so it
+                    // is not a second "Point of sale" in the same list.
+                    boolean twin = Nav.POS.equals(to) && find(Sections.POS) != null;
+                    list.add(entry(Nav.icon(to), twin ? "Open register" : Nav.label(to),
+                            "switch-" + to, () -> Nav.switchTo(to)));
                 }
             }
         }
