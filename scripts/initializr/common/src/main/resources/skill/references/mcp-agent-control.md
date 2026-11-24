@@ -174,3 +174,16 @@ Build and compile errors carry a stable ID in square brackets. Key on the ID, no
 | `CN1-LIBRARY-MISSING` | Compliance check | A class from a library that isn't in the application. Add the dependency or remove the use. |
 | `CN1-API-TOOLKIT`, `CN1-API-UI-LIBRARY` | Compliance check | Swing, AWT, JavaFX or UI-library API the compatibility layers lack. |
 | `CN1-API-OTHER` | Compliance check | Anything else a device lacks; read the `Instead:` line. |
+
+A failed build's log gets its ID from `java .agent-skills/codename-one/tools/BuildLog.java <log>`, which reads the toolchains' own messages and prints the fix:
+
+| ID | What failed |
+|---|---|
+| `CN1-SIGN-CERT` | iOS certificate missing, expired, revoked, not matching its key, or a wrong P12 password. |
+| `CN1-SIGN-PROFILE` | Provisioning profile with the wrong bundle ID, certificate or kind, or expired. |
+| `CN1-SIGN-ENTITLEMENT` | A capability the app uses that its profile doesn't grant. |
+| `CN1-ANDROID-KEYSTORE` | Wrong keystore, password or alias. |
+| `CN1-BUILD-NATIVE` | A native interface or cn1lib native that didn't compile or link. |
+| `CN1-BUILD-DEPENDENCY` | A Gradle/Maven artifact, CocoaPod or Swift package that didn't resolve. |
+| `CN1-BUILD-QUOTA` | Out of build credits, or the upload is over the plan's size. |
+| `CN1-BUILD-TIMEOUT` | The build ran out of time on the server. |
