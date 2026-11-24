@@ -79,6 +79,13 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     /// In strict mode, the codes of the last frame that had any, waiting for a
     /// later frame to confirm them.
     private Barcode[] pending;
+    /// Frames since {@link #pending} was last refreshed by a frame holding a
+    /// code that needs confirming.
+    private int pendingAge;
+    /// How many frames without such a code a pending read survives: enough
+    /// for a few blurred frames, few enough that a code read once and then
+    /// brought back much later still needs two fresh reads.
+    private static final int PENDING_FRAMES = 15;
 
     /// Creates an analyzer using the platform default backend and options.
     /// @see VisionOptions
@@ -94,7 +101,7 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     }
 
     @Override
-    synchronized Object filter(Object value, VisionImage image) {
+    Object filter(Object value, VisionImage image) {
         if (!(value instanceof Barcode[])) {
             return value;
         }
@@ -130,8 +137,15 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
         // Only codes that need confirming are remembered, and only a frame
         // that has one replaces them: a QR code decoding alone in between
         // must not push out the PDF417 waiting for its second read. A frame
-        // with no such code keeps the pending read for the same reason.
-        if (strictCount > 0) {
+        // with no such code keeps the pending read for the same reason, for
+        // PENDING_FRAMES frames. This runs on the EDT, where the analysis
+        // result is delivered, so it needs no lock.
+        if (strictCount == 0) {
+            if (pending != null && ++pendingAge > PENDING_FRAMES) {
+                pending = null;
+            }
+        } else {
+            pendingAge = 0;
             Barcode[] next = new Barcode[strictCount];
             int n = 0;
             for (int i = 0; i < codes.length; i++) {

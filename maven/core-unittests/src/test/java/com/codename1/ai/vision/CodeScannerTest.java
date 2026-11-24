@@ -282,6 +282,23 @@ class CodeScannerTest extends UITestBase {
         scanner.close();
     }
 
+    @Test
+    void aPendingReadExpiresSoAStaleMisreadCannotConfirmLater() {
+        BarcodeScanner scanner = new BarcodeScanner();
+        VisionImage frame = VisionImage.detachedCameraData(new byte[] {1}, false,
+                0, 0, 0, 1L, null);
+        vision.result = new Barcode[] {pdf("misread", new byte[] {9})};
+        assertEquals(0, processNow(scanner, frame).length);
+        vision.result = new Barcode[0];
+        for (int i = 0; i < 16; i++) {
+            processNow(scanner, frame);
+        }
+        vision.result = new Barcode[] {pdf("misread", new byte[] {9})};
+        assertEquals(0, processNow(scanner, frame).length,
+                "a read from long ago must not confirm this one");
+        scanner.close();
+    }
+
     private Barcode[] processNow(BarcodeScanner scanner, VisionImage frame) {
         final Barcode[][] out = new Barcode[1][];
         scanner.process(frame).ready(new SuccessCallback<Barcode[]>() {

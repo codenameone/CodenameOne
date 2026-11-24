@@ -129,7 +129,8 @@ public final class VisionOptions {
     /// This is state kept by the scanner between calls to
     /// {@link BarcodeScanner#process(VisionImage)}, which is what a camera
     /// pipeline ({@link VisionCameraView}, {@link CodeScanner}) does once per
-    /// frame. A frame with no code keeps the pending read, and every code in a
+    /// frame. A frame with no code keeps the pending read for up to 15 frames,
+    /// and every code in a
     /// frame is checked against every code of the pending frame, so codes in
     /// view whose order changes between frames still confirm. With this set to
     /// {@code true} a single still image processed once reports nothing.

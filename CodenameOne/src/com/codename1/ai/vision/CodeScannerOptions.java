@@ -119,7 +119,9 @@ public final class CodeScannerOptions {
     /// such as a PDF417 at level 0; see
     /// {@link VisionOptions#strictBarcodes(boolean)}, which this sets on the
     /// scanner's detector, for why and how frames are compared. It also
-    /// reaches a {@link BarcodeScanner} built from {@link #getVisionOptions()}.
+    /// reaches a {@link BarcodeScanner} built from {@link #getVisionOptions()},
+    /// and overrides a {@code strictBarcodes} set on the options passed to
+    /// {@link #visionOptions(VisionOptions)}.
     ///
     /// @param value whether two matching reads are required
     /// @return this options object
