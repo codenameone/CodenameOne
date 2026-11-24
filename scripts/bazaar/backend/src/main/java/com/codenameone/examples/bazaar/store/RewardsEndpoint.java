@@ -33,6 +33,9 @@ import com.codenameone.examples.bazaar.loyalty.Loyalty;
 import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.repository.LoyaltyMemberRepository;
 import com.codenameone.examples.bazaar.repository.LoyaltyLedgerRepository;
+import com.codenameone.examples.bazaar.repository.LoyaltyProgramRepository;
+import com.codenameone.examples.bazaar.domain.LoyaltyProgram;
+import com.codenameone.examples.bazaar.loyalty.LoyaltyMath;
 import com.codenameone.examples.bazaar.repository.ReviewRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
@@ -54,10 +57,13 @@ public class RewardsEndpoint implements RewardsApiServer {
     private final LoyaltyLedgerRepository ledger;
     private final StoreRepository stores;
     private final Loyalty loyalty;
+    private final LoyaltyProgramRepository programs;
 
     public RewardsEndpoint(StoreOrderRepository orders, ReviewRepository reviews,
             WishlistRepository wishlists, LoyaltyMemberRepository members,
-            LoyaltyLedgerRepository ledger, StoreRepository stores, Loyalty loyalty) {
+            LoyaltyLedgerRepository ledger, StoreRepository stores, Loyalty loyalty,
+            LoyaltyProgramRepository programs) {
+        this.programs = programs;
         this.orders = orders;
         this.reviews = reviews;
         this.wishlists = wishlists;
@@ -129,6 +135,16 @@ public class RewardsEndpoint implements RewardsApiServer {
             LoyaltyLedger earned = ledger.findByStoreIdAndRef(asked.getStoreId(),
                     Loyalty.EARN + ":" + orderId);
             orderPoints = earned == null ? 0 : earned.getPoints();
+            // Points are credited when the payment is captured. Until then the
+            // order-placed card shows what the store's programme will credit
+            // ("added when your order ships"), never a misleading zero.
+            if (earned == null && !Orders.CANCELLED.equals(asked.getStatus())) {
+                LoyaltyProgram p = programs.findByStoreId(asked.getStoreId());
+                if (p != null && p.isActive()) {
+                    orderPoints = LoyaltyMath.points(
+                            asked.getSubtotalCents() - asked.getDiscountCents(), p);
+                }
+            }
             for (int iter = 0; iter < balances.size(); iter++) {
                 if (balances.get(iter).storeId().equals(asked.getStoreId())) {
                     orderBalance = balances.get(iter).points();
