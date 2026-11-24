@@ -209,8 +209,8 @@ final class McpUiTools {
                 }));
 
         tools.add(new Tool("ui_clock_release",
-                "Returns animation time to the wall clock. Settle first: an animation started while time was "
-                        + "advanced ahead of the wall clock waits for the wall clock to catch up.",
+                "Lets animation time run again at the wall clock's pace, carrying on from where the frozen "
+                        + "clock stood, so animations and timers continue without a jump.",
                 "{\"type\":\"object\",\"properties\":{}}",
                 new ToolHandler() {
                     @Override

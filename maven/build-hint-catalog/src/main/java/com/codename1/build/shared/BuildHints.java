@@ -67,6 +67,8 @@ public final class BuildHints {
 
     private static final List<Hint> ENTRIES;
     private static final Map<String, Hint> BY_NAME;
+    /** Whether the annotated hints' data file was on the class path; without it the catalog is partial. */
+    private static final boolean ANNOTATED_LOADED;
 
     static {
         List<Hint> h = new ArrayList<Hint>();
@@ -82,7 +84,9 @@ public final class BuildHints {
         // bytecode -- the Settings editor above all -- and not a second
         // statement of them. Anything that CAN read bytecode reads the
         // annotations directly and never comes here.
-        h.addAll(BuildHintsJson.load());
+        List<Hint> annotated = BuildHintsJson.load();
+        ANNOTATED_LOADED = !annotated.isEmpty();
+        h.addAll(annotated);
 
         Map<String, Hint> byName = new LinkedHashMap<String, Hint>();
         for (Hint entry : h) {
@@ -142,6 +146,14 @@ public final class BuildHints {
      * "no setting at all" unless something says so.
      */
     public static String unknownHintAdvice(String name) {
+        // Without the annotated hints the catalog is missing every hint declared by an
+        // annotation, and warning would name real hints as unknown. A class path that
+        // lacks cn1-build-hints.json (the Gradle plugin's, for one) gets no advice.
+        return ANNOTATED_LOADED ? advice(name) : null;
+    }
+
+    /** The advice for a name, judged against whatever the catalog holds. */
+    static String advice(String name) {
         if (isKnown(name)) {
             return null;
         }

@@ -34,6 +34,7 @@ package com.codename1.ui.animations;
 public final class AnimationTime {
     private static long overrideTime;
     private static boolean overridden;
+    private static long offset;
 
     private AnimationTime() {
     }
@@ -49,7 +50,7 @@ public final class AnimationTime {
         if (overridden) {
             return overrideTime;
         }
-        return System.currentTimeMillis();
+        return System.currentTimeMillis() + offset;
     }
 
     /// Overrides the value returned by [now()][#now()]. Once set, every animation
@@ -70,6 +71,19 @@ public final class AnimationTime {
     /// `System.currentTimeMillis()`.
     public static void reset() {
         overridden = false;
+        offset = 0;
+    }
+
+    /// Clears an override without moving time: [now()][#now()] carries on from the
+    /// overridden value at the wall clock's pace. Every start time an animation or
+    /// timer recorded under the override stays in step, where [reset()][#reset()]
+    /// would jump to the wall clock and stall anything that started ahead of it.
+    /// Does nothing when no override is active.
+    public static void resume() {
+        if (overridden) {
+            offset = overrideTime - System.currentTimeMillis();
+            overridden = false;
+        }
     }
 
     /// Returns true when an override time is currently active.

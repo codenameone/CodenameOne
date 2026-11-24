@@ -182,20 +182,39 @@ final class SimulatorVerifier {
                 conditions.add(result);
             }
         } finally {
-            port.setSimulatorLargerTextScale(largerBefore ? scaleBefore : 1.0f);
-            if (port.isSimulatorPortrait() != portraitBefore) {
-                port.rotateSimulator(portraitBefore);
-                waitForRotation(portraitBefore);
+            // Each step is restored on its own: one that fails must neither leave the
+            // others undone nor, above all, leave a live session's clock frozen.
+            try {
+                port.setSimulatorLargerTextScale(largerBefore ? scaleBefore : 1.0f);
+            } catch (RuntimeException ex) {
+                restoreFailed("text scale", ex);
             }
-            onEdt(new Runnable() {
-                public void run() {
-                    Display.getInstance().setDarkMode(darkBefore[0]);
-                    refreshTheme();
+            try {
+                if (port.isSimulatorPortrait() != portraitBefore) {
+                    port.rotateSimulator(portraitBefore);
+                    waitForRotation(portraitBefore);
                 }
-            });
-            tool("ui_clock_settle", "{\"maxMs\":3000}");
-            if (!wasFrozen) {
-                tool("ui_clock_release", "{}");
+            } catch (RuntimeException ex) {
+                restoreFailed("orientation", ex);
+            }
+            try {
+                onEdt(new Runnable() {
+                    public void run() {
+                        Display.getInstance().setDarkMode(darkBefore[0]);
+                        refreshTheme();
+                    }
+                });
+            } catch (RuntimeException ex) {
+                restoreFailed("dark mode", ex);
+            }
+            try {
+                tool("ui_clock_settle", "{\"maxMs\":3000}");
+            } catch (RuntimeException ex) {
+                restoreFailed("settling", ex);
+            } finally {
+                if (!wasFrozen) {
+                    tool("ui_clock_release", "{}");
+                }
             }
         }
         Map<String, Object> report = new LinkedHashMap<String, Object>();
@@ -305,6 +324,12 @@ final class SimulatorVerifier {
             if (!c.isVisible() || c.getWidth() <= 0 || c.getHeight() <= 0) {
                 continue;
             }
+            // Wholly outside its parent is out of view by design: the other pages of
+            // Tabs or a swipe container. Nothing in it is on screen to judge.
+            if (c.getX() >= parent.getWidth() || c.getX() + c.getWidth() <= 0
+                    || c.getY() >= parent.getHeight() || c.getY() + c.getHeight() <= 0) {
+                continue;
+            }
             if (!parent.isScrollableX() && c.getX() + c.getWidth() > parent.getWidth() - parent.getStyle().getPaddingRightNoRTL() + 1
                     && parent.getWidth() > 0) {
                 out.add(finding("warning", "overflows-parent", c,
@@ -343,7 +368,11 @@ final class SimulatorVerifier {
         Component p = c;
         while (p != null) {
             Style s = p.getStyle();
-            if (s.getBgImage() != null) {
+            // A background drawn by a border (a round rect, a pill, a 9-piece image) is
+            // not the bg colour, and is not known here. (Every style has a bg painter,
+            // the framework's own, so that says nothing.)
+            if (s.getBgImage() != null
+                    || (s.getBorder() != null && s.getBorder().isBackgroundPainter())) {
                 return null;
             }
             if ((s.getBgTransparency() & 0xff) == 0xff) {
@@ -417,12 +446,22 @@ final class SimulatorVerifier {
         }
     }
 
-    private static void onEdt(final Runnable r) {
-        Display d = Display.getInstance();
-        if (d.isEdt()) {
-            r.run();
-        } else {
-            d.callSeriallyAndWait(r);
+    private static void restoreFailed(String what, RuntimeException ex) {
+        System.err.println("[cn1:verify] could not restore the " + what + ": " + ex);
+    }
+
+    /// The clock is frozen for the whole run, so an unbounded wait would hang on a
+    /// transition that a rotation or theme change started: the bounded call is used,
+    /// and when a transition holds it back the clock is settled and the call retried.
+    private void onEdt(final Runnable r) {
+        try {
+            SimulatorMcpTools.onEdt(r);
+        } catch (IllegalStateException held) {
+            if (!com.codename1.ui.animations.AnimationTime.isOverridden()) {
+                throw held;
+            }
+            tool("ui_clock_settle", "{\"maxMs\":3000}");
+            SimulatorMcpTools.onEdt(r);
         }
     }
 

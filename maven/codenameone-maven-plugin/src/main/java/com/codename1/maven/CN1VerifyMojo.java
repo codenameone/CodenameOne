@@ -84,7 +84,9 @@ public class CN1VerifyMojo extends CN1AgentMojo {
             throw new MojoFailureException("The simulator wrote no report (" + json
                     + "); see its output above.", ex);
         }
-        if (report.contains("\"failed\"")) {
+        // A failure report is an object whose only key is "failed"; a clean report can
+        // hold the word anywhere in app text, so only its first key counts.
+        if (isFailure(report)) {
             throw new MojoFailureException("cn1:verify could not run: " + report);
         }
         int errors = count(report, "errors");
@@ -95,6 +97,17 @@ public class CN1VerifyMojo extends CN1AgentMojo {
             throw new MojoFailureException("cn1:verify found " + summary);
         }
         getLog().info("cn1:verify: " + summary);
+    }
+
+    static boolean isFailure(String json) {
+        return json.trim().matches("(?s)\\{\\s*\"failed\"\\s*:.*");
+    }
+
+    /// verify starts a simulator of its own while a cn1:agent session may be running;
+    /// it must not take over or delete that session's port file.
+    @Override
+    protected boolean publishesPortFile() {
+        return false;
     }
 
     static int count(String json, String key) {

@@ -63,4 +63,22 @@ class AnimationTimeFreezeTest extends UITestBase {
             AnimationTime.reset();
         }
     }
+
+    /// Releasing a clock that was advanced ahead of the wall clock carries on from the
+    /// advanced time; jumping back would stall every timer armed while frozen.
+    @org.junit.jupiter.api.Test
+    void resumeCarriesOnFromTheFrozenTime() {
+        try {
+            long ahead = System.currentTimeMillis() + 60000L;
+            AnimationTime.setTime(ahead);
+            AnimationTime.resume();
+            assertFalse(AnimationTime.isOverridden());
+            long now = AnimationTime.now();
+            assertTrue(now >= ahead && now < ahead + 5000L, "time jumped: " + (now - ahead));
+            AnimationTime.reset();
+            assertTrue(Math.abs(AnimationTime.now() - System.currentTimeMillis()) < 5000L);
+        } finally {
+            AnimationTime.reset();
+        }
+    }
 }

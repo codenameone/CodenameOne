@@ -25,6 +25,8 @@ package com.codename1.maven;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CN1VerifyMojoTest {
     @Test
@@ -33,5 +35,11 @@ class CN1VerifyMojoTest {
         assertEquals(3, CN1VerifyMojo.count(report, "errors"));
         assertEquals(12, CN1VerifyMojo.count(report, "warnings"));
         assertEquals(0, CN1VerifyMojo.count("{}", "errors"));
+    }
+
+    @Test
+    void onlyAFailureReportCountsAsFailed() {
+        assertTrue(CN1VerifyMojo.isFailure("{\"failed\":\"no form\"}"));
+        assertFalse(CN1VerifyMojo.isFailure("{\"errors\":0,\"warnings\":0,\"form\":\"failed\"}"));
     }
 }

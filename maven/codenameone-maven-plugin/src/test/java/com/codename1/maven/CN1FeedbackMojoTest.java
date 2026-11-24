@@ -45,7 +45,8 @@ class CN1FeedbackMojoTest {
         File a = CN1FeedbackMojo.write(dir, "The CSS error did not say which file", "8.0", when);
         File b = CN1FeedbackMojo.write(dir, "Second note", "8.0", when);
         assertNotEquals(a, b);
-        assertEquals(2, dir.listFiles().length);
+        assertEquals(3, dir.listFiles().length);
+        assertTrue(new File(dir, ".gitignore").isFile(), "notes must not be committed by accident");
         String text = new String(Files.readAllBytes(a.toPath()), StandardCharsets.UTF_8);
         assertTrue(text.contains("The CSS error did not say which file"), text);
         assertTrue(text.contains("- Plugin: 8.0"), text);

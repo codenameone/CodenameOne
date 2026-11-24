@@ -80,6 +80,11 @@ public class CN1FeedbackMojo extends AbstractCN1Mojo {
         if (!dir.isDirectory() && !dir.mkdirs()) {
             throw new IOException("Cannot create " + dir);
         }
+        // The notes are the developer's to read or send, never to commit by accident.
+        File ignore = new File(dir, ".gitignore");
+        if (!ignore.exists()) {
+            Files.write(ignore.toPath(), "*\n".getBytes(StandardCharsets.UTF_8));
+        }
         SimpleDateFormat name = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT);
         name.setTimeZone(TimeZone.getTimeZone("UTC"));
         SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ROOT);

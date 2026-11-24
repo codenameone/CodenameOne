@@ -61,7 +61,7 @@ final class McpClock {
     static Map<String, Object> freeze() {
         requireOffEdt();
         if (!AnimationTime.isOverridden()) {
-            AnimationTime.setTime(System.currentTimeMillis());
+            AnimationTime.setTime(AnimationTime.now());
         }
         pump();
         return state("frozen");
@@ -69,7 +69,7 @@ final class McpClock {
 
     static Map<String, Object> release() {
         requireOffEdt();
-        AnimationTime.reset();
+        AnimationTime.resume();
         pump();
         return state("released");
     }
@@ -101,10 +101,15 @@ final class McpClock {
         while (AnimationTime.now() < limit) {
             AnimationTime.setTime(Math.min(limit, AnimationTime.now() + FRAME_MS));
             if (!pump()) {
-                // Still inside a transition; its frames are changing by definition.
-                stableChecks = 0;
-                last = null;
-                continue;
+                if (!inTransition() && waitForEdt()) {
+                    // The EDT was only slow (a first layout, an image decode); it has
+                    // now drawn this frame, so judge it like any other.
+                } else {
+                    // Still inside a transition; its frames are changing by definition.
+                    stableChecks = 0;
+                    last = null;
+                    continue;
+                }
             }
             if (AnimationTime.now() < nextCheck) {
                 continue;
@@ -134,6 +139,33 @@ final class McpClock {
     /// screen. Returns false when the EDT did not pick a call up because a form
     /// transition is being painted; that loop repaints on every pass, so the time spent
     /// waiting has already covered at least one frame of it.
+    /// Waits, without moving time, for an EDT that is busy rather than held back by a
+    /// transition, so a slow frame is not skipped. False if it stays busy.
+    private static boolean waitForEdt() {
+        long deadline = System.currentTimeMillis() + SLOW_EDT_WAIT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            if (pump()) {
+                return true;
+            }
+            if (inTransition()) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static final long SLOW_EDT_WAIT_MS = 5000;
+
+    /// Read off the EDT, so the queue may change under it; a read that races a change
+    /// counts as a transition, which only means one more frame is stepped.
+    private static boolean inTransition() {
+        try {
+            return Display.getInstance().isInTransition();
+        } catch (RuntimeException ex) {
+            return true;
+        }
+    }
+
     private static boolean pump() {
         return roundTrip() && roundTrip();
     }

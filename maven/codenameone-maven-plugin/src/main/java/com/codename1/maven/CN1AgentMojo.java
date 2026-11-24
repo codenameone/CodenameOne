@@ -117,7 +117,9 @@ public class CN1AgentMojo extends CN1RunMojo {
             mcpPort = freePort();
             getLog().warn("Port " + requested + " is in use by another process; using " + mcpPort + " instead.");
         }
-        writePortFile();
+        if (publishesPortFile()) {
+            writePortFile();
+        }
         request.addShellEnvironment("CN1_MCP_PORT", String.valueOf(mcpPort));
         request.addShellEnvironment("CN1_AGENT_BACKGROUND", "1");
         if (hidden) {
@@ -133,6 +135,11 @@ public class CN1AgentMojo extends CN1RunMojo {
         getLog().info("[cn1.mcp] agent mode: the simulator will serve MCP on 127.0.0.1:" + mcpPort
                 + " -- drive it with `java .agent-skills/codename-one/tools/Sim.java snapshot` "
                 + "(it reads the port from common/target/" + PORT_FILE + ")");
+    }
+
+    /// Whether this run writes `common/target/cn1-agent.port` for Sim.java to find.
+    protected boolean publishesPortFile() {
+        return true;
     }
 
     private void writePortFile() {

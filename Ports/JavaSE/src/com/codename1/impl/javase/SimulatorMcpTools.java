@@ -820,7 +820,7 @@ final class SimulatorMcpTools {
         }
     }
 
-    private static void onEdt(final Runnable r) {
+    static void onEdt(final Runnable r) {
         Display d = Display.getInstance();
         if (d.isEdt()) {
             r.run();
@@ -924,6 +924,10 @@ final class SimulatorMcpTools {
         if (!com.codename1.ui.animations.AnimationTime.isOverridden()) {
             throw new IllegalStateException("The clock is not frozen; call ui_clock_freeze first");
         }
+        // A sheet of more frames than this is unreadable anyway; the step widens to fit.
+        if (overMs / everyMs + 1 > MAX_FILM_FRAMES) {
+            everyMs = (overMs + MAX_FILM_FRAMES - 2) / (MAX_FILM_FRAMES - 1);
+        }
         long start = com.codename1.ui.animations.AnimationTime.now();
         java.util.List<java.awt.image.BufferedImage> shots = new java.util.ArrayList<java.awt.image.BufferedImage>();
         for (long t = 0; t <= overMs; t += everyMs) {
@@ -936,14 +940,15 @@ final class SimulatorMcpTools {
             paintOneFrame();
             java.awt.image.BufferedImage shot = port.captureSimulatorFrame(RecordingOptions.Frame.SCREEN);
             if (shot != null) {
-                shots.add(shot);
+                // Scaled as it is taken, so only the small copy of each frame is held.
+                shots.add(scaled(shot, scale));
             }
         }
         if (shots.isEmpty()) {
             throw new IllegalStateException("No screen to capture");
         }
-        int fw = Math.max(1, (int) Math.round(shots.get(0).getWidth() * scale));
-        int fh = Math.max(1, (int) Math.round(shots.get(0).getHeight() * scale));
+        int fw = shots.get(0).getWidth();
+        int fh = shots.get(0).getHeight();
         int cols = (int) Math.ceil(Math.sqrt(shots.size()));
         int rows = (shots.size() + cols - 1) / cols;
         int gap = 4;
@@ -969,6 +974,24 @@ final class SimulatorMcpTools {
             throw new IOException("No PNG writer");
         }
         return shots.size();
+    }
+
+    private static final int MAX_FILM_FRAMES = 64;
+
+    private static java.awt.image.BufferedImage scaled(java.awt.image.BufferedImage src, double scale) {
+        int w = Math.max(1, (int) Math.round(src.getWidth() * scale));
+        int h = Math.max(1, (int) Math.round(src.getHeight() * scale));
+        java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(w, h,
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = out.createGraphics();
+        try {
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(src, 0, 0, w, h, null);
+        } finally {
+            g.dispose();
+        }
+        return out;
     }
 
     /// Two EDT round trips, so one whole loop (paint included) runs between them. A form

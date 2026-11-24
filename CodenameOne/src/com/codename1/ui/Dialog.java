@@ -1679,13 +1679,20 @@ public class Dialog extends Form implements AbstractDialog {
     ///
     /// Does nothing when there is no deadline, and nothing when one is already armed,
     /// so the show path can call it unconditionally.
+    private static final long FROZEN_REPOLL_MS = 250L;
+
     private void armTimeoutClockIfPending() {
         if (time == 0 || timeoutClock != null) {
             return;
         }
         java.util.Timer clock = new java.util.Timer();
-        clock.schedule(new TimeoutSchedule(new TimeoutClock(this)),
-                Math.max(0L, time - AnimationTime.now()));
+        // While the clock is frozen the remaining delay never shrinks, so a re-arm
+        // polls at a floor rather than spinning on a delay of a few milliseconds.
+        long delay = Math.max(0L, time - AnimationTime.now());
+        if (AnimationTime.isOverridden()) {
+            delay = Math.max(FROZEN_REPOLL_MS, delay);
+        }
+        clock.schedule(new TimeoutSchedule(new TimeoutClock(this)), delay);
         timeoutClock = clock;
     }
 
@@ -1726,7 +1733,13 @@ public class Dialog extends Form implements AbstractDialog {
             // and the animation poll finds it already past on the first paint and closes
             // the dialog at once.
             if (dlg.isShowingAnywhere()) {
-                dlg.isTimedOut();
+                if (!dlg.isTimedOut()) {
+                    // Fired before the deadline in animation time: the agent clock was
+                    // frozen while wall time ran. Arm again, or this spent clock would
+                    // block every later one and the dialog would close only when painted.
+                    dlg.cancelTimeoutClock();
+                    dlg.armTimeoutClockIfPending();
+                }
                 return;
             }
             // Not on screen, so the deadline stays -- but this clock has fired and is
