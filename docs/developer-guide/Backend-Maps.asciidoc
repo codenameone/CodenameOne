@@ -115,7 +115,7 @@ ask for:
   convention in the lower-right corner, legible and not hidden behind a
   control.
 * A link from that text, or close to it, to
-  https://www.openstreetmap.org/copyright, which explains the licence.
+  https://www.openstreetmap.org/copyright, which explains the license.
 * The same credit wherever you show results derived from the data without a
   map, such as a route description or a geocoding result.
 

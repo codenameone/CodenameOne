@@ -940,3 +940,6 @@ certbot
 Fargate
 Lightsail
 Linode
+Nominatim
+Planetiler
+Geofabrik
