@@ -936,7 +936,7 @@ final class OdpWriter {
             stringCell(o, c.category(k));
             for (int i = 0; i < series; i++) {
                 double[] v = c.values(i);
-                if (v != null && k < v.length) {
+                if (k < v.length) {
                     String s = num(v[k]);
                     o.raw("<table:table-cell office:value-type=\"float\"")
                             .attr("office:value", s).raw("><text:p>").raw(s)
