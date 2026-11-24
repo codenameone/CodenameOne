@@ -586,7 +586,7 @@ public final class Color  {
             }
         } catch (NumberFormatException nfe) {}
 
-        throw new IllegalArgumentException("Invalid color specification: Color string was "+colorString);
+        throw new IllegalArgumentException(CssDiagnostics.invalidColor(colorString, NamedColors.names()));
     }
 
     private static Color parseRGBColor(String color, int roff,
@@ -1832,6 +1832,10 @@ public final class Color  {
 
         private static Color get(String name) {
             return NAMED_COLORS.get(name);
+        }
+
+        static java.util.Set<String> names() {
+            return NAMED_COLORS.keySet();
         }
 
         private static final Map<String, Color> NAMED_COLORS = mapOfEntries(

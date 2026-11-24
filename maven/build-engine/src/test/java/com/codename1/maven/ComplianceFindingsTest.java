@@ -136,9 +136,9 @@ public class ComplianceFindingsTest {
     public void theConsoleGetsOneLineForEachSourceAndCategory() {
         assertEquals("10 references to 7 APIs a device does not have:\n"
                 + "  The application: 6 call sites, 4 APIs\n"
-                + "    Swing, AWT and JavaFX API the compatibility layers lack: 1 API, 1 call site -- java.awt.Robot 1\n"
-                + "    JDK API a device lacks: 2 APIs, 4 call sites -- processes 3, files 1\n"
-                + "    Language features a device cannot run: 1 API, 1 call site -- "
+                + "    Swing, AWT and JavaFX API the compatibility layers lack [CN1-API-TOOLKIT]: 1 API, 1 call site -- java.awt.Robot 1\n"
+                + "    JDK API a device lacks [CN1-API-JDK]: 2 APIs, 4 call sites -- processes 3, files 1\n"
+                + "    Language features a device cannot run [CN1-LANGUAGE]: 1 API, 1 call site -- "
                 + "records (java.lang.runtime.ObjectMethods) 1\n"
                 + "  big-2.jar: 3 call sites, 3 APIs -- networking 1, org.missing 1, reflection 1\n"
                 + "  small-1.jar: 1 call site, 1 API -- networking 1", sample().summary());
@@ -149,7 +149,7 @@ public class ComplianceFindingsTest {
         String report = sample().report();
         assertTrue(report, report.startsWith("The application: 6 call sites of 4 missing APIs\n"
                 + "==============================================="));
-        assertTrue(report, report.contains("\nJDK API a device lacks (2 APIs, 4 call sites)\n"
+        assertTrue(report, report.contains("\nJDK API a device lacks [CN1-API-JDK] (2 APIs, 4 call sites)\n"
                 + "  by family: processes 3, files 1\n"
                 + "\n"
                 + "  3 x java.lang.ProcessBuilder.start()\n"

@@ -9019,7 +9019,7 @@ public class CSSTheme {
             }
             
             default :
-                throw new RuntimeException("Unsupported CSS property "+property);
+                throw new RuntimeException(CssDiagnostics.unsupportedProperty(property));
             
                 
         }

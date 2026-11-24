@@ -589,7 +589,24 @@ public class AppBuilder {
         // is newer than the sources (getSourcesModificationTime does not account for build hints).
         // After the annotations, so -D still wins over one.
         overlayCommandLineBuildHints(settings);
+        warnUnknownBuildHints(settings);
         applyHardeningPreflight(settings);
+    }
+
+    /// The settings read above are the project's whole hint set (file, annotations,
+    /// command line), so this is where a misspelt hint is caught: a builder ignores a
+    /// name it does not read, and the build succeeds without the setting.
+    private void warnUnknownBuildHints(Properties settings) {
+        java.util.List<String> keys = new java.util.ArrayList<String>(settings.stringPropertyNames());
+        java.util.Collections.sort(keys);
+        for (String key : keys) {
+            if (key.startsWith(com.codename1.build.shared.BuildHints.ARG_PREFIX)) {
+                String advice = com.codename1.build.shared.BuildHints.unknownHintAdvice(key);
+                if (advice != null) {
+                    getLog().warn(advice);
+                }
+            }
+        }
     }
 
     /**

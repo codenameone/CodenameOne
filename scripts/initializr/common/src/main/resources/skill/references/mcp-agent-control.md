@@ -159,3 +159,18 @@ The server merges these with the built-in UI tools when a host lists what is ava
 - **Do not leave a starter in shipping code** on the assumption the gate will catch it. The JavaSE port cannot tell a packaged desktop app from the simulator, so it reports a development build in every case and the gate does not protect a desktop release.
 - **Watch what you are doing.** `MCP -> Debug Logging` echoes the conversation to the Codename One log; `SUMMARY` gives one line per call, `FULL` gives every request and response.
 - **Say when you could not check -- after trying.** A headless environment is not a reason: `cn1:agent` runs there. Report "could not verify" only when a step failed, and quote the failure.
+
+## Error IDs
+
+Build and compile errors carry a stable ID in square brackets. Key on the ID, not on the wording, and apply the fix the message names:
+
+| ID | Where | What to do |
+|---|---|---|
+| `CN1-CSS-PROPERTY` | CSS compile | The property isn't supported. Use the one the message suggests ("Did you mean text-align?"). |
+| `CN1-CSS-COLOR` | CSS compile | The value isn't a color. Use the suggested name, `#rrggbb` or `rgb()`/`rgba()`. |
+| `CN1-HINT-UNKNOWN` | Any build (a warning) | No builder reads this build hint, so it does nothing. Rename it to the suggested hint. |
+| `CN1-API-JDK` | Compliance check | A JDK API a device doesn't have. The report's `Instead:` line names the replacement. |
+| `CN1-LANGUAGE` | Compliance check | A Java feature compiled to something a device can't run. Rewrite it as the report says. |
+| `CN1-LIBRARY-MISSING` | Compliance check | A class from a library that isn't in the application. Add the dependency or remove the use. |
+| `CN1-API-TOOLKIT`, `CN1-API-UI-LIBRARY` | Compliance check | Swing, AWT, JavaFX or UI-library API the compatibility layers lack. |
+| `CN1-API-OTHER` | Compliance check | Anything else a device lacks; read the `Instead:` line. |
