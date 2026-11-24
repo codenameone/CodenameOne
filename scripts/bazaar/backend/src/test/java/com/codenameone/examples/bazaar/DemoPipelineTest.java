@@ -72,11 +72,15 @@ class DemoPipelineTest {
         }
         Map<String, String> was = columns(board(store));
         int moved = 0;
+        int acted = 0;
         for (int iter = 0; iter < 6; iter++) {
             long heard = hub.changes();
             String kind = demo.step(store.getId());
             assertTrue(DemoPipeline.IDLE.equals(kind) || hub.changes() > heard,
                     () -> kind + " was not published");
+            if (!DemoPipeline.IDLE.equals(kind)) {
+                acted++;
+            }
             Map<String, String> now = columns(board(store));
             for (Map.Entry<String, String> e : now.entrySet()) {
                 String old = was.get(e.getKey());
@@ -86,8 +90,13 @@ class DemoPipelineTest {
             }
             was = now;
         }
+        // A step is a pack, a label, a ship or a new order; labelling keeps a
+        // card in Fulfilling, and shipping one line of a two-line order keeps
+        // it there as partially fulfilled, so not every step changes a column.
         final int total = moved;
-        assertTrue(total >= 4, () -> "cards arrived or moved: " + total);
+        final int steps = acted;
+        assertTrue(steps >= 5, () -> "steps that did something: " + steps);
+        assertTrue(total >= 2, () -> "cards arrived or moved: " + total);
     }
 
     private List<PipelineColumnDto> board(Store store) throws Exception {
