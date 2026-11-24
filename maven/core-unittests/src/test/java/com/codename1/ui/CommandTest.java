@@ -108,4 +108,13 @@ class CommandTest extends UITestBase {
 
         assertEquals(nullName, nullNameMatch);
     }
+
+    /// A command created with no listener is a plain button, such as a dialog's
+    /// Cancel; firing it must do nothing rather than throw.
+    @Test
+    void commandCreatedWithoutAListenerFiresQuietly() {
+        Command plain = Command.create("Cancel", null, null);
+        plain.actionPerformed(new ActionEvent(plain));
+        Command.createMaterial("Close", ' ', null).actionPerformed(new ActionEvent(plain));
+    }
 }
