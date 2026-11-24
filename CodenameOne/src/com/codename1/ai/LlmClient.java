@@ -136,6 +136,20 @@ public abstract class LlmClient {
         return new LocalLlmClient(modelPath);
     }
 
+    /// Uses the language model the operating system provides: Apple's
+    /// Foundation Models on iOS and macOS, Gemini Nano on Android. See
+    /// [SystemLlmClient] for what each platform supports and how to check it
+    /// on the running device.
+    ///
+    /// Using [SystemLlmClient] is what makes the builders link the platform
+    /// bridge into the application; an application that never does ships none
+    /// of it.
+    ///
+    /// @return the client
+    public static SystemLlmClient system() {
+        return new SystemLlmClient();
+    }
+
     /// Generic OpenAI-compatible endpoint (llama.cpp server, vLLM,
     /// LM Studio, a custom proxy). `apiKey` may be empty for local
     /// services that don't authenticate.

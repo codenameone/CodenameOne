@@ -1347,6 +1347,11 @@ public class IPhoneBuilder extends Executor {
     /// The app calls `LlmClient.local`; enables INCLUDE_CN1_LLAMA, the port
     /// glue over the llama.cpp xcframework the catalog links.
     private boolean usesCn1LocalLlm;
+    /// The app uses `SystemLlmClient`; injects the Swift Foundation Models
+    /// bridge and enables INCLUDE_CN1_SYSTEM_LLM.
+    private boolean usesCn1SystemLlm;
+    /// FoundationModels went into addLibs and must be marked optional.
+    private boolean weakLinkFoundationModels;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -2187,6 +2192,8 @@ public class IPhoneBuilder extends Executor {
         usesCn1Language = false;
         usesCn1Inference = false;
         usesCn1LocalLlm = false;
+        usesCn1SystemLlm = false;
+        weakLinkFoundationModels = false;
         minDeploymentTargets = "12.0";
         Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
@@ -3153,6 +3160,9 @@ public class IPhoneBuilder extends Executor {
                     aiAcc.consumeMethod(cls, method);
                     if (PlatformFeatureCatalog.isLocalLlmCall(cls, method)) {
                         usesCn1LocalLlm = true;
+                    }
+                    if (PlatformFeatureCatalog.isSystemLlmUse(cls, method)) {
+                        usesCn1SystemLlm = true;
                     }
                     // Display carries the contact picker too, and an app is
                     // free to call it there instead of through ContactPicker.
@@ -6524,6 +6534,32 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            if (usesCn1SystemLlm) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_SYSTEM_LLM",
+                            "#define INCLUDE_CN1_SYSTEM_LLM");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_SYSTEM_LLM", ex);
+                }
+                // Beside the port natives, before the translator runs: it puts
+                // every .swift there into the app target's sources itself, so
+                // this needs none of the later project mutation, and the
+                // Swift settings follow from hasSwiftFiles(dist).
+                SystemLlmInjector.injectApple(this, buildinRes);
+                // Declared rather than left to Swift's autolink hint, and weak:
+                // the deployment target is far below the OS that has it. Only
+                // when this Xcode's SDK has the framework (Xcode 26 and newer);
+                // an older one compiles the bridge's stub branch, references
+                // nothing in it, and would fail the link on the name alone.
+                if (xcodeVersion >= 26) {
+                    addLibs = appendFrameworks(addLibs, "FoundationModels.framework");
+                    weakLinkFoundationModels = true;
+                }
+            }
+
             if (usesCn1Vision) {
                 try {
                     replaceInFile(new File(buildinRes,
@@ -7001,6 +7037,9 @@ public class IPhoneBuilder extends Executor {
                 if (tvNativeBuilder.isEnabled()) {
                     collectOptionalFrameworks(optionalFrameworks,
                             tvNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (weakLinkFoundationModels) {
+                    optionalFrameworks.add("FoundationModels.framework");
                 }
                 if (!optionalFrameworks.isEmpty()) {
                     StringBuilder frameworksArg = new StringBuilder("-Doptional.frameworks=");

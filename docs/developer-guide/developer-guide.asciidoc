@@ -165,6 +165,8 @@ include::Backend-MCP.asciidoc[]
 
 include::Backend-Operations.asciidoc[]
 
+include::Deployment.asciidoc[]
+
 include::Command-Line-Applications.asciidoc[]
 
 include::Wayline-Users-Guide.asciidoc[]
@@ -263,6 +265,8 @@ include::Miscellaneous-Features.asciidoc[]
 include::Ai-And-Speech.asciidoc[]
 
 include::MCP-Headless-API.asciidoc[]
+
+include::BuildCloud-MCP.asciidoc[]
 
 = Security and identity
 

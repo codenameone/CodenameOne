@@ -1652,6 +1652,9 @@ public class AndroidGradleBuilder extends Executor {
     /// The app calls `LlmClient.local`; keeps `AndroidLocalLlmImpl`, whose
     /// native library the catalog's llama AAR supplies.
     private boolean localLlmSupport;
+    /// The app uses `SystemLlmClient`; keeps `AndroidSystemLlmImpl`, which
+    /// compiles against the ML Kit GenAI artifacts the catalog adds.
+    private boolean systemLlmSupport;
     private boolean languageSupport;
     private final Set<String> includedAiAdapterSources =
             new HashSet<String>();
@@ -2752,6 +2755,7 @@ public class AndroidGradleBuilder extends Executor {
         visionSupport = false;
         inferenceSupport = false;
         localLlmSupport = false;
+        systemLlmSupport = false;
         usesCodenameOneNatives = false;
         languageSupport = false;
         includedAiAdapterSources.clear();
@@ -3246,6 +3250,9 @@ public class AndroidGradleBuilder extends Executor {
                     aiAcc.consumeMethod(cls, method);
                     if (PlatformFeatureCatalog.isLocalLlmCall(cls, method)) {
                         localLlmSupport = true;
+                    }
+                    if (PlatformFeatureCatalog.isSystemLlmUse(cls, method)) {
+                        systemLlmSupport = true;
                     }
                     String scriptAdapter =
                             androidTextScriptAdapterSource(cls, method);
@@ -4838,6 +4845,20 @@ public class AndroidGradleBuilder extends Executor {
                         new RuntimeException("kotlin plugin below the "
                                 + "Health Connect floor"));
             }
+        }
+
+        // ML Kit GenAI declares minSdk 26, but raising the app to 26 changes more than the
+        // floor: D8 stops backporting java.time below 26, so the app silently switches to the
+        // platform's own java.time, which still has OpenJDK 8 bugs the backport fixed
+        // (Duration.ofMillis(-500) prints PT0.5S -- measured, hellocodenameone's TimeApiTest).
+        // The libraries are only ever touched through AndroidSystemLlmImpl, which the port
+        // loads on API 26 and newer alone, so the app keeps its floor and accepts theirs.
+        // Through android.xmanifest, because every manifest the builder writes reads it: the
+        // phone's, the Wear module's (which merges the same dependencies) and AGP 9's.
+        if (systemLlmSupport) {
+            request.putArgument("android.xmanifest", withOverrideLibraries(
+                    request.getArg("android.xmanifest", ""),
+                    PlatformFeatureCatalog.MLKIT_GENAI_MANIFEST_PACKAGES));
         }
 
         // Android Auto glue: when the app references com.codename1.car, copy the injected
@@ -7997,7 +8018,7 @@ public class AndroidGradleBuilder extends Executor {
         String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
                 "-keep class com.google.firebase.** { *; }\n\n";
         String keepAi = visionSupport || languageSupport || inferenceSupport
-                || localLlmSupport
+                || localLlmSupport || systemLlmSupport
                 ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
                 : "";
         String keepInferenceRuntime =
@@ -8383,6 +8404,30 @@ public class AndroidGradleBuilder extends Executor {
                             + kotlinVersion + " cannot read; compiling with Kotlin "
                             + KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES + " instead");
                     kotlinVersion = KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES;
+                }
+            }
+        }
+        // ML Kit GenAI (LlmClient.system()) is compiled with a newer Kotlin than the
+        // builder's defaults and brings that kotlin-stdlib along, so the Kotlin compiler
+        // refuses its metadata ("compiled with an incompatible version of Kotlin") the
+        // moment the app has Kotlin sources of its own. The same rule as coroutines above:
+        // raise the compiler to read it. On Gradle 9 this also replaces AGP's built-in
+        // compiler, which is older still. A Java-only app compiles no Kotlin and is left
+        // as it is.
+        if (hasKotlinSources && systemLlmSupport && (useGradle8 || useGradle9)) {
+            String comparable = HealthManifestFragments.numericVersionPrefix(kotlinVersion);
+            if (comparable == null
+                    || compareVersions(comparable, KOTLIN_FOR_ML_KIT_GENAI) < 0) {
+                if (request.getArg("android.topDependency", "").contains("kotlin-gradle-plugin")) {
+                    log("WARNING: LlmClient.system() brings ML Kit GenAI, whose kotlin-stdlib"
+                            + " needs Kotlin " + KOTLIN_FOR_ML_KIT_GENAI + " or newer, but"
+                            + " android.topDependency pins its own kotlin-gradle-plugin; raise"
+                            + " it if :app:compileDebugKotlin reports an incompatible Kotlin"
+                            + " version");
+                } else {
+                    log("LlmClient.system() brings ML Kit GenAI, whose kotlin-stdlib needs"
+                            + " Kotlin " + KOTLIN_FOR_ML_KIT_GENAI + "; compiling with it");
+                    kotlinVersion = KOTLIN_FOR_ML_KIT_GENAI;
                 }
             }
         }
@@ -9022,6 +9067,9 @@ public class AndroidGradleBuilder extends Executor {
         if (!localLlmSupport) {
             new File(aiDir, "AndroidLocalLlmImpl.java").delete();
         }
+        if (!systemLlmSupport) {
+            new File(aiDir, "AndroidSystemLlmImpl.java").delete();
+        }
     }
 
     private void pruneAiGroup(File aiDir, boolean groupIncluded,
@@ -9657,6 +9705,28 @@ public class AndroidGradleBuilder extends Executor {
                 // here, so the attribute was stripped and nothing replaced it.
                 "android:maxSdkVersion\\s*=\\s*[\"']\\s*([0-9]+)\\s*[\"']").matcher(xmanifest);
         return m.find() ? m.group(1) : null;
+    }
+
+    /// `xmanifest` (the android.xmanifest value) with `packages` added to its
+    /// tools:overrideLibrary, which is created when absent and extended when the project
+    /// already declares one -- a second attribute of the same name would not parse.
+    static String withOverrideLibraries(String xmanifest, String packages) {
+        String value = xmanifest == null ? "" : xmanifest;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "tools:overrideLibrary\\s*=\\s*([\"'])([^\"']*)\\1").matcher(value);
+        if (!m.find()) {
+            return value + " tools:overrideLibrary=\"" + packages + "\"";
+        }
+        StringBuilder merged = new StringBuilder(m.group(2).trim());
+        for (String pkg : packages.split(",")) {
+            if (!("," + merged + ",").replace(" ", "").contains("," + pkg + ",")) {
+                if (merged.length() > 0) {
+                    merged.append(',');
+                }
+                merged.append(pkg);
+            }
+        }
+        return value.substring(0, m.start(2)) + merged + value.substring(m.end(2));
     }
 
     static String wearUsesSdk(BuildRequest request) {
@@ -12803,6 +12873,11 @@ public class AndroidGradleBuilder extends Executor {
     /// GRADLE_PROVIDED_LIBRARIES is declared: the stdlib that coroutines version depends
     /// on, or newer. Raise it together with that coordinate.
     private static final String KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES = "2.1.21";
+
+    /// The Kotlin compiler a Kotlin app gets when it calls LlmClient.system(): the
+    /// kotlin-stdlib the ML Kit GenAI artifacts in PlatformFeatureCatalog depend on (the
+    /// genai-prompt pom), or newer. Raise it together with those coordinates.
+    private static final String KOTLIN_FOR_ML_KIT_GENAI = "2.4.0";
 
     private String gradleProvidedLibraryDependencies = "";
 

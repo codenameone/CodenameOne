@@ -1190,6 +1190,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return inferenceImpl;
     }
 
+    private com.codename1.impl.SystemLlmImpl systemLlmImpl;
+
+    public void setSystemLlmImpl(com.codename1.impl.SystemLlmImpl systemLlmImpl) {
+        this.systemLlmImpl = systemLlmImpl;
+    }
+
+    @Override
+    public com.codename1.impl.SystemLlmImpl createSystemLlmImpl() {
+        return systemLlmImpl;
+    }
+
     public void setLanguageImpl(com.codename1.impl.LanguageImpl languageImpl) {
         this.languageImpl = languageImpl;
     }
