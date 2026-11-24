@@ -127,9 +127,10 @@ int cn1BackendUringOpenat2(int dirFd, const char* path, void* how, size_t howSiz
 struct cn1OffloadSignal {
     int readFd;
     int writeFd;
-    /* 1 from hand-off until the wakeup write has RETURNED (atomics). The write
-       lands after `done`, so a signal back on the free list may still be about
-       to receive it; teardown closes only signals that are not busy. */
+    /* Wakeup writes handed out and not yet RETURNED (atomics). A COUNT, not a
+       flag: the write lands after `done`, so a signal is back on the free list --
+       and can be taken again -- while its last write is still pending, and two
+       writes can then be outstanding at once. Teardown closes only signals at 0. */
     int busy;
     struct cn1OffloadSignal* next;
 };
@@ -153,8 +154,8 @@ static int cn1OffloadThreads = 0;  /* written once, inside the once */
 /*
  * Per HOST, not per virtual thread: only host-thread code touches it, and the
  * virtual threads on a host run one at a time, so it needs no lock. A virtual
- * thread that resumes on another host returns its signal to that host's list,
- * which is just as good -- this is a cache, not ownership.
+ * thread never moves to another host, so a signal always comes back to the
+ * list it was taken from.
  */
 static __thread struct cn1OffloadSignal* cn1OffloadFree = 0;
 
@@ -207,7 +208,7 @@ static void* cn1OffloadWorker(void* unused) {
 #endif
         /* The signal is heap memory that outlives every caller, so this is safe
            after `done`; only teardown reads it. */
-        __atomic_store_n(&sig->busy, 0, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&sig->busy, 1, __ATOMIC_RELEASE);
     }
     return 0;
 }
@@ -265,6 +266,9 @@ static void cn1UringHostExit(void);
 static void cn1OffloadHostExit(void* unused) {
     struct cn1OffloadSignal* s = cn1OffloadFree;
     struct cn1OffloadSignal* kept = 0;
+    /* On macOS the __thread storage read here is torn down by another key's
+       destructor in an unspecified order; read as empty, the signals leak,
+       which is harmless on an exiting thread. glibc and musl keep it valid. */
     (void)unused;
     cn1UringHostExit();
     while(s != 0) {
@@ -374,7 +378,7 @@ void cn1BackendOffload(cn1OffloadFn fn, void* arg) {
     job.fn = fn;
     job.arg = arg;
     job.signal = signal;
-    __atomic_store_n(&signal->busy, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&signal->busy, 1, __ATOMIC_RELAXED);
     job.done = 0;
     job.next = 0;
     /* Counted before the hand-off: from here a pool thread may be writing into
@@ -431,8 +435,9 @@ void cn1BackendOffload(cn1OffloadFn fn, void* arg) {
  * is safe because a virtual thread never moves to another host (HttpServer.stop:
  * "a yielded task can only ever run on the host it started on"), so every job in
  * this ring belongs to a virtual thread parked on this same OS thread, and the
- * virtual threads of a host run one at a time. The wakeup write carries
- * user_data 0 and is discarded.
+ * virtual threads of a host run one at a time. The wakeup write carries its
+ * signal's address with the low bit set; reaping it releases the signal's
+ * busy count.
  *
  * Nothing here is an off switch. A kernel without io_uring, a seccomp profile
  * that refuses it (Docker's and containerd's defaults do), a ring that cannot be
@@ -617,7 +622,7 @@ static void cn1UringReap(struct cn1Uring* u) {
             /* The wakeup write finished: its signal may be closed at teardown. */
             struct cn1OffloadSignal* sig =
                     (struct cn1OffloadSignal*)(uintptr_t)(cqe->user_data & ~(uint64_t)1);
-            __atomic_store_n(&sig->busy, 0, __ATOMIC_RELEASE);
+            __atomic_sub_fetch(&sig->busy, 1, __ATOMIC_RELEASE);
         } else if(cqe->user_data != 0) {
             struct cn1UringJob* job = (struct cn1UringJob*)(uintptr_t)cqe->user_data;
             job->res = cqe->res;
@@ -675,10 +680,10 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
     sqe->addr = (uint64_t)(uintptr_t)&cn1UringOne;
     sqe->len = sizeof(cn1UringOne);
     /* Tagged with the low bit (a malloc'd signal is aligned) so the reap can
-       tell it from a job and clear the signal's busy flag. */
+       tell it from a job and release the signal's busy count. */
     sqe->user_data = (uint64_t)(uintptr_t)signal | 1;
     u->sqArray[(tail + 1) & u->sqMask] = (tail + 1) & u->sqMask;
-    __atomic_store_n(&signal->busy, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&signal->busy, 1, __ATOMIC_RELAXED);
 
     __atomic_store_n(u->sqTail, tail + 2, __ATOMIC_RELEASE);
     /* Counted before the kernel can touch this stack; see VirtualThread freeImpl. */
@@ -692,7 +697,7 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
     if(entered < 0 && __atomic_load_n(u->sqHead, __ATOMIC_ACQUIRE) == head) {
         /* The kernel took nothing, so nothing references the job: withdraw it. */
         __atomic_store_n(u->sqTail, tail, __ATOMIC_RELEASE);
-        __atomic_store_n(&signal->busy, 0, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&signal->busy, 1, __ATOMIC_RELAXED);
         cn1BackendVtOffloading(-1);
         cn1OffloadReturnSignal(signal);
         return 0;
