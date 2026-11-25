@@ -175,6 +175,8 @@ image::img/bazaar-merchant-assistant-tablet.png["The store assistant answering h
 
 image::img/bazaar-merchant-pipeline-desktop.png["The sales pipeline: open carts and orders in columns, with purchase intent",scaledwidth=90%]
 
+image::img/bazaar-merchant-pipeline-tablet.png["The sales pipeline on a tablet",scaledwidth=70%]
+
 ==== Products and collections
 
 Products are a table on a wide screen and a list on a phone. A product has a
