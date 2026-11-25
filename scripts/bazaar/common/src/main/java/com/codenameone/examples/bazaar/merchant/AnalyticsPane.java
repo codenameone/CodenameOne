@@ -455,7 +455,7 @@ final class AnalyticsPane extends MerchantPane {
         for (int iter = 0; iter < data.daily().size(); iter++) {
             SeriesPointDto p = data.daily().get(iter);
             rows[iter + 1] = new String[] {p.label(), String.valueOf(p.orders()),
-                ProductCsv.major(p.salesCents())};
+                ProductCsv.major(p.salesCents(), MerchantState.currency())};
         }
         Files.saveCsv("analytics-" + Period.iso(period.from) + ".csv", rows);
     }

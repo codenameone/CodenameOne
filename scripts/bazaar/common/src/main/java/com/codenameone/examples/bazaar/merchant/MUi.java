@@ -106,13 +106,15 @@ final class MUi {
 
     /// A field for an amount of money, typed in major units.
     static TextField money(Container to, String caption, String name, long cents) {
-        TextField f = Ui.field(to, caption, name, "0.00", TextArea.DECIMAL);
-        f.setText(cents == 0 ? "" : ProductCsv.major(cents));
+        String currency = MerchantState.currency();
+        TextField f = Ui.field(to, caption, name, ProductCsv.major(0, currency), TextArea.DECIMAL);
+        f.setText(cents == 0 ? "" : ProductCsv.major(cents, currency));
         return f;
     }
 
+    /// What `f` holds, in the minor units of the store's currency.
     static long cents(TextField f) {
-        return ProductCsv.cents(f.getText());
+        return ProductCsv.cents(f.getText(), MerchantState.currency());
     }
 
     /// A field for a whole number.

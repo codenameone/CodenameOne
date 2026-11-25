@@ -260,9 +260,7 @@ final class Dashboard extends LiveChannel.Adapter {
                 "platformSuspended");
         platform.stat(String.valueOf(stats.orders()), "Orders", "platformOrders");
         platform.stat(String.valueOf(stats.ordersToday()), "Orders today", "platformOrdersToday");
-        String currency = stats.perStore() != null && !stats.perStore().isEmpty()
-                ? stats.perStore().get(0).currency() : "USD";
-        platform.stat(Ui.money(stats.gmvCents(), currency), "Gross sales", "platformGmv");
+        platform.stat(Ui.money(stats.gmvCents(), stats.reportingCurrency()), "Gross sales", "platformGmv");
         Ui.relayout(page);
     }
 

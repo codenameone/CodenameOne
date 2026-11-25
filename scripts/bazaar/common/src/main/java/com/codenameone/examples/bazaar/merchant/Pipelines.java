@@ -56,7 +56,7 @@ final class Pipelines {
         @Override
         public String money(long cents, String currency) {
             // Signed from the whole value: -50 is "-0.50", not "0.50".
-            return ProductCsv.major(cents) + " " + currency;
+            return ProductCsv.major(cents, currency) + " " + currency;
         }
     };
 

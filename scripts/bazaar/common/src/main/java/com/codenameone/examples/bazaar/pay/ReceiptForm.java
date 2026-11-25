@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.pay;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
 import com.codenameone.examples.bazaar.shop.PayLabels;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -96,21 +97,28 @@ public final class ReceiptForm {
     /// An amount typed with or without a decimal point, in cents; 0 for
     /// anything that is not an amount.
     static long cents(String typed) {
+        return cents(typed, "USD");
+    }
+
+    /// [#cents(String)] in the minor units of `currency`.
+    static long cents(String typed, String currency) {
+        int digits = Amounts.digits(currency);
         String text = typed.trim().replace(',', '.');
         int point = text.indexOf('.');
         String whole = point < 0 ? text : text.substring(0, point);
         String part = point < 0 ? "" : text.substring(point + 1);
-        if (part.length() > 2) {
-            part = part.substring(0, 2);
+        if (part.length() > digits) {
+            part = part.substring(0, digits);
         }
-        while (part.length() < 2) {
+        while (part.length() < digits) {
             part += "0";
         }
         if (Cards.digits(whole).length() != whole.length()
                 || Cards.digits(part).length() != part.length() || whole.length() > 6) {
             return 0;
         }
-        return (whole.length() == 0 ? 0 : Long.parseLong(whole)) * 100 + Long.parseLong(part);
+        return (whole.length() == 0 ? 0 : Long.parseLong(whole)) * Amounts.unit(digits)
+                + (part.length() == 0 ? 0 : Long.parseLong(part));
     }
 
     /// A payment's state, in words.

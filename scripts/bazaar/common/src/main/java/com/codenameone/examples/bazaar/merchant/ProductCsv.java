@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bazaar.merchant;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
+
 import com.codename1.io.CSVParser;
 import com.codename1.io.CSVWriter;
 import com.codenameone.examples.bazaar.api.OptionDto;
@@ -69,6 +71,11 @@ public final class ProductCsv {
 
     /// The rows for `products`, the header first.
     public static String[][] rows(List<ProductDto> products) {
+        return rows(products, "USD");
+    }
+
+    /// [#rows(List)] with prices in the minor units of `currency`.
+    public static String[][] rows(List<ProductDto> products, String currency) {
         List<String[]> out = new ArrayList<String[]>();
         out.add(HEADER);
         for (int p = 0; products != null && p < products.size(); p++) {
@@ -103,9 +110,9 @@ public final class ProductCsv {
                     row[OPTION1 + 5] = text(variant.option3());
                     row[SKU] = text(variant.sku());
                     row[BARCODE] = text(variant.barcode());
-                    row[PRICE] = major(variant.priceCents());
-                    row[COMPARE] = variant.compareAtCents() > 0 ? major(variant.compareAtCents()) : "";
-                    row[COST] = variant.costCents() > 0 ? major(variant.costCents()) : "";
+                    row[PRICE] = major(variant.priceCents(), currency);
+                    row[COMPARE] = variant.compareAtCents() > 0 ? major(variant.compareAtCents(), currency) : "";
+                    row[COST] = variant.costCents() > 0 ? major(variant.costCents(), currency) : "";
                     row[WEIGHT] = variant.weightGrams() > 0 ? String.valueOf(variant.weightGrams()) : "";
                 }
                 out.add(row);
@@ -116,22 +123,37 @@ public final class ProductCsv {
 
     /// The CSV text of `products`.
     public static String write(List<ProductDto> products) {
+        return write(products, "USD");
+    }
+
+    /// [#write(List)] with prices in the minor units of `currency`.
+    public static String write(List<ProductDto> products, String currency) {
         CSVWriter writer = new CSVWriter(',');
         writer.setEscapeFormulas(true);
-        return writer.toString(rows(products));
+        return writer.toString(rows(products, currency));
     }
 
     /// The products in CSV text.
     public static List<ProductDto> read(String text) throws IOException {
-        return read(new ByteArrayInputStream(text.getBytes("UTF-8")));
+        return read(text, "USD");
+    }
+
+    /// [#read(String)] with prices in the minor units of `currency`.
+    public static List<ProductDto> read(String text, String currency) throws IOException {
+        return read(new ByteArrayInputStream(text.getBytes("UTF-8")), currency);
     }
 
     /// The products in a CSV stream; the separator is detected, so a file
     /// saved by a spreadsheet set to semicolons reads too.
     public static List<ProductDto> read(InputStream in) throws IOException {
+        return read(in, "USD");
+    }
+
+    /// [#read(InputStream)] with prices in the minor units of `currency`.
+    public static List<ProductDto> read(InputStream in, String currency) throws IOException {
         CSVParser parser = new CSVParser(',');
         parser.setDetectSeparator(true);
-        return fromRows(parser.parse(in, "UTF-8"));
+        return fromRows(parser.parse(in, "UTF-8"), currency);
     }
 
     /// The products in parsed rows. Columns are found by their header, ignoring
@@ -140,6 +162,11 @@ public final class ProductCsv {
     /// product. Values the escaping writer guarded with a leading apostrophe
     /// are read without it.
     public static List<ProductDto> fromRows(String[][] rows) {
+        return fromRows(rows, "USD");
+    }
+
+    /// [#fromRows(String[][])] with prices in the minor units of `currency`.
+    public static List<ProductDto> fromRows(String[][] rows, String currency) {
         List<ProductDto> out = new ArrayList<ProductDto>();
         if (rows == null || rows.length == 0) {
             return out;
@@ -194,8 +221,8 @@ public final class ProductCsv {
             current.variants.add(new VariantDto(null, null, VariantMatrix.title(values),
                     nullIfEmpty(o1), nullIfEmpty(o2), nullIfEmpty(o3),
                     cell(row, at[SKU]), cell(row, at[BARCODE]),
-                    cents(cell(row, at[PRICE])), cents(cell(row, at[COMPARE])),
-                    cents(cell(row, at[COST])), integer(cell(row, at[WEIGHT])),
+                    cents(cell(row, at[PRICE]), currency), cents(cell(row, at[COMPARE]), currency),
+                    cents(cell(row, at[COST]), currency), integer(cell(row, at[WEIGHT])),
                     true, true, false, current.variants.size(), 0, new ArrayList<StockDto>(),
                     false, null, null, 0L, null, 0, null));
         }
@@ -205,11 +232,23 @@ public final class ProductCsv {
         return out;
     }
 
-    /// Cents as "12.50", a minus in front when negative.
+    /// Hundredths as "12.50", a minus in front when negative: two decimals
+    /// always, which is what basis points and percentages want. Money goes
+    /// through [#major(long, String)].
     public static String major(long cents) {
-        long a = Math.abs(cents);
-        long frac = a % 100;
-        return (cents < 0 ? "-" : "") + (a / 100) + "." + (frac < 10 ? "0" : "") + frac;
+        return Amounts.plain(cents, 2);
+    }
+
+    /// An amount in the minor units of `currency` as it is typed: "12.50"
+    /// dollars, "1250" yen, "1.250" dinars.
+    public static String major(long minor, String currency) {
+        return Amounts.plain(minor, Amounts.digits(currency));
+    }
+
+    /// [#cents(String)] in the minor units of `currency`: "1250" yen is
+    /// 1250, "1.25" dinars is 1250 fils.
+    public static long cents(String text, String currency) {
+        return cents(text, Amounts.digits(currency));
     }
 
     /// A whole number typed by hand; 0 for anything that is not one, so
@@ -248,13 +287,20 @@ public final class ProductCsv {
     /// value too large to hold. A comma followed by exactly one or two digits at the end
     /// is a decimal comma; any other comma groups thousands.
     public static long cents(String text) {
+        return cents(text, 2);
+    }
+
+    /// [#cents(String)] with `digits` decimals. A comma followed by 1 to
+    /// `digits` digits at the end is a decimal comma, so for a currency
+    /// without decimals every comma groups thousands.
+    static long cents(String text, int digits) {
         if (text == null) {
             return 0;
         }
         String t = text.trim();
         int lastComma = t.lastIndexOf(',');
         boolean decimalComma = lastComma >= 0 && t.indexOf('.') < 0
-                && t.length() - lastComma - 1 >= 1 && t.length() - lastComma - 1 <= 2;
+                && t.length() - lastComma - 1 >= 1 && t.length() - lastComma - 1 <= digits;
         long whole = 0;
         long frac = 0;
         int fracDigits = -1;
@@ -279,7 +325,7 @@ public final class ProductCsv {
                     if (whole > 100000000000L) {
                         return 0;
                     }
-                } else if (fracDigits < 2) {
+                } else if (fracDigits < digits) {
                     frac = frac * 10 + (c - '0');
                     fracDigits++;
                 }
@@ -288,10 +334,10 @@ public final class ProductCsv {
         if (!any) {
             return 0;
         }
-        if (fracDigits == 1) {
+        for (int d = Math.max(0, fracDigits); d < digits; d++) {
             frac *= 10;
         }
-        long value = whole * 100 + frac;
+        long value = whole * Amounts.unit(digits) + frac;
         return negative ? -value : value;
     }
 

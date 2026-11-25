@@ -135,9 +135,9 @@ final class FilterPanel {
     private void price(FacetsDto facets) {
         panel.add(Ui.label("Price", "ShopFilterTitle"));
         Container row = new Container(new com.codename1.ui.layouts.GridLayout(1, 2));
-        final TextField min = new TextField(query.min >= 0 ? Money.typed(query.min) : "",
+        final TextField min = new TextField(query.min >= 0 ? Money.typed(query.min, ShopState.currency()) : "",
                 ShopState.money(facets.minPriceCents()), 8, TextField.DECIMAL);
-        final TextField max = new TextField(query.max >= 0 ? Money.typed(query.max) : "",
+        final TextField max = new TextField(query.max >= 0 ? Money.typed(query.max, ShopState.currency()) : "",
                 ShopState.money(facets.maxPriceCents()), 8, TextField.DECIMAL);
         min.setUIID("SvField");
         max.setUIID("SvField");
@@ -154,8 +154,8 @@ final class FilterPanel {
         row.add(minBox).add(maxBox);
         panel.add(row);
         Runnable apply = () -> {
-            long lo = Money.parse(min.getText());
-            long hi = Money.parse(max.getText());
+            long lo = Money.parse(min.getText(), ShopState.currency());
+            long hi = Money.parse(max.getText(), ShopState.currency());
             if (lo >= 0 && hi >= 0 && hi < lo) {
                 long t = lo;
                 lo = hi;

@@ -18,10 +18,13 @@
  */
 package com.codenameone.examples.bazaar.shop;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
+
 /// Money as the shopper reads it. Pure: no display, no bundle, so the rules
 /// are tested on their own.
 ///
-/// Amounts are whole cents (minor units). Dollars are written `$12.40`; any
+/// Amounts are whole minor units of their currency -- cents, yen, fils --
+/// with as many decimals as [Amounts#digits(String)] gives it. Dollars are written `$12.40`; any
 /// other currency as the amount followed by its code, `12.40 EUR`. A negative
 /// amount -- a discount, a gift card -- keeps its sign even under one unit,
 /// which plain integer division would lose (`-50 / 100` is `0`).
@@ -34,9 +37,9 @@ public final class Money {
         String code = currency == null || currency.length() == 0 ? fallback : currency;
         boolean negative = cents < 0;
         long abs = negative ? -cents : cents;
-        long whole = abs / 100;
-        long part = abs % 100;
-        String amount = grouped(whole) + "." + (part < 10 ? "0" : "") + part;
+        int digits = Amounts.digits(code);
+        long unit = Amounts.unit(digits);
+        String amount = grouped(abs / unit) + fraction(abs % unit, digits);
         String sign = negative ? "-" : "";
         if (code == null || code.length() == 0 || "USD".equalsIgnoreCase(code)) {
             return sign + "$" + amount;
@@ -48,6 +51,20 @@ public final class Money {
     /// in a ring: `$877`, `$1,250`.
     public static String whole(long cents) {
         return (cents < 0 ? "-$" : "$") + grouped(Math.abs(cents) / 100);
+    }
+
+    /// `part` minor units as the decimals of an amount, `.05` for two
+    /// digits, `.005` for three, nothing for a currency without decimals.
+    private static String fraction(long part, int digits) {
+        if (digits <= 0) {
+            return "";
+        }
+        String text = String.valueOf(part);
+        StringBuilder out = new StringBuilder(".");
+        for (int iter = text.length(); iter < digits; iter++) {
+            out.append('0');
+        }
+        return out.append(text).toString();
     }
 
     /// `whole` with a comma between each group of three digits: `4,952`.
@@ -85,20 +102,35 @@ public final class Money {
     /// `cents` as a price filter shows it back for editing: `12`, or `12.50`
     /// when there are cents, so what `parse` reads is what was typed.
     public static String typed(long cents) {
+        return typed(cents, "USD");
+    }
+
+    /// [#typed(long)] in the minor units of `currency`: `1250` yen is `1250`,
+    /// `1250` fils is `1.250`.
+    public static String typed(long cents, String currency) {
         // Sign first, then the magnitude: -1250 is "-12.50", never "-12.-50".
         String sign = cents < 0 ? "-" : "";
         long a = Math.abs(cents);
-        long whole = a / 100;
-        long part = a % 100;
+        int digits = Amounts.digits(currency);
+        long unit = Amounts.unit(digits);
+        long whole = a / unit;
+        long part = a % unit;
         if (part == 0) {
             return sign + whole;
         }
-        return sign + whole + "." + (part < 10 ? "0" : "") + part;
+        return sign + whole + fraction(part, digits);
     }
 
     /// Dollars as typed into a price filter (`12`, `12.5`, `12.50`) to cents;
     /// -1 for anything that is not an amount.
     public static long parse(String text) {
+        return parse(text, "USD");
+    }
+
+    /// [#parse(String)] in `currency`: as many decimals as it has, so `12.5`
+    /// is 1250 cents, `1250` is 1250 yen and `1.25` is 1250 fils.
+    public static long parse(String text, String currency) {
+        int digits = Amounts.digits(currency);
         if (text == null) {
             return -1;
         }
@@ -119,7 +151,7 @@ public final class Money {
                 dot = true;
             } else if (c >= '0' && c <= '9') {
                 if (dot) {
-                    if (partDigits < 2) {
+                    if (partDigits < digits) {
                         part = part * 10 + (c - '0');
                         partDigits++;
                     }
@@ -133,9 +165,9 @@ public final class Money {
                 return -1;
             }
         }
-        if (partDigits == 1) {
+        for (; partDigits < digits; partDigits++) {
             part *= 10;
         }
-        return whole * 100 + part;
+        return whole * Amounts.unit(digits) + part;
     }
 }

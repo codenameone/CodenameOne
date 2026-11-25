@@ -205,14 +205,14 @@ final class CollectionsPane extends MerchantPane {
             }
             field.setStrings(labels);
             field.setSelectedStringIndex(chosen);
-            final TextField value = new TextField(r.isPrice() ? ProductCsv.major(cents(r.value)) : r.value,
+            final TextField value = new TextField(r.isPrice() ? ProductCsv.major(cents(r.value), MerchantState.currency()) : r.value,
                     Lang.tr("Value"), 12, TextArea.ANY);
             value.setUIID("SvField");
             value.setName("rule-value-" + iter);
             Runnable store = () -> {
                 String f = SmartRules.FIELDS[Math.max(0, field.getSelectedStringIndex())];
                 boolean price = SmartRules.PRICE_BELOW.equals(f) || SmartRules.PRICE_ABOVE.equals(f);
-                String v = price ? String.valueOf(ProductCsv.cents(value.getText()))
+                String v = price ? String.valueOf(ProductCsv.cents(value.getText(), MerchantState.currency()))
                         : value.getText();
                 rules.set(at, new SmartRules.Rule(f, v));
             };

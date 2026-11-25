@@ -51,7 +51,7 @@ final class SettingsPane extends MerchantPane {
     /// Accent colours offered as swatches; any hex value can be typed too.
     static final int[] SWATCHES = {0x2563eb, 0x7c3aed, 0xdb2777, 0xdc2626, 0xea580c, 0xca8a04,
         0x16a34a, 0x0d9488, 0x0f172a, 0x6b7280};
-    static final String[] CURRENCIES = {"USD", "EUR", "GBP", "ILS", "CAD", "AUD", "JPY"};
+    static final String[] CURRENCIES = {"USD", "EUR", "GBP", "ILS", "CAD", "AUD", "JPY", "BHD"};
 
     private int accent;
     private String logoPhotoId;

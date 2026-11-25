@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
 import com.codename1.analytics.Analytics;
 import com.codename1.analytics.AnalyticsConsent;
 import com.codename1.analytics.AnalyticsEvent;
@@ -223,8 +224,9 @@ public final class Telemetry {
     }
 
     /// @param channel `online` or `pos`
-    public static void orderPlaced(String channel, long totalCents) {
-        send(ORDER, "order_placed", "channel", channel, "total", fare(totalCents));
+    /// @param currency the code `totalCents` is in
+    public static void orderPlaced(String channel, long totalCents, String currency) {
+        send(ORDER, "order_placed", "channel", channel, "total", fare(totalCents, currency));
     }
 
     public static void rated(int stars) {
@@ -282,8 +284,8 @@ public final class Telemetry {
 
     /// The bracket an amount of money falls in, in whole units of the
     /// currency. The amount itself, beside a time, can be matched to an order.
-    static String fare(long cents) {
-        long units = cents / 100;
+    static String fare(long cents, String currency) {
+        long units = cents / Amounts.unitOf(currency);
         return units < 5 ? "under_5" : units < 10 ? "5_to_10" : units < 20 ? "10_to_20"
                 : units < 35 ? "20_to_35" : units < 50 ? "35_to_50" : "50_or_more";
     }

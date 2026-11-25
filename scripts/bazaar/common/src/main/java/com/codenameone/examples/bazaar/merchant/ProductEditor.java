@@ -456,7 +456,8 @@ final class ProductEditor extends Container {
     private void change(VariantDto v, String field, Object value) {
         String text = value == null ? "" : String.valueOf(value).trim();
         long number = value instanceof Long ? ((Long) value).longValue()
-                : value instanceof Number ? ((Number) value).longValue() : ProductCsv.cents(text);
+                : value instanceof Number ? ((Number) value).longValue()
+                : ProductCsv.cents(text, MerchantState.currency());
         VariantDto out = new VariantDto(v.id(), v.productId(), v.title(), v.option1(), v.option2(),
                 v.option3(),
                 "sku".equals(field) ? text : v.sku(),
@@ -465,7 +466,8 @@ final class ProductEditor extends Container {
                 "compare".equals(field) ? number : v.compareAtCents(),
                 "cost".equals(field) ? number : v.costCents(),
                 "weight".equals(field) ? (int) Math.max(0, Math.min(Integer.MAX_VALUE,
-                        value instanceof Number ? ((Number) value).longValue() : number / 100))
+                        value instanceof Number ? ((Number) value).longValue()
+                                : ProductCsv.cents(text) / 100))
                         : v.weightGrams(),
                 v.taxable(), v.trackInventory(), v.allowBackorder(), v.position(), v.available(),
                 v.stock(), v.digital(), v.hsCode(), v.originCountry(), v.unitQuantity(),

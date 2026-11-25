@@ -108,7 +108,7 @@ public final class StoresForm {
         for (int iter = 0; iter < n; iter++) {
             StoreStatsDto s = stores.get(iter);
             data[iter] = new Object[] {s.name(), "@" + s.handle(), Integer.valueOf(s.orders()),
-                Long.valueOf(s.gmvCents()), SUSPENDED.equals(s.status()) ? SUSPENDED : ACTIVE,
+                Long.valueOf(s.reportingGmvCents()), SUSPENDED.equals(s.status()) ? SUSPENDED : ACTIVE,
                 s.createdAt() > 0 ? Ui.day(s.createdAt()) : "-"};
         }
         String[] titles = {Lang.tr("Store"), Lang.tr("Handle"), Lang.tr("Orders"),
@@ -123,7 +123,7 @@ public final class StoresForm {
             grid.getColumn(c).setFlex(c == 0 ? 2 : 1);
         }
         grid.getColumn(2).setKind(GridColumn.Kind.NUMBER);
-        grid.getColumn(3).setKind(GridColumn.Kind.NUMBER).setFormatter(new GmvFormat(stores));
+        grid.getColumn(3).setKind(GridColumn.Kind.NUMBER).setFormatter(new GmvFormat(stats.reportingCurrency()));
         grid.getColumn(4).setRenderer(new StatusPill());
         // One tap opens a store, as a row of the list does; the grid's own
         // action waits for a double tap.
@@ -148,10 +148,10 @@ public final class StoresForm {
     private static Container summary(PlatformStatsDto stats) {
         com.codenameone.examples.bazaar.ui.StatRow row = Ui.stats(4);
         row.setName("stores-summary");
-        String currency = stats.perStore() != null && !stats.perStore().isEmpty()
-                ? stats.perStore().get(0).currency() : "USD";
+        // The total adds stores that sell in different currencies, so the
+        // server converts every order into its reporting currency.
         row.stat(String.valueOf(stats.stores()), "Stores", "storesCount");
-        row.stat(Ui.money(stats.gmvCents(), currency), "Gross sales", "storesGmv");
+        row.stat(Ui.money(stats.gmvCents(), stats.reportingCurrency()), "Gross sales", "storesGmv");
         row.stat(String.valueOf(stats.orders()), "Orders", "storesOrders");
         row.stat(String.valueOf(stats.ordersToday()), "Orders today", "storesOrdersToday");
         return row;
@@ -167,20 +167,23 @@ public final class StoresForm {
         for (int iter = 0; stores != null && iter < stores.size(); iter++) {
             StoreStatsDto s = stores.get(iter);
             // Tested before dividing: a platform with no sales has no shares.
-            long percent = total <= 0L ? 0L : s.gmvCents() * 100L / total;
+            // Shares compare the reporting figures: the total is in that
+            // currency, and a store's own may be in yen or dinars.
+            long percent = total <= 0L ? 0L : s.reportingGmvCents() * 100L / total;
             Container fact = Ui.fact(s.name(), percent + "%");
             tile.add(fact);
-            tile.add(new Chart.Meter("Sv", total <= 0L ? 0 : s.gmvCents() / (double) total));
+            tile.add(new Chart.Meter("Sv", total <= 0L ? 0 : s.reportingGmvCents() / (double) total));
         }
         return tile;
     }
 
-    /// Gross sales in the currency of the stores on the platform.
+    /// Gross sales in the platform's reporting currency, the one figure that
+    /// sorts and compares across stores selling in different currencies.
     private static final class GmvFormat implements GridFormatter {
         private final String currency;
 
-        GmvFormat(List<StoreStatsDto> stores) {
-            currency = stores == null || stores.isEmpty() ? null : stores.get(0).currency();
+        GmvFormat(String reportingCurrency) {
+            currency = reportingCurrency;
         }
 
         @Override
@@ -232,8 +235,10 @@ public final class StoresForm {
         Container page = Ui.page();
         page.setName("store-detail");
         page.add(Ui.person(s.name(), "@" + s.handle(), null));
-        page.add(Ui.stats(2)
+        page.add(Ui.stats(3)
                 .stat(Ui.money(s.gmvCents(), s.currency()), "Gross sales", "storeGmv")
+                .stat(Ui.money(s.reportingGmvCents(), s.reportingCurrency()), "Reported sales",
+                        "storeReportingGmv")
                 .stat(String.valueOf(s.orders()), "Orders", "storeOrders"));
         final boolean suspended = SUSPENDED.equals(s.status());
         // Who runs it and whether it sells, as rows in a card of the same

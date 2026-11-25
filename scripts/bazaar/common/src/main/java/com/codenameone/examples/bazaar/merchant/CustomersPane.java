@@ -420,7 +420,7 @@ final class CustomersPane extends MerchantPane {
         }
         String text = amount.getText().trim();
         boolean negative = text.startsWith("-");
-        long cents = ProductCsv.cents(negative ? text.substring(1) : text);
+        long cents = ProductCsv.cents(negative ? text.substring(1) : text, MerchantState.currency());
         if (cents == 0) {
             return;
         }

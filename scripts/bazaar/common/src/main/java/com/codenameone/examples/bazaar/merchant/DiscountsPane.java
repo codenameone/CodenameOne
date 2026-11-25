@@ -140,7 +140,9 @@ final class DiscountsPane extends MerchantPane {
         Picker kind = MUi.picker(body, Lang.tr("Type"), "discount-kind", Words.DISCOUNT_KINDS,
                 d == null ? "PERCENT" : d.kind());
         TextField amount = Ui.field(body, Lang.tr("Percent, or amount for a fixed discount"),
-                "discount-amount", d == null ? "10" : ProductCsv.major(d.amount()), TextField.DECIMAL);
+                "discount-amount", d == null ? "10" : "FIXED".equals(d.kind())
+                        ? ProductCsv.major(d.amount(), MerchantState.currency()) : ProductCsv.major(d.amount()),
+                TextField.DECIMAL);
         TextField min = MUi.money(body, "Minimum subtotal", "discount-min",
                 d == null ? 0 : d.minSubtotalCents());
         TextField buy = MUi.number(body, "Buy quantity", "discount-buy", d == null ? 0 : d.buyQty());
@@ -167,7 +169,9 @@ final class DiscountsPane extends MerchantPane {
         }
         // Percent and buy-X-get-Y amounts are basis points; "12.5" percent
         // parses as 1250 just as "12.50" dollars parses as 1250 cents.
-        long amt = ProductCsv.cents(amount.getText());
+        // A fixed discount is money, in the store currency's own decimals.
+        long amt = "FIXED".equals(k) ? ProductCsv.cents(amount.getText(), MerchantState.currency())
+                : ProductCsv.cents(amount.getText());
         Api.discounts().save(MerchantState.storeId(), new DiscountDto(d == null ? null : d.id(), c,
                 title.getText().trim().length() == 0 ? c : title.getText().trim(), k, Math.max(0, amt),
                 MUi.cents(min), MUi.integer(buy), MUi.integer(get), d == null ? "ALL" : d.appliesTo(),

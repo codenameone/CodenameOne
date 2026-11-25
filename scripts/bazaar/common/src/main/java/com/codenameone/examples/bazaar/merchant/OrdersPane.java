@@ -371,7 +371,7 @@ final class OrdersPane extends MerchantPane {
             OrderDto o = rows.at(iter);
             table[iter + 1] = new String[] {String.valueOf(o.number()), MUi.when(o.createdAt()),
                 customer(o), o.channel(), o.financial(), o.fulfilment(),
-                ProductCsv.major(o.totalCents())};
+                ProductCsv.major(o.totalCents(), MerchantState.currency())};
         }
         Files.saveCsv("orders.csv", table);
     }
@@ -400,7 +400,7 @@ final class OrdersPane extends MerchantPane {
 
         @Override
         public Object parse(String text, Object previous) {
-            return Long.valueOf(ProductCsv.cents(text));
+            return Long.valueOf(ProductCsv.cents(text, MerchantState.currency()));
         }
     }
 

@@ -326,7 +326,7 @@ final class ProductsPane extends MerchantPane {
 
     private void fetch(final List<ProductCardDto> cards, final int at, final List<ProductDto> full) {
         if (at >= cards.size()) {
-            Files.save("products.csv", ProductCsv.write(full), "text/csv");
+            Files.save("products.csv", ProductCsv.write(full, MerchantState.currency()), "text/csv");
             return;
         }
         Api.catalog().merchantProduct(MerchantState.storeId(), cards.get(at).id(), Net.to(p -> {
@@ -339,7 +339,7 @@ final class ProductsPane extends MerchantPane {
         Files.askCsv("Import products", text -> {
             List<ProductDto> products;
             try {
-                products = ProductCsv.read(text);
+                products = ProductCsv.read(text, MerchantState.currency());
             } catch (IOException | IllegalArgumentException bad) {
                 Ui.say(Lang.tr("That file could not be read: {0}", bad.getMessage()));
                 return;
