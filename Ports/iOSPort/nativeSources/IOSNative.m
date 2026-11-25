@@ -14283,6 +14283,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(CN1_THRE
     return o;
 }
 
+// The locale's currency symbol ("$"), which DecimalFormatSymbols and
+// L10NManager.getCurrencySymbol() report as such. This answered the ISO code
+// ("USD") until getCurrencyCode below took that job.
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
@@ -14295,7 +14298,65 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(CN1_THREAD_STAT
     } else {
         formatter.locale = cn1DeviceLocale();
     }
+    [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
+    JAVA_OBJECT c = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter currencySymbol]);
+    POOL_END();
+    return c;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencyCode___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+#else
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
     JAVA_OBJECT c = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter currencyCode]);
+    POOL_END();
+    return c;
+}
+
+// An amount of any currency, written the way the current locale writes money.
+// NSNumberFormatter takes the currency's fraction digits from the code.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrencyCode___double_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_DOUBLE d, JAVA_OBJECT currencyCode) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+#else
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
+    [formatter setCurrencyCode:toNSString(CN1_THREAD_STATE_PASS_ARG currencyCode)];
+    JAVA_OBJECT c = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
+    POOL_END();
+    return c;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbolForCode___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT currencyCode) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    NSNumberFormatter *formatter = [[[NSNumberFormatter alloc] init] autorelease];
+#else
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+#endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    } else {
+        formatter.locale = cn1DeviceLocale();
+    }
+    [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
+    [formatter setCurrencyCode:toNSString(CN1_THREAD_STATE_PASS_ARG currencyCode)];
+    JAVA_OBJECT c = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter currencySymbol]);
     POOL_END();
     return c;
 }

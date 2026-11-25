@@ -25,7 +25,10 @@ package com.codename1.l10n;
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
 
+import java.text.NumberFormat;
+import java.util.Currency;
 import java.util.Date;
+import java.util.Locale;
 
 /// The localization manager allows adapting values for display in different locales thru parsing and formatting
 /// capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
@@ -53,6 +56,22 @@ import java.util.Date;
 ///     add("parseInt").add(l10n.format(l10n.parseInt("56"))).
 ///     add("parseLong").add("" + l10n.parseLong("4444444"));
 /// hi.show();
+/// ```
+///
+/// #### Currencies
+///
+/// [#getCurrencyCode()] is the ISO 4217 code of the user's currency, and
+/// [#formatCurrency(double, String)] formats an amount in any currency the way
+/// the user's locale writes it: a price in euros shown to a user in the US
+/// reads `\u20ac12.50` there and `12,50 \u20ac` in France. Use the standard
+/// `java.util.Currency` for the facts about a currency itself -- its fraction
+/// digits, numeric code and symbol -- which are the same on every platform.
+///
+/// ```java
+/// L10NManager l10n = L10NManager.getInstance();
+/// String mine = l10n.getCurrencyCode();               // "USD" for a user in the US
+/// String price = l10n.formatCurrency(1250, "JPY");    // "\u00a51,250"
+/// int digits = Currency.getInstance("JPY").getDefaultFractionDigits(); // 0
 /// ```
 public class L10NManager {
     private String language;
@@ -253,7 +272,7 @@ public class L10NManager {
 
     }
 
-    /// Format a currency value
+    /// Format a currency value in the user's currency ([#getCurrencyCode()]).
     ///
     /// #### Parameters
     ///
@@ -263,7 +282,43 @@ public class L10NManager {
     ///
     /// a string representation of a number
     public String formatCurrency(double currency) {
-        return "" + currency;
+        String code = getCurrencyCode();
+        if (code == null) {
+            return "" + currency;
+        }
+        return formatCurrency(currency, code);
+    }
+
+    /// Formats an amount of the given currency the way this locale writes
+    /// money: its separators and its placement of the symbol, with the
+    /// currency's own number of fraction digits (none for the yen).
+    ///
+    /// The default implementation uses `java.text.NumberFormat`; the ports
+    /// replace it with the platform's own currency formatting.
+    ///
+    /// #### Parameters
+    ///
+    /// - `amount`: the monetary value
+    ///
+    /// - `currencyCode`: an ISO 4217 code such as `"EUR"`
+    ///
+    /// #### Returns
+    ///
+    /// the formatted amount
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `currencyCode` is not an ISO 4217 code
+    public String formatCurrency(double amount, String currencyCode) {
+        Currency c = Currency.getInstance(currencyCode);
+        NumberFormat format = NumberFormat.getCurrencyInstance(toJavaLocale());
+        format.setCurrency(c);
+        int digits = c.getDefaultFractionDigits();
+        if (digits >= 0) {
+            format.setMinimumFractionDigits(digits);
+            format.setMaximumFractionDigits(digits);
+        }
+        return format.format(amount);
     }
 
     /// Returns the currency symbol for this locale
@@ -272,7 +327,67 @@ public class L10NManager {
     ///
     /// currency symbol
     public String getCurrencySymbol() {
-        return "$";
+        String code = getCurrencyCode();
+        if (code == null) {
+            return "$";
+        }
+        return getCurrencySymbol(code);
+    }
+
+    /// The symbol this locale writes for the given currency: `$` for US
+    /// dollars in the US, `US$` elsewhere.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currencyCode`: an ISO 4217 code such as `"EUR"`
+    ///
+    /// #### Returns
+    ///
+    /// the currency symbol
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if `currencyCode` is not an ISO 4217 code
+    public String getCurrencySymbol(String currencyCode) {
+        return Currency.getInstance(currencyCode).getSymbol(toJavaLocale());
+    }
+
+    /// The ISO 4217 code of the user's currency, such as `"USD"`: the one the
+    /// platform reports, or by default the currency of the country in
+    /// [#getLocale()].
+    ///
+    /// #### Returns
+    ///
+    /// the currency code, or null when the locale names no country
+    public String getCurrencyCode() {
+        String country = getLocale();
+        if (country == null || country.length() != 2) {
+            return null;
+        }
+        try {
+            Currency c = Currency.getInstance(toJavaLocale());
+            return c == null ? null : c.getCurrencyCode();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /// This manager's language and country as a `java.util.Locale`.
+    private Locale toJavaLocale() {
+        String lang = getLanguage();
+        String country = getLocale();
+        return new Locale(lang == null ? "" : lang, country == null ? "" : asciiUpper(country));
+    }
+
+    /// Upper-cases ASCII letters only: a country code is ASCII by
+    /// specification, and `toUpperCase()` depends on the device locale.
+    private static String asciiUpper(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return b.toString();
     }
 
     /// Formats a date in a long form e.g. Sunday January 1st 2001

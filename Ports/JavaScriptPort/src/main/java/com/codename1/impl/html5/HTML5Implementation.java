@@ -12565,8 +12565,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
 
                 public String formatCurrency(double currency) {
-                    
-                    return getCurrencyFormatter(Display.getInstance().getProperty("l10n.currency", "USD")).format(currency);
+                    String code = getCurrencyCode();
+                    return getCurrencyFormatter(code == null ? "USD" : code).format(currency);
+                }
+
+                @Override
+                public String formatCurrency(double amount, String currencyCode) {
+                    // Validates the code the way every other port does.
+                    java.util.Currency.getInstance(currencyCode);
+                    return getCurrencyFormatter(currencyCode).format(amount);
+                }
+
+                // The l10n.currency property still wins, as it always did for
+                // formatCurrency; the browser itself has no notion of a currency.
+                @Override
+                public String getCurrencyCode() {
+                    String code = Display.getInstance().getProperty("l10n.currency", null);
+                    return code != null ? code : super.getCurrencyCode();
                 }
 
                 public String formatDateLongStyle(Date d) {
