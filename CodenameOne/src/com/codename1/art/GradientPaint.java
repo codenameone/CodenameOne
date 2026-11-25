@@ -71,8 +71,21 @@ public final class GradientPaint extends ArtPaint {
             throw new IllegalArgumentException("one color per stop, at least one stop");
         }
         this.type = type;
-        this.positions = positions;
-        this.colors = colors;
+        this.positions = copyOf(positions);
+        this.colors = copyOf(colors);
+    }
+
+    // Stops are copied in and out: an undo snapshot shares nothing with what a caller holds.
+    private static float[] copyOf(float[] a) {
+        float[] c = new float[a.length];
+        System.arraycopy(a, 0, c, 0, a.length);
+        return c;
+    }
+
+    private static int[] copyOf(int[] a) {
+        int[] c = new int[a.length];
+        System.arraycopy(a, 0, c, 0, a.length);
+        return c;
     }
 
     /// A linear gradient.
@@ -197,14 +210,14 @@ public final class GradientPaint extends ArtPaint {
         return type;
     }
 
-    /// Stop offsets.
+    /// Stop offsets, as a copy.
     public float[] getPositions() {
-        return positions;
+        return copyOf(positions);
     }
 
-    /// Stop colors.
+    /// Stop colors, as a copy.
     public int[] getColors() {
-        return colors;
+        return copyOf(colors);
     }
 
     /// Replaces the stops.
@@ -217,8 +230,8 @@ public final class GradientPaint extends ArtPaint {
         if (positions.length != colors.length || positions.length == 0) {
             throw new IllegalArgumentException("one color per stop, at least one stop");
         }
-        this.positions = positions;
-        this.colors = colors;
+        this.positions = copyOf(positions);
+        this.colors = copyOf(colors);
     }
 
     /// First x.

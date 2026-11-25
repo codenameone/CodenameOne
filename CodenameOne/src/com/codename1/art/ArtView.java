@@ -112,13 +112,30 @@ public class ArtView extends Component implements ArtListener {
     ///
     /// - `m`: the model
     public final void setModel(ArtModel m) {
-        if (model != null) {
+        if (model != null && isInitialized()) {
             model.removeArtListener(this);
         }
         model = m;
-        model.addArtListener(this);
+        if (isInitialized()) {
+            model.addArtListener(this);
+        }
         fitPending = true;
         invalidateCache();
+    }
+
+    // The view listens only while it is on screen, so a model that outlives its forms does
+    // not keep every view it was ever shown in.
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        model.addArtListener(this);
+        invalidateCache();
+    }
+
+    @Override
+    protected void deinitialize() {
+        model.removeArtListener(this);
+        super.deinitialize();
     }
 
     @Override

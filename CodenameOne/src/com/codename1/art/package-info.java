@@ -41,6 +41,6 @@
 /// recorded as an `ImportNote` on the document rather than dropped silently.
 ///
 /// `ArtModel` makes a document editable with undo, `ArtView` shows one with pan, zoom and hit
-/// testing, and `ArtEditor` is a ready-made drawing editor over both. `SvgImage` is an `Image`
-/// backed by a document, which `Image.createSVG` uses on platforms with no native SVG support.
+/// testing, and `ArtEditor` is a ready-made drawing editor over both. `ArtImages.renderSvg` is what
+/// `Image.createSVG` answers on platforms with no native SVG support.
 package com.codename1.art;

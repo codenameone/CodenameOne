@@ -43,7 +43,7 @@ public final class Compositor {
         if (src.length != dst.length) {
             throw new IllegalArgumentException("src and dst differ in length");
         }
-        double[] scratch = new double[9];
+        double[] scratch = new double[Compositor.SCRATCH];
         for (int i = 0; i < src.length; i++) {
             dst[i] = blendPixel(src[i], dst[i], mode, opacity, scratch, i);
         }
@@ -58,13 +58,37 @@ public final class Compositor {
     /// - `mode`: how colors combine
     /// - `opacity`: the layer's opacity, 0 to 1
     public static int blend(int src, int dst, BlendMode mode, float opacity) {
-        return blendPixel(src, dst, mode, opacity, new double[9], 0);
+        return blendPixel(src, dst, mode, opacity, new double[SCRATCH], 0);
     }
 
-    /// Blends one pixel with caller-owned scratch space (nine doubles); `seed` picks the
+    /// The scratch space `blend(int, int, BlendMode, float, double[])` needs, in doubles.
+    public static final int SCRATCH = 18;
+
+    /// Blends one pixel without allocating, for loops over many pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `src`: the layer's pixel
+    /// - `dst`: the backdrop pixel
+    /// - `mode`: how colors combine
+    /// - `opacity`: the layer's opacity, 0 to 1
+    /// - `scratch`: at least `SCRATCH` doubles, reused across calls
+    ///
+    /// #### Returns
+    ///
+    /// the composited pixel
+    public static int blend(int src, int dst, BlendMode mode, float opacity, double[] scratch) {
+        return blendPixel(src, dst, mode, opacity, scratch, 0);
+    }
+
+    /// Blends one pixel with caller-owned scratch space (`SCRATCH` doubles); `seed` picks the
     /// pixels a dissolve keeps and should differ per pixel position.
     static int blendPixel(int src, int dst, BlendMode mode, float opacity, double[] scratch, int seed) {
-        double as = ((src >>> 24) / 255.0) * opacity;
+        // NaN and out-of-range opacities are clamped, so they never reach the arithmetic.
+        if (!(opacity > 0)) { // NOPMD LogicInversion - true for NaN too, which opacity <= 0 is not
+            return dst;
+        }
+        double as = ((src >>> 24) / 255.0) * Math.min(1, opacity);
         if (as <= 0) {
             return dst;
         }
@@ -195,50 +219,48 @@ public final class Compositor {
         return b + s2 - b * s2;
     }
 
+    // The source color is c[0..2], the backdrop c[3..5]; the result goes to c[6..8] and
+    // c[9..11] is working space. Nothing is allocated: this runs once per pixel.
     private static void nonSeparable(BlendMode mode, double[] c) {
-        double[] s = {c[0], c[1], c[2]};
-        double[] b = {c[3], c[4], c[5]};
-        double[] out = new double[3];
         switch (mode) {
             case HUE:
-                setSat(s, sat(b), out);
-                setLum(out, lum(b), out);
+                setSat(c, 0, sat(c, 3), c, 9);
+                setLum(c, 9, lum(c, 3), c, 6);
                 break;
             case SATURATION:
-                setSat(b, sat(s), out);
-                setLum(out, lum(b), out);
+                setSat(c, 3, sat(c, 0), c, 9);
+                setLum(c, 9, lum(c, 3), c, 6);
                 break;
             case COLOR:
-                setLum(s, lum(b), out);
+                setLum(c, 0, lum(c, 3), c, 6);
                 break;
             case DARKER_COLOR:
-                System.arraycopy(lum(s) < lum(b) ? s : b, 0, out, 0, 3);
+                System.arraycopy(c, lum(c, 0) < lum(c, 3) ? 0 : 3, c, 6, 3);
                 break;
             case LIGHTER_COLOR:
-                System.arraycopy(lum(s) > lum(b) ? s : b, 0, out, 0, 3);
+                System.arraycopy(c, lum(c, 0) > lum(c, 3) ? 0 : 3, c, 6, 3);
                 break;
             default:
-                setLum(b, lum(s), out);
+                setLum(c, 3, lum(c, 0), c, 6);
                 break;
         }
-        c[6] = out[0];
-        c[7] = out[1];
-        c[8] = out[2];
     }
 
-    private static double lum(double[] c) {
-        return 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+    private static double lum(double[] c, int o) {
+        return 0.3 * c[o] + 0.59 * c[o + 1] + 0.11 * c[o + 2];
     }
 
-    private static double sat(double[] c) {
-        return Math.max(c[0], Math.max(c[1], c[2])) - Math.min(c[0], Math.min(c[1], c[2]));
+    private static double sat(double[] c, int o) {
+        return Math.max(c[o], Math.max(c[o + 1], c[o + 2])) - Math.min(c[o], Math.min(c[o + 1], c[o + 2]));
     }
 
-    private static void setLum(double[] c, double l, double[] out) {
-        double d = l - lum(c);
-        double r = c[0] + d;
-        double g = c[1] + d;
-        double bl = c[2] + d;
+    // ClipColor as the W3C compositing specification writes it: n and x come from the color
+    // before clipping, and the two clips apply one after the other.
+    private static void setLum(double[] c, int o, double l, double[] out, int oo) {
+        double d = l - lum(c, o);
+        double r = c[o] + d;
+        double g = c[o + 1] + d;
+        double bl = c[o + 2] + d;
         double ll = 0.3 * r + 0.59 * g + 0.11 * bl;
         double n = Math.min(r, Math.min(g, bl));
         double x = Math.max(r, Math.max(g, bl));
@@ -252,33 +274,32 @@ public final class Compositor {
             g = ll + (g - ll) * (1 - ll) / (x - ll);
             bl = ll + (bl - ll) * (1 - ll) / (x - ll);
         }
-        out[0] = r;
-        out[1] = g;
-        out[2] = bl;
+        out[oo] = r;
+        out[oo + 1] = g;
+        out[oo + 2] = bl;
     }
 
-    private static void setSat(double[] c, double s, double[] out) {
+    private static void setSat(double[] c, int o, double s, double[] out, int oo) {
         int max = 0;
         int min = 0;
         for (int i = 1; i < 3; i++) {
-            if (c[i] > c[max]) {
+            if (c[o + i] > c[o + max]) {
                 max = i;
             }
-            if (c[i] < c[min]) {
+            if (c[o + i] < c[o + min]) {
                 min = i;
             }
         }
         if (max == min) {
-            out[0] = 0;
-            out[1] = 0;
-            out[2] = 0;
+            out[oo] = 0;
+            out[oo + 1] = 0;
+            out[oo + 2] = 0;
             return;
         }
         int mid = 3 - max - min;
-        double range = c[max] - c[min];
-        double midV = (c[mid] - c[min]) * s / range;
-        out[mid] = midV;
-        out[max] = s;
-        out[min] = 0;
+        double range = c[o + max] - c[o + min];
+        out[oo + mid] = (c[o + mid] - c[o + min]) * s / range;
+        out[oo + max] = s;
+        out[oo + min] = 0;
     }
 }

@@ -662,7 +662,8 @@ public final class SvgReader {
         if (t == null || useDepth > 32) {
             return null;
         }
-        if (++useExpansions > MAX_USE_EXPANSIONS) {
+        useExpansions++;
+        if (useExpansions > MAX_USE_EXPANSIONS) {
             if (useExpansions == MAX_USE_EXPANSIONS + 1) {
                 note("use", "more than " + MAX_USE_EXPANSIONS + " references expanded; the rest were dropped");
             }

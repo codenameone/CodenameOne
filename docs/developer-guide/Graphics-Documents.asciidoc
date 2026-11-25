@@ -33,9 +33,11 @@ Rendering is done in software by `ArtRenderer`. That is slower than drawing a
 desktop and the web, with every blend mode and effect. Render once at the size you need and
 keep the `Image`.
 
-`SvgImage` is an `Image` backed by a document that renders itself at whatever size it is
-drawn. `Image.createSVG` falls back to it on platforms with no native SVG renderer, so code
-that called `createSVG` before now works everywhere.
+`Image.createSVG` falls back to this renderer on platforms with no native SVG support, so code
+that called `createSVG` before now works everywhere. The fallback renders the document once,
+at the size it declares, into an ordinary `Image`; a document over 4096 pixels on a side fails
+with an `IOException` there, and is rendered with `ArtRenderer.toImage` at a smaller scale
+instead.
 
 === Effects
 

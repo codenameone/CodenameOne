@@ -185,33 +185,57 @@ final class Pixels {
         return e;
     }
 
-    /// Dilates (`grow` true) or erodes a channel with a rectangle of radius `rx, ry`.
+    /// Dilates (`grow` true) or erodes a channel with a rectangle of radius `rx, ry`. Outside
+    /// the raster counts as transparent. Each pass is van Herk/Gil-Werman, so the cost does not
+    /// grow with the radius, which a hostile document can set as large as it likes.
     static float[] morph(float[] a, int w, int h, int rx, int ry, boolean grow) {
         float[] t = new float[a.length];
+        int r = Math.min(rx, w);
+        float[] line = new float[w + 2 * r];
+        float[] res = new float[w];
         for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                float v = grow ? 0 : 1;
-                for (int k = -rx; k <= rx; k++) {
-                    int xx = x + k;
-                    float s = xx < 0 || xx >= w ? 0 : a[y * w + xx];
-                    v = grow ? Math.max(v, s) : Math.min(v, s);
-                }
-                t[y * w + x] = v;
-            }
+            java.util.Arrays.fill(line, 0);
+            System.arraycopy(a, y * w, line, r, w);
+            window(line, w, r, grow, res);
+            System.arraycopy(res, 0, t, y * w, w);
         }
         float[] o = new float[a.length];
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                float v = grow ? 0 : 1;
-                for (int k = -ry; k <= ry; k++) {
-                    int yy = y + k;
-                    float s = yy < 0 || yy >= h ? 0 : t[yy * w + x];
-                    v = grow ? Math.max(v, s) : Math.min(v, s);
-                }
-                o[y * w + x] = v;
+        r = Math.min(ry, h);
+        line = new float[h + 2 * r];
+        res = new float[h];
+        for (int x = 0; x < w; x++) {
+            java.util.Arrays.fill(line, 0);
+            for (int y = 0; y < h; y++) {
+                line[r + y] = t[y * w + x];
+            }
+            window(line, h, r, grow, res);
+            for (int y = 0; y < h; y++) {
+                o[y * w + x] = res[y];
             }
         }
         return o;
+    }
+
+    /// The max (or min) of every window of `2r+1` values of a padded line, answered for the
+    /// `n` windows centred on the unpadded values.
+    private static void window(float[] line, int n, int r, boolean grow, float[] out) {
+        int k = 2 * r + 1;
+        int len = line.length;
+        float[] g = new float[len];
+        float[] hh = new float[len];
+        for (int i = 0; i < len; i++) {
+            g[i] = i % k == 0 ? line[i] : pick(g[i - 1], line[i], grow);
+        }
+        for (int i = len - 1; i >= 0; i--) {
+            hh[i] = i == len - 1 || (i + 1) % k == 0 ? line[i] : pick(hh[i + 1], line[i], grow);
+        }
+        for (int i = 0; i < n; i++) {
+            out[i] = pick(hh[i], g[i + k - 1], grow);
+        }
+    }
+
+    private static float pick(float a, float b, boolean grow) {
+        return grow ? Math.max(a, b) : Math.min(a, b);
     }
 
     /// The channel shifted by whole pixels; what moves in is `fill`.

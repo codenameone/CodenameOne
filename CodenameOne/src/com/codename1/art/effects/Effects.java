@@ -425,6 +425,27 @@ public final class Effects {
         return 0;
     }
 
+    /// Gives each pixel of `r` the color that, drawn normally over `backdrop`, shows it blended
+    /// with `mode`: the W3C source color `(1 - ab) cs + ab B(cb, cs)`. A shadow drawn under the
+    /// layer's own pixels keeps its own blend mode this way.
+    static void blendOnto(Raster r, Raster backdrop, BlendMode mode) {
+        if (backdrop == null || mode == BlendMode.NORMAL) {
+            return;
+        }
+        int[] px = r.getPixels();
+        int w = r.getWidth();
+        double[] scratch = new double[Compositor.SCRATCH];
+        for (int i = 0; i < px.length; i++) {
+            int a = px[i] >>> 24;
+            if (a == 0) {
+                continue;
+            }
+            int cb = backdrop.get(r.getX() + i % w, r.getY() + i / w);
+            int res = Compositor.blend(px[i] | 0xff000000, cb, mode, 1, scratch);
+            px[i] = (a << 24) | (res & 0xffffff);
+        }
+    }
+
     static Raster apply(Effect e, Raster layer, EffectContext ctx) {
         String k = e.getKind();
         double s = ctx.getScale();
@@ -453,6 +474,7 @@ public final class Effects {
             if (e.getFloat("knockout", 0) != 0) {
                 knockout(out, ex);
             }
+            blendOnto(out, ctx.getBackdrop(), e.getBlend(BlendMode.NORMAL));
             out.composite(ex, BlendMode.NORMAL, 1);
             return out;
         }
@@ -687,6 +709,7 @@ public final class Effects {
     static void atop(Raster base, Raster over, BlendMode mode, float opacity) {
         int[] bp = base.getPixels();
         int bw = base.getWidth();
+        double[] scratch = new double[Compositor.SCRATCH];
         for (int y = 0; y < base.getHeight(); y++) {
             for (int x = 0; x < bw; x++) {
                 int i = y * bw + x;
@@ -699,7 +722,7 @@ public final class Effects {
                 if ((o >>> 24) == 0) {
                     continue;
                 }
-                int res = Compositor.blend(o, 0xff000000 | b, mode, opacity);
+                int res = Compositor.blend(o, 0xff000000 | b, mode, opacity, scratch);
                 bp[i] = (ba << 24) | (res & 0xffffff);
             }
         }

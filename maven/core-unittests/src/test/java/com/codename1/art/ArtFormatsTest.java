@@ -551,4 +551,43 @@ class ArtFormatsTest {
             0, 0, 0x75, 0x30, 0, 0, 0x75, 0x30, 8, 6, 0, 0, 0};
         assertEquals(null, ArtImages.decode(png));
     }
+
+    @Test
+    void morphologyRadiusIsBoundedAndZeroDisables() throws IOException {
+        String svg = "<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'>"
+                + "<filter id='f'><feMorphology operator='dilate' radius='%s'/></filter>"
+                + "<rect x='8' y='8' width='4' height='4' fill='#f00' filter='url(#f)'/></svg>";
+        long start = System.currentTimeMillis();
+        Raster huge = ArtRenderer.render(SvgReader.read(utf8(svg.replace("%s", "1e12"))), 1);
+        assertTrue(System.currentTimeMillis() - start < 10000);
+        assertEquals(0xff0000, rgb(huge, 1, 1));
+        Raster neg = ArtRenderer.render(SvgReader.read(utf8(svg.replace("%s", "-3"))), 1);
+        assertEquals(0xff0000, rgb(neg, 10, 10));
+        assertEquals(0, neg.get(2, 2) >>> 24);
+    }
+
+    @Test
+    void dropShadowKeepsItsBlendMode() {
+        ArtDocument d = new ArtDocument(20, 20);
+        ShapeNode back = ShapeNode.rect(0, 0, 20, 20, 0);
+        back.fill(new SolidPaint(0xffffff00));
+        ShapeNode s = ShapeNode.rect(2, 2, 6, 6, 0);
+        s.fill(new SolidPaint(0xff0000ff));
+        s.getEffects().add(com.codename1.art.effects.Effects.dropShadow(0xffff00ff, 8, 8, 0, 0)
+                .set("blend", BlendMode.MULTIPLY));
+        d.getRoot().getChildren().add(back);
+        d.getRoot().getChildren().add(s);
+        // Yellow multiplied by magenta is red; drawn normally the shadow would be magenta.
+        near(0xff0000, rgb(ArtRenderer.render(d, 1), 13, 13));
+    }
+
+    @Test
+    void createSvgFallbackIsAnOrdinaryImage() throws IOException {
+        com.codename1.ui.Image img = ArtImages.renderSvg(utf8(
+                "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='4'><rect width='8' height='4' fill='#00f'/></svg>"));
+        assertEquals(8, img.getWidth());
+        assertFalse(img.isSVG());
+        assertThrows(IOException.class, () -> ArtImages.renderSvg(utf8(
+                "<svg xmlns='http://www.w3.org/2000/svg' width='9000' height='10'/>")));
+    }
 }

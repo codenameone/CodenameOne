@@ -82,6 +82,9 @@ public class ArtModel {
     ///
     /// - `doc`: the new document
     public void setDocument(ArtDocument doc) {
+        // An open group would otherwise swallow every later change.
+        groupDepth = 0;
+        groupSaved = false;
         document = doc;
         undo.clear();
         redo.clear();
@@ -113,6 +116,36 @@ public class ArtModel {
         for (int i = 0; i < ls.length; i++) { // NOPMD ForLoopCanBeForeach - indexed: no iterator allocation
             ls[i].artChanged(this, content);
         }
+    }
+
+    /// The node of the current tree that `n` stands for. Undo and redo install a saved copy of
+    /// the tree, so a reference taken before one of them names a node that is no longer shown;
+    /// it is resolved by id, which every node of the model has.
+    private ArtNode live(ArtNode n) {
+        ArtNode r = find(n);
+        if (r == null) {
+            throw new IllegalArgumentException("Node is not in the document: " + (n == null ? null : n.getId()));
+        }
+        return r;
+    }
+
+    private ArtNode liveGroup(GroupNode g) {
+        ArtNode r = live(g);
+        if (!(r instanceof GroupNode)) {
+            throw new IllegalArgumentException("Not a group: " + g.getId());
+        }
+        return r;
+    }
+
+    private ArtNode find(ArtNode n) {
+        if (n == null) {
+            return null;
+        }
+        GroupNode root = document.getRoot();
+        if (n == root || contains(root, n)) { // NOPMD CompareObjectsWithEquals - node identity
+            return n;
+        }
+        return n.getId() == null ? null : document.findById(n.getId());
     }
 
     private void assignIds(ArtNode n) {
@@ -204,6 +237,9 @@ public class ArtModel {
         if (undo.isEmpty()) {
             return false;
         }
+        // An open group would otherwise swallow every later change.
+        groupDepth = 0;
+        groupSaved = false;
         redo.add(document.getRoot());
         document.setRoot(undo.remove(undo.size() - 1));
         pruneSelection();
@@ -216,6 +252,9 @@ public class ArtModel {
         if (redo.isEmpty()) {
             return false;
         }
+        // An open group would otherwise swallow every later change.
+        groupDepth = 0;
+        groupSaved = false;
         undo.add(document.getRoot());
         document.setRoot(redo.remove(redo.size() - 1));
         pruneSelection();
@@ -267,6 +306,9 @@ public class ArtModel {
     /// - `n`: the node, or null to clear the selection
     /// - `add`: true to add it to the selection, false to replace the selection
     public void select(ArtNode n, boolean add) {
+        if (n != null) {
+            n = live(n);
+        }
         if (!add) {
             selection.clear();
         }
@@ -291,6 +333,7 @@ public class ArtModel {
     ///
     /// - `n`: the node
     public boolean isSelected(ArtNode n) {
+        n = find(n);
         return n != null && n.getId() != null && selection.contains(n.getId());
     }
 
@@ -311,6 +354,7 @@ public class ArtModel {
     ///
     /// - `n`: the node
     public GroupNode parentOf(ArtNode n) {
+        n = live(n);
         return document.parentOf(n);
     }
 
@@ -321,6 +365,7 @@ public class ArtModel {
     ///
     /// - `n`: the node
     public Matrix toDocument(ArtNode n) {
+        n = live(n);
         Matrix m = n.getTransform();
         GroupNode p = document.parentOf(n);
         while (p != null) {
@@ -340,6 +385,7 @@ public class ArtModel {
     /// - `index`: the position among its children, or -1 for the top
     /// - `n`: the node
     public void insert(GroupNode parent, int index, ArtNode n) {
+        parent = parent == null ? null : (GroupNode) liveGroup(parent);
         checkpoint();
         GroupNode p = parent == null ? document.getRoot() : parent;
         if (index < 0 || index > p.getChildren().size()) {
@@ -378,6 +424,7 @@ public class ArtModel {
     ///
     /// - `n`: the node
     public void remove(ArtNode n) {
+        n = live(n);
         GroupNode p = parentOf(n);
         if (p == null) {
             return;
@@ -413,6 +460,8 @@ public class ArtModel {
     /// - `parent`: the new group, or null for the root
     /// - `index`: the position, or -1 for the top
     public void move(ArtNode n, GroupNode parent, int index) {
+        n = live(n);
+        parent = parent == null ? null : (GroupNode) liveGroup(parent);
         GroupNode from = parentOf(n);
         GroupNode to = parent == null ? document.getRoot() : parent;
         if (from == null || n == to || n instanceof GroupNode && contains((GroupNode) n, to)) { // NOPMD CompareObjectsWithEquals - node identity
@@ -450,6 +499,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `up`: true to bring it forward
     public void reorder(ArtNode n, boolean up) {
+        n = live(n);
         GroupNode p = parentOf(n);
         if (p == null) {
             return;
@@ -543,6 +593,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `opacity`: 0 to 1
     public void setOpacity(ArtNode n, float opacity) {
+        n = live(n);
         checkpoint();
         n.setOpacity(opacity);
         fire(true);
@@ -555,6 +606,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `visible`: true to show it
     public void setVisible(ArtNode n, boolean visible) {
+        n = live(n);
         checkpoint();
         n.setVisible(visible);
         fire(true);
@@ -567,6 +619,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `locked`: true to lock it
     public void setLocked(ArtNode n, boolean locked) {
+        n = live(n);
         checkpoint();
         n.setLocked(locked);
         fire(true);
@@ -579,6 +632,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `name`: the name
     public void setName(ArtNode n, String name) {
+        n = live(n);
         checkpoint();
         n.setName(name);
         fire(true);
@@ -591,6 +645,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `mode`: the mode
     public void setBlendMode(ArtNode n, BlendMode mode) {
+        n = live(n);
         checkpoint();
         n.setBlendMode(mode);
         fire(true);
@@ -603,6 +658,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `t`: the transform, in its parent's space
     public void setTransform(ArtNode n, Matrix t) {
+        n = live(n);
         checkpoint();
         n.setTransform(t);
         fire(true);
@@ -672,6 +728,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `e`: the effect
     public void addEffect(ArtNode n, Effect e) {
+        n = live(n);
         checkpoint();
         n.getEffects().add(e);
         fire(true);
@@ -684,6 +741,7 @@ public class ArtModel {
     /// - `n`: the node
     /// - `index`: the effect's position
     public void removeEffect(ArtNode n, int index) {
+        n = live(n);
         if (index < 0 || index >= n.getEffects().size()) {
             return;
         }
@@ -701,6 +759,7 @@ public class ArtModel {
     /// - `param`: the parameter
     /// - `value`: its value
     public void setEffectParameter(ArtNode n, int index, String param, Object value) {
+        n = live(n);
         if (index < 0 || index >= n.getEffects().size()) {
             return;
         }

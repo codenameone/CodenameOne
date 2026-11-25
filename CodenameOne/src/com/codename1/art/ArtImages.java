@@ -36,6 +36,36 @@ public final class ArtImages {
     /// The largest width or height a decoded image may have.
     public static final int MAX_DIMENSION = 30000;
 
+    /// The largest side, in pixels, `renderSvg` renders. A larger document fails rather than
+    /// allocate hundreds of megabytes on a device; render it with `ArtRenderer.toImage` at a
+    /// scale of your choosing instead.
+    public static final int MAX_SVG_SIDE = 4096;
+
+    /// Renders an SVG document, once, into an ordinary image at the size it declares. This is
+    /// what `Image.createSVG` answers on a platform without native SVG.
+    ///
+    /// #### Parameters
+    ///
+    /// - `svg`: the document
+    ///
+    /// #### Returns
+    ///
+    /// the rendered image
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the data is not SVG or is larger than `MAX_SVG_SIDE` on a side
+    public static Image renderSvg(byte[] svg) throws IOException {
+        ArtDocument doc = SvgReader.read(svg);
+        double w = Math.ceil(doc.getWidth());
+        double h = Math.ceil(doc.getHeight());
+        if (!(w <= MAX_SVG_SIDE && h <= MAX_SVG_SIDE)) {
+            throw new IOException("SVG is " + w + "x" + h + ", larger than " + MAX_SVG_SIDE
+                    + " pixels on a side; render it with ArtRenderer.toImage at a smaller scale");
+        }
+        return ArtRenderer.toImage(doc, 1);
+    }
+
     private ArtImages() {
     }
 

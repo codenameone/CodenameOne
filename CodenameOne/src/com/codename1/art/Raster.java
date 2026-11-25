@@ -173,7 +173,7 @@ public final class Raster {
         int x1 = Math.min(x + width, src.x + src.width);
         int y1 = Math.min(y + height, src.y + src.height);
         boolean normal = mode == BlendMode.NORMAL;
-        double[] scratch = normal ? null : new double[9];
+        double[] scratch = normal ? null : new double[Compositor.SCRATCH];
         for (int yy = y0; yy < y1; yy++) {
             int si = (yy - src.y) * src.width + (x0 - src.x);
             int di = (yy - y) * width + (x0 - x);

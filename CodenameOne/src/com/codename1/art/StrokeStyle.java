@@ -150,9 +150,19 @@ public final class StrokeStyle {
         this.miterLimit = miterLimit;
     }
 
-    /// The dash pattern, or null for a solid line.
+    /// The dash pattern, as a copy, or null for a solid line.
     public float[] getDash() {
-        return dash;
+        return copyOf(dash);
+    }
+
+    // Copied in and out: an undo snapshot shares nothing with what a caller holds.
+    private static float[] copyOf(float[] a) {
+        if (a == null) {
+            return null;
+        }
+        float[] c = new float[a.length];
+        System.arraycopy(a, 0, c, 0, a.length);
+        return c;
     }
 
     /// Sets the dash pattern.
@@ -161,7 +171,7 @@ public final class StrokeStyle {
     ///
     /// - `dash`: alternating on and off lengths; null for solid
     public void setDash(float[] dash) {
-        this.dash = dash;
+        this.dash = copyOf(dash);
     }
 
     /// The dash offset.

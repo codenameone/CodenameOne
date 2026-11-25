@@ -226,9 +226,16 @@ final class FilterGraph {
         if ("feMorphology".equals(t)) {
             Raster in = input(p, "in");
             double[] rad = nums(p, "radius");
-            int rx = (int) Math.round((rad.length > 0 ? rad[0] : 0) * s);
-            int ry = (int) Math.round((rad.length > 1 ? rad[1] : (rad.length > 0 ? rad[0] : 0)) * s);
+            double rxd = (rad.length > 0 ? rad[0] : 0) * s;
+            double ryd = (rad.length > 1 ? rad[1] : (rad.length > 0 ? rad[0] : 0)) * s;
+            // Clamped to the raster: a wider window sees nothing more, and the int stays sane.
+            int rx = rxd >= in.getWidth() ? in.getWidth() : (int) Math.round(rxd);
+            int ry = ryd >= in.getHeight() ? in.getHeight() : (int) Math.round(ryd);
             boolean dilate = "dilate".equals(str(p, "operator", "erode"));
+            if (rx <= 0 || ry <= 0) {
+                // A zero or negative radius disables the primitive: its result is its input.
+                return in;
+            }
             float[][] c = Pixels.premul(in);
             for (int k = 0; k < 4; k++) {
                 c[k] = Pixels.morph(c[k], in.getWidth(), in.getHeight(), rx, ry, dilate);
@@ -560,6 +567,15 @@ final class FilterGraph {
         float[][] c = Pixels.premul(in);
         int w = in.getWidth();
         int h = in.getHeight();
+        if (keepAlpha) {
+            // With preserveAlpha the specification convolves the colors unpremultiplied.
+            for (int i = 0; i < c[0].length; i++) {
+                float a = c[0][i];
+                for (int ch = 1; ch < 4; ch++) {
+                    c[ch][i] = a <= 0 ? 0 : c[ch][i] / a;
+                }
+            }
+        }
         float[][] o = new float[4][c[0].length];
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
@@ -592,14 +608,17 @@ final class FilterGraph {
                             acc += v * k[(oy - 1 - j) * ox + (ox - 1 - i)];
                         }
                     }
-                    o[ch][y * w + x] = (float) (acc / div + bias);
+                    // The bias is premultiplied like the colors: scaled by the result's alpha.
+                    double b = ch == 0 || keepAlpha ? bias : bias * o[0][y * w + x];
+                    o[ch][y * w + x] = (float) (acc / div + b);
                 }
             }
         }
         for (int i = 0; i < o[0].length; i++) {
             o[0][i] = Pixels.clamp01(o[0][i]);
             for (int ch = 1; ch < 4; ch++) {
-                o[ch][i] = Math.max(0, Math.min(o[0][i], o[ch][i]));
+                float v = keepAlpha ? Pixels.clamp01(o[ch][i]) * o[0][i] : o[ch][i];
+                o[ch][i] = Math.max(0, Math.min(o[0][i], v));
             }
         }
         Raster out = blank();

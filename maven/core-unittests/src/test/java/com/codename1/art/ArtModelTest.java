@@ -108,4 +108,37 @@ class ArtModelTest {
         RasterNode back = (RasterNode) m.findById(r.getId());
         assertEquals(0xff000000, back.getImage().getPixels()[0]);
     }
+
+    @Test
+    void referencesSurviveUndoAndGroupsDoNotStick() {
+        ArtModel m = new ArtModel(new ArtDocument(100, 100));
+        ShapeNode box = ShapeNode.rect(0, 0, 10, 10, 0);
+        m.add(box);
+        m.setOpacity(box, 0.5f);
+        m.undo();
+        // The reference taken before the undo still edits the node the document shows.
+        m.setOpacity(box, 0.25f);
+        assertEquals(0.25f, m.findById(box.getId()).getOpacity(), 0.0001);
+        assertTrue(m.undo());
+        assertEquals(1f, m.findById(box.getId()).getOpacity(), 0.0001);
+        // An undo inside an open group closes it, so later changes undo on their own again.
+        m.beginGroup();
+        m.setOpacity(box, 0.4f);
+        m.undo();
+        m.setOpacity(box, 0.3f);
+        m.setOpacity(box, 0.2f);
+        m.undo();
+        assertEquals(0.3f, m.findById(box.getId()).getOpacity(), 0.0001);
+    }
+
+    @Test
+    void gradientStopsAreCopied() {
+        float[] pos = {0, 1};
+        int[] cols = {0xff000000, 0xffffffff};
+        GradientPaint g = GradientPaint.linear(0, 0, 1, 0, pos, cols);
+        cols[0] = 0xffff0000;
+        g.getColors()[1] = 0xff00ff00;
+        assertEquals(0xff000000, g.getColors()[0]);
+        assertEquals(0xffffffff, g.getColors()[1]);
+    }
 }

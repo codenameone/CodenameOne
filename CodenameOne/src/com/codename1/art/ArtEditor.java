@@ -135,9 +135,23 @@ public class ArtEditor extends Container implements ArtListener {
         add(BorderLayout.EAST, side);
         side.setPreferredW(Math.min(Display.getInstance().getDisplayWidth() / 3,
                 Display.getInstance().convertToPixels(55)));
-        model.addArtListener(this);
         setTool(TOOL_SELECT);
         rebuildPanels();
+    }
+
+    // The editor listens only while it is on screen, so a model that outlives its forms does
+    // not keep every editor it was ever shown in.
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        model.addArtListener(this);
+        rebuildPanels();
+    }
+
+    @Override
+    protected void deinitialize() {
+        model.removeArtListener(this);
+        super.deinitialize();
     }
 
     /// The model.
@@ -737,14 +751,29 @@ public class ArtEditor extends Container implements ArtListener {
     private ShapeNode penShape;
 
     private void finishPen() {
-        if (penShape != null) {
-            model.endGroup();
-            if (penPoints.size() < 2) {
-                model.undo();
-            }
+        livePen();
+        if (penShape != null && penPoints.size() < 2) {
+            // A single click is not a path.
+            model.remove(penShape);
         }
         penShape = null;
         penPoints.clear();
+    }
+
+    /// The path being drawn as the current tree has it. Each pen point is its own undo step,
+    /// with no group held open between gestures, so an undo between two clicks installs a copy
+    /// of the path; it is picked up again by id, or dropped when the undo removed it.
+    private void livePen() {
+        if (penShape == null) {
+            return;
+        }
+        ArtNode n = model.findById(penShape.getId());
+        if (n instanceof ShapeNode) {
+            penShape = (ShapeNode) n;
+        } else {
+            penShape = null;
+            penPoints.clear();
+        }
     }
 
     private GeneralPath penPath(boolean close) {
@@ -1001,24 +1030,26 @@ public class ArtEditor extends Container implements ArtListener {
 
         private void pressPen(double x, double y) {
             double slop = Display.getInstance().convertToPixels(2) / view.getZoom();
+            livePen();
             if (penShape != null && penPoints.size() > 1) {
                 double[] first = penPoints.get(0);
                 if (Math.abs(first[0] - x) <= slop && Math.abs(first[1] - y) <= slop) {
+                    model.checkpoint();
                     penShape.setPath(penPath(true));
                     penShape.fill(new SolidPaint(fillColor));
                     model.changed();
-                    model.endGroup();
                     penShape = null;
                     penPoints.clear();
                     return;
                 }
             }
             if (penShape == null) {
-                model.beginGroup();
                 penShape = new ShapeNode(new GeneralPath());
                 penShape.stroke(new StrokeStyle(new SolidPaint(strokeColor), strokeWidth));
                 penShape.setName("Path");
                 model.add(penShape);
+            } else {
+                model.checkpoint();
             }
             penPoints.add(new double[]{x, y, x, y, x, y});
             penShape.setPath(penPath(false));
@@ -1078,7 +1109,7 @@ public class ArtEditor extends Container implements ArtListener {
             int x1 = Math.min(w - 1, (int) Math.ceil(cx + rad));
             int y0 = Math.max(0, (int) Math.floor(cy - rad));
             int y1 = Math.min(h - 1, (int) Math.ceil(cy + rad));
-            double[] scratch = new double[9];
+            double[] scratch = new double[Compositor.SCRATCH];
             for (int yy = y0; yy <= y1; yy++) {
                 for (int xx = x0; xx <= x1; xx++) {
                     double ddx = xx + 0.5 - cx;

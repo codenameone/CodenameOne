@@ -102,8 +102,8 @@ public class Image implements ActionSource {
     }
 
     /// Indicates whether the platform renders SVG natively. `createSVG` works either way: a
-    /// platform without native support renders the document with
-    /// `com.codename1.art.SvgImage`.
+    /// platform without native support renders the document in software with
+    /// `com.codename1.art.ArtImages.renderSvg`.
     ///
     /// #### Returns
     ///
@@ -113,9 +113,8 @@ public class Image implements ActionSource {
     }
 
     /// Creates an SVG Image from the given byte array data and the base URL. A platform with
-    /// native SVG support renders it natively; any other renders it with
-    /// `com.codename1.art.SvgImage`, a software renderer that draws the image at whatever size
-    /// it is painted.
+    /// native SVG support renders it natively; any other renders it once, in software, into an
+    /// ordinary image at the size the document declares (`com.codename1.art.ArtImages.renderSvg`).
     ///
     /// #### Parameters
     ///
@@ -131,10 +130,11 @@ public class Image implements ActionSource {
     ///
     /// #### Throws
     ///
-    /// - `IOException`: if the data is not an SVG document
+    /// - `IOException`: if the data is not an SVG document, or, on a platform without native
+    ///   SVG, the document is larger than `com.codename1.art.ArtImages.MAX_SVG_SIDE` pixels on a side
     public static Image createSVG(String baseURL, boolean animated, byte[] data) throws IOException {
         if (!Display.impl.isSVGSupported()) {
-            return com.codename1.art.SvgImage.create(data);
+            return com.codename1.art.ArtImages.renderSvg(data);
         }
         Image i = new Image(Display.impl.createSVGImage(baseURL, data));
         i.animated = animated;
