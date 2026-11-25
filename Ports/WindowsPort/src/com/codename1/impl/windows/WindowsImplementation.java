@@ -4000,6 +4000,50 @@ public class WindowsImplementation extends CodenameOneImplementation {
             Locale l = Locale.getDefault();
             l10n = new L10NManager(l.getLanguage(), l.getCountry()) {
                 /*
+                 * Money in the user's locale. The platform reports the
+                 * conventions (separators, symbol, placement) and the shared
+                 * LocaleCurrencyFormat writes any currency with them. When the
+                 * platform has no monetary conventions -- a minimal embedded
+                 * image without locale data, or the C locale -- the base class's
+                 * table-driven formatting answers.
+                 */
+                private com.codename1.impl.LocaleCurrencyFormat money;
+                private boolean moneyRead;
+
+                private com.codename1.impl.LocaleCurrencyFormat money() {
+                    if (!moneyRead) {
+                        moneyRead = true;
+                        money = com.codename1.impl.LocaleCurrencyFormat.parse(WindowsNative.localeCurrency());
+                    }
+                    return money;
+                }
+
+                @Override
+                public String getCurrencyCode() {
+                    com.codename1.impl.LocaleCurrencyFormat m = money();
+                    String code = m == null ? null : m.getCurrencyCode();
+                    return code != null ? code : super.getCurrencyCode();
+                }
+
+                @Override
+                public String formatCurrency(double amount, String currencyCode) {
+                    com.codename1.impl.LocaleCurrencyFormat m = money();
+                    if (m == null) {
+                        return super.formatCurrency(amount, currencyCode);
+                    }
+                    return m.format(amount, currencyCode, new Locale(getLanguage(), getLocale() == null ? "" : getLocale()));
+                }
+
+                @Override
+                public String getCurrencySymbol(String currencyCode) {
+                    com.codename1.impl.LocaleCurrencyFormat m = money();
+                    if (m == null) {
+                        return super.getCurrencySymbol(currencyCode);
+                    }
+                    return m.getSymbol(currencyCode, new Locale(getLanguage(), getLocale() == null ? "" : getLocale()));
+                }
+
+                /*
                  * The base L10NManager resolves month names by formatting the
                  * date with formatDateLongStyle() (which here returns
                  * Date.toString()) and scanning for the first word -- on the

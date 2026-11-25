@@ -1217,8 +1217,14 @@ extern JAVA_VOID com_codename1_backend_HttpServer_serveVirtual___int(CODENAME_ON
  * libcurl can have a second open while it races an IPv4 and an IPv6 connect. */
 #define CN1_BACKEND_VT_MAX_WAIT 8
 
+static JAVA_LONG cn1BackendVtSerial = 0;
+
 struct cn1BackendVtArg {
     JAVA_INT fd;
+    /* Never reused, unlike this struct's address: what Db's gate keys its owner
+       on, so a virtual thread freed by a stop while holding the gate cannot be
+       mistaken for a later one allocated at the same address. */
+    JAVA_LONG serial;
     /* For a background task's virtual thread: the key Tasks.runVirtual finds the
      * task by. The fd is then -1, which is how the host tells the two apart. */
     JAVA_LONG token;
@@ -1238,7 +1244,23 @@ struct cn1BackendVtArg {
     /* Relative, in milliseconds, or -1 for none. Relative because the host keeps
      * its deadlines on its own clock. */
     JAVA_LONG waitTimeout;
+    /*
+     * Non-zero while a job of this virtual thread's is on the native I/O pool
+     * (cn1_backend_offload.c). The job and the buffers it writes live on this
+     * virtual thread's stack, so freeing it before the job reports would let a
+     * pool thread write into freed memory. See freeImpl.
+     */
+    int offloading;
 };
+
+/* Brackets a cn1BackendOffload hand-off; called on the virtual thread itself. */
+void cn1BackendVtOffloading(int delta) {
+    struct cn1VirtualThread* vt = cn1VirtualThreadCurrent();
+    struct cn1BackendVtArg* a = vt == 0 ? 0 : (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
+    if(a != 0) {
+        a->offloading += delta;
+    }
+}
 
 /* The Java entry point a background task's virtual thread runs; named here for
  * the same reason serveVirtual is -- nothing in Java calls it. */
@@ -1334,6 +1356,7 @@ JAVA_LONG com_codename1_backend_VirtualThread_createImpl___int_int_R_long(CODENA
     /* malloc, not calloc, so every field is said: a stale `waiting` would have
      * the host register descriptors this thread never asked for. */
     memset(a, 0, sizeof(struct cn1BackendVtArg));
+    a->serial = __atomic_add_fetch(&cn1BackendVtSerial, 1, __ATOMIC_RELAXED);
     a->fd = fd;
     a->token = 0;
     vt = cn1SpawnVirtualThread(cn1BackendVtBody, a, (size_t)stackBytes);
@@ -1362,6 +1385,7 @@ JAVA_LONG com_codename1_backend_VirtualThread_createTaskImpl___long_int_R_long(C
         return 0;
     }
     memset(a, 0, sizeof(struct cn1BackendVtArg));
+    a->serial = __atomic_add_fetch(&cn1BackendVtSerial, 1, __ATOMIC_RELAXED);
     a->fd = -1;
     a->token = token;
     vt = cn1SpawnVirtualThread(cn1BackendVtTaskBody, a, (size_t)stackBytes);
@@ -1583,7 +1607,22 @@ JAVA_INT com_codename1_backend_VirtualThread_descriptorImpl___long_R_int(CODENAM
 JAVA_VOID com_codename1_backend_VirtualThread_freeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     struct cn1VirtualThread* vt = (struct cn1VirtualThread*)(intptr_t)handle;
     struct ThreadLocalData* victim;
+    struct cn1BackendVtArg* offloadArg;
     if(vt == 0) {
+        return;
+    }
+    /*
+     * NEVER FREE ONE WHOSE JOB IS STILL ON THE I/O POOL. Only a server stop frees
+     * a virtual thread that has not finished (freeParkedVirtualThreads), and one
+     * parked in cn1BackendOffload has its job -- and the buffers the job writes --
+     * on the stack this would release. A pool thread finishing a query or a read
+     * after the stop would then write into freed memory. Leaking that one
+     * virtual thread, once, at shutdown, is the safe answer: nothing resumes it,
+     * and the job writes into memory that is still its own. Waiting for the job
+     * instead could hang the stop for ever on an open that never returns.
+     */
+    offloadArg = (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
+    if(offloadArg != 0 && offloadArg->offloading > 0) {
         return;
     }
     /*
@@ -1669,6 +1708,17 @@ JAVA_BOOLEAN com_codename1_backend_VirtualThread_isVirtualImpl___R_boolean(CODEN
  * or 0 on a host or platform thread. A waiter gives it to its host to nap. */
 JAVA_LONG com_codename1_backend_VirtualThread_currentImpl___R_long(CODENAME_ONE_THREAD_STATE) {
     return (JAVA_LONG)(intptr_t)cn1VirtualThreadCurrent();
+}
+
+/* The current virtual thread's serial (see struct cn1BackendVtArg), or 0. */
+JAVA_LONG com_codename1_backend_VirtualThread_currentSerialImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+    struct cn1VirtualThread* vt = cn1VirtualThreadCurrent();
+    struct cn1BackendVtArg* a;
+    if(vt == 0) {
+        return 0;
+    }
+    a = (struct cn1BackendVtArg*)cn1VirtualThreadArg(vt);
+    return a == 0 ? 0 : a->serial;
 }
 
 /*

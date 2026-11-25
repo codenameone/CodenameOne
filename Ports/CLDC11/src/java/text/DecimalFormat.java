@@ -64,7 +64,7 @@ package java.text;
 ///
 /// #### Differences from the JDK
 ///
-/// - No `setRoundingMode`, `setCurrency`, `setParseBigDecimal` or
+/// - No `setRoundingMode`, `setParseBigDecimal` or
 ///   `formatToCharacterIterator`: the device has none of the types they name.
 /// - No localized patterns (`applyLocalizedPattern`, `toLocalizedPattern`).
 public class DecimalFormat extends NumberFormat {
@@ -1350,6 +1350,33 @@ public class DecimalFormat extends NumberFormat {
     public DecimalFormatSymbols getDecimalFormatSymbols() {
         Object copy = symbols.clone();
         return copy instanceof DecimalFormatSymbols ? (DecimalFormatSymbols) copy : symbols;
+    }
+
+    /// The currency of this format's symbols, or null when their
+    /// international symbol is not an ISO 4217 code.
+    @Override
+    public java.util.Currency getCurrency() {
+        return symbols.getCurrency();
+    }
+
+    /// Sets the currency of this format's symbols, and rewrites the prefix
+    /// and suffix when the pattern has a currency sign. The number of
+    /// fraction digits is left alone, as in the JDK.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `currency` is null
+    @Override
+    public void setCurrency(java.util.Currency currency) {
+        if (currency == null) {
+            throw new NullPointerException();
+        }
+        if (currency != symbols.getCurrency()) {
+            symbols.setCurrency(currency);
+            if (currencyFormat) {
+                expandAffixes();
+            }
+        }
     }
 
     public void setDecimalFormatSymbols(DecimalFormatSymbols newSymbols) {
