@@ -59,6 +59,7 @@ class EmojiAndMentionTest extends UITestBase {
         assertEquals(e, p.getSelectedEmoji());
         assertTrue(f.getText().contains(e));
         assertEquals(e, EmojiPicker.getRecents().get(0));
+        com.codename1.io.Preferences.delete("cn1.emojiPicker.recent");
     }
 
     @FormTest
@@ -87,5 +88,18 @@ class EmojiAndMentionTest extends UITestBase {
         m.setCandidates("Ada Lovelace");
         m.setText("mail me at x@a");
         assertFalse(m.isShowingSuggestions());
+    }
+
+    @FormTest
+    void mentionsNeedAWordBoundary() {
+        MentionField m = new MentionField();
+        m.setCandidates("Ann");
+        m.setText("@an");
+        m.pick("Ann");
+        assertEquals(Arrays.asList("Ann"), m.getMentions());
+        m.setText("hi @Anna");
+        assertTrue(m.getMentions().isEmpty());
+        m.setText("hi @Ann.");
+        assertTrue(m.getMentions().isEmpty(), "a name no longer in the text is forgotten");
     }
 }

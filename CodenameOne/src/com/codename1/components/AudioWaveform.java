@@ -43,8 +43,9 @@ import com.codename1.ui.util.EventDispatcher;
 /// ```
 ///
 /// Levels are fractions from 0 to 1, one per bar, and are drawn evenly across
-/// the width. Tapping or dragging seeks: the progress follows the finger and
-/// action listeners fire, so the component doubles as the clip's scrubber. Call
+/// the width. Tapping or dragging seeks: the progress follows the finger, and
+/// action listeners fire once when it lifts, so the component doubles as the
+/// clip's scrubber. Call
 /// `setSeekable(false)` for a display only waveform.
 ///
 /// UIIDs: `AudioWaveform`. The played bars take the foreground of
@@ -185,7 +186,9 @@ public class AudioWaveform extends Component {
         setGrabsPointerEvents(seekable);
     }
 
-    /// True while the user drags across the waveform.
+    /// True while the user drags across the waveform. Listeners are not called
+    /// during the drag, only when it ends, so `#setProgress(float)` calls from
+    /// playback can be skipped while this is true.
     ///
     /// #### Returns
     ///
@@ -312,7 +315,7 @@ public class AudioWaveform extends Component {
     }
 
     private void seek(int absX) {
+        // The progress follows the finger; listeners hear once, on release.
         setProgress(progressAt(absX - getAbsoluteX() + getX()));
-        listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
     }
 }

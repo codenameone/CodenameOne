@@ -71,4 +71,50 @@ class RangeSliderTest extends UITestBase {
         assertEquals(0, new ColorPicker().getStyle().getBgTransparency() & 0xff);
         assertEquals(0, new MentionField().getStyle().getBgTransparency() & 0xff);
     }
+
+    @FormTest
+    void tapFiresOnceWhileAdjustingAndOnceFinal() {
+        RangeSlider r = new RangeSlider(0, 100, 20, 80);
+        com.codename1.ui.Form f = new com.codename1.ui.Form("t", new com.codename1.ui.layouts.BorderLayout());
+        f.add(com.codename1.ui.layouts.BorderLayout.NORTH, r);
+        f.show();
+        f.revalidate();
+        final int[] adjusting = {0};
+        final int[] finals = {0};
+        r.addActionListener(e -> {
+            if (r.isAdjusting()) {
+                adjusting[0]++;
+            } else {
+                finals[0]++;
+            }
+        });
+        int x = r.getAbsoluteX() + r.positionOf(60);
+        int y = r.getAbsoluteY() + r.getHeight() / 2;
+        f.pointerPressed(x, y);
+        f.pointerReleased(x, y);
+        assertEquals(1, adjusting[0]);
+        assertEquals(1, finals[0]);
+        // a tap that moves nothing fires nothing
+        f.pointerPressed(x, y);
+        f.pointerReleased(x, y);
+        assertEquals(1, adjusting[0]);
+        assertEquals(1, finals[0]);
+    }
+
+    @FormTest
+    void coincidentThumbsSplitInRtl() {
+        RangeSlider r = new RangeSlider(0, 100, 50, 50);
+        r.setRTL(true);
+        com.codename1.ui.Form f = new com.codename1.ui.Form("t", new com.codename1.ui.layouts.BorderLayout());
+        f.add(com.codename1.ui.layouts.BorderLayout.NORTH, r);
+        f.show();
+        f.revalidate();
+        int y = r.getAbsoluteY() + r.getHeight() / 2;
+        // In RTL the higher values are on the left.
+        int x = r.getAbsoluteX() + r.positionOf(80);
+        f.pointerPressed(x, y);
+        f.pointerReleased(x, y);
+        assertEquals(50, r.getLowerValue());
+        assertEquals(80, r.getUpperValue(), 2);
+    }
 }

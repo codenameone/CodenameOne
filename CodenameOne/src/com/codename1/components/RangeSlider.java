@@ -61,6 +61,7 @@ public class RangeSlider extends Component {
     private int upperValue;
     private int step = 1;
     private boolean adjusting;
+    private boolean changedWhileAdjusting;
     private int dragging = -1;
     private final EventDispatcher listeners = new EventDispatcher();
 
@@ -198,7 +199,9 @@ public class RangeSlider extends Component {
         setRange(lo, hi);
     }
 
-    /// True while the user is dragging a thumb.
+    /// True while the user is dragging a thumb. Listeners hear every change
+    /// during a drag with this true, then once more with it false when the
+    /// finger lifts; a listener that runs a search can ignore the first kind.
     ///
     /// #### Returns
     ///
@@ -226,6 +229,9 @@ public class RangeSlider extends Component {
     }
 
     private void fire() {
+        if (adjusting) {
+            changedWhileAdjusting = true;
+        }
         listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
     }
 
@@ -289,14 +295,14 @@ public class RangeSlider extends Component {
         int alpha = g.getAlpha();
         boolean aa = g.isAntiAliased();
         g.setAntiAliased(true);
+        if (!isEnabled()) {
+            g.setAlpha(alpha / 2);
+        }
         g.setColor(Palette.track(this, "RangeSliderTrack"));
         g.fillRoundRect(left, cy - track / 2, width, track, track, track);
         int accent = Palette.accent(this, "RangeSliderFill");
         g.setColor(accent);
         g.fillRect(start, cy - track / 2, end - start, track);
-        if (!isEnabled()) {
-            g.setAlpha(alpha / 2);
-        }
         paintThumb(g, lo, cy, thumb, accent);
         paintThumb(g, hi, cy, thumb, accent);
         g.setAlpha(alpha);
@@ -322,7 +328,10 @@ public class RangeSlider extends Component {
         int lo = positionOf(lowerValue);
         int hi = positionOf(upperValue);
         if (lo == hi) {
-            dragging = px < lo ? 0 : 1;
+            // The lower thumb is the one on the side of the smaller values,
+            // which is the right in RTL.
+            boolean before = isRTL() ? px > lo : px < lo;
+            dragging = before ? 0 : 1;
             if (lowerValue == maxValue) {
                 dragging = 0;
             } else if (upperValue == minValue) {
@@ -332,6 +341,7 @@ public class RangeSlider extends Component {
             dragging = Math.abs(px - lo) <= Math.abs(px - hi) ? 0 : 1;
         }
         adjusting = true;
+        changedWhileAdjusting = false;
         moveTo(px);
     }
 
@@ -350,7 +360,11 @@ public class RangeSlider extends Component {
         if (dragging >= 0) {
             dragging = -1;
             adjusting = false;
-            fire();
+            // One more event with isAdjusting() false, for listeners that wait
+            // for the final value; none when the gesture moved nothing.
+            if (changedWhileAdjusting) {
+                fire();
+            }
         }
     }
 

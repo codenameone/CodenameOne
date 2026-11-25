@@ -27,6 +27,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
@@ -56,6 +57,9 @@ import java.util.List;
 /// field, falling back to `TextField`; the chips use the `Chip` UIIDs.
 public class ChipInput extends Container {
     private final TextField field = new TextField();
+    // The chips and the field live in a private container, so a caller adding
+    // to the ChipInput itself can never shift the chip indices.
+    private final Container box = new Container(new FlowLayout());
     private final List<String> values = new ArrayList<String>();
     private final EventDispatcher listeners = new EventDispatcher();
     private String separators = ",";
@@ -63,8 +67,9 @@ public class ChipInput extends Container {
 
     /// An empty tag input.
     public ChipInput() {
-        super(new FlowLayout());
+        super(new BorderLayout());
         setUIID("ChipInput");
+        box.setUIID("Container");
         field.setUIID(getUIManager().isThemeStyleDefined("ChipInputField") ? "ChipInputField" : "TextField");
         field.setColumns(8);
         field.setDoneListener(new ActionListener() {
@@ -79,7 +84,8 @@ public class ChipInput extends Container {
                 splitOnSeparator();
             }
         });
-        add(field);
+        box.add(field);
+        add(BorderLayout.CENTER, box);
     }
 
     @Override
@@ -176,7 +182,7 @@ public class ChipInput extends Container {
                 removeChip(chip);
             }
         });
-        addComponent(getComponentIndex(field), chip);
+        box.addComponent(box.getComponentIndex(field), chip);
         revalidateLater();
         fire();
         return true;
@@ -204,7 +210,7 @@ public class ChipInput extends Container {
     public void clearValues() {
         while (!values.isEmpty()) {
             values.remove(0);
-            removeComponent(getComponentAt(0));
+            box.removeComponent(box.getComponentAt(0));
         }
         revalidateLater();
         fire();
@@ -231,14 +237,14 @@ public class ChipInput extends Container {
     /// Turns the text in the field into a chip, as Done does.
     public void commit() {
         String t = field.getText();
-        if (t != null && t.trim().length() > 0) {
-            addValue(t);
+        // A refused entry (a duplicate) stays in the field for the user to fix.
+        if (t != null && t.trim().length() > 0 && addValue(t)) {
             field.setText("");
         }
     }
 
     private void removeChip(Chip chip) {
-        int i = getComponentIndex(chip);
+        int i = box.getComponentIndex(chip);
         if (i >= 0 && i < values.size()) {
             removeChipAt(i);
         }
@@ -246,7 +252,7 @@ public class ChipInput extends Container {
 
     private void removeChipAt(int i) {
         values.remove(i);
-        removeComponent(getComponentAt(i));
+        box.removeComponent(box.getComponentAt(i));
         revalidateLater();
         fire();
     }
@@ -274,15 +280,20 @@ public class ChipInput extends Container {
         }
         int start = 0;
         boolean split = false;
+        StringBuilder kept = new StringBuilder();
         for (int i = 0; i < t.length(); i++) {
             if (separators.indexOf(t.charAt(i)) >= 0) {
-                addValue(t.substring(start, i));
+                String part = t.substring(start, i);
+                // A refused segment (a duplicate) stays in the field.
+                if (!addValue(part) && part.trim().length() > 0) {
+                    kept.append(part.trim()).append(' ');
+                }
                 start = i + 1;
                 split = true;
             }
         }
         if (split) {
-            field.setText(t.substring(start));
+            field.setText(kept.append(t.substring(start)).toString());
         }
     }
 

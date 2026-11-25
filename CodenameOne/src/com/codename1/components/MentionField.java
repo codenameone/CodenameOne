@@ -70,6 +70,7 @@ public class MentionField extends Container {
     private int maxSuggestions = 5;
     private int tokenStart = -1;
     private int tokenEnd = -1;
+    private boolean picking;
 
     /// An empty mention field.
     public MentionField() {
@@ -179,12 +180,37 @@ public class MentionField extends Container {
     public List<String> getMentions() {
         List<String> out = new ArrayList<String>();
         String text = field.getText() == null ? "" : field.getText();
+        List<String> stale = new ArrayList<String>();
         for (String m : mentions) {
-            if (text.indexOf(trigger + m) >= 0 && !out.contains(m)) {
-                out.add(m);
+            if (!out.contains(m)) {
+                if (containsMention(text, trigger + m)) {
+                    out.add(m);
+                } else {
+                    stale.add(m);
+                }
             }
         }
+        mentions.removeAll(stale);
         return out;
+    }
+
+    /// True when `token` appears with a word boundary on both sides, so a
+    /// picked "@Ann" is not found inside "@Anna" or "x@Ann".
+    private static boolean containsMention(String text, String token) {
+        int from = 0;
+        while (true) {
+            int i = text.indexOf(token, from);
+            if (i < 0) {
+                return false;
+            }
+            int end = i + token.length();
+            boolean startOk = i == 0 || Character.isWhitespace(text.charAt(i - 1));
+            boolean endOk = end == text.length() || !Character.isLetterOrDigit(text.charAt(end));
+            if (startOk && endOk) {
+                return true;
+            }
+            from = i + 1;
+        }
     }
 
     /// Adds a listener called when the user picks a suggestion.
@@ -268,8 +294,15 @@ public class MentionField extends Container {
         mentions.add(name);
         tokenStart = -1;
         tokenEnd = -1;
-        field.setText(before + inserted + after);
-        field.setCursorPosition(before.length() + inserted.length());
+        // setText notifies the data listener before the cursor moves, and the
+        // scan would find the completed name and offer it again.
+        picking = true;
+        try {
+            field.setText(before + inserted + after);
+            field.setCursorPosition(before.length() + inserted.length());
+        } finally {
+            picking = false;
+        }
         hideSuggestions();
         listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Other));
     }
@@ -283,6 +316,9 @@ public class MentionField extends Container {
     }
 
     private void updateSuggestions() {
+        if (picking) {
+            return;
+        }
         String text = field.getText() == null ? "" : field.getText();
         int cursor = cursor(field, text);
         int start = cursor;
@@ -328,6 +364,7 @@ public class MentionField extends Container {
             return text.length();
         }
         // A field that is not being edited reports 0; read that as the end.
-        return c == 0 ? text.length() : c;
+        // While editing, 0 is a real position at the start of the text.
+        return c == 0 && !f.isEditing() ? text.length() : c;
     }
 }

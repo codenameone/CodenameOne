@@ -90,4 +90,37 @@ class MasonryLayoutTest extends UITestBase {
         c.setWidth(100);
         assertEquals(25, m.getPreferredSize(c).getHeight());
     }
+
+    @FormTest
+    void tilesAreMeasuredAtTheirColumnWidth() {
+        MasonryLayout m = new MasonryLayout(2);
+        m.setGap(0);
+        Container c = new Container(m);
+        c.getAllStyles().setPadding(0, 0, 0, 0);
+        final int[] seenWidth = {-1};
+        Label wraps = new Label() {
+            @Override
+            protected Dimension calcPreferredSize() {
+                seenWidth[0] = getWidth();
+                return new Dimension(1000, getWidth() > 0 ? 10000 / getWidth() : 10);
+            }
+        };
+        wraps.getAllStyles().setMargin(0, 0, 0, 0);
+        c.add(wraps).add(tile(10));
+        c.setWidth(200);
+        c.layoutContainer();
+        assertEquals(100, seenWidth[0]);
+        assertEquals(100, wraps.getHeight());
+    }
+
+    @FormTest
+    void preferredWidthCanShrink() {
+        MasonryLayout m = new MasonryLayout(2);
+        m.setGap(0);
+        Container c = new Container(m);
+        c.getAllStyles().setPadding(0, 0, 0, 0);
+        c.add(tile(10)).add(tile(10));
+        c.setWidth(5000);
+        assertEquals(20, m.getPreferredSize(c).getWidth());
+    }
 }

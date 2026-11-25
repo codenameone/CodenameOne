@@ -79,11 +79,12 @@ class ChipInputTest extends UITestBase {
         in.addActionListener(e -> fired[0]++);
         assertTrue(in.removeValue("Y"));
         assertEquals(Arrays.asList("x", "z"), in.getValues());
-        assertEquals(3, in.getComponentCount());
+        com.codename1.ui.Container box = in.getTextField().getParent();
+        assertEquals(3, box.getComponentCount());
         in.clearValues();
         assertTrue(in.getValues().isEmpty());
-        assertEquals(1, in.getComponentCount());
-        assertSame(in.getTextField(), in.getComponentAt(0));
+        assertEquals(1, box.getComponentCount());
+        assertSame(in.getTextField(), box.getComponentAt(0));
         assertEquals(2, fired[0]);
     }
 
@@ -92,7 +93,30 @@ class ChipInputTest extends UITestBase {
         ChipInput in = new ChipInput();
         in.addValue("x");
         in.addValue("y");
-        ((Chip) in.getComponentAt(0)).requestRemove();
+        ((Chip) in.getTextField().getParent().getComponentAt(0)).requestRemove();
         assertEquals(Arrays.asList("y"), in.getValues());
+    }
+
+    @FormTest
+    void refusedEntryStaysInTheField() {
+        ChipInput in = new ChipInput();
+        in.addValue("x");
+        in.getTextField().setText("X");
+        in.commit();
+        assertEquals("X", in.getTextField().getText());
+        in.getTextField().setText("x,y,");
+        assertEquals(Arrays.asList("x", "y"), in.getValues());
+        assertEquals("x ", in.getTextField().getText());
+    }
+
+    @FormTest
+    void callerComponentsDoNotShiftChips() {
+        ChipInput in = new ChipInput();
+        in.add(com.codename1.ui.layouts.BorderLayout.NORTH, new com.codename1.ui.Label("To"));
+        in.addValue("a");
+        in.addValue("b");
+        in.clearValues();
+        assertTrue(in.getValues().isEmpty());
+        assertEquals(2, in.getComponentCount());
     }
 }

@@ -151,20 +151,41 @@ public class MasonryLayout extends Layout {
     @Override
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
-        int width = parent.getWidth() - parent.getSideGap() - s.getHorizontalPadding();
-        if (width <= 0) {
-            int widest = 0;
-            for (int i = 0; i < parent.getComponentCount(); i++) {
-                Component c = parent.getComponentAt(i);
+        int widest = 0;
+        for (int i = 0; i < parent.getComponentCount(); i++) {
+            Component c = parent.getComponentAt(i);
+            if (!c.isHidden()) {
                 widest = Math.max(widest, c.getPreferredW() + c.getStyle().getHorizontalMargins());
             }
-            int gap = CN.convertToPixels(gapMM);
-            width = columns * widest + (columns - 1) * gap;
-            return new Dimension(width + s.getHorizontalPadding(),
-                    place(parent, 0, 0, width, false) + s.getVerticalPadding());
         }
-        return new Dimension(width + s.getHorizontalPadding(),
+        int gap = CN.convertToPixels(gapMM);
+        // The width asked for comes from the tiles, never from the width the
+        // container happens to have, so it can shrink as well as grow.
+        int natural = columns * widest + (columns - 1) * gap;
+        // The height is measured at the width the container really has once
+        // it has one, since tiles are as tall as they are at their column width.
+        int actual = parent.getWidth() - parent.getSideGap() - s.getHorizontalPadding();
+        int width = actual > 0 ? actual : natural;
+        return new Dimension(natural + s.getHorizontalPadding(),
                 place(parent, 0, 0, width, false) + s.getVerticalPadding());
+    }
+
+    /// The height of a tile at a given width. The component is given that width
+    /// first, so text wraps to it; an image label that scales its image is
+    /// scaled to it keeping its aspect ratio.
+    private static int heightAt(Component c, int w) {
+        if (c.getWidth() != w) {
+            c.setWidth(w);
+            // Only on a change, so measuring converges instead of relaying out forever.
+            c.setShouldCalcPreferredSize(true);
+        }
+        int h = c.getPreferredH();
+        int pw = c.getPreferredW();
+        if (pw > 0 && w > 0 && (c instanceof com.codename1.components.ScaleImageLabel
+                || c instanceof com.codename1.components.ScaleImageButton)) {
+            h = (int) ((long) h * w / pw);
+        }
+        return h;
     }
 
     /// Packs the children into columns; places them when `apply` is set and
@@ -190,7 +211,7 @@ public class MasonryLayout extends Layout {
             }
             Style cs = c.getStyle();
             int w = Math.max(0, colWidth - cs.getHorizontalMargins());
-            int h = c.getPreferredH();
+            int h = heightAt(c, w);
             int y = heights[col] == 0 ? 0 : heights[col] + gap;
             if (apply) {
                 int x = col * (colWidth + gap);
