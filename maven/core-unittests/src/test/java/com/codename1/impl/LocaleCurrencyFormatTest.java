@@ -50,6 +50,7 @@ class LocaleCurrencyFormatTest {
         String dinar = f.format(1.25, "BHD", US);
         assertEquals("1.250", dinar.substring(dinar.length() - 5));
         assertEquals("$", f.getSymbol("USD", US));
+        assertEquals("$0.00", f.format(-0.001, "USD", US));
         assertThrows(IllegalArgumentException.class, () -> f.format(1, "XYZ", US));
     }
 

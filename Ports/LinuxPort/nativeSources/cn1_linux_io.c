@@ -37,6 +37,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <locale.h>
+#include <langinfo.h>
+
+/* Decodes UTF-8; newStringFromCString widens each byte, which garbles non-ASCII text. */
+extern JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* text, int length);
 #include <fcntl.h>
 #include <sys/file.h>
 #include <dirent.h>
@@ -491,7 +495,8 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_formatLocalTime___long_int_R_ja
             buf[0] = 0;
         }
     }
-    return newStringFromCString(threadStateData, buf);
+    /* A month name is not ASCII in most languages (fevrier, Maerz in their own letters). */
+    return newStringFromUtf8Len(threadStateData, buf, (int) strlen(buf));
 }
 
 /*
@@ -508,10 +513,18 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_formatLocalTime___long_int_R_ja
  */
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_localeCurrency___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
     char buf[512];
-    locale_t loc = newlocale(LC_MONETARY_MASK, "", (locale_t) 0);
+    locale_t loc = newlocale(LC_CTYPE_MASK | LC_MONETARY_MASK, "", (locale_t) 0);
     locale_t previous;
     struct lconv* lc;
+    const char* codeset;
     if (loc == (locale_t) 0) {
+        return JAVA_NULL;
+    }
+    /* The symbols are in the locale's own encoding; only UTF-8 can be decoded here. A
+     * legacy ISO-8859 locale keeps the table-driven formatting rather than mojibake. */
+    codeset = nl_langinfo_l(CODESET, loc);
+    if (codeset == 0 || (strcmp(codeset, "UTF-8") != 0 && strcmp(codeset, "utf8") != 0)) {
+        freelocale(loc);
         return JAVA_NULL;
     }
     previous = uselocale(loc);
@@ -525,7 +538,7 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_localeCurrency___R_java_lang_St
              lc->p_sep_by_space == 1 ? 1 : 0);
     uselocale(previous);
     freelocale(loc);
-    return newStringFromCString(threadStateData, buf);
+    return newStringFromUtf8Len(threadStateData, buf, (int) strlen(buf));
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_executableDir___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {

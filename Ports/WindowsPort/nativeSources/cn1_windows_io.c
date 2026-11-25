@@ -615,7 +615,7 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_localeCurrency___R_java_lan
         grp[0] = L'\0';
     }
     pattern = pos[0] - L'0';
-    _snwprintf(out, 96, L"%s\n%s\n%s\n%s\n%d\n%d", dec, grp, sym, iso,
+    _snwprintf(out, 96, L"%ls\n%ls\n%ls\n%ls\n%d\n%d", dec, grp, sym, iso,
                (pattern == 0 || pattern == 2) ? 1 : 0, pattern >= 2 ? 1 : 0);
     out[95] = L'\0';
     return cn1WinWideToJavaString(threadStateData, out);

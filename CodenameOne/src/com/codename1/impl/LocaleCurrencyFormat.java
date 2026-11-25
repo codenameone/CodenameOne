@@ -38,8 +38,10 @@ import java.util.Locale;
 /// amount, and `1` when a space separates them. [#parse(String)] answers null
 /// for anything else, and the caller then keeps the table-driven default.
 ///
-/// A negative amount is written with a leading minus sign; the locale's own
-/// negative pattern (parentheses, a trailing sign) is not reproduced.
+/// Not reproduced: the locale's own negative pattern (parentheses, a trailing
+/// sign; a negative amount gets a leading minus), digit grouping other than
+/// threes (India's 1,00,000), and separators longer than one character, of
+/// which only the first is used.
 public final class LocaleCurrencyFormat {
     private final String decimal;
     private final String grouping;
@@ -93,6 +95,16 @@ public final class LocaleCurrencyFormat {
         }
         return new LocaleCurrencyFormat(parts[0], parts[1], parts[2], iso,
                 "1".equals(parts[4]), "1".equals(parts[5].trim()));
+    }
+
+    private static boolean isZero(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c >= '1' && c <= '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isKnownCode(String iso) {
@@ -179,6 +191,10 @@ public final class LocaleCurrencyFormat {
         number.setMaximumFractionDigits(digits);
         boolean negative = amount < 0;
         String digitsText = number.format(negative ? -amount : amount);
+        if (negative && isZero(digitsText)) {
+            // -0.001 dollars is written as no money at all, not "-$0.00".
+            negative = false;
+        }
         StringBuilder sb = new StringBuilder();
         if (negative) {
             sb.append('-');
