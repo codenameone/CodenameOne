@@ -33,8 +33,6 @@ import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.store.Stores;
 import com.codenameone.examples.bazaar.web.StoreText;
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
@@ -255,7 +253,7 @@ class StoreTextTest {
         File[] files = new File("src/main/resources/templates").listFiles();
         int seen = 0;
         for (int iter = 0; files != null && iter < files.length; iter++) {
-            String s = new String(Files.readAllBytes(files[iter].toPath()), StandardCharsets.UTF_8);
+            String s = read(files[iter]);
             int at = s.indexOf(".t['");
             while (at >= 0) {
                 int end = s.indexOf("']", at);
@@ -271,5 +269,21 @@ class StoreTextTest {
     private static String body(MockResponse r) throws Exception {
         assertEquals(200, r.getStatus());
         return r.getContentAsString();
+    }
+
+    // Not java.nio.file: the compiled backend's class library has none.
+    private static String read(File f) throws java.io.IOException {
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return new String(out.toByteArray(), "UTF-8");
+        } finally {
+            in.close();
+        }
     }
 }

@@ -22,7 +22,8 @@ import com.codename1.backend.Config;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.annotations.Component;
 import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -197,7 +198,8 @@ public class GeoCountry {
 
         static RangeTable load(String file) throws IOException {
             List<String> lines = new ArrayList<String>();
-            try (BufferedReader r = new BufferedReader(new FileReader(file))) {
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
                 String line;
                 while ((line = r.readLine()) != null) {
                     lines.add(line);

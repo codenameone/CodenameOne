@@ -506,7 +506,8 @@ class MerchantIdorTest {
     @Test
     void theListIsEveryRouteTheInterfacesDeclare() throws Exception {
         File dir = new File("../shared/src/main/java/"
-                + CompanyBuyerDto.class.getPackage().getName().replace('.', '/'));
+                + CompanyBuyerDto.class.getName().substring(0,
+                        CompanyBuyerDto.class.getName().lastIndexOf('.')).replace('.', '/'));
         String[] names = dir.list();
         if (names == null) {
             // A compiled test binary does not run beside the sources.

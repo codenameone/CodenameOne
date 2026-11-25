@@ -737,6 +737,15 @@ try {
   if (!follow) {
     throw new Error('no Follow button on a store card');
   }
+  // Found is not the same as on screen: a card half under the tab bar is
+  // in the accessibility tree, and a click there lands on something else.
+  const homeH = page.viewportSize().height;
+  for (let i = 0; i < 12 && (follow.y < 60 || follow.y + follow.height > homeH - 90); i++) {
+    await page.mouse.move(210, 400);
+    await page.mouse.wheel(0, follow.y < 60 ? -300 : 300);
+    await page.waitForTimeout(500);
+    follow = await waitFor('a Follow button on a store card', stepSeconds, button('Follow'));
+  }
   await click(follow);
   await waitFor('the follow to be saved', stepSeconds, async () =>
       requests.some(r => /^20\d PUT \/api\/follows\//.test(r)));

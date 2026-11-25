@@ -72,6 +72,18 @@ class StoreInsightsTest {
     }
 
     /// A second, uncosted product in `s`, stocked.
+    // Not String.split: the compiled backend's class library has no regex.
+    private static String[] lines(String text) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        int from = 0;
+        for (int at = text.indexOf('\n'); at >= 0; at = text.indexOf('\n', from)) {
+            out.add(text.substring(from, at));
+            from = at + 1;
+        }
+        out.add(text.substring(from));
+        return out.toArray(new String[0]);
+    }
+
     private String saucer(Shop s, String name) throws Exception {
         String pid = Ids.next();
         db.execute("INSERT INTO product (id, store_id, handle, title, description, vendor, "
@@ -92,7 +104,7 @@ class StoreInsightsTest {
     @Test
     void profitAndLossSubtractsCostOfGoodsAndCountsUncostedUnits() throws Exception {
         Shop s = shop("si-pnl");
-        String[] saucer = saucer(s, "si-pnl").split("\n");
+        String[] saucer = lines(saucer(s, "si-pnl"));
         String buyer = People.customer(accounts, "si-pnl-buyer");
         carts.add(s.storeId, buyer, null, new CartLineChangeDto(saucer[1], 2));
         s.buy(buyer, 3);
@@ -117,7 +129,7 @@ class StoreInsightsTest {
     @Test
     void productsBoughtTogetherAreRecommendedOnTheWebPage() throws Exception {
         Shop s = shop("si-fbt");
-        String[] saucer = saucer(s, "si-fbt").split("\n");
+        String[] saucer = lines(saucer(s, "si-fbt"));
         assertTrue(catalog.together(s.productId, 4).isEmpty() || !catalog.together(s.productId, 4)
                 .get(0).id().equals(saucer[0]), "nothing bought together yet");
         String buyer = People.customer(accounts, "si-fbt-buyer");

@@ -845,8 +845,17 @@ public class DemoStores {
         for (int s = 0; s < all.length; s++) {
             for (int iter = 0; iter < all[s].length; iter++) {
                 String handle = Catalog.slug(all[s][iter][0]);
-                if (DemoStores.class.getResource("/seed-media/" + handle + ".jpg") == null) {
+                // getResourceAsStream, not getResource: the compiled backend's
+                // class library has no URLs for resources.
+                java.io.InputStream in = DemoStores.class.getResourceAsStream("/seed-media/" + handle + ".jpg");
+                if (in == null) {
                     missing.add(handle);
+                } else {
+                    try {
+                        in.close();
+                    } catch (java.io.IOException ignored) {
+                        // only asked whether it exists
+                    }
                 }
             }
         }

@@ -379,7 +379,8 @@ class DigitalGoodsTest {
         assertTrue(url.startsWith("/media/file/"), url);
         MockResponse whole = mvc.perform(get(url)).andReturn().getResponse();
         assertEquals(200, whole.getStatus());
-        assertEquals("video/mp4", whole.getHeader("Content-Type").split(";")[0]);
+        String type = whole.getHeader("Content-Type");
+        assertEquals("video/mp4", type.indexOf(';') < 0 ? type : type.substring(0, type.indexOf(';')));
         assertEquals("bytes", whole.getHeader("Accept-Ranges"));
         MockResponse part = mvc.perform(get(url).header("Range", "bytes=4-7")).andReturn()
                 .getResponse();
