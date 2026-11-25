@@ -1,5 +1,7 @@
 # UI Components and Layouts Reference
 
+Looking for a specific widget (Markdown view, swipe actions, drag to reorder, data grid, kanban, calendar, rating, cropper, Lottie/Rive, ...)? Check `component-catalog.md` first -- most of what pub.dev and npm offer already exists, often as a method on a class you would not guess.
+
 Codename One's UI model is "Swing for mobile". You assemble `Component`s into `Container`s, attach a `Layout` to control arrangement, and put the root in a `Form`. The single EDT serializes UI work.
 
 ## Core hierarchy
@@ -51,7 +53,7 @@ form.add(BorderLayout.CENTER, col);
 | `TextComponent` | Material-Design–style input — floating label, optional description / error message, optional action icon | The right default for new form inputs. See *TextComponent* below. |
 | `Picker` | Native picker (date/time/string/list) | Reads as a button, opens a native sheet on mobile. **Use this instead of `ComboBox`.** |
 | `Switch` / `CheckBox` / `RadioButton` | Toggles | RadioButton requires a `ButtonGroup` |
-| `Slider` | Range or progress | |
+| `Slider` | Single-value range or progress | Also the star rating bar -- see `component-catalog.md`. |
 | `List` / `MultiList` | Scrolling list of items | Prefer `InfiniteContainer` for paged data |
 | `Container` | Generic group | Most screens are nested Containers. See *Container UIID* caveat below. |
 | `Tabs` | Tabbed pane | Like Swing JTabbedPane |
@@ -65,6 +67,9 @@ form.add(BorderLayout.CENTER, col);
 | `CoachMarks` | Feature tour / onboarding spotlight over the form | `new CoachMarks(form).add(cmp, title, text).showOnce("key")`. Replaces the deprecated `GlassTutorial`. |
 | `Dialog` | Modal popup | `Dialog.show(...)` blocks current EDT pump |
 | `Toolbar` | Top bar | Already on every Form |
+| `RichTextArea` | Rich text editor **and Markdown / HTML / RTF / AsciiDoc viewer** | `setMarkdown(md)`, `setContent(text, RichTextFormat.HTML)`; `setEditable(false)` for read-only. |
+| `AutoCompleteTextField` | Typeahead / searchable dropdown | Override `filter(String)` for server-side results. |
+| `SwipeableContainer` | Swipe a row to reveal actions | `new SwipeableContainer(left, right, top)`. |
 | `BrowserComponent` | Embedded WebView | Use sparingly; ParparVM/iOS WebView has caveats. See *BrowserComponent appearance* below. |
 
 **Note on `ComboBox`**: It exists but is **not recommended** in CN1. The dropdown rendering is awkward on touch screens and behaves inconsistently across platforms. Use `Picker` (set `pickerType` to `Display.PICKER_TYPE_STRINGS` for a string-list picker) — it opens a native sheet on iOS, a Material dialog on Android, and a normal popup in the simulator. `ComboBox` is kept only for legacy ports of Swing apps.
