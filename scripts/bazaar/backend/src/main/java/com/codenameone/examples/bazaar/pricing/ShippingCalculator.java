@@ -89,6 +89,12 @@ public final class ShippingCalculator {
                     rate.getEtaDaysMax());
         }
 
+        /// This option under another name and price, as a checkout function
+        /// renames or reprices it; everything else is kept.
+        public Option with(String newName, long newPriceCents) {
+            return new Option(rate, newPriceCents, id, newName, service, etaDaysMin, etaDaysMax);
+        }
+
         Option(ShippingRate rate, long priceCents, String id, String name, String service,
                 int etaDaysMin, int etaDaysMax) {
             this.rate = rate;

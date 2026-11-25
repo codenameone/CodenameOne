@@ -75,13 +75,15 @@ public class StoreApiKeys implements ApiKeyRepository {
     public static final String READ_METAFIELDS = "read_metafields";
     public static final String WRITE_METAFIELDS = "write_metafields";
     public static final String READ_ANALYTICS = "read_analytics";
+    /// Lets an app upload checkout functions (`functions.FunctionApi`).
+    public static final String WRITE_FUNCTIONS = "write_functions";
     /// Every scope a key or an app may be given. A `write_x` scope also
     /// grants `read_x` ([#has]).
     public static final List<String> SCOPES = Collections.unmodifiableList(Arrays.asList(
             READ_PRODUCTS, WRITE_PRODUCTS, READ_ORDERS, WRITE_ORDERS, READ_CUSTOMERS,
             WRITE_CUSTOMERS, READ_INVENTORY, WRITE_INVENTORY, READ_DISCOUNTS, WRITE_DISCOUNTS,
             READ_FULFILLMENTS, WRITE_FULFILLMENTS, READ_METAFIELDS, WRITE_METAFIELDS,
-            READ_ANALYTICS));
+            READ_ANALYTICS, WRITE_FUNCTIONS));
     /// What a key's owner name starts with: no account name has a colon.
     static final String OWNER_PREFIX = "apikey:";
     /// What an app installation's token signs in as: `app:<installationId>`.
@@ -306,7 +308,7 @@ public class StoreApiKeys implements ApiKeyRepository {
         return list(username, storeId);
     }
 
-    static List<String> scopes(String stored) {
+    public static List<String> scopes(String stored) {
         List<String> out = new ArrayList<String>();
         int start = 0;
         while (stored != null && start < stored.length()) {

@@ -101,6 +101,9 @@ public class Checkouts {
     private final CheckoutSettings settings;
     private final com.codenameone.examples.bazaar.routing.OrderRouting routing;
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.functions.CheckoutFunctions functions;
+
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
             DiscountUseRepository uses, CustomerRepository customers,
@@ -275,6 +278,21 @@ public class Checkouts {
                 || !com.codenameone.examples.bazaar.pay.PaymentTypes.allowed(via.methodType,
                     payCurrency, hasCountry ? address.country().trim() : ""))) {
             throw new ResponseStatusException(400, "That payment method is not offered here");
+        }
+        // An installed app's payment function may hide a method; paying with
+        // it anyway is refused as if the store had not offered it. A wallet
+        // (held, no type) already paid through its own sheet.
+        if (via == null || via.methodType != null) {
+            String type = via == null ? com.codenameone.examples.bazaar.pay.PaymentTypes.CARD
+                    : via.methodType;
+            String payCountry = hasCountry ? address.country().trim() : "";
+            List<com.codenameone.examples.bazaar.functions.CheckoutFunctions.Active> fns =
+                    functions.active(storeId);
+            if (!fns.isEmpty() && !functions.paymentOffered(fns, quote,
+                    com.codenameone.examples.bazaar.pay.PaymentTypes.offered(rules.methods(),
+                            payCurrency, payCountry), type, payCountry, username)) {
+                throw new ResponseStatusException(400, "That payment method is not offered here");
+            }
         }
         final StoreOrder order = orders.newOrder(quote, Orders.ONLINE, username,
                 empty(req.email()) ? username : req.email(), address, clientId);

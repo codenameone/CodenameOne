@@ -34,6 +34,8 @@ public class CheckoutEndpoint implements CheckoutApiServer {
     private final com.codenameone.examples.bazaar.cart.Quoter quoter;
     private final com.codenameone.examples.bazaar.repository.StoreRepository stores;
     private final com.codenameone.examples.bazaar.pay.Payments payments;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.functions.CheckoutFunctions functions;
 
     public CheckoutEndpoint(Checkouts checkouts, CheckoutSettings settings,
             com.codenameone.examples.bazaar.cart.Carts carts,
@@ -64,10 +66,19 @@ public class CheckoutEndpoint implements CheckoutApiServer {
         com.codenameone.examples.bazaar.cart.Quote quote = quoter.price(
                 carts.cart(storeId, who, null), null, null, who);
         String c = country == null ? "" : country.trim();
-        return settings.options(storeId, payments.provider().name(), store.getCurrency(),
-                c.length() == 2 ? upper(c) : "",
+        com.codenameone.examples.bazaar.api.CheckoutOptionsDto offered = settings.options(storeId,
+                payments.provider().name(), store.getCurrency(), c.length() == 2 ? upper(c) : "",
                 quote.subtotalCents - quote.discountCents(),
                 com.codenameone.examples.bazaar.web.SiteUrls.checkout(store.getHandle()));
+        // Installed apps' payment functions hide and reorder what is offered.
+        java.util.List<com.codenameone.examples.bazaar.functions.CheckoutFunctions.Active> fns =
+                functions.active(storeId);
+        if (fns.isEmpty()) {
+            return offered;
+        }
+        return new com.codenameone.examples.bazaar.api.CheckoutOptionsDto(offered.provider(),
+                functions.payments(fns, quote, offered.methods(), c.length() == 2 ? upper(c) : "",
+                        who), offered.tips(), offered.fields(), offered.webCheckoutUrl());
     }
 
     /// Two letters upper case, folded by hand (never `toUpperCase()`, which

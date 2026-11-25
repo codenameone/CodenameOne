@@ -79,6 +79,11 @@ public class Quoter {
     private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
     @com.codename1.backend.annotations.Autowired
     private com.codenameone.examples.bazaar.repository.CustomerRepository customerRows;
+    /// Installed apps' checkout functions, run after the built-in logic on a
+    /// shopper's cart only: a staff draft and the register price without
+    /// them, as the register works out its own discounts.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.functions.CheckoutFunctions functions;
 
     public static final String ACTIVE = "ACTIVE";
 
@@ -345,6 +350,10 @@ public class Quoter {
         }
         quote.discounts = DiscountEngine.apply(priceLines, automatic, typed, code, now, used,
                 cheapest, member);
+        List<com.codenameone.examples.bazaar.functions.CheckoutFunctions.Active> fns = online
+                ? functions.active(cart.getStoreId())
+                : new ArrayList<com.codenameone.examples.bazaar.functions.CheckoutFunctions.Active>();
+        functions.discounts(fns, quote, country, username);
         if (quote.discounts.codeProblem != null) {
             quote.problems.add(quote.discounts.codeProblem);
         }
@@ -357,6 +366,7 @@ public class Quoter {
                     quote.discounts.freeShipping, live);
             quote.options = pickupsInStock(quote, quote.options, locationById,
                     bundleParts.keySet());
+            quote.options = functions.shipping(fns, quote, quote.options, country, username);
             quote.shipping = ShippingCalculator.find(quote.options, rateId);
             if (quote.shipping == null) {
                 if (rateId != null && rateId.length() > 0) {
@@ -422,6 +432,7 @@ public class Quoter {
                         Math.max(0, quote.totalCents - quote.giftCardCents));
             }
         }
+        quote.problems.addAll(functions.validate(fns, quote, country, username));
         return quote;
     }
 

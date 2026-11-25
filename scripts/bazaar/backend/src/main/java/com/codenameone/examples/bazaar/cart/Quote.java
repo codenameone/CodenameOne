@@ -85,6 +85,21 @@ public final class Quote {
     /// shown, never charged.
     public long dutyCents;
     public final List<String> problems = new ArrayList<String>();
+    /// What checkout functions took off, already in [#discounts]' total.
+    public final List<FunctionDiscount> functionDiscounts = new ArrayList<FunctionDiscount>();
+
+    /// One checkout function's discount on the quote.
+    public static final class FunctionDiscount {
+        public final String functionId;
+        public final String title;
+        public final long amountCents;
+
+        public FunctionDiscount(String functionId, String title, long amountCents) {
+            this.functionId = functionId;
+            this.title = title;
+            this.amountCents = amountCents;
+        }
+    }
 
     /// False when every line is a digital variant: nothing to ship, so no
     /// address, delivery option or shipping charge.
@@ -149,6 +164,11 @@ public final class Quote {
                 applied.add(new AppliedDiscountDto(a.discount.getId(), a.discount.getCode(),
                         a.discount.getTitle(), a.amountCents, a.freeShipping));
             }
+        }
+        for (int iter = 0; iter < functionDiscounts.size(); iter++) {
+            FunctionDiscount f = functionDiscounts.get(iter);
+            applied.add(new AppliedDiscountDto("function:" + f.functionId, "", f.title,
+                    f.amountCents, false));
         }
         List<ShippingOptionDto> opts = new ArrayList<ShippingOptionDto>();
         for (int iter = 0; iter < options.size(); iter++) {
