@@ -746,7 +746,17 @@ try {
   await waitFor('Stores you follow on the Account tab', stepSeconds, heading('Stores you follow'));
   await waitFor('the returns request', stepSeconds, async () => requests.includes('200 GET /api/returns'));
   await waitFor('Returns on the Account tab', stepSeconds, heading('Returns'));
-  await click(await waitFor('Unfollow beside the store followed', stepSeconds, button('Unfollow')));
+  // The Account tab is taller than the window (rewards, addresses, orders),
+  // so scroll until the Unfollow button is on screen before clicking it.
+  let unfollow = await waitFor('Unfollow beside the store followed', stepSeconds, button('Unfollow'));
+  const viewH = page.viewportSize().height;
+  for (let i = 0; i < 12 && (unfollow.y < 60 || unfollow.y + unfollow.height > viewH - 90); i++) {
+    await page.mouse.move(210, 400);
+    await page.mouse.wheel(0, unfollow.y < 60 ? -300 : 300);
+    await page.waitForTimeout(500);
+    unfollow = await waitFor('Unfollow beside the store followed', stepSeconds, button('Unfollow'));
+  }
+  await click(unfollow);
   await waitFor('the unfollow to be saved', stepSeconds, async () =>
       requests.some(r => /^20\d DELETE \/api\/follows\//.test(r)));
   await waitFor('the store to leave the list', stepSeconds, async () => !(await button('Unfollow')()));

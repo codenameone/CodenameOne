@@ -325,6 +325,10 @@ final class HomePane extends ShopPane {
         // outside that tap -- a lead component takes every press in its
         // container, and puts its own button in the south of a border.
         Container tappable = Ui.tap(card, "store-" + s.handle(), e -> open(s));
+        // Read as the store's name and tagline: merged descendants would
+        // start with the monogram's initials ("LS, Little Clay Studio").
+        tappable.getSemantics().setLabel(s.tagline() == null ? s.name()
+                : s.name() + ", " + s.tagline());
         Container whole = new Container(new BorderLayout());
         whole.setUIID("ShopStoreCard");
         card.setUIID("Container");
