@@ -68,8 +68,10 @@ public class SlideBuildAnimationScreenshotTest extends AbstractAnimationScreensh
         float scale = Math.min(width / deck.width, height / deck.height);
         int x = Math.round((width - deck.width * scale) / 2);
         int y = Math.round((height - deck.height * scale) / 2);
-        long elapsed = Math.round(progress * SlideAnimation.stepDuration(s, 0));
-        renderer.paint(g, deck, s, x, y, scale, SlideAnimation.states(s, 0, elapsed));
+        // step 0 is what plays on entry, before any click; this slide's first build is
+        // on click, so its builds are step 1
+        long elapsed = Math.round(progress * SlideAnimation.stepDuration(s, 1));
+        renderer.paint(g, deck, s, x, y, scale, SlideAnimation.states(s, 1, elapsed));
     }
 
     @Override

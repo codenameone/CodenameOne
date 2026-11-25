@@ -45,8 +45,6 @@ import java.util.Map;
 /// laid out with `PdfMeasurer` and drawn by `PdfExport.drawItems`, so it is selectable and
 /// breaks exactly as a document's does.
 public final class SlidePdfExport {
-    /// Chart resolution: pixels per point of the rendered chart image.
-    private static final int CHART_SCALE = 2;
 
     private SlidePdfExport() {
     }
@@ -267,9 +265,7 @@ public final class SlidePdfExport {
 
         @Override
         public void chart(ChartElement chart, float x, float y, float w, float h) {
-            int pw = Math.max(1, Math.round(w * CHART_SCALE));
-            int ph = Math.max(1, Math.round(h * CHART_SCALE));
-            Image img = SlideRenderer.chartImage(chart, pw, ph);
+            Image img = SlideRenderer.chartImage(chart, w, h);
             int[] argb = img.getRGB();
             c.save();
             c.setFillAlpha(alpha);

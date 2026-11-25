@@ -652,13 +652,13 @@ public class SlideRenderer {
         public void chart(ChartElement c, float x, float y, float w, float h) {
             int pw = Math.max(1, Math.round(w * scale));
             int ph = Math.max(1, Math.round(h * scale));
-            Key k = new Key(c, new Key(Integer.valueOf(pw), Integer.valueOf(ph)));
+            Key k = new Key(c, new Key(Float.valueOf(w), Float.valueOf(h)));
             Object o = cache.get(k);
             Image img;
             if (o instanceof Image) {
                 img = (Image) o;
             } else {
-                img = chartImage(c, pw, ph);
+                img = chartImage(c, w, h);
                 cache.put(k, img);
             }
             alpha(1);
@@ -667,12 +667,25 @@ public class SlideRenderer {
     }
 
     /// A chart drawn by `com.codename1.ui.chart.Chart` into an image, settled at the end of
-    /// its entrance animation.
-    static Image chartImage(ChartElement c, int w, int h) {
+    /// its entrance animation. It is drawn at the size it has on a slide shown at its real
+    /// size -- a point is 1/72 inch -- because the chart sizes its text for the device: drawn
+    /// at the pixels a thumbnail covers, a legend in a 12 pixel font swamps a plot 60 pixels
+    /// high. The caller scales the image into place, so text keeps its proportion at any zoom.
+    static Image chartImage(ChartElement c, float widthPoints, float heightPoints) {
+        float perPoint = com.codename1.ui.CN.convertToPixels(25.4f / 72 * 100) / 100f;
+        float k = Math.max(0.25f, perPoint);
+        float big = Math.max(widthPoints, heightPoints) * k;
+        if (big > MAX_CHART_PIXELS) {
+            k *= MAX_CHART_PIXELS / big;
+        }
         com.codename1.ui.chart.Chart chart = c.toChart();
         chart.setAnimationDuration(0);
-        return chart.toImage(w, h);
+        return chart.toImage(Math.max(1, Math.round(widthPoints * k)),
+                Math.max(1, Math.round(heightPoints * k)));
     }
+
+    /// The longest side of a chart image, in pixels.
+    private static final float MAX_CHART_PIXELS = 2048;
 
     /// The straight segments of a path cut into dashes. Curves are flattened to their end
     /// points, which is close enough for the dashed outlines slides use.
