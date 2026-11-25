@@ -46,7 +46,8 @@ package java.util;
 /// - [#getDisplayName(Locale)] answers the English name for every locale. For
 ///   a name in the user's language use the platform's localization
 ///   (`com.codename1.l10n.L10NManager`).
-/// - The table is the one Java 17 ships, fixed at build time; there is no
+/// - The table is Java 17's plus the ISO 4217 changes since, fixed at
+///   build time; there is no
 ///   `java.util.currency.data` override, no `CurrencyNameProvider` and no
 ///   serialization.
 public final class Currency {
@@ -55,7 +56,8 @@ public final class Currency {
     // code, the fraction digits ('-' for none, as for gold), the symbol used
     // outside the home country (US English's, and `US$` for the dollar), '|',
     // the home symbol when it differs, '|', the English name. Generated from
-    // the JDK 17 tables.
+    // the JDK 17 tables, plus the ISO 4217 amendments since (ZWG for
+    // Zimbabwe, XCG for Curacao and Sint Maarten).
     private static final String TABLE = ""
             + "ADP0200ADP||Andorran Peseta\n"
             + "AED7842AED||United Arab Emirates Dirham\n"
@@ -267,6 +269,7 @@ public final class Currency {
             + "XBC957-XBC||European Unit of Account (XBC)\n"
             + "XBD958-XBD||European Unit of Account (XBD)\n"
             + "XCD9512EC$|$|East Caribbean Dollar\n"
+            + "XCG5322XCG||Caribbean Guilder\n"
             + "XDR960-XDR||Special Drawing Rights\n"
             + "XFO000-XFO||French Gold Franc\n"
             + "XFU000-XFU||French UIC-Franc\n"
@@ -284,6 +287,7 @@ public final class Currency {
             + "ZMK8942ZMK||Zambian Kwacha (1968\u20132012)\n"
             + "ZMW9672ZMW|K|Zambian Kwacha\n"
             + "ZWD7162ZWD||Zimbabwean Dollar (1980\u20132008)\n"
+            + "ZWG9242ZWG||Zimbabwe Gold\n"
             + "ZWL9322ZWL||Zimbabwean Dollar (2009)\n"
             + "ZWN9422ZWN||ZWN\n"
             + "ZWR9352ZWR||Zimbabwean Dollar (2008)\n";
@@ -296,7 +300,7 @@ public final class Currency {
             + "BGBGNBHBHDBIBIFBJXOFBLEURBMBMDBNBNDBOBOBBQUSDBRBRL"
             + "BSBSDBTBTNBVNOKBWBWPBYBYNBZBZDCACADCCAUDCDCDFCFXAF"
             + "CGXAFCHCHFCIXOFCKNZDCLCLPCMXAFCNCNYCOCOPCRCRCCUCUP"
-            + "CVCVECWANGCXAUDCYEURCZCZKDEEURDJDJFDKDKKDMXCDDODOP"
+            + "CVCVECWXCGCXAUDCYEURCZCZKDEEURDJDJFDKDKKDMXCDDODOP"
             + "DZDZDECUSDEEEUREGEGPEHMADERERNESEURETETBFIEURFJFJD"
             + "FKFKPFMUSDFODKKFREURGAXAFGBGBPGDXCDGEGELGFEURGGGBP"
             + "GHGHSGIGIPGLDKKGMGMDGNGNFGPEURGQXAFGREURGSGBPGTGTQ"
@@ -311,11 +315,11 @@ public final class Currency {
             + "OMOMRPAPABPEPENPFXPFPGPGKPHPHPPKPKRPLPLNPMEURPNNZD"
             + "PRUSDPSILSPTEURPWUSDPYPYGQAQARREEURRORONRSRSDRURUB"
             + "RWRWFSASARSBSBDSCSCRSDSDGSESEKSGSGDSHSHPSIEURSJNOK"
-            + "SKEURSLSLESMEURSNXOFSOSOSSRSRDSSSSPSTSTNSVSVCSXANG"
+            + "SKEURSLSLESMEURSNXOFSOSOSSRSRDSSSSPSTSTNSVSVCSXXCG"
             + "SYSYPSZSZLTCUSDTDXAFTFEURTGXOFTHTHBTJTJSTKNZDTLUSD"
             + "TMTMTTNTNDTOTOPTRTRYTTTTDTVAUDTWTWDTZTZSUAUAHUGUGX"
             + "UMUSDUSUSDUYUYUUZUZSVAEURVCXCDVEVESVGUSDVIUSDVNVND"
-            + "VUVUVWFXPFWSWSTYEYERYTEURZAZARZMZMWZWZWL"
+            + "VUVUVWFXPFWSWSTYEYERYTEURZAZARZMZMWZWZWG"
             ;
 
     private final String currencyCode;

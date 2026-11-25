@@ -14279,7 +14279,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 @Override
                 public String getCurrencyCode() {
                     String code = nativeInstance.getCurrencyCode();
-                    return code == null || code.length() == 0 ? super.getCurrencyCode() : code;
+                    if (code == null || code.length() == 0) {
+                        return super.getCurrencyCode();
+                    }
+                    try {
+                        // A code newer than java.util.Currency's table would make
+                        // every call that takes the answer back throw.
+                        java.util.Currency.getInstance(code);
+                        return code;
+                    } catch (IllegalArgumentException e) {
+                        return super.getCurrencyCode();
+                    }
                 }
 
                 @Override

@@ -63,6 +63,15 @@ public final class CurrencyChecks {
             }
         });
 
+        // Newer than some HotSpot references, so judged on ParparVM alone.
+        Bulk.cn1Only("Currency.knowsTheIso4217AmendmentsAfterJava17", () -> {
+            Bulk.expectEquals(Integer.valueOf(924), Integer.valueOf(Currency.getInstance("ZWG").getNumericCode()), "ZWG");
+            Bulk.expectEquals("ZWG", Currency.getInstance(new Locale("", "ZW")).getCurrencyCode(), "Zimbabwe");
+            Bulk.expectEquals("XCG", Currency.getInstance(new Locale("", "CW")).getCurrencyCode(), "Curacao");
+            Bulk.expectEquals("XCG", Currency.getInstance(new Locale("", "SX")).getCurrencyCode(), "Sint Maarten");
+            Bulk.expectEquals("ANG", Currency.getInstance("ANG").getCurrencyCode(), "ANG still known");
+        });
+
         Bulk.check("Currency.isOneInstancePerCode", () -> {
             p("same", Currency.getInstance("EUR") == Currency.getInstance("EUR"));
             p("by locale", Currency.getInstance(Locale.GERMANY) == Currency.getInstance("EUR"));

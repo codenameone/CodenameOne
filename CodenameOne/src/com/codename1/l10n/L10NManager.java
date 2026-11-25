@@ -61,9 +61,10 @@ import java.util.Locale;
 /// #### Currencies
 ///
 /// [#getCurrencyCode()] is the ISO 4217 code of the user's currency, and
-/// [#formatCurrency(double, String)] formats an amount in any currency the way
-/// the user's locale writes it: a price in euros shown to a user in the US
-/// reads `\u20ac12.50` there and `12,50 \u20ac` in France. Use the standard
+/// [#formatCurrency(double, String)] formats an amount in any currency for the
+/// user's locale. Android, iOS, the simulator and the browser use the
+/// platform's currency formatting, so a price in euros reads `\u20ac12.50` in
+/// the US and `12,50 \u20ac` in France; elsewhere the symbol always leads. Use the standard
 /// `java.util.Currency` for the facts about a currency itself -- its fraction
 /// digits, numeric code and symbol -- which are the same on every platform.
 ///
@@ -289,12 +290,13 @@ public class L10NManager {
         return formatCurrency(currency, code);
     }
 
-    /// Formats an amount of the given currency the way this locale writes
-    /// money: its separators and its placement of the symbol, with the
+    /// Formats an amount of the given currency for this locale, with the
     /// currency's own number of fraction digits (none for the yen).
     ///
-    /// The default implementation uses `java.text.NumberFormat`; the ports
-    /// replace it with the platform's own currency formatting.
+    /// The default implementation uses `java.text.NumberFormat`, which puts
+    /// the symbol first; the ports with currency formatting of their own
+    /// (Android, iOS, the simulator, the browser) also follow the locale's
+    /// placement and spacing of the symbol.
     ///
     /// #### Parameters
     ///

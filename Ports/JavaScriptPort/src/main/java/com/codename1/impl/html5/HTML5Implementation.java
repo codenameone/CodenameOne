@@ -12581,7 +12581,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 @Override
                 public String getCurrencyCode() {
                     String code = Display.getInstance().getProperty("l10n.currency", null);
-                    return code != null ? code : super.getCurrencyCode();
+                    if (code != null) {
+                        try {
+                            // A value that is not an ISO 4217 code would make
+                            // getCurrencySymbol() and every DecimalFormatSymbols throw.
+                            java.util.Currency.getInstance(code);
+                            return code;
+                        } catch (IllegalArgumentException e) {
+                            // Fall through to the locale's currency.
+                        }
+                    }
+                    return super.getCurrencyCode();
                 }
 
                 public String formatDateLongStyle(Date d) {
