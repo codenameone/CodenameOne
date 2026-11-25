@@ -104,7 +104,7 @@ Checkout reserves stock through `Inventory.reserve`, a conditional update that
 names the version of the level it read and retries a lost race. Two shoppers
 buying the last unit at the same moment therefore can't both succeed:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/inventory/Inventory.java[tag=bazaar-reserve,indent=0]
 ----
@@ -229,7 +229,7 @@ single use; notes on both orders name the other. `buyNow` is the same
 single-line order to a saved address on the default card, keyed for
 idempotency, leaving the shopper's cart alone.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pay/Payments.java[tag=bazaar-authorize,indent=0]
 ----
@@ -238,7 +238,7 @@ Everything provider specific sits behind `PaymentProvider`. The development
 profile uses a simulated provider; the Stripe implementation adds a card on
 Stripe's own page, so a card number never reaches the app or this server.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pay/PaymentProvider.java[tag=bazaar-payment-provider,indent=0]
 ----
@@ -272,7 +272,7 @@ and the guest cart are open; the merchant routes need staff of the store, which
 each service checks again against the store's staff list; the platform routes
 need an administrator.
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/SecurityConfig.java[tag=bazaar-api-rules,indent=0]
 ----
@@ -286,7 +286,7 @@ customers it may need. A sale is priced on the device from that snapshot, writte
 to the outbox with an id the register made for it, and only then is the receipt
 shown:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/pos/Outbox.java[tag=bazaar-outbox-add,indent=0]
 ----
@@ -298,7 +298,7 @@ safe because the server keys every sale by the store and the register's id for
 it, and answers a sale it already has as a duplicate instead of recording it
 twice:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/pos/Outbox.java[tag=bazaar-outbox-answer,indent=0]
 ----
@@ -314,7 +314,7 @@ shows for a person to retry or settle.
 The tenders are held against the server's total like this; a stale tax rate
 moves a total by cents, so only a shortfall past `tolerance()` is refused:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pos/PosSales.java[tag=bazaar-pos-sync,indent=0]
 ----
@@ -332,7 +332,7 @@ card that moves it on. The live channel reloads the board when an order changes.
 list for the cards in the first column is made on the device, with the same
 `com.codenameone.pdf` package the server renders invoices with:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/PickListPdf.java[tag=bazaar-picklist-pdf,indent=0]
 ----
@@ -427,7 +427,7 @@ as JSON, signed with the webhook's secret in the `X-Bazaar-Signature` header. A
 receiver computes the same value over the exact bytes it received and compares
 the two in constant time before trusting the body:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/webhook/Webhooks.java[tag=bazaar-webhook-signature,indent=0]
 ----
@@ -446,7 +446,7 @@ node's data is a map of its parameters with its type repeated under `type`, and
 every value is kept as text, whole numbers for money and counts. Ports are named
 `in`, `out`, `yes` and `no`:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/AutomationCodec.java[tag=bazaar-automation-encode,indent=0]
 ----
@@ -455,7 +455,7 @@ The server's `NodeCatalog` is the list of node types, which the editor reads to
 build its palette, so a new type needs no app release. Each entry names its
 kind, title, description and parameters:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/automation/NodeCatalog.java[tag=bazaar-node-catalog,indent=0]
 ----
