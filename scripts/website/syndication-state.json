@@ -3546,6 +3546,18 @@
         "canonical_set": true,
         "syndicated_at": "2026-11-24T01:01:10+00:00"
       }
+    },
+    "windows-kiosks-and-command-line-apps": {
+      "hashnode": {
+        "url": "https://debugagent.com/windows-kiosks-and-command-line-tools-built-from-java",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b06331b15a414f719e18630",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-25T01:01:09+00:00"
+      }
     }
   }
 }
