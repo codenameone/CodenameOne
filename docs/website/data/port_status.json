@@ -839,6 +839,15 @@
       ]
     },
     {
+      "id": "currency",
+      "category": "Application runtime",
+      "name": "Currencies",
+      "description": "ISO 4217 currencies through java.util.Currency, and amounts formatted in any currency for the user's locale.",
+      "tests": [
+        "CurrencyApiTest"
+      ]
+    },
+    {
       "id": "backend-networking",
       "category": "Application runtime",
       "name": "Networking against a Codename One backend",

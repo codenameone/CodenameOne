@@ -710,6 +710,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingToStringTest(),
             new StringFormatTest(),
             new ClipboardRoundTripTest(),
+            new CurrencyApiTest(),
             // The app's networking APIs against the CI's own backend
             // (scripts/hellocodenameone/backend), served by the same process that
             // receives these screenshots: Rest, the generated @RestClient,

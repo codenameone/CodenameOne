@@ -24,6 +24,7 @@ package java.text;
 
 import com.codename1.impl.JdkHost;
 
+import java.util.Currency;
 import java.util.Locale;
 
 /// The characters a [DecimalFormat] writes and reads -- decimal and
@@ -42,6 +43,11 @@ import java.util.Locale;
 /// other locale gets the device's symbols, since the device cannot format for
 /// a locale other than its own. Before Codename One is initialized, and where
 /// the platform answers nothing usable, the symbols are US English.
+///
+/// When the device reports a currency symbol, the [Currency] is the one the
+/// locale's country uses (or the default locale's, when the locale names no
+/// country), and the international currency symbol is its ISO 4217 code.
+/// Otherwise both stay US dollars, with the rest of the US English symbols.
 public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -63,6 +69,9 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
     private String intlCurrencySymbol = "USD";
     private char monetarySeparator = '.';
     private String exponentSeparator = "E";
+    private Currency currency;
+    private boolean deviceCurrencySymbol;
+    private final Locale locale;
 
     public DecimalFormatSymbols() {
         this(Locale.getDefault());
@@ -72,9 +81,54 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
         if (locale == null) {
             throw new NullPointerException();
         }
-        if (!isUsEnglish(locale)) {
+        this.locale = locale;
+        if (isUsEnglish(locale)) {
+            currency = Currency.getInstance("USD");
+        } else {
             readDeviceSymbols();
+            if (deviceCurrencySymbol) {
+                readCurrency();
+            }
         }
+    }
+
+    /// The currency of the locale's country, falling back to the default
+    /// locale's. Its code is the international symbol, since a device reports
+    /// only the local symbol.
+    private void readCurrency() {
+        Currency c = countryCurrency(locale);
+        if (c == null) {
+            c = countryCurrency(Locale.getDefault());
+        }
+        if (c == null) {
+            return;
+        }
+        currency = c;
+        intlCurrencySymbol = c.getCurrencyCode();
+        // The device's symbol belongs to the device's own currency. A locale
+        // whose country uses another one (yen asked for on a US device) must
+        // not write that currency's amounts with a dollar sign.
+        if (c != countryCurrency(Locale.getDefault())) {
+            currencySymbol = c.getSymbol(locale);
+        }
+    }
+
+    private static Currency countryCurrency(Locale l) {
+        String country = l.getCountry();
+        if (country == null || country.length() != 2) {
+            return null;
+        }
+        try {
+            return Currency.getInstance(l);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /// For [#clone]: the locale alone, every symbol at its default, nothing
+    /// asked of the platform.
+    private DecimalFormatSymbols(Locale locale, boolean bare) {
+        this.locale = locale;
     }
 
     public static final DecimalFormatSymbols getInstance() {
@@ -117,7 +171,7 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
         String currency = device[2];
         if (currency != null && currency.length() > 0) {
             currencySymbol = currency;
-            intlCurrencySymbol = currency;
+            deviceCurrencySymbol = true;
         }
     }
 
@@ -216,8 +270,39 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
         return intlCurrencySymbol;
     }
 
+    /// Sets the ISO 4217 code. A known code also becomes the [Currency]; any
+    /// other leaves no currency, as in the JDK. The symbol is left alone.
     public void setInternationalCurrencySymbol(String currencyCode) {
         intlCurrencySymbol = currencyCode;
+        currency = null;
+        if (currencyCode != null) {
+            try {
+                currency = Currency.getInstance(currencyCode);
+            } catch (IllegalArgumentException e) {
+                // Not an ISO 4217 code: the JDK keeps the text and no currency.
+            }
+        }
+    }
+
+    /// The currency, or null when the international symbol is not a known
+    /// ISO 4217 code.
+    public Currency getCurrency() {
+        return currency;
+    }
+
+    /// Sets the currency, its code as the international symbol and its
+    /// symbol in this object's locale as the currency symbol.
+    ///
+    /// #### Throws
+    ///
+    /// - `NullPointerException`: if `currency` is null
+    public void setCurrency(Currency currency) {
+        if (currency == null) {
+            throw new NullPointerException();
+        }
+        this.currency = currency;
+        intlCurrencySymbol = currency.getCurrencyCode();
+        currencySymbol = currency.getSymbol(locale);
     }
 
     public char getMonetaryDecimalSeparator() {
@@ -243,7 +328,7 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
     /// answers `null` on the device for anything but an array.
     @Override
     public Object clone() {
-        DecimalFormatSymbols copy = new DecimalFormatSymbols(new Locale("en", "US"));
+        DecimalFormatSymbols copy = new DecimalFormatSymbols(locale, true);
         copy.zeroDigit = zeroDigit;
         copy.groupingSeparator = groupingSeparator;
         copy.decimalSeparator = decimalSeparator;
@@ -258,6 +343,8 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
         copy.intlCurrencySymbol = intlCurrencySymbol;
         copy.monetarySeparator = monetarySeparator;
         copy.exponentSeparator = exponentSeparator;
+        copy.currency = currency;
+        copy.deviceCurrencySymbol = deviceCurrencySymbol;
         return copy;
     }
 
