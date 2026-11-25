@@ -593,6 +593,11 @@ jobs:
           retry mvn -B test -pl tests -am -DexcludedGroups=benchmark
         env:
           RETRY_ONLY_MATCHING: transient
+          # BackendHttpIntegrationTest runs the backend with io_uring, and twice
+          # with it refused by seccomp. This makes the first copy FAIL unless it
+          # really got the ring: without it, a runner image that turned io_uring
+          # off would test the thread pool three times and stay green.
+          CN1_REQUIRE_IO_URING: '1'
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
           JDK_17_HOME: ${{ env.JDK_17_HOME }}

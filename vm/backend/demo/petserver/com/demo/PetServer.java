@@ -30,6 +30,7 @@ import com.codename1.backend.DbPool;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
 import com.codename1.backend.Signals;
+import com.codename1.backend.FileIo;
 import com.codename1.backend.StaticFiles;
 import com.codename1.backend.Tls;
 
@@ -120,6 +121,99 @@ public class PetServer {
                         sb.append(" field=").append(field);
                     }
                     return HttpServer.Response.text(200, sb.toString());
+                }
+                // A query that keeps SQLite busy for seconds, on a pooled
+                // connection. BackendHttpIntegrationTest holds it in flight and
+                // asks /healthz on the same single-host server: the step runs on
+                // the native I/O pool with this virtual thread parked, so the
+                // host answers meanwhile. If anything on the path blocks the host
+                // again -- a native that stops offloading, a synchronized Db, a
+                // pool that wait()s -- /healthz answers only after this does.
+                if("/slowquery".equals(stripQuery(target)) && pool != null) {
+                    String n = request.param("n");
+                    final long rows = n == null ? 20000000L : Long.parseLong(n);
+                    Object sum = pool.withConnection(new Db.Work() {
+                        public Object run(Db db) throws Exception {
+                            return db.query("WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL "
+                                    + "SELECT x + 1 FROM c WHERE x < " + rows
+                                    + ") SELECT sum(x) AS s FROM c", null);
+                        }
+                    });
+                    return HttpServer.Response.text(200, String.valueOf(sum));
+                }
+                // GC STRESS FOR THE I/O POOL. A pool thread writes into a byte[]
+                // that only the parked virtual thread's frame references; a
+                // collection running meanwhile (gcchurn, on another virtual
+                // thread of the same host) must neither free nor corrupt it.
+                // Every buffer is fresh garbage-to-be, so a missed root shows as
+                // a wrong byte or a crash. gcchurn does not yield (yieldNow from a
+                // handler is not safe yet), which is the point on one host: it
+                // collects for its whole run while the gcfile requests sit parked
+                // with their jobs on the pool.
+                if("/gcfile".equals(stripQuery(target))) {
+                    String kbParam = request.param("kb");
+                    int kb = kbParam == null ? 256 : Integer.parseInt(kbParam);
+                    int fd = FileIo.createTemp(null);
+                    if(fd < 0) {
+                        return HttpServer.Response.text(500, "createTemp failed");
+                    }
+                    try {
+                        for(int block = 0 ; block < kb / 4 ; block++) {
+                            byte[] out = new byte[4096];
+                            for(int i = 0 ; i < out.length ; i++) {
+                                out[i] = (byte)(block * 31 + i);
+                            }
+                            if(!FileIo.write(fd, out, 0, out.length)) {
+                                return HttpServer.Response.text(500, "write failed");
+                            }
+                        }
+                        for(int block = 0 ; block < kb / 4 ; block++) {
+                            byte[] in = new byte[4096];
+                            int got = FileIo.pread(fd, in, 0, in.length, block * 4096L);
+                            if(got != in.length) {
+                                return HttpServer.Response.text(500, "short pread " + got);
+                            }
+                            for(int i = 0 ; i < in.length ; i++) {
+                                if(in[i] != (byte)(block * 31 + i)) {
+                                    return HttpServer.Response.text(500,
+                                            "corrupt at " + (block * 4096L + i));
+                                }
+                            }
+                        }
+                    } finally {
+                        FileIo.close(fd);
+                    }
+                    return HttpServer.Response.text(200, "ok " + kb);
+                }
+                if("/gcchurn".equals(stripQuery(target))) {
+                    String msParam = request.param("ms");
+                    long until = System.currentTimeMillis()
+                            + (msParam == null ? 2000 : Long.parseLong(msParam));
+                    long made = 0;
+                    while(System.currentTimeMillis() < until) {
+                        Object[] junk = new Object[256];
+                        for(int i = 0 ; i < junk.length ; i++) {
+                            junk[i] = new byte[512];
+                        }
+                        made += junk.length;
+                        System.gc();
+                    }
+                    return HttpServer.Response.text(200, "churned " + made);
+                }
+                // One sqlite3_step per row, so this prices the per-call hop to the
+                // native I/O pool against the inline build (CN1_BACKEND_NO_IO_OFFLOAD).
+                if("/rows".equals(stripQuery(target)) && pool != null) {
+                    String n = request.param("n");
+                    final long rows = n == null ? 10000L : Long.parseLong(n);
+                    Object list = pool.withConnection(new Db.Work() {
+                        public Object run(Db db) throws Exception {
+                            return db.query("WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL "
+                                    + "SELECT x + 1 FROM c WHERE x < " + rows
+                                    + ") SELECT x FROM c", null);
+                        }
+                    });
+                    return HttpServer.Response.text(200,
+                            String.valueOf(((java.util.List) list).size()));
                 }
                 if("/healthz".equals(stripQuery(target))) {
                     return HttpServer.Response.json(200, Json.write(serverRef[0].getMetrics()));
