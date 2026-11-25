@@ -3557,6 +3557,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-25T01:01:09+00:00"
+      },
+      "devto": {
+        "id": 5117006,
+        "url": "https://dev.to/codenameone/windows-kiosks-and-command-line-tools-built-from-java-4mpb",
+        "syndicated_at": "2026-11-25T14:18:58+00:00"
       }
     }
   }
