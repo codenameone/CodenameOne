@@ -858,10 +858,11 @@ public class SlideView extends Container {
                 }
                 renderer.paint(g, p, p.slides.get(i), x, y, scale);
                 if (p.slides.get(i).hidden) {
+                    int was = g.getAlpha();
                     g.setColor(0xffffff);
-                    g.setAlpha(150);
+                    g.setAlpha(150 * was / 255);
                     g.fillRect(x, y, tw, th);
-                    g.setAlpha(255);
+                    g.setAlpha(was);
                 }
                 g.setColor(0x6b7280);
                 g.drawString(String.valueOf(i + 1), getX() + 2, y);
