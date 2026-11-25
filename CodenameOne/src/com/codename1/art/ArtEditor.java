@@ -56,7 +56,8 @@ import java.util.List;
 /// separately through `getLayersPanel` and `getInspector`.
 ///
 /// ```java
-/// ArtEditor editor = new ArtEditor(new ArtModel(ArtFormats.read(in)));
+/// byte[] svg = "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='120'><circle cx='60' cy='60' r='40' fill='#1e88e5'/></svg>".getBytes("UTF-8");
+/// ArtEditor editor = new ArtEditor(new ArtModel(ArtFormats.read(svg)));
 /// Form form = new Form("Draw", new BorderLayout());
 /// form.add(BorderLayout.CENTER, editor);
 /// form.show();

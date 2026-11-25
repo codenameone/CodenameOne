@@ -30,7 +30,8 @@
 /// saves everything losslessly.
 ///
 /// ```java
-/// ArtDocument doc = ArtFormats.read(in);          // SVG, PSD, Sketch, Figma or .cn1gfx
+/// byte[] data = "<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><rect width='80' height='80' fill='#43a047'/></svg>".getBytes("UTF-8");
+/// ArtDocument doc = ArtFormats.read(data);        // SVG, PSD, Sketch, Figma or .cn1gfx
 /// Image preview = ArtRenderer.toImage(doc, 2);    // two pixels per document unit
 /// ArtEditor editor = new ArtEditor(new ArtModel(doc));
 /// ```

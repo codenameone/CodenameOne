@@ -40,8 +40,15 @@ import java.util.Map;
 /// through `invokeAndBlock`.
 ///
 /// ```java
-/// FigmaClient figma = new FigmaClient(tokenTheUserTyped);
-/// ArtDocument doc = figma.fetch("FILE_KEY_FROM_THE_URL");
+/// String token = "PERSONAL_ACCESS_TOKEN";   // typed by the user, never stored
+/// Display.getInstance().startThread(() -> {
+///     try {
+///         ArtDocument doc = new FigmaClient(token).fetch("FILE_KEY_FROM_THE_URL");
+///         Log.p("Layers: " + doc.getRoot().getChildren().size());
+///     } catch (IOException err) {
+///         Log.e(err);
+///     }
+/// }, "figma").start();
 /// ```
 public final class FigmaClient {
     /// The API this client talks to.

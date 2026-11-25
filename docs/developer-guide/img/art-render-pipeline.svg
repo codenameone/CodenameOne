@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="330" viewBox="0 0 760 330">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#4a6fa5"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="760" height="330" fill="#ffffff"/>
+  <text x="380" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#222222">How one node reaches the canvas</text>
+  <text x="380" y="43" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">A plain group just draws its children into the canvas. Anything with a blend mode, a mask, a clip or an effect</text>
+  <text x="380" y="57" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#333333">is first drawn alone into a layer of its own, so the effect sees only that node and the blend sees what is below.</text>
+
+  <g font-family="Arial, sans-serif" font-size="10.5" fill="#222222">
+    <rect x="12" y="84" width="112" height="56" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+    <text x="68" y="106" text-anchor="middle" font-weight="bold" fill="#4a6fa5">1 Content</text>
+    <text x="68" y="122" text-anchor="middle" font-size="9.5">paths, text, pixels,</text>
+    <text x="68" y="134" text-anchor="middle" font-size="9.5">children, padded</text>
+
+    <rect x="148" y="84" width="112" height="56" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+    <text x="204" y="106" text-anchor="middle" font-weight="bold" fill="#4a6fa5">2 Clip path</text>
+    <text x="204" y="122" text-anchor="middle" font-size="9.5">coverage cuts the</text>
+    <text x="204" y="134" text-anchor="middle" font-size="9.5">layer's alpha</text>
+
+    <rect x="284" y="84" width="112" height="56" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+    <text x="340" y="106" text-anchor="middle" font-weight="bold" fill="#4a6fa5">3 Mask</text>
+    <text x="340" y="122" text-anchor="middle" font-size="9.5">the mask node is</text>
+    <text x="340" y="134" text-anchor="middle" font-size="9.5">rendered, then applied</text>
+
+    <rect x="420" y="84" width="112" height="56" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+    <text x="476" y="106" text-anchor="middle" font-weight="bold" fill="#4a6fa5">4 Effects</text>
+    <text x="476" y="122" text-anchor="middle" font-size="9.5">in list order; shadows</text>
+    <text x="476" y="134" text-anchor="middle" font-size="9.5">may read the backdrop</text>
+
+    <rect x="556" y="84" width="192" height="56" rx="4" fill="#ffffff" stroke="#4a6fa5" stroke-width="1.5"/>
+    <text x="652" y="106" text-anchor="middle" font-weight="bold" fill="#4a6fa5">5 Composite</text>
+    <text x="652" y="122" text-anchor="middle" font-size="9.5">blend mode and opacity onto</text>
+    <text x="652" y="134" text-anchor="middle" font-size="9.5">the canvas (W3C formulas)</text>
+  </g>
+  <g stroke="#4a6fa5" stroke-width="1.5" fill="none" marker-end="url(#arr)">
+    <path d="M124 112 L146 112"/>
+    <path d="M260 112 L282 112"/>
+    <path d="M396 112 L418 112"/>
+    <path d="M532 112 L554 112"/>
+  </g>
+
+  <rect x="12" y="168" width="360" height="146" rx="4" fill="#f5f8fc" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="24" y="188" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">Groups: pass-through or isolated</text>
+  <text x="24" y="208" font-family="Arial, sans-serif" font-size="10" fill="#333333">A pass-through group (Photoshop's default) draws its</text>
+  <text x="24" y="223" font-family="Arial, sans-serif" font-size="10" fill="#333333">children straight onto the canvas, so a multiply layer inside</text>
+  <text x="24" y="238" font-family="Arial, sans-serif" font-size="10" fill="#333333">it darkens everything below, outside the group too.</text>
+  <text x="24" y="258" font-family="Arial, sans-serif" font-size="10" fill="#333333">An isolated group, or one with opacity, a blend mode, a mask</text>
+  <text x="24" y="273" font-family="Arial, sans-serif" font-size="10" fill="#333333">or effects, renders its children into its own layer first and</text>
+  <text x="24" y="288" font-family="Arial, sans-serif" font-size="10" fill="#333333">composites that layer once, through steps 2 to 5.</text>
+
+  <rect x="388" y="168" width="360" height="146" rx="4" fill="#f5f8fc" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="400" y="188" font-family="Arial, sans-serif" font-size="11.5" font-weight="bold" fill="#4a6fa5">Adjustments work on what is already there</text>
+  <text x="400" y="208" font-family="Arial, sans-serif" font-size="10" fill="#333333">An AdjustmentNode has no content. Levels, curves,</text>
+  <text x="400" y="223" font-family="Arial, sans-serif" font-size="10" fill="#333333">hue/saturation and the rest are applied to a copy of the</text>
+  <text x="400" y="238" font-family="Arial, sans-serif" font-size="10" fill="#333333">canvas as it stands at that point in the order, and the result</text>
+  <text x="400" y="253" font-family="Arial, sans-serif" font-size="10" fill="#333333">is composited back with the node's blend and opacity.</text>
+  <text x="400" y="273" font-family="Arial, sans-serif" font-size="10" fill="#333333">Moving one up or down the layer list changes which</text>
+  <text x="400" y="288" font-family="Arial, sans-serif" font-size="10" fill="#333333">layers it affects, exactly as in Photoshop.</text>
+</svg>

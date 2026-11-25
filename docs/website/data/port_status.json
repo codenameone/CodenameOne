@@ -1756,6 +1756,10 @@
       "test": "DocumentReviewScreenshotTest"
     },
     {
+      "pattern": "ArtEditor*",
+      "test": "ArtEditorScreenshotTest"
+    },
+    {
       "pattern": "DocumentFormats*",
       "test": "DocumentFormatsScreenshotTest"
     },

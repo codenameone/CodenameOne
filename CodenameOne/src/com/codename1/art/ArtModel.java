@@ -40,10 +40,12 @@ import java.util.List;
 /// draw into that.
 ///
 /// ```java
-/// ArtModel model = new ArtModel(PsdReader.read(in));
-/// ArtNode layer = model.findById("layer-3");
+/// ArtModel model = new ArtModel(new ArtDocument(200, 120));
+/// ShapeNode layer = ShapeNode.rect(10, 10, 80, 50, 6);
+/// layer.fill(new SolidPaint(0xff1e88e5));
+/// model.add(layer);
 /// model.setOpacity(layer, 0.5f);
-/// model.undo();
+/// model.undo();   // back to fully opaque
 /// ```
 public class ArtModel {
     private ArtDocument document;
