@@ -1588,6 +1588,22 @@
       "test": "Chart2ZoomAnimationScreenshotTest"
     },
     {
+      "pattern": "SlideCapabilities*",
+      "test": "SlideCapabilitiesScreenshotTest"
+    },
+    {
+      "pattern": "SlideEditor*",
+      "test": "SlideEditorScreenshotTest"
+    },
+    {
+      "pattern": "SlideTransitionAnimationScreenshotTest*",
+      "test": "SlideTransitionAnimationScreenshotTest"
+    },
+    {
+      "pattern": "SlideBuildAnimationScreenshotTest*",
+      "test": "SlideBuildAnimationScreenshotTest"
+    },
+    {
       "pattern": "chart2-bar-styles",
       "test": "Chart2BarStylesScreenshotTest"
     },
