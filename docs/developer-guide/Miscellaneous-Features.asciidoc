@@ -282,6 +282,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 On iOS, the JavaScript port and the native desktop ports `Currency` knows two symbols per currency: the one used at home (`$` for the dollar in America) and the one American English writes everywhere else (`US$`). Its display names are in English. Use `L10NManager` when the user should see a symbol or an amount in their own language.
 
+On iOS `getCurrencySymbol()` returns the symbol (`$`), as on the other platforms; it used to return the ISO code (`USD`). Code that needs the code calls `getCurrencyCode()`.
+
 ==== RTL/Bidi
 
 RTL stands for right to left, in the world of internationalization it refers to languages that are written from right to left (Arabic, Hebrew, Syriac, Thaana).

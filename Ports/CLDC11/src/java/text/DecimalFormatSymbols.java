@@ -105,6 +105,12 @@ public class DecimalFormatSymbols implements Cloneable, java.io.Serializable {
         }
         currency = c;
         intlCurrencySymbol = c.getCurrencyCode();
+        // The device's symbol belongs to the device's own currency. A locale
+        // whose country uses another one (yen asked for on a US device) must
+        // not write that currency's amounts with a dollar sign.
+        if (c != countryCurrency(Locale.getDefault())) {
+            currencySymbol = c.getSymbol(locale);
+        }
     }
 
     private static Currency countryCurrency(Locale l) {

@@ -463,6 +463,14 @@ public final class DecimalFormatChecks {
         }
     }
 
+    /// A US device: US separators, priced in dollars.
+    private static final class DecimalFormatUsDevice extends BulkHost {
+        @Override
+        public String[] localeNumberSymbols() {
+            return new String[] {".", ",", "$"};
+        }
+    }
+
     /// A device that writes a decimal comma and does not group.
     private static final class DecimalFormatUngroupedDevice extends BulkHost {
         @Override
@@ -485,7 +493,16 @@ public final class DecimalFormatChecks {
     private static void hostChecks() {
         Bulk.cn1Only("DecimalFormatSymbolsHost.deviceSymbolsComeFromTheHost", () -> {
             JdkHost.install(new DecimalFormatGermanDevice());
-            DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("de", "DE"));
+            // The device's currency symbol is its own currency's: a German
+            // device has a German default locale.
+            Locale previous = Locale.getDefault();
+            Locale.setDefault(new Locale("de", "DE"));
+            DecimalFormatSymbols symbols;
+            try {
+                symbols = new DecimalFormatSymbols(new Locale("de", "DE"));
+            } finally {
+                Locale.setDefault(previous);
+            }
             Bulk.expectEquals(Character.valueOf(','), Character.valueOf(symbols.getDecimalSeparator()), "decimal");
             Bulk.expectEquals(Character.valueOf(','), Character.valueOf(symbols.getMonetaryDecimalSeparator()),
                     "monetary decimal");
@@ -501,6 +518,20 @@ public final class DecimalFormatChecks {
             Bulk.expectEquals(Character.valueOf('.'), Character.valueOf(symbols.getDecimalSeparator()), "decimal");
             Bulk.expectEquals(Character.valueOf(','), Character.valueOf(symbols.getGroupingSeparator()), "grouping");
             Bulk.expectEquals("$", symbols.getCurrencySymbol(), "currency");
+        });
+        Bulk.cn1Only("DecimalFormatSymbolsHost.anotherCountrysCurrencyGetsItsOwnSymbol", () -> {
+            JdkHost.install(new DecimalFormatUsDevice());
+            Locale previous = Locale.getDefault();
+            Locale.setDefault(new Locale("en", "US"));
+            try {
+                DecimalFormatSymbols symbols = new DecimalFormatSymbols(new Locale("ja", "JP"));
+                Bulk.expectEquals("JPY", symbols.getInternationalCurrencySymbol(), "code");
+                Bulk.expectEquals(String.valueOf((char) 0xFFE5), symbols.getCurrencySymbol(), "symbol");
+                Bulk.expectEquals("$", new DecimalFormatSymbols(new Locale("es", "US")).getCurrencySymbol(),
+                        "the device's own currency keeps the device's symbol");
+            } finally {
+                Locale.setDefault(previous);
+            }
         });
         Bulk.cn1Only("DecimalFormatSymbolsHost.aDecimalCommaNeverGroupsWithAComma", () -> {
             JdkHost.install(new DecimalFormatUngroupedDevice());
