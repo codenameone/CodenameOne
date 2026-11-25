@@ -91,8 +91,6 @@ import javax.crypto.spec.SecretKeySpec;
  * covers the bundle, so a captured frame authenticates nothing the second time
  * and a program cannot be swapped in behind a valid answer. The device still
  * asks its user to approve, unless they chose "Always".</p>
- *
- * @author Shai Almog
  */
 public final class DevicePush {
     private static final int MAGIC = 0x434E3150;   // "CN1P"
@@ -110,6 +108,14 @@ public final class DevicePush {
     private static final int FRAME_PING = 0;
     private static final int FRAME_PAIR = 1;
     private static final int FRAME_PUSH = 2;
+    /// Stops whatever program the device is running. Authenticated exactly as a
+    /// push is, over {@link #STOP_BODY} in place of a bundle, so only a paired
+    /// computer can end a program -- a stop is as much control over the phone
+    /// as a push.
+    private static final int FRAME_STOP = 3;
+    static final byte[] STOP_BODY = {'c', 'n', '1', '-', 's', 't', 'o', 'p'};
+    /// The frame {@link #send} opens with: a push, or a stop with `--stop`.
+    private static int frame = FRAME_PUSH;
 
     /** Must equal InterpPairingSecret.ITERATIONS, or nothing pairs. */
     private static final int PAIRING_ITERATIONS = 20000;
@@ -160,13 +166,17 @@ public final class DevicePush {
                 // network path but is now the only authenticated way to reach
                 // the runtime even over adb-reverse loopback.
                 prepackaged = new File(args[++i]);
+            } else if ("--stop".equals(a)) {
+                frame = FRAME_STOP;
             } else if ("--help".equals(a)) {
                 usage();
                 return;
             }
         }
         byte[] bundle;
-        if (prepackaged != null) {
+        if (frame == FRAME_STOP) {
+            bundle = STOP_BODY;
+        } else if (prepackaged != null) {
             if (!prepackaged.isFile()) {
                 System.err.println("no bundle at " + prepackaged.getAbsolutePath());
                 System.exit(2);
@@ -186,7 +196,8 @@ public final class DevicePush {
             }
             bundle = buildBundle(classes, sources, mainClass);
         }
-        System.out.println("bundle " + bundle.length + " bytes");
+        System.out.println(frame == FRAME_STOP ? "stopping the device's program"
+                : "bundle " + bundle.length + " bytes");
 
         if (lan) {
             System.out.println();
@@ -211,7 +222,9 @@ public final class DevicePush {
 
     private static void usage() {
         System.out.println("DevicePush [--classes dir] [--source dir] [--main Class]"
-                + " [--port 18234] [--lan] [--device <address>]");
+                + " [--port 18234] [--lan] [--device <address>] [--stop]");
+        System.out.println("  --stop  end the program the device is running instead of"
+                + " pushing one");
         System.out.println("  --device  connect straight to a device at this address,"
                 + " which the runtime shows on screen");
         System.out.println("  --lan   the device is on Wi-Fi rather than USB;"
@@ -229,7 +242,7 @@ public final class DevicePush {
             throw new IllegalStateException("no .class files under " + classesDir);
         }
         for (File f : classes) {
-            w.addClassFile(f);
+            InterpBundleFiles.addClassFile(w, f);
         }
         // Every configured root contributes sources and resources. A Kotlin
         // project passes `src/main/java` and `src/main/kotlin`; a mixed
@@ -239,12 +252,12 @@ public final class DevicePush {
         // than the host app's.
         for (File sourceRoot : sourceRoots) {
             if (sourceRoot.isDirectory()) {
-                w.addSourceTree(sourceRoot);
-                w.addResourceTree(sourceRoot);
+                InterpBundleFiles.addSourceTree(w, sourceRoot);
+                InterpBundleFiles.addResourceTree(w, sourceRoot);
             }
             File res = new File(sourceRoot.getParentFile(), "resources");
             if (res.isDirectory()) {
-                w.addResourceTree(res);
+                InterpBundleFiles.addResourceTree(w, res);
             }
         }
         if (mainClass.length() == 0) {
@@ -484,7 +497,7 @@ public final class DevicePush {
             out.writeInt(MAGIC);
             String desktopChallenge = hex(randomBytes(32));
             out.writeInt(V3);
-            out.writeInt(FRAME_PUSH);
+            out.writeInt(frame);
             out.writeUTF(peerId);
             out.writeUTF(desktopChallenge);
             out.flush();
@@ -511,7 +524,9 @@ public final class DevicePush {
             // device id is public, so anything on the LAN could answer this
             // dial claiming to be a paired phone, and the bundle carries the
             // program's whole source.
-            if (!respond(secret, desktopChallenge, null).equals(deviceProof)) {
+            if (!java.security.MessageDigest.isEqual(
+                    respondAsDevice(secret, desktopChallenge).getBytes(StandardCharsets.UTF_8),
+                    deviceProof.getBytes(StandardCharsets.UTF_8))) {
                 lastRejection = "the device on the other end did not authenticate";
                 System.out.println("FAILED: " + lastRejection);
                 return false;
@@ -949,11 +964,28 @@ public final class DevicePush {
     }
 
     /** The answer to a device's challenge, optionally covering a bundle. */
+    /// A pairing answer (no payload) or a push answer (with one). Labelled and
+    /// length prefixed exactly as InterpPairingSecret does on the device, so
+    /// no answer of one kind verifies as another.
     private static String respond(byte[] secret, String challenge, byte[] payload) {
+        return answer(secret, payload == null ? "cn1-pair" : "cn1-push", challenge, payload);
+    }
+
+    /// What the device must answer to prove itself.
+    private static String respondAsDevice(byte[] secret, String challenge) {
+        return answer(secret, "cn1-device-proof", challenge, null);
+    }
+
+    private static String answer(byte[] secret, String label, String challenge, byte[] payload) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret, "HmacSHA256"));
-            mac.update(challenge.getBytes(StandardCharsets.UTF_8));
+            mac.update(label.getBytes(StandardCharsets.UTF_8));
+            mac.update((byte) 0);
+            byte[] c = challenge.getBytes(StandardCharsets.UTF_8);
+            mac.update(new byte[]{(byte) (c.length >>> 24), (byte) (c.length >>> 16),
+                (byte) (c.length >>> 8), (byte) c.length});
+            mac.update(c);
             if (payload != null) {
                 mac.update(payload);
             }

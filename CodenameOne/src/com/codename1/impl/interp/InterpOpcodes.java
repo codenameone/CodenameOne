@@ -35,8 +35,6 @@ package com.codename1.impl.interp;
 /// [#OP_TABLESWITCH] and [#OP_LOOKUPSWITCH] store their own operand count
 /// first. Everything else has a constant operand count given by
 /// [#operandCount].
-///
-/// @author Shai Almog
 public final class InterpOpcodes {
     private InterpOpcodes() {
     }

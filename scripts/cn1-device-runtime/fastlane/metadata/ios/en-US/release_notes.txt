@@ -1,1 +1,1 @@
-Weekly development build.
+First TestFlight beta: on-device Java editor with code completion, live run, and sending programs from your computer.

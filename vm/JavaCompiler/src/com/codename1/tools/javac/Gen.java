@@ -189,7 +189,13 @@ final class Gen {
         List<ByteBuf> attrs = new ArrayList<ByteBuf>();
         if (c.unit != null && c.unit.source != null) {
             ByteBuf a = new ByteBuf();
-            a.u2(pool.utf8("SourceFile")).u4(2).u2(pool.utf8(c.unit.source.name));
+            // The bare file name, as javac writes it (JVMS 4.7.10): a source added
+            // as "com/foo/A.java" must still say "A.java", or anything that
+            // locates source as package + SourceFile -- debuggers, stack traces,
+            // the device runtime -- looks for com/foo/com/foo/A.java.
+            String sourceName = c.unit.source.name;
+            int slash = Math.max(sourceName.lastIndexOf('/'), sourceName.lastIndexOf('\\'));
+            a.u2(pool.utf8("SourceFile")).u4(2).u2(pool.utf8(sourceName.substring(slash + 1)));
             attrs.add(a);
         }
         List<ClassSymbol> inner = new ArrayList<ClassSymbol>();

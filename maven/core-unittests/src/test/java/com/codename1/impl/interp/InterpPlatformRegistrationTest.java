@@ -46,8 +46,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * every test that could have noticed needs a device. This one reads the source
  * instead, which is worth more than its ugliness: it costs nothing and it runs
  * on every push.</p>
- *
- * @author Shai Almog
  */
 class InterpPlatformRegistrationTest {
 

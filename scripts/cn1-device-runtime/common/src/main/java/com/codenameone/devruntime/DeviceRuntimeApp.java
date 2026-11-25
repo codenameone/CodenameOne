@@ -38,8 +38,6 @@ import com.codename1.system.Lifecycle;
  * accept an inbound connection, and over USB the device's loopback is what
  * {@code adb reverse} maps. So the device asks the desktop, every couple of
  * seconds, whether it has anything to run.</p>
- *
- * @author Shai Almog
  */
 public class DeviceRuntimeApp extends Lifecycle {
     /** The port the desktop tooling listens on. */
@@ -68,7 +66,7 @@ public class DeviceRuntimeApp extends Lifecycle {
         // and this comes back when the app is resumed, which is what you want
         // from a debugging proxy: somewhere to see where it is dialling and what
         // it last loaded.
-        DeviceRuntimeForm.showIt();
+        IdeForm.showIt();
     }
 
     /**

@@ -34,8 +34,6 @@ package com.codename1.impl.interp;
 /// It is deliberately narrow. Only static calls are offered, only the
 /// interpreter consults it, and the host application is untouched: a mock
 /// installed here changes what a *pushed program* sees and nothing else.
-///
-/// @author Shai Almog
 public interface InterpHostInterceptor {
     /// Returned when the call should go to the linker as usual.
     Object NOT_INTERCEPTED = new Object();

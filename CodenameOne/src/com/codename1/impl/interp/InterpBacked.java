@@ -29,8 +29,6 @@ package com.codename1.impl.interp;
 /// which is what makes the round trip work -- interpreted code hands its peer
 /// to the framework, the framework hands the peer back to a listener, and the
 /// runtime has to get from there to the interpreted instance again.
-///
-/// @author Shai Almog
 public interface InterpBacked {
     /// The interpreted object this peer stands for.
     InterpObject getInterpObject();

@@ -61,10 +61,12 @@ import com.codename1.ui.Label;
  * <p>The order matters: authenticate, then ask. Prompting first would let
  * anyone on the network raise a dialog on somebody's phone until they tapped
  * Approve to make it stop.</p>
- *
- * @author Shai Almog
  */
 public final class DeviceRuntimePairing {
+    /// How long the pairing prompt waits for an answer. The computer waits
+    /// 180 seconds, so the device gives up first and says so.
+    static final long PROMPT_TIMEOUT_MS = 150000;
+
     /** Peer id -> friendly name, for every computer that has ever paired. */
     private static final String PREF_PAIRED = "cn1devruntime.paired.";
 
@@ -111,7 +113,7 @@ public final class DeviceRuntimePairing {
             return null;
         }
         final String[] result = new String[1];
-        lastFailure = "pairing declined on the device";
+        lastFailure = "pairing declined on the device, or nobody answered in time";
         Display.getInstance().callSeriallyAndWait(new Runnable() {
             public void run() {
                 final TextField code = new TextField("", "000000", 6, TextField.NUMERIC);
@@ -122,12 +124,12 @@ public final class DeviceRuntimePairing {
                 Container body = new Container(BoxLayout.y());
                 SpanLabel who = new SpanLabel("Pair with \"" + peerName + "\"?");
                 body.add(who)
-                    .add(new Label("Type the code shown in the IDE:"))
+                    .add(new Label("Type the code shown on your computer:"))
                     .add(code);
                 // Real buttons rather than dialog commands: a Command renders as
                 // a line of text at the dialog's edge, which on a phone is too
                 // small a target to hit reliably.
-                final Dialog prompt = new Dialog("Device runtime");
+                final Dialog prompt = new Dialog("Pair with computer");
                 prompt.setLayout(new BorderLayout());
                 Button pairBtn = new Button("Pair");
                 Button denyBtn = new Button("Deny");
@@ -147,6 +149,13 @@ public final class DeviceRuntimePairing {
                 actions.add(pairBtn).add(denyBtn);
                 prompt.add(BorderLayout.CENTER, body);
                 prompt.add(BorderLayout.SOUTH, actions);
+                // A deadline, shorter than the computer's own wait for the
+                // answer. Nothing watches the connection while the dialog is
+                // up, so a computer that went away mid-pairing used to leave
+                // the prompt -- and with it the only pairing slot -- held until
+                // someone answered it, refusing every later pairing as "a
+                // pairing prompt is already open".
+                prompt.setTimeout(PROMPT_TIMEOUT_MS);
                 prompt.show();
                 if (!pairPressed[0]) {
                     lastFailure = "you chose Deny on the device";
@@ -155,7 +164,7 @@ public final class DeviceRuntimePairing {
                 String typed = code.getText() == null ? "" : code.getText().trim();
                 if (typed.length() == 0) {
                     lastFailure = "no code was typed on the device";
-                    Dialog.show("Device runtime", "Type the six digits shown in the IDE.",
+                    Dialog.show("Pair with computer", "Type the six digits shown on your computer.",
                             "OK", null);
                     return;
                 }
@@ -219,7 +228,7 @@ public final class DeviceRuntimePairing {
         lastFailure = "the code typed on the device did not match";
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                Dialog.show("Device runtime", "That code did not match. "
+                Dialog.show("Pair with computer", "That code did not match. "
                         + "Push again to get a new one.", "OK", null);
             }
         });
@@ -272,7 +281,7 @@ public final class DeviceRuntimePairing {
                 // Buttons rather than commands, for the same reason as the
                 // pairing prompt: a command is a line of text at the dialog's
                 // edge and too small a target on a phone.
-                final Dialog prompt = new Dialog("Device runtime");
+                final Dialog prompt = new Dialog("Pair with computer");
                 prompt.setLayout(new BorderLayout());
                 Container body = new Container(BoxLayout.y());
                 body.add(new SpanLabel("Approve connection from \"" + name + "\"?"));

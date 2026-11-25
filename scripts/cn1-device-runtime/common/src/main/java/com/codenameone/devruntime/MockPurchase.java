@@ -44,8 +44,6 @@ import java.util.Vector;
  * purchase succeeds, and no receipt is valid anywhere. The runtime says so on
  * screen the first time a pushed program touches this, because a mock that
  * looks like the real thing is worse than no mock at all.</p>
- *
- * @author Shai Almog
  */
 public class MockPurchase extends Purchase {
     /** SKUs currently owned, in memory and for this session only. */
@@ -98,8 +96,8 @@ public class MockPurchase extends Purchase {
             Product p = new Product();
             p.setSku(skus[i]);
             p.setDisplayName(skus[i]);
-            p.setDescription("Mock product. Not a real store listing.");
-            p.setLocalizedPrice("$0.00 (mock)");
+            p.setDescription("Simulated product for testing your code. Nothing is sold.");
+            p.setLocalizedPrice("No charge (simulated)");
             out[i] = p;
         }
         return out;

@@ -1951,10 +1951,44 @@ public abstract class Executor {
         scanClassesForPermissions(directory, scanner, new PermScanBudget());
     }
 
+    /// Package directories (`com/example/gen`) the permission scan skips; see
+    /// the `ios.featureScanExclude` hint.
+    private final java.util.List<String> permissionScanExcludes = new java.util.ArrayList<String>();
+
+    /// Skips classes under these packages in later permission scans.
+    protected void setPermissionScanExcludes(String commaSeparatedPackages) {
+        permissionScanExcludes.clear();
+        if (commaSeparatedPackages == null) {
+            return;
+        }
+        for (String p : commaSeparatedPackages.split(",")) {
+            String t = p.trim();
+            if (t.length() > 0) {
+                permissionScanExcludes.add(t.replace('.', '/'));
+            }
+        }
+    }
+
+    private boolean isPermissionScanExcluded(File dir) {
+        if (permissionScanExcludes.isEmpty()) {
+            return false;
+        }
+        String path = dir.getPath().replace('\\', '/');
+        for (String p : permissionScanExcludes) {
+            if (path.endsWith("/" + p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void scanClassesForPermissions(File directory, final ClassScanner scanner,
             PermScanBudget budget) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {
+            if (current.isDirectory() && isPermissionScanExcluded(current)) {
+                continue;
+            }
             if (current.isDirectory()) {
                 scanClassesForPermissions(current, scanner, budget);
             } else if (current.getName().endsWith(".jar") || current.getName().endsWith(".aar")) {

@@ -33,8 +33,6 @@ package com.codename1.impl.interp;
 /// them as one slot would be simpler until `dup2`, `pop2` and `dup2_x1` -- whose
 /// meaning is defined in terms of slots, not values -- quietly did the wrong
 /// thing for `long` and `double`.
-///
-/// @author Shai Almog
 final class InterpFrame {
     final InterpMethod method;
     final long[] prim;

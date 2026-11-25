@@ -46,8 +46,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the event thread indefinitely, runaway recursion is a diagnosable error
  * rather than a process death, failures name the user's own source lines, and
  * code whose source cannot be shown does not run at all.</p>
- *
- * @author Shai Almog
  */
 class InterpRuntimeContractTest {
 
@@ -907,8 +905,8 @@ class InterpRuntimeContractTest {
 
         Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
         Object writer = writerClass.getDeclaredConstructor().newInstance();
-        writerClass.getMethod("addClassFile", java.io.File.class)
-                .invoke(writer, dir.resolve("Bare.class").toFile());
+        Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addClassFile", writerClass, java.io.File.class)
+                .invoke(null, writer, dir.resolve("Bare.class").toFile());
         writerClass.getMethod("setMainClass", String.class).invoke(writer, "Bare");
         java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
         writerClass.getMethod("write", java.io.OutputStream.class).invoke(writer, bos);
@@ -1091,11 +1089,11 @@ class InterpRuntimeContractTest {
 
         Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
         Object writer = writerClass.getDeclaredConstructor().newInstance();
-        writerClass.getMethod("addClassFile", java.io.File.class)
-                .invoke(writer, classes.resolve("a/Util.class").toFile());
-        writerClass.getMethod("addClassFile", java.io.File.class)
-                .invoke(writer, classes.resolve("b/Util.class").toFile());
-        writerClass.getMethod("addSourceTree", java.io.File.class).invoke(writer, src.toFile());
+        Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addClassFile", writerClass, java.io.File.class)
+                .invoke(null, writer, classes.resolve("a/Util.class").toFile());
+        Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addClassFile", writerClass, java.io.File.class)
+                .invoke(null, writer, classes.resolve("b/Util.class").toFile());
+        Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addSourceTree", writerClass, java.io.File.class).invoke(null, writer, src.toFile());
         java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
         writerClass.getMethod("write", java.io.OutputStream.class).invoke(writer, bos);
 
@@ -1194,7 +1192,7 @@ class InterpRuntimeContractTest {
 
         Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
         Object writer = writerClass.getDeclaredConstructor().newInstance();
-        writerClass.getMethod("addResourceTree", java.io.File.class).invoke(writer, dir.toFile());
+        Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addResourceTree", writerClass, java.io.File.class).invoke(null, writer, dir.toFile());
 
         java.lang.reflect.Field resourcesField = writerClass.getDeclaredField("resources");
         resourcesField.setAccessible(true);

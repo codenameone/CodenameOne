@@ -26,8 +26,6 @@ import com.codename1.impl.interp.InterpRuntime;
 
 /**
  * Snippets for the device runtime chapter of the developer guide.
- *
- * @author Shai Almog
  */
 class DeviceRuntimeSnippets {
     InterpRuntime runtime;

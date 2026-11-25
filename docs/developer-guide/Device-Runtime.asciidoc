@@ -16,6 +16,39 @@ Native integration. Native code can't be pushed. A `cn1lib`'s Java half runs; it
 
 Anything that depends on app identity. Bundle id, icons, splash screens, URL schemes, push certificates, background modes and app extensions all belong to the runtime app, not to your program.
 
+== Using the app
+
+The Codename One Device Runtime app has two halves: an editor on the device, and a receiver for programs sent from your computer. Neither needs a build server, a certificate or a cable.
+
+=== The on-device editor
+
+The app opens on a project called Hello. Tap *Run* at the top right: the source is compiled on the device in a fraction of a second and its screen appears. A red *Stop* button floats over every screen a running program shows; tap it to come back to the editor.
+
+image::img/device-runtime-ide-phone.png[The editor on a phone,scaledwidth=30%]
+
+Compile errors appear in the console under the editor. Tap one to jump to its line. Typing a dot after a variable or a class name lists its methods, and class names and keywords are suggested as you type.
+
+On a phone, the title opens the project list, where you also create projects, delete files, and reach *About and help*. The strip under the toolbar holds the project's files, and the `+` chip adds one. On a tablet the files and projects sit in a sidebar instead.
+
+image::img/device-runtime-ide-tablet.png[The editor on a tablet,scaledwidth=60%]
+
+=== Sending a program from your computer
+
+The computer icon at the top left of the editor opens the pairing screen. From a Codename One project on your computer, run:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/device-runtime.sh[tag=device-runtime-push,indent=0]
+----
+
+These are goals of the Codename One Maven plugin, so they work the same way on every operating system. The first time, the command prints a six-digit code; type it on the device and press *Pair*. After that, the computer is remembered and later sends start the program at once.
+
+image::img/device-runtime-pushed.png[A program sent from the computer, with its Stop button,scaledwidth=30%]
+
+A received program can be stopped three ways: the floating *Stop* button, *Stop the program* on the pairing screen, or `mvn cn1:push-stop` from the computer. *View and edit source* shows everything that runs, and *Edit* saves the received program as a project in the editor, where you can change it and run it again.
+
+Only a paired computer can send or stop a program. *Unpair all computers* on the pairing screen revokes every pairing.
+
 == How it works
 
 Three pieces, in the order they run.
@@ -240,7 +273,7 @@ These are the ones that will actually bite you.
 
 From JDK 9 onwards `javac` compiles `"a" + b` into an `invokedynamic` against `StringConcatFactory`. ParparVM has no runtime `invokedynamic` -- the translator desugars it at build time, and a pushed bundle gets no such pass.
 
-Compile pushed code with `-XDstringConcat=inline`; `cn1-push.sh` already does. The bundle writer rejects any `invokedynamic` it doesn't recognise, naming the bootstrap method, rather than producing something that fails obscurely on the device.
+Compile pushed code with `-XDstringConcat=inline` when the project targets Java 9 or later: add it to the `maven-compiler-plugin` `compilerArgs` of the module you push. A project at source level 8 needs nothing. The bundle writer rejects any `invokedynamic` it doesn't recognise, naming the bootstrap method, rather than producing something that fails obscurely on the device.
 
 Lambdas and method references are handled without a flag. `InterpLambdaDesugar` rewrites each site into the class `LambdaMetafactory` would have spun -- captures in fields, the single abstract method forwarding to the lambda body, the call site becoming a plain static call -- so lambdas, method references, constructor references and bound receivers all work. The generated class inherits the source file of the class that contained the lambda, which is both true and required, since the runtime won't execute a class whose source it can't show.
 
@@ -319,7 +352,7 @@ That's what the `super_` bridges on every shim are for: `super.paint(g)` from in
 
 === Pushing an application, not a file
 
-`cn1-push.sh` takes a source tree as well as a single file, compiles the whole tree,
+`cn1:push` sends the module's whole compiled tree with all of its source roots,
 and carries every source -- the runtime won't run a class whose source it
 can't show, and an application is many files.
 

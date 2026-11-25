@@ -37,8 +37,6 @@ package com.codename1.impl.interp;
 ///
 /// The interpreter above this interface never learns which one it is talking
 /// to.
-///
-/// @author Shai Almog
 public interface InterpLinker {
     /// Resolves a class by JVM internal name (a/b/C), or null if the host does
     /// not have it. Returning null rather than throwing matters: a pushed

@@ -33,8 +33,6 @@ package com.codename1.impl.interp;
 /// distinct because the host's object has the host's layout and the host's
 /// vtable, while interpreted state has to live somewhere the host does not know
 /// about.
-///
-/// @author Shai Almog
 public final class InterpObject {
     final InterpClass type;
     final Object[] fields;

@@ -60,8 +60,6 @@ import java.util.Set;
  * already built with the optimizer off and nothing culled. iOS does not pay it
  * at all: there, runtime vtable synthesis subclasses any class with no
  * generated code whatsoever.</p>
- *
- * @author Shai Almog
  */
 public final class GenerateInterpShims {
     /**
@@ -829,8 +827,17 @@ public final class GenerateInterpShims {
 
             Map<String, Class<?>> bindings = typeBindings(target);
             Map<String, Method> ifaceMethods = collectInterfaceMethods(target);
+            // Keyed on the erased descriptor, two methods can still render the
+            // same Java signature once the target's type arguments are bound:
+            // PrimitiveIterator.forEachRemaining(T_CONS) erases to Object but is
+            // emitted as forEachRemaining(DoubleConsumer) for OfDouble, which
+            // declares that exact method itself. The first one found is the
+            // most derived, so it is the one kept.
+            java.util.Set<String> emitted = new java.util.HashSet<String>();
             for (Method m : ifaceMethods.values()) {
-                emitInterfaceMethod(w, m, target, bindings);
+                if (emitted.add(m.getName() + descriptorOfParams(resolvedParams(m, bindings)))) {
+                    emitInterfaceMethod(w, m, target, bindings);
+                }
             }
             emitObjectMethods(w, ifaceMethods.keySet(), target);
             w.println("}");
@@ -896,7 +903,7 @@ public final class GenerateInterpShims {
             // implements a host interface and does not override a default
             // method is ordinary Java, and throwing here would make its peer
             // fail on a method the interface plainly provides.
-            String call = target.getName() + ".super." + m.getName() + "(" + boxed + ")";
+            String call = target.getCanonicalName() + ".super." + m.getName() + "(" + boxed + ")";
             if (ret == Void.TYPE) {
                 w.println("            " + call + ";");
                 w.println("            return;");
@@ -942,7 +949,7 @@ public final class GenerateInterpShims {
         }
         w.println("    public " + typeName(ret) + " super_" + m.getName() + "(" + sig + ")"
                 + throwsClause(m) + " {");
-        String invocation = target.getName() + ".super." + m.getName() + "(" + call + ")";
+        String invocation = target.getCanonicalName() + ".super." + m.getName() + "(" + call + ")";
         if (ret == Void.TYPE) {
             w.println("        " + invocation + ";");
         } else {
@@ -1014,7 +1021,7 @@ public final class GenerateInterpShims {
             Map<String, Class<?>> bindings = typeBindings(target);
             Map<String, Method> methods = collectOverridable(target);
             for (Map.Entry<String, Method> e : methods.entrySet()) {
-                emitOverride(w, e.getValue(), bindings);
+                emitOverride(w, e.getValue(), bindings, target);
             }
             emitObjectMethods(w, methods.keySet(), target);
             w.println("}");
@@ -1644,7 +1651,9 @@ public final class GenerateInterpShims {
         return false;
     }
 
-    private static void emitOverride(PrintWriter w, Method m, Map<String, Class<?>> bindings) {
+    private static void emitOverride(PrintWriter w, Method m, Map<String, Class<?>> bindings,
+                                     Class<?> target) {
+        Class<?>[] thrown = overrideExceptions(target, m);
         Class<?>[] params = resolvedParams(m, bindings);
         Class<?> ret = resolved(m.getGenericReturnType(), m.getReturnType(), m, bindings);
         StringBuilder sig = new StringBuilder();
@@ -1676,7 +1685,7 @@ public final class GenerateInterpShims {
             w.println("    @Override");
         }
         w.println("    " + visibility + " " + typeName(ret) + " " + m.getName()
-                + "(" + sig + ")" + throwsClause(m) + " {");
+                + "(" + sig + ")" + throwsClause(thrown) + " {");
         // `$runtime` is null while the framework superclass constructor is
         // still running -- Java assigns subclass fields only after super()
         // returns -- but a framework `super(...)` that calls an overridable
@@ -1686,7 +1695,7 @@ public final class GenerateInterpShims {
         // constructor pushes before super() runs; the object has no state
         // yet, exactly as Java dictates during that window, but the
         // override runs rather than being silently skipped.
-        emitDispatch(w, m, "InterpRuntime.dispatchOrDeferred(this, $runtime, $interp, \""
+        emitDispatch(w, thrown, "InterpRuntime.dispatchOrDeferred(this, $runtime, $interp, \""
                 + m.getName() + "\", \""
                 + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "})");
         if (abstractMethod) {
@@ -1719,7 +1728,7 @@ public final class GenerateInterpShims {
         // and only exists where there is a super to reach.
         if (!abstractMethod) {
             w.println("    public " + typeName(ret) + " super_" + m.getName() + "(" + sig + ")"
-                    + throwsClause(m) + " {");
+                    + throwsClause(thrown) + " {");
             if (ret == Void.TYPE) {
                 w.println("        super." + m.getName() + "(" + call + ");");
             } else {
@@ -1822,7 +1831,10 @@ public final class GenerateInterpShims {
      * as it was.</p>
      */
     private static void emitDispatch(PrintWriter w, Method m, String call) {
-        Class<?>[] declared = m.getExceptionTypes();
+        emitDispatch(w, m.getExceptionTypes(), call);
+    }
+
+    private static void emitDispatch(PrintWriter w, Class<?>[] declared, String call) {
         java.util.List<Class<?>> checked = new java.util.ArrayList<Class<?>>();
         for (Class<?> e : declared) {
             if (!RuntimeException.class.isAssignableFrom(e) && !Error.class.isAssignableFrom(e)) {
@@ -1857,8 +1869,48 @@ public final class GenerateInterpShims {
         w.println("        }");
     }
 
+    /**
+     * The checked exceptions an override in a subclass of {@code target} may
+     * declare: those of {@code m} that the most derived declaration of the
+     * method, between {@code target} and {@code m}'s own class, still allows.
+     *
+     * <p>{@link #collectOverridable} can pick a declaration higher up than the
+     * one the JDK compiles against, when the device does not declare the lower
+     * one. {@code ByteArrayInputStream.readAllBytes} is the case: the device
+     * has only {@code InputStream}'s, which throws IOException, while the JDK
+     * overrides it in {@code ByteArrayInputStream} without the clause -- so
+     * repeating InputStream's throws there does not compile.</p>
+     */
+    private static Class<?>[] overrideExceptions(Class<?> target, Method m) {
+        Class<?>[] declared = m.getExceptionTypes();
+        Class<?>[] allowed = declared;
+        for (Class<?> c = target; c != null && c != m.getDeclaringClass(); c = c.getSuperclass()) {
+            try {
+                allowed = c.getDeclaredMethod(m.getName(), m.getParameterTypes()).getExceptionTypes();
+                break;
+            } catch (NoSuchMethodException notHere) {
+                // keep walking up
+            }
+        }
+        java.util.List<Class<?>> out = new java.util.ArrayList<Class<?>>();
+        for (Class<?> e : declared) {
+            boolean unchecked = RuntimeException.class.isAssignableFrom(e) || Error.class.isAssignableFrom(e);
+            boolean ok = unchecked;
+            for (Class<?> a : allowed) {
+                ok |= a.isAssignableFrom(e);
+            }
+            if (ok) {
+                out.add(e);
+            }
+        }
+        return out.toArray(new Class<?>[out.size()]);
+    }
+
     private static String throwsClause(Method m) {
-        Class<?>[] ex = m.getExceptionTypes();
+        return throwsClause(m.getExceptionTypes());
+    }
+
+    private static String throwsClause(Class<?>[] ex) {
         if (ex.length == 0) {
             return "";
         }

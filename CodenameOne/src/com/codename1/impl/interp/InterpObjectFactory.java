@@ -45,8 +45,6 @@ package com.codename1.impl.interp;
 ///
 /// Both satisfy this interface, so the interpreter never learns which is in
 /// play.
-///
-/// @author Shai Almog
 public interface InterpObjectFactory {
     /// Creates the host-visible peer for an interpreted object.
     ///

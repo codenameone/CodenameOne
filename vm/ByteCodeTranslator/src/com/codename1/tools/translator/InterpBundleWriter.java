@@ -29,13 +29,8 @@ import com.codename1.tools.translator.classfile.tree.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -57,8 +52,6 @@ import java.util.Map;
  * <p>What it does not do is reinterpret the bytecode. Opcodes are preserved
  * as-is, so the interpreter's behaviour can be checked against a real JVM
  * running the same source -- which is what the conformance tests do.</p>
- *
- * @author Shai Almog
  */
 public class InterpBundleWriter {
     private static final int MAGIC = 0x434E3149;
@@ -109,22 +102,6 @@ public class InterpBundleWriter {
         interpretedNames.add(cn.name);
     }
 
-    /** Adds a class from a {@code .class} file. */
-    public void addClassFile(File f) throws IOException {
-        InputStream in = new FileInputStream(f);
-        try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                bos.write(buf, 0, n);
-            }
-            addClass(bos.toByteArray());
-        } finally {
-            in.close();
-        }
-    }
-
     /**
      * Adds a source file. The runtime refuses to load a bundle whose
      * interpreted classes are not all covered by sources -- the App Store's
@@ -163,72 +140,11 @@ public class InterpBundleWriter {
         resources.put(path.startsWith("/") ? path : "/" + path, data);
     }
 
-    /**
-     * Adds every non-source file under a directory, keyed by its path relative
-     * to that directory. Source files ({@code .java}, {@code .kt}) are skipped
-     * because {@link #addSourceTree} has already collected them into the
-     * bundle's source section; storing them again as resources doubles the
-     * payload of a Kotlin-heavy project and can push it past the service's
-     * 64 MiB limit even though the executable half would fit.
-     */
-    public void addResourceTree(File dir) throws IOException {
-        addResourceTree(dir, dir);
-    }
-
-    private void addResourceTree(File root, File dir) throws IOException {
-        File[] kids = dir.listFiles();
-        if (kids == null) {
-            return;
-        }
-        for (File f : kids) {
-            if (f.isDirectory()) {
-                addResourceTree(root, f);
-            } else if (!isSourceFile(f.getName())) {
-                String rel = f.getAbsolutePath()
-                        .substring(root.getAbsolutePath().length())
-                        .replace(File.separatorChar, '/');
-                addResource(rel, Files.readAllBytes(f.toPath()));
-            }
-        }
-    }
-
-    /**
-     * Adds every source file under a directory, recursively.
-     *
-     * <p>Both {@code .java} and {@code .kt} are collected: the pushed bundle's
-     * source lookup keys on the {@code SourceFile} attribute javac and kotlinc
-     * emit, so a Kotlin class advertises {@code MyApp.kt} and the runtime
-     * refuses the whole push as missing source if only {@code .java} is
-     * gathered here. Any other language producing JVM classes would need its
-     * extension added the same way.</p>
-     *
-     * <p>Keyed by package rather than by file name. A bare name collides the
-     * moment a project has two {@code Util.java} in different packages, and the
-     * loser is simply absent -- which the runtime reports as "bundle is missing
-     * the source file Util.java" for a file that was right there. Since the
-     * source requirement is what lets the app run pushed code at all, losing one
-     * silently is not an option.</p>
-     */
-    public void addSourceTree(File dir) throws IOException {
-        File[] kids = dir.listFiles();
-        if (kids == null) {
-            return;
-        }
-        for (File f : kids) {
-            if (f.isDirectory()) {
-                addSourceTree(f);
-            } else if (isSourceFile(f.getName())) {
-                String text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-                addSource(sourceKey(packageOf(text, f.getName()), f.getName()), text);
-            }
-        }
-    }
-
     /// Whether a filename is a source extension that produces bundled classes.
     /// Java and Kotlin only; both are compiled to the same class files the
     /// interpreter runs, and their `SourceFile` attributes name a file with
     /// one of these extensions.
-    private static boolean isSourceFile(String name) {
+    static boolean isSourceFile(String name) {
         return name.endsWith(".java") || name.endsWith(".kt");
     }
 
@@ -669,7 +585,7 @@ public class InterpBundleWriter {
             // Stored uncompressed: ParparVM's java.util subset has no
             // java.util.zip, so the device could not inflate it. Sources are
             // small and the transport is a local socket, so nothing is lost.
-            byte[] utf8 = e.getValue().getBytes(StandardCharsets.UTF_8);
+            byte[] utf8 = e.getValue().getBytes("UTF-8");
             out.writeInt(utf8.length);
             out.write(utf8);
         }

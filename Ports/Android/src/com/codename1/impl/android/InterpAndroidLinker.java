@@ -47,8 +47,6 @@ import java.util.Map;
  * {@code Class[]} to do it; a pushed program calls the same handful of
  * framework methods in a loop, so caching the resolved {@link Method} is the
  * difference between "usable" and "visibly slow".</p>
- *
- * @author Shai Almog
  */
 public class InterpAndroidLinker implements InterpLinker {
     private final ClassLoader loader;

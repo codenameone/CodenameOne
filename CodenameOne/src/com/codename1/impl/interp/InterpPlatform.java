@@ -37,8 +37,6 @@ package com.codename1.impl.interp;
 ///
 /// A build with no device runtime registers nothing, so the whole feature
 /// reduces to one null field.
-///
-/// @author Shai Almog
 public final class InterpPlatform {
     private static InterpLinker linker;
 

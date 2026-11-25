@@ -56,8 +56,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a pushed {@code main} and from the event thread calling an interpreted
  * {@code paint}, at the same time. Depth, fuel and the call stack have to
  * belong to the thread, not to the runtime.</p>
- *
- * @author Shai Almog
  */
 public class InterpHostSubclassTest {
 

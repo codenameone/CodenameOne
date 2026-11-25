@@ -39,8 +39,6 @@ import java.util.Hashtable;
 /// reinterpretation that has to be rediscovered by testing. What the IR removes
 /// is only the parts a device should not pay for: constant-pool lookups, symbol
 /// resolution and label arithmetic.
-///
-/// @author Shai Almog
 public final class InterpBundle {
     /// Magic word at the head of every bundle: 'C','N','1','I'.
     public static final int MAGIC = 0x434E3149;

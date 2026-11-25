@@ -28,8 +28,6 @@ package com.codename1.impl.interp;
 /// count per opcode, and `pcOfInstruction` maps instruction index to code
 /// offset. Jump operands are already instruction indices, so branching is an
 /// array index rather than a search for a label.
-///
-/// @author Shai Almog
 public final class InterpMethod {
     final InterpClass owner;
 

@@ -29,8 +29,6 @@ package com.codename1.impl.interp;
 /// cannot be thrown directly. This wraps it, along with the interpreted stack
 /// at the point it was raised, since a real stack trace would show the
 /// interpreter's frames rather than the user's source lines.
-///
-/// @author Shai Almog
 public final class InterpThrowable extends RuntimeException {
     private final Object thrown;
     private final String[] interpretedStack;

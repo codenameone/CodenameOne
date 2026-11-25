@@ -41,8 +41,6 @@ import java.lang.reflect.Proxy;
  * factory reports that honestly through {@link #canExtend} rather than
  * producing a peer that the framework would accept and then never dispatch
  * to.</p>
- *
- * @author Shai Almog
  */
 public class ProxyInterpObjectFactory implements InterpObjectFactory {
     private final InterpLinker linker;

@@ -33,8 +33,6 @@ import java.util.Vector;
 /// [#superInterp]. Extending a host class means an object the AOT framework has
 /// to accept as an instance of that class, which the host cannot manufacture
 /// from a name; that is what [InterpObjectFactory] exists for.
-///
-/// @author Shai Almog
 public final class InterpClass {
     String name;
     int accessFlags;

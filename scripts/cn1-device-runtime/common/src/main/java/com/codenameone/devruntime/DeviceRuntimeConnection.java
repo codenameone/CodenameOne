@@ -36,8 +36,6 @@ import java.io.OutputStream;
  * translator emits a default-constructor function pointer into every
  * {@code struct clazz} -- so the framework's own listener API works unchanged on
  * iOS.</p>
- *
- * @author Shai Almog
  */
 public class DeviceRuntimeConnection extends SocketConnection {
     public void connectionEstablished(InputStream is, OutputStream os) {

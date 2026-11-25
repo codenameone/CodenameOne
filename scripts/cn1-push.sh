@@ -38,6 +38,13 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 JDK="${JAVA17_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null || true)}"
+if [ "$SOURCE" = "--stop" ]; then
+    LOCAL_REPO="${M2_LOCAL:-$REPO_ROOT/.m2-local}"
+    PARPAR_JAR="$(ls -t "$LOCAL_REPO"/com/codenameone/codenameone-parparvm/*/codenameone-parparvm-*.jar 2>/dev/null \
+        | grep -v -- '-sources\|-javadoc\|-bundle' | head -1)"
+    [ -n "$PARPAR_JAR" ] || { echo "codenameone-parparvm not found in $LOCAL_REPO" >&2; exit 1; }
+    exec "$JDK/bin/java" -cp "$PARPAR_JAR" com.codename1.tools.translator.DevicePush --stop --port "$PORT"
+fi
 if [ -z "$JDK" ]; then
     JDK="${JAVA_HOME:-}"
 fi
@@ -62,13 +69,16 @@ pick_latest_artifact() {
     done
 }
 
-CORE_JAR="$(pick_latest_artifact "$REPO_ROOT/.m2-local/com/codenameone/codenameone-core" codenameone-core)"
+# The local repository the framework was installed into; run-device-runtime-*.sh
+# take the same variable, so one export serves the build and the push.
+LOCAL_REPO="${M2_LOCAL:-$REPO_ROOT/.m2-local}"
+CORE_JAR="$(pick_latest_artifact "$LOCAL_REPO/com/codenameone/codenameone-core" codenameone-core)"
 if [ -z "$CORE_JAR" ]; then
     CORE_JAR="$(pick_latest_artifact "$HOME/.m2/repository/com/codenameone/codenameone-core" codenameone-core)"
 fi
-PARPAR_JAR="$(pick_latest_artifact "$REPO_ROOT/.m2-local/com/codenameone/codenameone-parparvm" codenameone-parparvm)"
+PARPAR_JAR="$(pick_latest_artifact "$LOCAL_REPO/com/codenameone/codenameone-parparvm" codenameone-parparvm)"
 if [ -z "$PARPAR_JAR" ]; then
-    echo "codenameone-parparvm not found in .m2-local; build it first:" >&2
+    echo "codenameone-parparvm not found in $LOCAL_REPO; build it first:" >&2
     echo "  mvn -pl parparvm install -f maven/pom.xml" >&2
     exit 1
 fi
@@ -81,7 +91,7 @@ fi
 # advertised `mvn -pl parparvm install` puts on disk, and the push then
 # failed for missing ASM classes on a fresh checkout.
 ASM_JARS=""
-for asm_repo in "$REPO_ROOT/.m2-local/org/ow2/asm" "$HOME/.m2/repository/org/ow2/asm"; do
+for asm_repo in "$LOCAL_REPO/org/ow2/asm" "$HOME/.m2/repository/org/ow2/asm"; do
     [ -d "$asm_repo/asm" ] || continue
     for v in $(ls "$asm_repo/asm" 2>/dev/null | sort -V -r); do
         if [ -f "$asm_repo/asm/$v/asm-$v.jar" ] \
@@ -122,6 +132,7 @@ fi
 
 echo "building bundle"
 cat > "$WORK/Pack.java" <<'JAVA'
+import com.codename1.tools.translator.InterpBundleFiles;
 import com.codename1.tools.translator.InterpBundleWriter;
 import java.io.*;
 import java.nio.file.*;
@@ -138,16 +149,16 @@ public final class Pack {
         List<File> classes = new ArrayList<File>();
         collect(classesDir, classes);
         for (File f : classes) {
-            w.addClassFile(f);
+            InterpBundleFiles.addClassFile(w, f);
         }
         // Every source in the tree, not just the entry point's: the runtime
         // refuses to run a class whose source it cannot show, and a real
         // application is many files.
         if (sourceRoot.isDirectory()) {
-            w.addSourceTree(sourceRoot);
+            InterpBundleFiles.addSourceTree(w, sourceRoot);
             // Everything that is not source: theme.res, CSS, images. Keyed by
             // path relative to the tree, which is how an application loads them.
-            w.addResourceTree(sourceRoot);
+            InterpBundleFiles.addResourceTree(w, sourceRoot);
             // Maven layout puts non-source assets under a sibling `resources/`
             // directory and Kotlin sources under `kotlin/`. The documented
             // invocation names the `java/` root, so both siblings would
@@ -160,13 +171,13 @@ public final class Pack {
                 File resources = new File(parent, "resources");
                 if (resources.isDirectory() && !resources.getCanonicalPath()
                         .equals(sourceRoot.getCanonicalPath())) {
-                    w.addResourceTree(resources);
+                    InterpBundleFiles.addResourceTree(w, resources);
                 }
                 File kotlin = new File(parent, "kotlin");
                 if (kotlin.isDirectory() && !kotlin.getCanonicalPath()
                         .equals(sourceRoot.getCanonicalPath())) {
-                    w.addSourceTree(kotlin);
-                    w.addResourceTree(kotlin);
+                    InterpBundleFiles.addSourceTree(w, kotlin);
+                    InterpBundleFiles.addResourceTree(w, kotlin);
                 }
             }
         } else {

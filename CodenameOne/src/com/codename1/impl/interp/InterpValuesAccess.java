@@ -30,8 +30,6 @@ package com.codename1.impl.interp;
 /// take a method descriptor apart in exactly the same way. Exposing the parser
 /// keeps that one implementation rather than one per platform, each with its
 /// own bugs around array and object descriptors.
-///
-/// @author Shai Almog
 public final class InterpValuesAccess {
     private InterpValuesAccess() {
     }

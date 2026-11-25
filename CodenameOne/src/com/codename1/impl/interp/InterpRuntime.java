@@ -47,8 +47,6 @@ import java.util.Vector;
 /// permanently. Accounting deliberately pauses while inside a host call, or a
 /// legitimate `invokeAndBlock` waiting on the network would look like a runaway
 /// loop.
-///
-/// @author Shai Almog
 public final class InterpRuntime {
     private final InterpBundle bundle;
     private final InterpLinker linker;

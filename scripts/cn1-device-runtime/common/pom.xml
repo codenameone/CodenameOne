@@ -45,6 +45,26 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- The on-device IDE's compiler, translatable like the Playground's.
+             Provided and unpacked (unpack-bundle-writer) rather than shipped
+             whole: its desktop entry points, Main and BuildStubLibrary, each
+             have a static main, and an iOS translation takes exactly one. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-javac</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Provided: only the bundle writer, the lambda desugarer and the
+             class-file library they use are unpacked into the app's classes
+             (unpack-bundle-writer). The rest of the translator is not shipped. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-parparvm</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- INJECT DEPENDENCIES -->
     </dependencies>
 
@@ -410,6 +430,53 @@
                         <phase>initialize</phase>
                         <goals><goal>properties</goal></goals>
                     </execution>
+                    <!--
+                      The on-device IDE packages what it compiles with the same
+                      writer a desktop push uses, so the two cannot drift.
+                    -->
+                    <execution>
+                        <id>unpack-bundle-writer</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>unpack</goal></goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>codenameone-parparvm</artifactId>
+                                    <version>${cn1.version}</version>
+                                    <type>jar</type>
+                                    <includes>com/codename1/tools/translator/classfile/**,com/codename1/tools/translator/InterpBundleWriter*.class,com/codename1/tools/translator/InterpLambdaDesugar*.class</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>codenameone-javac</artifactId>
+                                    <version>${cn1.version}</version>
+                                    <type>jar</type>
+                                    <includes>com/codename1/tools/javac/**</includes>
+                                    <excludes>com/codename1/tools/javac/Main*.class,com/codename1/tools/javac/BuildStubLibrary*.class</excludes>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>unpack-parparvm-java-api</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>unpack</goal></goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>codenameone-parparvm</artifactId>
+                                    <version>${cn1.version}</version>
+                                    <classifier>bundle</classifier>
+                                    <type>jar</type>
+                                    <includes>parparvm-java-api.jar</includes>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}/parparvm-bundle</outputDirectory>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -443,6 +510,30 @@
                                 <argument>${com.codenameone:java-runtime:jar}</argument>
                                 <argument>--exclude</argument>
                                 <argument>${project.basedir}/../tools/unshimmable-by-contract.txt</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!--
+                      The API the IDE compiles against: the device's java.* and
+                      Codename One core, code stripped. Not the runtime's own
+                      classes: a program has no business naming them.
+                    -->
+                    <execution>
+                        <id>build-api-stubs</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>-cp</argument>
+                                <classpath/>
+                                <argument>com.codename1.tools.javac.BuildStubLibrary</argument>
+                                <argument>${project.build.outputDirectory}/devruntime-api.cn1stubs</argument>
+                                <argument>--exclude</argument>
+                                <argument>com/codename1/tools/</argument>
+                                <argument>${project.build.directory}/parparvm-bundle/parparvm-java-api.jar</argument>
+                                <argument>${com.codenameone:codenameone-core:jar}</argument>
                             </arguments>
                         </configuration>
                     </execution>

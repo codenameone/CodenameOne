@@ -32,8 +32,6 @@ import java.util.Vector;
 /// stops a sub-int type (`boolean`, `byte`, `char`, `short`) from being handed
 /// over as the `int` it is stored as -- a mismatch reflection rejects at the
 /// call rather than silently coercing.
-///
-/// @author Shai Almog
 final class InterpValues {
     private InterpValues() {
     }

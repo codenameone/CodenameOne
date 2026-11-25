@@ -60,8 +60,6 @@ import java.util.Vector;
  * iOS, both of which require possession of the device. That is the pairing
  * story for the development build; a store build gets the code-and-approve
  * handshake instead, and this listener is not what it will use.</p>
- *
- * @author Shai Almog
  */
 public class DeviceRuntimeService {
     /** Wire magic: the ASCII bytes "CN1P". */
@@ -94,6 +92,12 @@ public class DeviceRuntimeService {
 
     static final int FRAME_PAIR = 1;
     static final int FRAME_PUSH = 2;
+    /// Ends the running program. It is a push in every respect but the last
+    /// step -- the same challenge, the same answer over a body, the same
+    /// approval -- because stopping a program is control of the device too,
+    /// and an unauthenticated stop would let anything on the network end it.
+    static final int FRAME_STOP = 3;
+    private static final byte[] STOP_BODY = {'c', 'n', '1', '-', 's', 't', 'o', 'p'};
 
     /** A bundle larger than this is a framing error, not a program. */
     private static final int MAX_BUNDLE = 64 * 1024 * 1024;
@@ -135,6 +139,9 @@ public class DeviceRuntimeService {
     private volatile InterpRuntime runtime;
     private volatile String status = "idle";
     private volatile String loadedSource = "";
+    /// The loaded program's sources by path, for opening it in the editor.
+    private volatile java.util.Hashtable<String, String> loadedSources =
+            new java.util.Hashtable<String, String>();
 
     /// The entry class of whatever is running, for the screen to name.
     private volatile String loadedName = "";
@@ -1085,6 +1092,7 @@ public class DeviceRuntimeService {
         try {
             String reject = null;
             byte[] payload = null;
+            boolean stopRequest = false;
             if (in.readInt() != MAGIC) {
                 reject = "bad magic";
             } else {
@@ -1162,7 +1170,8 @@ public class DeviceRuntimeService {
                             }
                         }
                         return true;
-                    } else if (frame == FRAME_PUSH) {
+                    } else if (frame == FRAME_PUSH || frame == FRAME_STOP) {
+                        stopRequest = frame == FRAME_STOP;
                         String peerId = in.readUTF();
                         String desktopChallenge = in.readUTF();
                         // Identified, which buys a bounded grace and no more:
@@ -1187,7 +1196,7 @@ public class DeviceRuntimeService {
                             // answer the desktop's dial, claim to be a paired
                             // device and be handed the bundle -- which carries
                             // the program's whole source.
-                            out.writeUTF(InterpPairingSecret.respond(secret, desktopChallenge));
+                            out.writeUTF(InterpPairingSecret.respondAsDevice(secret, desktopChallenge));
                             out.flush();
 
                             String response = in.readUTF();
@@ -1268,8 +1277,25 @@ public class DeviceRuntimeService {
             // connection. Nothing unauthenticated reaches here: a v3 push
             // answered the challenge and was approved, and v1 is loopback only.
             progress.allowLongWait();
+            if (stopRequest) {
+                if (!java.util.Arrays.equals(payload, STOP_BODY)) {
+                    out.writeByte(0);
+                    out.writeUTF("malformed stop request");
+                } else {
+                    boolean wasRunning = runtime != null;
+                    stopProgram();
+                    status = "stopped from the computer";
+                    out.writeByte(1);
+                    out.writeUTF(wasRunning ? "stopped" : "nothing was running");
+                }
+                out.flush();
+                return true;
+            }
             try {
-                String result = loadAndRun(payload);
+                String result = loadAndRun(payload, false);
+                // A pushed program needs a way out on the device as much as one
+                // the editor started; stopping from the computer is the other.
+                IdeRunOverlay.install();
                 out.writeByte(1);
                 out.writeUTF(result);
             } catch (Throwable t) {
@@ -1400,8 +1426,11 @@ public class DeviceRuntimeService {
      */
     private final Object installLock = new Object();
 
-    private String loadAndRun(byte[] payload) throws Throwable {
+    private String loadAndRun(byte[] payload, boolean local) throws Throwable {
         synchronized (installLock) {
+            // Under the install lock, so a push racing an editor run cannot
+            // leave this naming the other one's origin.
+            localRun = local;
             return install(payload);
         }
     }
@@ -1439,13 +1468,16 @@ public class DeviceRuntimeService {
         applyPushedTheme((byte[])res.get("/theme.res"));
 
         StringBuilder src = new StringBuilder();
+        java.util.Hashtable<String, String> byPath = new java.util.Hashtable<String, String>();
         Enumeration e = bundle.getSourceFileNames();
         while (e.hasMoreElements()) {
             String name = (String)e.nextElement();
+            byPath.put(name, bundle.getSource(name));
             src.append("// ").append(name).append('\n')
                .append(bundle.getSource(name)).append('\n');
         }
         loadedSource = src.toString();
+        loadedSources = byPath;
         String main = bundle.getMainClass();
         loadedName = main == null ? "" : main.replace('/', '.');
 
@@ -1517,6 +1549,7 @@ public class DeviceRuntimeService {
                 runtime = null;
                 loadedName = "";
                 loadedSource = "";
+                loadedSources = new java.util.Hashtable<String, String>();
                 CodenameOneImplementation.clearLocalResources();
                 applyPushedTheme(null);
             }
@@ -1602,6 +1635,7 @@ public class DeviceRuntimeService {
         }
         loadedName = "";
         loadedSource = "";
+        loadedSources = new java.util.Hashtable<String, String>();
         CodenameOneImplementation.clearLocalResources();
         applyPushedTheme(null);
         DeviceRuntimeForm.showIt();
@@ -1663,12 +1697,43 @@ public class DeviceRuntimeService {
         }
     }
 
+    /// Stops the running program and shows where it was started from. Callable
+    /// from any thread: the work happens on the EDT.
     public void stopProgram() {
-        // Counted whether or not something is running: an install in flight has
-        // to notice a stop that arrives before it published its runtime.
-        stopGeneration++;
+        stopProgramThen(null);
+    }
+
+    /// Stops the running program, then runs `next` on the EDT instead of
+    /// showing the screen the program was started from.
+    ///
+    /// The program's own stop() touches its forms and media, and detaching
+    /// races any listener of the same runtime the EDT is dispatching, so all
+    /// of it runs on the EDT -- the socket worker (a stop from the computer)
+    /// and the overlay's Stop both used to do it on their own threads.
+    public void stopProgramThen(final Runnable next) {
+        synchronized (this) {
+            // Counted whether or not something is running: an install in flight
+            // has to notice a stop that arrives before it published its runtime.
+            stopGeneration++;
+        }
+        Runnable work = new Runnable() {
+            public void run() {
+                stopOnEdt(next);
+            }
+        };
+        if (Display.getInstance().isEdt()) {
+            work.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(work);
+        }
+    }
+
+    private void stopOnEdt(Runnable next) {
         InterpRuntime rt = runtime;
         if (rt == null) {
+            if (next != null) {
+                next.run();
+            }
             return;
         }
         // stop() first, while the runtime still answers: a Lifecycle that
@@ -1687,13 +1752,18 @@ public class DeviceRuntimeService {
         runtime = null;
         loadedName = "";
         loadedSource = "";
+        loadedSources = new java.util.Hashtable<String, String>();
         CodenameOneImplementation.clearLocalResources();
         // And the theme with them: a pushed program that shipped its own
         // theme.res left the runtime's screen wearing it, until some later
         // theme-less push happened to put it back.
         applyPushedTheme(null);
         status = "stopped";
-        DeviceRuntimeForm.showIt();
+        if (next != null) {
+            next.run();
+        } else {
+            DeviceRuntimeForm.showIt();
+        }
     }
 
     public String getStatus() {
@@ -1713,11 +1783,65 @@ public class DeviceRuntimeService {
         return mocksUsed;
     }
 
+    /// The loaded program's sources, path to text; empty when nothing is loaded.
+    public java.util.Hashtable<String, String> getLoadedSources() {
+        return loadedSources;
+    }
+
     public String getLoadedSource() {
         return loadedSource;
     }
 
     /// The entry class of the running program, or "" when nothing is running.
+    /// Told when a program the on-device IDE started has been installed and
+    /// its entry point has returned, or has failed to.
+    public interface LocalRunListener {
+        /// `error` is null on success; otherwise it is the failure as the
+        /// desktop would have been told it, interpreted stack included.
+        void finished(String result, String error);
+    }
+
+    /// Whether the last program started came from the on-device IDE rather
+    /// than a push, which decides where Stop goes back to.
+    private volatile boolean localRun;
+
+    /// Installs and starts a bundle the on-device IDE built -- the same path a
+    /// push takes, minus the network. Off the event thread, because installing
+    /// waits on the event thread to start the program; the listener is called
+    /// on the event thread.
+    public void runLocalBundle(final byte[] bundle, final LocalRunListener listener) {
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                String result = null;
+                String error = null;
+                try {
+                    result = loadAndRun(bundle, true);
+                } catch (Throwable ex) {
+                    error = describe(runtime, ex);
+                    status = "error: " + error;
+                }
+                final String r = result;
+                final String e = error;
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        listener.finished(r, e);
+                    }
+                });
+            }
+        }, "cn1-ide-run");
+        t.start();
+    }
+
+    /// Whether a program is installed and has not been stopped.
+    public boolean isProgramRunning() {
+        return runtime != null;
+    }
+
+    /// True when the running program came from the on-device IDE.
+    public boolean isLocalRun() {
+        return localRun;
+    }
+
     public String getLoadedName() {
         return loadedName;
     }

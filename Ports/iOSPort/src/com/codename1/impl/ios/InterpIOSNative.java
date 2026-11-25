@@ -37,8 +37,6 @@ package com.codename1.impl.ios;
  * ParparVM does not have. The same convention carries the result back:
  * primitives through {@code resultOut[0]}, references through the return
  * value.</p>
- *
- * @author Shai Almog
  */
 class InterpIOSNative {
     private InterpIOSNative() {

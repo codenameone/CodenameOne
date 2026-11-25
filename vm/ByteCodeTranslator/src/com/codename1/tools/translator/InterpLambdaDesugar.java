@@ -50,8 +50,6 @@ import java.util.List;
  * the lambda, which is both true -- that is where the lambda is written -- and
  * required, since the runtime refuses to execute a class whose source it cannot
  * show the user.</p>
- *
- * @author Shai Almog
  */
 final class InterpLambdaDesugar {
     private static final String METAFACTORY = "java/lang/invoke/LambdaMetafactory";

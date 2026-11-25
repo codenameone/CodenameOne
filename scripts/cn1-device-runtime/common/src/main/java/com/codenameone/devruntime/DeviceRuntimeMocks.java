@@ -51,8 +51,6 @@ import java.util.Hashtable;
  * on screen and in the status line, and the mock objects say it again in the
  * data they return -- a price of "$0.00 (mock)", a token that reads
  * {@code mock-...-not-valid-anywhere}.</p>
- *
- * @author Shai Almog
  */
 public final class DeviceRuntimeMocks implements InterpHostInterceptor {
     /// Subsystems already announced, so the warning appears once per program
@@ -98,10 +96,10 @@ public final class DeviceRuntimeMocks implements InterpHostInterceptor {
         DeviceRuntimeService.getInstance().noteMockUsed(subsystem);
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                Dialog.show("This is a mock",
-                        "This program just used " + subsystem + ", which this runtime "
-                        + "mocks. It always succeeds, no money moves and no real account "
-                        + "is involved. Test the real thing in a build of your own app.",
+                Dialog.show("Simulated",
+                        "Your program called " + subsystem + ". In this app that is "
+                        + "simulated so you can test your code: it always succeeds, nothing "
+                        + "is bought or charged and no account is used.",
                         "OK", null);
             }
         });

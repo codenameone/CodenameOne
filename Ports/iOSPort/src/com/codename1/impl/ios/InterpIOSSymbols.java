@@ -39,8 +39,6 @@ import java.util.Hashtable;
  * which is miserable to write in C against a runtime with no string library
  * worth the name. The native layer's only job is to hand over the bytes and to
  * dispatch a thunk once an id is known.</p>
- *
- * @author Shai Almog
  */
 class InterpIOSSymbols {
     /** "owner.name+descriptor" -> method id. */

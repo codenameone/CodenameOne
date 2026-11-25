@@ -29,8 +29,6 @@ package com.codename1.impl.interp;
 /// contains `catch (Exception e)` around a loop, and a cancellation that user
 /// code can swallow is not a cancellation -- the app would stay wedged with the
 /// Stop button apparently doing nothing.
-///
-/// @author Shai Almog
 public final class InterpCancelled extends Error {  //NOPMD DoNotExtendJavaLangError - see above: Exception would be swallowed
     InterpCancelled(String message) {
         super(message);

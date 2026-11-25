@@ -44,8 +44,6 @@ import com.codename1.impl.interp.InterpValuesAccess;
  * {@code long[]}, references in an {@code Object[]}, selected per argument by a
  * kind code. The C side cannot box or unbox, since doing so would need the very
  * reflection this exists to replace.</p>
- *
- * @author Shai Almog
  */
 public class InterpIOSLinker implements InterpLinker {
     // Kind codes, matching com.codename1.impl.interp.InterpOpcodes.
@@ -210,7 +208,7 @@ public class InterpIOSLinker implements InterpLinker {
         // not that. JVM raises IllegalAccessError -- the sidecar records the
         // private bit, so mirror it here.
         if (symbols.isPrivateMethod(id)) {
-            throw new IllegalAccessError(owner + ".<init>" + descriptor + " is private");
+            throw illegalAccess(owner + ".<init>" + descriptor + " is private");
         }
         // A constructor thunk allocates its own receiver and returns it,
         // which is why this passes no target and expects an object back.
@@ -266,7 +264,7 @@ public class InterpIOSLinker implements InterpLinker {
         // the declaring class; pushed code is not that. JVM raises
         // IllegalAccessError.
         if (symbols.isPrivateMethod(id)) {
-            throw new IllegalAccessError(owner + "." + name + " is private");
+            throw illegalAccess(owner + "." + name + " is private");
         }
         return invokeWithId(id, descriptor, null, args,
                 kindOf(InterpValuesAccess.returnType(descriptor)));
@@ -291,7 +289,7 @@ public class InterpIOSLinker implements InterpLinker {
             throw new IncompatibleClassChangeError(owner + "." + name + " is static");
         }
         if (!allowPrivate && symbols.isPrivateMethod(id)) {
-            throw new IllegalAccessError(owner + "." + name + " is private");
+            throw illegalAccess(owner + "." + name + " is private");
         }
         return invokeWithId(id, descriptor, target, args, returnKind);
     }
@@ -404,7 +402,7 @@ public class InterpIOSLinker implements InterpLinker {
     // check. The sidecar's optional access-flags column tells us this.
     private void requireAccessibleField(int fieldId, String owner, String name) {
         if (symbols.isPrivateField(fieldId)) {
-            throw new IllegalAccessError(owner + "." + name + " is private");
+            throw illegalAccess(owner + "." + name + " is private");
         }
     }
 
@@ -536,4 +534,14 @@ public class InterpIOSLinker implements InterpLinker {
             default:        return null;
         }
     }
+
+    /// What the JVM throws as IllegalAccessError. The device's class library
+    /// (vm/JavaAPI, and Ports/CLDC11 that apps compile against) has no such
+    /// class, and an interp-host translation refuses a reference to an absent
+    /// one, so this raises its superclass, which a `catch` for the JVM's
+    /// linkage family still matches. The message says which access failed.
+    private static IncompatibleClassChangeError illegalAccess(String message) {
+        return new IncompatibleClassChangeError("IllegalAccessError: " + message);
+    }
+
 }

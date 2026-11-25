@@ -46,8 +46,6 @@ import com.codename1.ui.Display;
  * <p><b>No real identity is involved.</b> The token is fabricated, it
  * authenticates against nothing, and a server that accepts it is broken. The
  * runtime says so on screen the first time a pushed program logs in.</p>
- *
- * @author Shai Almog
  */
 public final class DeviceRuntimeSocialMocks {
     private DeviceRuntimeSocialMocks() {

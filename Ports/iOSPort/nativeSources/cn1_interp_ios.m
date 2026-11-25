@@ -182,11 +182,11 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_invokeById___int_java_lang_Ob
     JAVA_ARRAY objArray = (JAVA_ARRAY)objs;
     JAVA_ARRAY kindArray = (JAVA_ARRAY)kinds;
     JAVA_ARRAY_LONG* primData = primArray == JAVA_NULL
-            ? NULL : (JAVA_ARRAY_LONG*)primArray->data;
+            ? NULL : (JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(primArray);
     JAVA_ARRAY_OBJECT* objData = objArray == JAVA_NULL
-            ? NULL : (JAVA_ARRAY_OBJECT*)objArray->data;
+            ? NULL : (JAVA_ARRAY_OBJECT*)CN1_ARRAY_DATA(objArray);
     JAVA_ARRAY_INT* kindData = kindArray == JAVA_NULL
-            ? NULL : (JAVA_ARRAY_INT*)kindArray->data;
+            ? NULL : (JAVA_ARRAY_INT*)CN1_ARRAY_DATA(kindArray);
 
     for (int i = 0; i < argCount; i++) {
         int k = kindData == NULL ? K_OBJECT : (int)kindData[i];
@@ -233,7 +233,7 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_invokeById___int_java_lang_Ob
     }
     if (resultOut != JAVA_NULL) {
         JAVA_ARRAY out = (JAVA_ARRAY)resultOut;
-        JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)out->data;
+        JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(out);
         switch (returnKind) {
             case K_LONG:
                 outData[0] = (JAVA_ARRAY_LONG)result.value.j;
@@ -276,7 +276,7 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_getFieldById___int_java_lang_
         return JAVA_NULL;
     }
     const cn1_field_entry* entry = cn1_reflect_field_for(
-            target->__codenameOneParentClsReference->classId, fieldId);
+            CN1_CLASS_OF(target)->classId, fieldId);
     if (entry == NULL) {
         throwException(threadStateData,
                 __NEW_INSTANCE_java_lang_NoSuchFieldError(threadStateData));
@@ -300,7 +300,7 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_getFieldById___int_java_lang_
     }
     if (resultOut != JAVA_NULL) {
         JAVA_ARRAY out = (JAVA_ARRAY)resultOut;
-        JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)out->data;
+        JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(out);
         switch (entry->type) {
             case 'J':
                 outData[0] = vol
@@ -402,7 +402,7 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_getStaticById___int_int_long_
     }
     if (resultOut != JAVA_NULL) {
         JAVA_ARRAY out = (JAVA_ARRAY)resultOut;
-        JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)out->data;
+        JAVA_ARRAY_LONG* outData = (JAVA_ARRAY_LONG*)CN1_ARRAY_DATA(out);
         switch (type) {
             case 'J': outData[0] = (JAVA_ARRAY_LONG)value.j; break;
             case 'D': {
@@ -482,7 +482,7 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
         return;
     }
     const cn1_field_entry* entry = cn1_reflect_field_for(
-            target->__codenameOneParentClsReference->classId, fieldId);
+            CN1_CLASS_OF(target)->classId, fieldId);
     if (entry == NULL) {
         throwException(threadStateData,
                 __NEW_INSTANCE_java_lang_NoSuchFieldError(threadStateData));
@@ -618,7 +618,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_InterpIOSNative_isInstanceOfId___int_java_la
     if (value == JAVA_NULL || classId < 0) {
         return JAVA_FALSE;
     }
-    return instanceofFunction(classId, value->__codenameOneParentClsReference->classId)
+    return instanceofFunction(classId, CN1_CLASS_OF(value)->classId)
             ? JAVA_TRUE : JAVA_FALSE;
 }
 
@@ -633,7 +633,7 @@ JAVA_INT com_codename1_impl_ios_InterpIOSNative_classIdOf___java_lang_Object_R_i
     if (value == JAVA_NULL) {
         return -1;
     }
-    return value->__codenameOneParentClsReference->classId;
+    return CN1_CLASS_OF(value)->classId;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_classObjectById___int_R_java_lang_Object(
@@ -681,7 +681,7 @@ JAVA_OBJECT com_codename1_impl_ios_InterpIOSNative_newArrayLike___java_lang_Obje
        a method declaring String[] -- so a clone silently broke the value it
        was copying. Taking the clazz from the object needs no registry lookup
        and is right for ranks and component types no table anticipated. */
-    struct clazz* arrayClass = source->__codenameOneParentClsReference;
+    struct clazz* arrayClass = CN1_CLASS_OF(source);
     if (arrayClass == NULL) {
         return JAVA_NULL;
     }
@@ -748,3 +748,38 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_initializeClassById___int(
         fn(threadStateData);
     }
 }
+
+#ifdef CN1_INTERP_HOST
+/*
+ * IOSExtensionTunnel.writeNative lives in the GENERATED packet-tunnel
+ * extension (IOSVpnTunnelExtensionBuilder.writerSource), a separate binary.
+ * An ordinary app never links it: dead-code elimination drops the class from
+ * the main binary. An interp host keeps every class, so the main binary
+ * references a symbol nothing in it defines and the link fails.
+ *
+ * Nothing in the host can call it -- the tunnel is only ever driven from
+ * inside the extension process -- so a weak no-op here satisfies the linker
+ * and loses to the real definition wherever one is linked.
+ */
+__attribute__((weak)) void com_codename1_impl_ios_IOSExtensionTunnel_writeNative___int_byte_1ARRAY_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT generation, JAVA_OBJECT packet,
+        JAVA_INT offset, JAVA_INT length) {
+}
+
+/*
+ * The VPN natives live in CN1Vpn.m, which the builder compiles in only when
+ * the app has a VPN extension. The interp host keeps IOSVpnBridge anyway (dead
+ * code elimination is off) and has no extension, so they are referenced and
+ * undefined. A program running here that asks for a tunnel gets none -- the
+ * request is never answered, the same as an app with no VPN entitlement --
+ * and the real definitions win wherever CN1Vpn.m is linked.
+ */
+__attribute__((weak)) void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT requestId,
+        JAVA_OBJECT setupWire) {
+}
+
+__attribute__((weak)) void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT requestId) {
+}
+#endif

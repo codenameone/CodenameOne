@@ -51,8 +51,6 @@ import javax.tools.ToolProvider;
  * <p>The harness drives the real bundle pipeline -- javac, then the translator's
  * {@code InterpBundleWriter}, then {@link InterpBundleReader} -- so the format
  * and both of its ends are exercised on every case rather than being assumed.</p>
- *
- * @author Shai Almog
  */
 final class InterpTestHarness {
     private InterpTestHarness() {
@@ -187,7 +185,7 @@ final class InterpTestHarness {
                               String[] sources) throws Exception {
         Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
         Object writer = writerClass.getDeclaredConstructor().newInstance();
-        Method addClassFile = writerClass.getMethod("addClassFile", File.class);
+        Method addClassFile = Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addClassFile", writerClass, File.class);
         Method addSource = writerClass.getMethod("addSource", String.class, String.class);
         Method setMain = writerClass.getMethod("setMainClass", String.class);
         Method write = writerClass.getMethod("write", java.io.OutputStream.class);
@@ -195,7 +193,7 @@ final class InterpTestHarness {
         List<File> classFiles = new ArrayList<File>();
         collectClassFiles(dir.toFile(), classFiles);
         for (File f : classFiles) {
-            addClassFile.invoke(writer, f);
+            addClassFile.invoke(null, writer, f);
         }
         for (int i = 0; i < sourceNames.length; i++) {
             addSource.invoke(writer, sourceNames[i], sources[i]);
@@ -212,7 +210,7 @@ final class InterpTestHarness {
         // dependency on the translator module.
         Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
         Object writer = writerClass.getDeclaredConstructor().newInstance();
-        Method addClassFile = writerClass.getMethod("addClassFile", File.class);
+        Method addClassFile = Class.forName("com.codename1.tools.translator.InterpBundleFiles").getMethod("addClassFile", writerClass, File.class);
         Method addSource = writerClass.getMethod("addSource", String.class, String.class);
         Method setMain = writerClass.getMethod("setMainClass", String.class);
         Method write = writerClass.getMethod("write", java.io.OutputStream.class);
@@ -220,7 +218,7 @@ final class InterpTestHarness {
         List<File> classFiles = new ArrayList<File>();
         collectClassFiles(dir.toFile(), classFiles);
         for (File f : classFiles) {
-            addClassFile.invoke(writer, f);
+            addClassFile.invoke(null, writer, f);
         }
         addSource.invoke(writer, mainClass + ".java", source);
         setMain.invoke(writer, mainClass);

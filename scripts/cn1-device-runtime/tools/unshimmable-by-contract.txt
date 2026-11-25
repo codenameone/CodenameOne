@@ -16,3 +16,9 @@
 # precisely what the intrinsic forbids. Subclassing a bag of intrinsics is
 # meaningless anyway.
 Interp_util_Simd
+
+# RealtimeTask.cycle() and periodsMissed(int) must not allocate, which the iOS
+# build enforces over everything they can reach. A shim's override dispatches
+# into the interpreter, and interpreting allocates frames, so an interpreted
+# real-time task is a contradiction, not a missing feature.
+Interp_realtime_RealtimeTask

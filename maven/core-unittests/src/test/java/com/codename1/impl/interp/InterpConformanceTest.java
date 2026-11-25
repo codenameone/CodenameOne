@@ -47,8 +47,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * opcodes whose meaning is in slots rather than values, which exception handler
  * wins and whether {@code finally} still runs, and virtual dispatch through an
  * interpreted hierarchy.</p>
- *
- * @author Shai Almog
  */
 class InterpConformanceTest {
 

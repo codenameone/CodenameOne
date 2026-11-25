@@ -43,8 +43,6 @@ import com.codenameone.devruntime.gen.InterpShimRegistry;
  * <p>The cost is that a class implementing several host interfaces at once has
  * no shim, since a shim covers one supertype. That is rare enough to be worth
  * the symmetry, and it fails loudly.</p>
- *
- * @author Shai Almog
  */
 public class ShimObjectFactory implements InterpObjectFactory {
     private InterpRuntime runtime;

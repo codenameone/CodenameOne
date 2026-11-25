@@ -44,17 +44,20 @@ import com.codename1.ui.util.UITimer;
  * computer rather than describing its own internals. The address is there
  * because a network can always refuse to cooperate and somebody will need to
  * see it, but nothing here has to be typed for the ordinary case.</p>
- *
- * @author Shai Almog
  */
 public class DeviceRuntimeForm extends Form {
     private final Label heading = new Label("");
     private final SpanLabel instruction = new SpanLabel("");
     private final Label command = new Label("");
     private final Label address = new Label("");
+    private Button sourceButton;
+    private Button stopButton;
 
     public DeviceRuntimeForm() {
-        super("Device Runtime", new BorderLayout());
+        super("Run from a computer", new BorderLayout());
+        // The way back to the on-device editor. A pushed program that stops
+        // returns here, so without this the editor was unreachable for good.
+        getToolbar().setBackCommand("", Toolbar.BackCommandPolicy.AS_ARROW, e -> IdeForm.showIt());
 
         heading.getAllStyles().setAlignment(Label.CENTER);
         heading.getAllStyles().setFont(Font.createSystemFont(
@@ -81,11 +84,11 @@ public class DeviceRuntimeForm extends Form {
                 revalidate();
             }
         });
-        Button forget = new Button("Forget paired computers");
+        Button forget = new Button("Unpair all computers");
         forget.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ev) {
                 DeviceRuntimePairing.forgetAll();
-                heading.setText("Pairings forgotten");
+                heading.setText("All computers unpaired");
                 revalidate();
             }
         });
@@ -93,7 +96,7 @@ public class DeviceRuntimeForm extends Form {
         // (2.5.2) is conditional on the person holding the device being able to
         // see and edit what runs on it, so this screen is load-bearing for
         // submission as well as useful for debugging.
-        Button source = new Button("View source");
+        Button source = new Button("View and edit source");
         source.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ev) {
                 DeviceRuntimeSourceForm.showIt(DeviceRuntimeForm.this);
@@ -116,8 +119,12 @@ public class DeviceRuntimeForm extends Form {
         body.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
         body.getAllStyles().setMargin(6, 2, 4, 4);
 
+        Button editor = new Button("No computer? Open the editor");
+        editor.addActionListener(e -> IdeForm.showIt());
+        sourceButton = source;
+        stopButton = stop;
         Container buttons = new Container(BoxLayout.y());
-        buttons.add(source).add(stop).add(find).add(forget);
+        buttons.add(source).add(stop).add(find).add(forget).add(editor);
         buttons.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
         buttons.getAllStyles().setMargin(2, 3, 4, 4);
         // Otherwise the last button sits under the gesture bar / soft keys and
@@ -148,27 +155,46 @@ public class DeviceRuntimeForm extends Form {
         String running = svc.getLoadedName();
         if (running != null && running.length() > 0) {
             heading.setText("Running " + running);
-            instruction.setText("Push again from your IDE to replace it.");
+            instruction.setText("Send again from your computer to replace it, or tap Stop.");
             command.setText("");
         } else {
             heading.setText("Waiting for your computer");
-            instruction.setText("In your project on the same network, run:");
-            command.setText("mvn -Ppush-lan package");
+            instruction.setText("Optional, for developers. In a Codename One project on the "
+                    + "same Wi-Fi network, run:");
+            command.setText("mvn compile cn1:push -Dcn1.push.lan");
         }
 
+        boolean isRunning = running != null && running.length() > 0;
+        if (sourceButton != null) {
+            sourceButton.setHidden(!isRunning);
+            sourceButton.setVisible(isRunning);
+            stopButton.setHidden(!isRunning);
+            stopButton.setVisible(isRunning);
+        }
         String ip = DeviceRuntimeService.getLocalAddress();
         address.setText(ip == null
                 ? "This device has no network address."
-                : "This device is " + ip + (svc.isListening() ? "" : " (dial-out only)"));
+                : "This device is " + ip + (svc.isListening() ? "" : " (can't accept connections on this network)"));
         revalidate();
     }
 
-    /** Shows the runtime screen, from any thread. */
+    /** Where a stopped program returns to: the editor, unless the program came
+     *  from a push, in which case the screen that is waiting for the next one. */
     public static void showIt() {
+        if (DeviceRuntimeService.getInstance().isLocalRun()) {
+            IdeForm.showIt();
+        } else {
+            showPushScreen();
+        }
+    }
+
+    /** Shows the push screen, from any thread. */
+    public static void showPushScreen() {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 Toolbar.setGlobalToolbar(true);
                 new DeviceRuntimeForm().show();
+                IdeRunOverlay.uninstall();
             }
         });
     }

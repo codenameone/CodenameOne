@@ -58,8 +58,6 @@ import com.codename1.security.Hmac;
 /// against the JDK's own HMAC. One authoritative definition is the difference
 /// between "pairing broke" and "pairing broke and a test said which end
 /// changed".
-///
-/// @author Shai Almog
 public final class InterpPairingSecret {
     /// Iterations of the derivation.
     ///
@@ -88,10 +86,27 @@ public final class InterpPairingSecret {
         return block;
     }
 
-    /// The answer to a challenge: hex HMAC-SHA256 of the challenge under the
-    /// secret. Used for the pairing handshake, where there is no payload yet.
+    /// What each answer is for, mixed into its MAC.
+    ///
+    /// Without these the three answers were one function: the device's proof
+    /// of itself, sent before the computer has proven anything, was a bare
+    /// HMAC over a challenge the computer chooses, and a push answer was the
+    /// same HMAC over a challenge followed by the bundle. Anyone who knew a
+    /// public peer id could have the device sign "its challenge + a bundle" as
+    /// its own proof and replay that as a push. With a label and a length
+    /// prefix, no answer of one kind is ever a valid answer of another.
+    static final String LABEL_PAIR = "cn1-pair";
+    static final String LABEL_DEVICE = "cn1-device-proof";
+    static final String LABEL_PUSH = "cn1-push";
+
+    /// The answer to a pairing challenge, where there is no payload yet.
     public static String respond(byte[] secret, String challenge) {
-        return hex(Hmac.sha256(secret, utf8(challenge)));
+        return answer(secret, LABEL_PAIR, challenge, null);
+    }
+
+    /// The device's proof of itself, over the computer's challenge.
+    public static String respondAsDevice(byte[] secret, String challenge) {
+        return answer(secret, LABEL_DEVICE, challenge, null);
     }
 
     /// The answer to a challenge over a bundle.
@@ -100,9 +115,20 @@ public final class InterpPairingSecret {
     /// modify the stream cannot swap in a different program behind a valid
     /// response -- the response would no longer verify against what arrived.
     public static String respond(byte[] secret, String challenge, byte[] payload) {
+        return answer(secret, LABEL_PUSH, challenge, payload);
+    }
+
+    private static String answer(byte[] secret, String label, String challenge, byte[] payload) {
         Hmac mac = Hmac.create(com.codename1.security.Hash.SHA256, secret);
-        mac.update(utf8(challenge));
-        mac.update(payload);
+        mac.update(utf8(label));
+        mac.update(new byte[]{0});
+        byte[] c = utf8(challenge);
+        mac.update(new byte[]{(byte) (c.length >>> 24), (byte) (c.length >>> 16),
+            (byte) (c.length >>> 8), (byte) c.length});
+        mac.update(c);
+        if (payload != null) {
+            mac.update(payload);
+        }
         return hex(mac.doFinal());
     }
 

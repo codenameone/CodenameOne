@@ -114,17 +114,34 @@ if [ "$SKIP_BUILD" = 0 ]; then
     # script invents.
     (cd "$APP" && JAVA_HOME="${JAVA17_HOME:-$JAVA_HOME}" \
         PATH="${JAVA17_HOME:-$JAVA_HOME}/bin:$PATH" \
-        mvn -o ${MVN_ARGS[@]+"${MVN_ARGS[@]}"} package -DskipTests \
+        mvn ${CN1_DEVRUNTIME_OFFLINE:+-o} ${MVN_ARGS[@]+"${MVN_ARGS[@]}"} package -DskipTests \
         -Dcodename1.platform=ios \
         -Dcodename1.buildTarget=ios-source \
         -Dcodename1.arg.ios.interpHost=true \
         -Dmaven.compiler.fork=true \
         -Dmaven.compiler.executable="${JAVA17_HOME:-$JAVA_HOME}/bin/javac" \
         -Dopen=false 2>&1 | tee "$WORK/translate.log" | grep -E "BUILD|ERROR" | head -20)
+    # The pipeline above ends in head, so its status says nothing about Maven.
+    grep -q "BUILD SUCCESS" "$WORK/translate.log" || {
+        echo "translation failed; see $WORK/translate.log" >&2
+        exit 1
+    }
 
     echo "=== xcodebuild ==="
-    (cd "$SRC_DIR" && xcodebuild -workspace CN1DeviceRuntime.xcworkspace \
-        -scheme CN1DeviceRuntime -sdk iphonesimulator -configuration Debug \
+    # The builder names the project after the main class, so find it rather
+    # than spell it: the name changed once already.
+    # A workspace exists only when the build needed CocoaPods.
+    WS="$(cd "$SRC_DIR" && ls -d *.xcworkspace 2>/dev/null | head -1 || true)"
+    if [ -n "$WS" ]; then
+        APP_NAME="${WS%.xcworkspace}"
+        CONTAINER=(-workspace "$WS")
+    else
+        PROJ="$(cd "$SRC_DIR" && ls -d *.xcodeproj | head -1)"
+        APP_NAME="${PROJ%.xcodeproj}"
+        CONTAINER=(-project "$PROJ")
+    fi
+    (cd "$SRC_DIR" && xcodebuild "${CONTAINER[@]}" \
+        -scheme "$APP_NAME" -sdk iphonesimulator -configuration Debug \
         -destination "platform=iOS Simulator,id=$SIM_UDID" \
         -derivedDataPath "$WORK/dd" \
         CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build \
@@ -136,12 +153,30 @@ if [ "$SKIP_BUILD" = 0 ]; then
     echo "BUILD SUCCEEDED"
 fi
 
-APP_BUNDLE="$WORK/dd/Build/Products/Debug-iphonesimulator/CN1DeviceRuntime.app"
+# Products also holds embedded targets (an App Clip, extensions); the app is
+# the bundle whose identifier is the runtime's own.
+APP_BUNDLE=""
+for b in "$WORK"/dd/Build/Products/Debug-iphonesimulator/*.app; do
+    if [ "$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$b/Info.plist" 2>/dev/null)" = com.codenameone.devruntime ]; then
+        APP_BUNDLE="$b"
+    fi
+done
 [ -d "$APP_BUNDLE" ] || { echo "no app bundle at $APP_BUNDLE" >&2; exit 1; }
 
 echo "=== installing ==="
-xcrun simctl uninstall "$SIM_UDID" com.codenameone.devruntime >/dev/null 2>&1 || true
+# A clean install by default, so every run starts from the same state.
+# CN1_DEVRUNTIME_KEEP_DATA=1 installs over the old copy instead, keeping its
+# projects and the computers it is paired with.
+if [ -z "${CN1_DEVRUNTIME_KEEP_DATA:-}" ]; then
+    xcrun simctl uninstall "$SIM_UDID" com.codenameone.devruntime >/dev/null 2>&1 || true
+fi
 xcrun simctl install "$SIM_UDID" "$APP_BUNDLE"
+if [ -n "${CN1_DEVRUNTIME_IDE_AUTORUN:-}" ]; then
+    # The on-device IDE compiles and runs its starter project at launch when
+    # this marker is in the app's home (Documents), and deletes it.
+    DATA="$(xcrun simctl get_app_container "$SIM_UDID" com.codenameone.devruntime data)"
+    mkdir -p "$DATA/Documents" && touch "$DATA/Documents/cn1ide-autorun"
+fi
 
 echo "=== launching ==="
 xcrun simctl launch --console-pty "$SIM_UDID" com.codenameone.devruntime \
@@ -177,4 +212,20 @@ if [ -n "$PROGRAM" ]; then
     "$ROOT/scripts/cn1-push.sh" "$PROGRAM" 18234
     sleep 2
     tail -20 "$WORK/console.log"
+fi
+
+if [ -n "${CN1_DEVRUNTIME_IDE_AUTORUN:-}" ]; then
+    echo "=== waiting for the on-device IDE to compile and run ==="
+    for _ in $(seq 1 60); do
+        grep -q "CN1SS:IDE run" "$WORK/console.log" 2>/dev/null && break
+        sleep 1
+    done
+    xcrun simctl spawn "$SIM_UDID" log show --last 5m --style compact \
+        --predicate 'eventMessage CONTAINS "CN1SS:IDE"' > "$WORK/ide.log" 2>/dev/null || true
+    grep -h "CN1SS:IDE" "$WORK/console.log" "$WORK/ide.log" 2>/dev/null | sort -u
+    xcrun simctl io "$SIM_UDID" screenshot "$WORK/ide-run.png" >/dev/null 2>&1 || true
+    grep -qh "CN1SS:IDE run ok" "$WORK/console.log" "$WORK/ide.log" 2>/dev/null || {
+        echo "the on-device IDE did not run its project" >&2
+        exit 1
+    }
 fi

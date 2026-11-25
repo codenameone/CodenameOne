@@ -45,8 +45,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * disagree by a byte, nothing pairs -- and the symptom is "that code did not
  * match", which reads exactly like a typo and sends people to the wrong place
  * entirely. So the test drives both halves and compares.</p>
- *
- * @author Shai Almog
  */
 class InterpPairingSecretTest extends UITestBase {
 
@@ -88,6 +86,27 @@ class InterpPairingSecretTest extends UITestBase {
                         new Class<?>[]{byte[].class, String.class, byte[].class},
                         new Object[]{secret, challenge, bundle}),
                 "the push answer differs between the two ends");
+        assertEquals(InterpPairingSecret.respondAsDevice(secret, challenge),
+                invokeDesktop("respondAsDevice",
+                        new Class<?>[]{byte[].class, String.class},
+                        new Object[]{secret, challenge}),
+                "the device proof differs between the two ends");
+    }
+
+    @Test
+    @DisplayName("no answer of one kind is a valid answer of another")
+    void answersAreDomainSeparated() {
+        byte[] secret = InterpPairingSecret.derive("123456", "peer", "device");
+        byte[] bundle = "XYZ".getBytes(StandardCharsets.UTF_8);
+        // The device signs any challenge as its proof before the computer has
+        // authenticated; that must never yield a push answer for challenge
+        // "aaaa" and this bundle.
+        assertNotEquals(InterpPairingSecret.respond(secret, "aaaa", bundle),
+                InterpPairingSecret.respondAsDevice(secret, "aaaaXYZ"),
+                "a device proof must not double as a push answer");
+        assertNotEquals(InterpPairingSecret.respond(secret, "aaaa"),
+                InterpPairingSecret.respondAsDevice(secret, "aaaa"),
+                "a device proof must not double as a pairing answer");
     }
 
     @Test

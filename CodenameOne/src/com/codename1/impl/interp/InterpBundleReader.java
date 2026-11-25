@@ -34,8 +34,6 @@ import java.util.Vector;
 /// allocation beyond the arrays it is filling. It has to run on ParparVM, where
 /// `java.io` is a subset -- `DataInputStream` over a byte stream is available
 /// and is all this uses.
-///
-/// @author Shai Almog
 public final class InterpBundleReader {
     private InterpBundleReader() {
     }
