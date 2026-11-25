@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+#
+# Pushes a Java program to a running Codename One device runtime.
+#
+#   scripts/cn1-push.sh <MainClass.java|source-dir> [port] [--main <Class>]
+#
+# Takes a single file or a whole source tree. A real application is a tree of
+# packages whose entry point is a Lifecycle subclass rather than a main, and
+# running one of those is the point of this runtime, so both shapes work.
+#
+# Compiles the sources, packages them as a .cn1ip bundle, and sends it to the
+# listener on the device. The bundle carries the source as well as the code:
+# the runtime refuses to execute anything whose source it cannot show, because
+# that is the condition Apple attaches to running downloaded code at all
+# (App Store Review Guideline 2.5.2).
+#
+# The listener binds loopback only. Reaching it means `adb reverse` on Android
+# (which needs an authorised device) or the shared loopback of the iOS
+# simulator. There is deliberately no discovery protocol: physical access to the
+# device is the pairing.
+#
+# -XDstringConcat=inline is not optional -- see the note where it is used.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${1:?usage: cn1-push.sh <MainClass.java|source-dir> [port] [--main <Class>]}"
+shift
+PORT=18234
+MAIN_OVERRIDE=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --main) MAIN_OVERRIDE="$2"; shift 2 ;;
+        *) PORT="$1"; shift ;;
+    esac
+done
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+JDK="${JAVA17_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null || true)}"
+if [ -z "$JDK" ]; then
+    JDK="${JAVA_HOME:-}"
+fi
+if [ -z "$JDK" ]; then
+    echo "no JDK found; set JAVA17_HOME" >&2
+    exit 1
+fi
+
+# Selects the highest version of a Maven artifact from a per-version tree,
+# excluding classified attachments (-sources, -javadoc, -bundle) whose names
+# often sort before the plain binary jar and would poison a `head -1`. A
+# missing directory returns nothing rather than tripping `set -e`.
+pick_latest_artifact() {
+    local dir="$1" prefix="$2" v
+    [ -d "$dir" ] || return 0
+    for v in $(ls "$dir" 2>/dev/null | sort -V -r); do
+        local candidate="$dir/$v/$prefix-$v.jar"
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+}
+
+CORE_JAR="$(pick_latest_artifact "$REPO_ROOT/.m2-local/com/codenameone/codenameone-core" codenameone-core)"
+if [ -z "$CORE_JAR" ]; then
+    CORE_JAR="$(pick_latest_artifact "$HOME/.m2/repository/com/codenameone/codenameone-core" codenameone-core)"
+fi
+PARPAR_JAR="$(pick_latest_artifact "$REPO_ROOT/.m2-local/com/codenameone/codenameone-parparvm" codenameone-parparvm)"
+if [ -z "$PARPAR_JAR" ]; then
+    echo "codenameone-parparvm not found in .m2-local; build it first:" >&2
+    echo "  mvn -pl parparvm install -f maven/pom.xml" >&2
+    exit 1
+fi
+# ASM classpath for the Pack.java compile and run. Any 9.x version is
+# fine (BCT uses stable API), but the four artifacts have to be the same
+# version -- ASM does not promise cross-minor compatibility between its
+# own modules. Search .m2-local first, then ~/.m2, and pick the highest
+# version present at which all four artifacts exist. Hard-coding 9.8 (as
+# an earlier version of this script did) missed the 9.2 that the
+# advertised `mvn -pl parparvm install` puts on disk, and the push then
+# failed for missing ASM classes on a fresh checkout.
+ASM_JARS=""
+for asm_repo in "$REPO_ROOT/.m2-local/org/ow2/asm" "$HOME/.m2/repository/org/ow2/asm"; do
+    [ -d "$asm_repo/asm" ] || continue
+    for v in $(ls "$asm_repo/asm" 2>/dev/null | sort -V -r); do
+        if [ -f "$asm_repo/asm/$v/asm-$v.jar" ] \
+                && [ -f "$asm_repo/asm-tree/$v/asm-tree-$v.jar" ] \
+                && [ -f "$asm_repo/asm-commons/$v/asm-commons-$v.jar" ] \
+                && [ -f "$asm_repo/asm-analysis/$v/asm-analysis-$v.jar" ]; then
+            ASM_JARS="$asm_repo/asm/$v/asm-$v.jar:$asm_repo/asm-tree/$v/asm-tree-$v.jar:$asm_repo/asm-commons/$v/asm-commons-$v.jar:$asm_repo/asm-analysis/$v/asm-analysis-$v.jar"
+            break 2
+        fi
+    done
+done
+if [ -z "$ASM_JARS" ]; then
+    echo "no complete ASM install found (asm, asm-tree, asm-commons, asm-analysis at the same version)" >&2
+    echo "build parparvm first:  mvn -pl parparvm install -f maven/pom.xml" >&2
+    exit 1
+fi
+
+echo "compiling $SOURCE"
+mkdir -p "$WORK/classes"
+if [ -d "$SOURCE" ]; then
+    SOURCE_ROOT="$SOURCE"
+    find "$SOURCE" -name '*.java' > "$WORK/sources.txt"
+    if [ ! -s "$WORK/sources.txt" ]; then
+        echo "no .java files under $SOURCE" >&2
+        exit 1
+    fi
+else
+    # The file itself, not its directory: a directory would sweep in every
+    # other program sitting beside it.
+    SOURCE_ROOT="$SOURCE"
+    echo "$SOURCE" > "$WORK/sources.txt"
+fi
+# The device has no runtime invokedynamic: ParparVM desugars it at build time
+# and a pushed bundle gets no such pass. From JDK 9 javac turns "a" + b into an
+# indy against StringConcatFactory, so it has to be compiled the old way.
+"$JDK/bin/javac" -g -nowarn -XDstringConcat=inline \
+    -cp "$CORE_JAR" -d "$WORK/classes" @"$WORK/sources.txt"
+
+echo "building bundle"
+cat > "$WORK/Pack.java" <<'JAVA'
+import com.codename1.tools.translator.InterpBundleWriter;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+
+public final class Pack {
+    public static void main(String[] a) throws Exception {
+        File classesDir = new File(a[0]);
+        String mainClass = a[1];
+        File sourceRoot = new File(a[2]);
+        File out = new File(a[3]);
+
+        InterpBundleWriter w = new InterpBundleWriter();
+        List<File> classes = new ArrayList<File>();
+        collect(classesDir, classes);
+        for (File f : classes) {
+            w.addClassFile(f);
+        }
+        // Every source in the tree, not just the entry point's: the runtime
+        // refuses to run a class whose source it cannot show, and a real
+        // application is many files.
+        if (sourceRoot.isDirectory()) {
+            w.addSourceTree(sourceRoot);
+            // Everything that is not source: theme.res, CSS, images. Keyed by
+            // path relative to the tree, which is how an application loads them.
+            w.addResourceTree(sourceRoot);
+            // Maven layout puts non-source assets under a sibling `resources/`
+            // directory and Kotlin sources under `kotlin/`. The documented
+            // invocation names the `java/` root, so both siblings would
+            // otherwise never enter the bundle -- theme.res and images would
+            // vanish and the runtime would refuse a mixed Java+Kotlin push
+            // as missing the Kotlin classes' source. Add whichever siblings
+            // exist alongside.
+            File parent = sourceRoot.getParentFile();
+            if (parent != null) {
+                File resources = new File(parent, "resources");
+                if (resources.isDirectory() && !resources.getCanonicalPath()
+                        .equals(sourceRoot.getCanonicalPath())) {
+                    w.addResourceTree(resources);
+                }
+                File kotlin = new File(parent, "kotlin");
+                if (kotlin.isDirectory() && !kotlin.getCanonicalPath()
+                        .equals(sourceRoot.getCanonicalPath())) {
+                    w.addSourceTree(kotlin);
+                    w.addResourceTree(kotlin);
+                }
+            }
+        } else {
+            // Keyed by the declared package, exactly as addSourceTree does:
+            // the reader looks a class's source up as <package>/<SourceFile>,
+            // so a lone com.example.Main stored under "Main.java" is a bundle
+            // the device refuses as missing its own source.
+            String text = new String(Files.readAllBytes(sourceRoot.toPath()), "UTF-8");
+            w.addSource(InterpBundleWriter.sourceKey(
+                    InterpBundleWriter.packageOf(text), sourceRoot.getName()), text);
+        }
+        if (mainClass.length() == 0) {
+            mainClass = findEntryPoint(classesDir, classes);
+            System.out.println("entry point " + mainClass.replace('/', '.'));
+        }
+        // Dots to slashes: the documented override is `--main com.example.Other`
+        // and every name in the bundle is an internal name, so leaving it dotted
+        // builds a bundle whose main class the device cannot find.
+        w.setMainClass(mainClass.replace('.', '/'));
+        OutputStream os = new FileOutputStream(out);
+        try {
+            w.write(os);
+        } finally {
+            os.close();
+        }
+        System.out.println("bundle " + out.length() + " bytes, " + classes.size() + " classes");
+    }
+
+    /// The class to enter: a main(String[]) if there is one, otherwise a
+    /// Lifecycle subclass, which is what a real application has.
+    private static String findEntryPoint(File root, List<File> classes) throws Exception {
+        Map<String,String> supers = new HashMap<String,String>();
+        Set<String> abstracts = new HashSet<String>();
+        List<String> mains = new ArrayList<String>();
+        for (File f : classes) {
+            org.objectweb.asm.tree.ClassNode cn = new org.objectweb.asm.tree.ClassNode();
+            new org.objectweb.asm.ClassReader(Files.readAllBytes(f.toPath()))
+                    .accept(cn, org.objectweb.asm.ClassReader.SKIP_CODE);
+            for (Object mo : cn.methods) {
+                org.objectweb.asm.tree.MethodNode m = (org.objectweb.asm.tree.MethodNode) mo;
+                // Java's entry-point rule is exactly `public static void
+                // main(String[])`. A package-private or private helper of the
+                // same signature is not an entry point, and picking one up
+                // here preferred an inaccessible method over a valid Lifecycle
+                // subclass -- matches the DevicePush filter for the same
+                // reason.
+                if ("main".equals(m.name) && "([Ljava/lang/String;)V".equals(m.desc)
+                        && (m.access & org.objectweb.asm.Opcodes.ACC_STATIC) != 0
+                        && (m.access & org.objectweb.asm.Opcodes.ACC_PUBLIC) != 0) {
+                    mains.add(cn.name);
+                }
+            }
+            supers.put(cn.name, cn.superName);
+            if ((cn.access & (org.objectweb.asm.Opcodes.ACC_ABSTRACT
+                    | org.objectweb.asm.Opcodes.ACC_INTERFACE)) != 0) {
+                abstracts.add(cn.name);
+            }
+        }
+        if (!mains.isEmpty()) {
+            // Sorted: listFiles() has no defined order, so a tree with a second
+            // main would otherwise push one program today and the other
+            // tomorrow from the same sources. As DevicePush does.
+            Collections.sort(mains);
+            if (mains.size() > 1) {
+                System.out.println("more than one main(String[]): " + mains
+                        + " -- entering " + mains.get(0));
+            }
+            return mains.get(0);
+        }
+        // Transitively, skipping the abstract ones and taking the deepest, as
+        // DevicePush does: a project whose app extends its own BaseApp extends
+        // Lifecycle has two descendants, and entering the wrong one runs a class
+        // that was never meant to be instantiated.
+        String lifecycle = null;
+        for (Map.Entry<String,String> e : supers.entrySet()) {
+            if (abstracts.contains(e.getKey()) || !descendsFromLifecycle(e.getKey(), supers)) continue;
+            if (lifecycle == null) { lifecycle = e.getKey(); continue; }
+            // Deepest wins, and a genuine tie is broken by name: entries arrive
+            // in hash order, and an entry point that changes between two
+            // identical pushes is worse than either answer.
+            int mine = depthOf(e.getKey(), supers);
+            int best = depthOf(lifecycle, supers);
+            if (mine > best || (mine == best && e.getKey().compareTo(lifecycle) < 0)) {
+                lifecycle = e.getKey();
+            }
+        }
+        if (lifecycle != null) {
+            return lifecycle;
+        }
+        throw new IllegalStateException(
+                "no entry point: expected a main(String[]) or a Lifecycle subclass");
+    }
+
+    // Bounded by what has been seen rather than by a count, as DevicePush is:
+    // a superclass chain is acyclic, and a count refused a hierarchy for being
+    // deep -- reporting no entry point for a project that has one.
+    private static boolean descendsFromLifecycle(String name, Map<String,String> supers) {
+        Set<String> seen = new HashSet<String>();
+        String parent = supers.get(name);
+        while (parent != null && seen.add(parent)) {
+            if ("com/codename1/system/Lifecycle".equals(parent)) return true;
+            parent = supers.get(parent);
+        }
+        return false;
+    }
+
+    private static int depthOf(String name, Map<String,String> supers) {
+        Set<String> seen = new HashSet<String>();
+        int depth = 0;
+        String at = supers.get(name);
+        while (at != null && seen.add(at)) { depth++; at = supers.get(at); }
+        return depth;
+    }
+
+    private static void collect(File dir, List<File> out) {
+        File[] kids = dir.listFiles();
+        if (kids == null) return;
+        for (File f : kids) {
+            if (f.isDirectory()) collect(f, out);
+            else if (f.getName().endsWith(".class")) out.add(f);
+        }
+    }
+}
+JAVA
+"$JDK/bin/javac" -nowarn -cp "$PARPAR_JAR:$ASM_JARS" -d "$WORK" "$WORK/Pack.java"
+"$JDK/bin/java" -cp "$WORK:$PARPAR_JAR:$ASM_JARS" Pack \
+    "$WORK/classes" "$MAIN_OVERRIDE" "$SOURCE_ROOT" "$WORK/program.cn1ip"
+
+echo "awaiting the device on 127.0.0.1:$PORT"
+# Delegate the push to the shipping DevicePush entry point rather than a
+# stripped-down local V1 helper. Android apps share the TCP loopback
+# namespace, so the runtime no longer treats loopback as authentication and
+# refuses V1 anywhere but the JavaSE simulator; the same V3 pairing flow
+# now covers both USB (adb reverse) and Wi-Fi, and DevicePush already knows
+# how to run it (challenge/response, secret persistence, retry after
+# pairing). --bundle skips DevicePush's own packaging and hands the .cn1ip
+# we already produced.
+"$JDK/bin/java" -cp "$PARPAR_JAR" com.codename1.tools.translator.DevicePush \
+    --bundle "$WORK/program.cn1ip" --port "$PORT"

@@ -324,6 +324,8 @@ include::App-Store-Submission.asciidoc[]
 
 include::Working-With-iOS.asciidoc[]
 
+include::Device-Runtime.asciidoc[]
+
 include::Working-With-Javascript.asciidoc[]
 
 include::Android-Interop.asciidoc[]

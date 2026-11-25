@@ -92,4 +92,23 @@ public class InsnList {
         cache();
         return node.index;
     }
+
+    /// Replaces a node of this list with one that belongs to no list.
+    public void set(AbstractInsnNode location, AbstractInsnNode node) {
+        node.previous = location.previous;
+        node.next = location.next;
+        if (location.previous == null) {
+            first = node;
+        } else {
+            location.previous.next = node;
+        }
+        if (location.next == null) {
+            last = node;
+        } else {
+            location.next.previous = node;
+        }
+        location.previous = null;
+        location.next = null;
+        cache = null;
+    }
 }

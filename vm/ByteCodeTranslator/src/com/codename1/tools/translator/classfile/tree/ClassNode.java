@@ -36,18 +36,52 @@
 package com.codename1.tools.translator.classfile.tree;
 
 import com.codename1.tools.translator.classfile.ClassVisitor;
+import com.codename1.tools.translator.classfile.FieldVisitor;
 import com.codename1.tools.translator.classfile.MethodVisitor;
 import java.util.ArrayList;
 import java.util.List;
 
 /** A class's name and its methods, each recorded as a {@link MethodNode}. */
 public class ClassNode extends ClassVisitor {
+    public int version;
+    public int access;
     public String name;
-    public final List<MethodNode> methods = new ArrayList<MethodNode>();
+    public String superName;
+    public List<String> interfaces = new ArrayList<String>();
+    public String sourceFile;
+    public List<FieldNode> fields = new ArrayList<FieldNode>();
+    public List<InnerClassNode> innerClasses = new ArrayList<InnerClassNode>();
+    public List<MethodNode> methods = new ArrayList<MethodNode>();
 
     @Override
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        this.version = version;
+        this.access = access;
         this.name = name;
+        this.superName = superName;
+        this.interfaces = new ArrayList<String>();
+        if (interfaces != null) {
+            for (String i : interfaces) {
+                this.interfaces.add(i);
+            }
+        }
+    }
+
+    @Override
+    public void visitSource(String source, String debug) {
+        this.sourceFile = source;
+    }
+
+    @Override
+    public void visitInnerClass(String name, String outerName, String innerName, int access) {
+        innerClasses.add(new InnerClassNode(name, outerName, innerName, access));
+    }
+
+    @Override
+    public FieldVisitor visitField(int access, String name, String desc, String signature, Object value) {
+        FieldNode field = new FieldNode(access, name, desc, signature, value);
+        fields.add(field);
+        return null;
     }
 
     @Override

@@ -597,9 +597,18 @@ public class ByteCodeTranslator {
         if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        if ("true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
+        if (BytecodeMethod.isOnDeviceDebug()) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
+        if (BytecodeMethod.isInterpHost()) {
+            replaceInFile(cn1Globals, "//#define CN1_INTERP_HOST", "#define CN1_INTERP_HOST");
+        }
+        // The ABI for the metadata the generated code emits under
+        // CN1_ON_DEVICE_DEBUG. Always copied, so include order never depends on
+        // which target is building; the weak sinks in cn1_reflect let a target
+        // without a debugger runtime link what it generated.
+        copyRuntimeResource(srcRoot, "cn1_reflect.h");
+        copyRuntimeResource(srcRoot, "cn1_reflect.m", "cn1_reflect.c");
         copyRuntimeResource(srcRoot, "cn1_globals.m", "cn1_globals.c");
         copyRuntimeResource(srcRoot, "nativeMethods.m", "nativeMethods.c");
         if (Util.getProperty("USE_RPMALLOC", "false").equals("true")) {
@@ -990,9 +999,18 @@ public class ByteCodeTranslator {
         if (Util.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        if ("true".equalsIgnoreCase(Util.getProperty("cn1.onDeviceDebug", "false"))) {
+        if (BytecodeMethod.isOnDeviceDebug()) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
+        if (BytecodeMethod.isInterpHost()) {
+            replaceInFile(cn1Globals, "//#define CN1_INTERP_HOST", "#define CN1_INTERP_HOST");
+        }
+        // The ABI for the metadata the generated code emits under
+        // CN1_ON_DEVICE_DEBUG. Always copied, so include order never depends on
+        // which target is building; the weak sinks in cn1_reflect let a target
+        // without a debugger runtime link what it generated.
+        copyRuntimeResource(srcRoot, "cn1_reflect.h");
+        copyRuntimeResource(srcRoot, "cn1_reflect.m");
         copyRuntimeResource(srcRoot, "cn1_globals.m");
         copyRuntimeResource(srcRoot, "nativeMethods.m");
         // java_io_File_RUNTIME.m, not java_io_File.m. When the application retains
@@ -1035,6 +1053,7 @@ public class ByteCodeTranslator {
 
         Parser.writeOutput(srcRoot);
         enableRealtimeIfPresent(cn1Globals);
+
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
         copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
