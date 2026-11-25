@@ -100,6 +100,63 @@ public class Metafields {
     public MetafieldDefDto define(String username, String storeId, MetafieldDefDto in)
             throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        return defineIn(storeId, in, "");
+    }
+
+    /// What every app-owned field key starts with.
+    public static final String APP_NAMESPACE = "app--";
+
+    /// The namespace an app's fields are kept in: `app--<appId>--`. A staff
+    /// key is made by [Lists#handle], which never writes two dashes in a
+    /// row, so no field staff define can fall in one; the key API is the only
+    /// way into a namespace, and only for its own app's token.
+    public static String appNamespace(String appId) {
+        return APP_NAMESPACE + appId + "--";
+    }
+
+    /// Defines a field in an app's own namespace, for that app's token.
+    @Transactional(rollbackFor = IOException.class)
+    public MetafieldDefDto defineForApp(String storeId, String appId, MetafieldDefDto in)
+            throws IOException {
+        return defineIn(storeId, in, appNamespace(appId));
+    }
+
+    /// Sets one field for an app's token: only a field in that app's own
+    /// namespace (403 otherwise, whoever defined it).
+    @Transactional(rollbackFor = IOException.class)
+    public List<MetafieldValueDto> putForApp(String storeId, String appId, MetafieldValueDto in)
+            throws IOException {
+        if (in == null) {
+            throw new ResponseStatusException(400, "Say which field to set");
+        }
+        MetafieldDef d = def(storeId, in.defId());
+        if (!d.getFieldKey().startsWith(appNamespace(appId))) {
+            throw new ResponseStatusException(403, "An app writes only the fields of its own "
+                    + "namespace, " + appNamespace(appId));
+        }
+        return putValue(storeId, d, in);
+    }
+
+    /// Every field of `ownerKind` on `ownerId`, for the key API.
+    @Transactional(readOnly = true)
+    public List<MetafieldValueDto> valuesForApi(String storeId, String ownerKind, String ownerId)
+            throws IOException {
+        String owner = choose(ownerKind, OWNERS, "owner");
+        requireOwner(storeId, owner, ownerId);
+        return fields(storeId, owner, ownerId, false);
+    }
+
+    /// Refuses a staff write to a field an app owns: staff read it, the app
+    /// alone writes it.
+    private static void refuseAppOwned(MetafieldDef d) {
+        if (d.getFieldKey().startsWith(APP_NAMESPACE)) {
+            throw new ResponseStatusException(403, "That field belongs to an app; only the app "
+                    + "writes it");
+        }
+    }
+
+    private MetafieldDefDto defineIn(String storeId, MetafieldDefDto in, String namespace)
+            throws IOException {
         if (in == null) {
             throw new ResponseStatusException(400, "Say what the field is");
         }
@@ -109,7 +166,7 @@ public class Metafields {
         if (name.length() == 0) {
             throw new ResponseStatusException(400, "Give the field a name");
         }
-        String key = Lists.handle(in.key(), name, 60);
+        String key = namespace + Lists.handle(in.key(), name, 60 - namespace.length());
         if (defs.findByStoreIdAndOwnerKindAndFieldKey(storeId, owner, key) != null) {
             throw new ResponseStatusException(409, "That field exists already");
         }
@@ -142,6 +199,7 @@ public class Metafields {
     public void undefine(String username, String storeId, String fieldId) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
         MetafieldDef d = def(storeId, fieldId);
+        refuseAppOwned(d);
         List<MetafieldValue> vs = values.findByDefId(d.getId());
         for (int iter = 0; iter < vs.size(); iter++) {
             values.delete(vs.get(iter));
@@ -171,6 +229,12 @@ public class Metafields {
             throw new ResponseStatusException(400, "Say which field to set");
         }
         MetafieldDef d = def(storeId, in.defId());
+        refuseAppOwned(d);
+        return putValue(storeId, d, in);
+    }
+
+    private List<MetafieldValueDto> putValue(String storeId, MetafieldDef d, MetafieldValueDto in)
+            throws IOException {
         requireOwner(storeId, d.getOwnerKind(), in.ownerId());
         MetafieldValue row = values.findByDefIdAndOwnerId(d.getId(), in.ownerId());
         String raw = in.value() == null ? "" : in.value().trim();

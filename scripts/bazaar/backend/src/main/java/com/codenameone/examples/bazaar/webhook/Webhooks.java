@@ -77,6 +77,19 @@ public class Webhooks {
             ORDERS_CREATE, ORDERS_PAID, ORDERS_FULFILLED, ORDERS_CANCELLED, REFUNDS_CREATE,
             INVENTORY_LOW, PRODUCTS_UPDATE, CUSTOMERS_CREATE));
 
+    /// Sent to an app when a store removes it; its token is already revoked.
+    public static final String APP_UNINSTALLED = "app/uninstalled";
+    /// Sent to every installed app when a customer asks for their data.
+    public static final String CUSTOMERS_DATA_REQUEST = "customers/data_request";
+    /// Sent to every installed app when a customer's personal data is erased.
+    public static final String CUSTOMERS_REDACT = "customers/redact";
+    /// Sent to an app 48 hours after a store removed it: delete the store's data.
+    public static final String SHOP_REDACT = "shop/redact";
+    /// The topics every installed app is subscribed to whether it asks or not:
+    /// no app and no member of staff can subscribe to or remove them.
+    public static final List<String> MANDATORY = Collections.unmodifiableList(Arrays.asList(
+            APP_UNINSTALLED, CUSTOMERS_DATA_REQUEST, CUSTOMERS_REDACT, SHOP_REDACT));
+
     private static final int BATCH = 50;
 
     /// How a delivery reaches its URL; answers the HTTP status, or throws
@@ -201,7 +214,8 @@ public class Webhooks {
     public WebhookDelivery queueTo(String storeId, String webhookId, String topic,
             String payloadJson) throws IOException {
         Webhook hook = webhookId == null ? null : hooks.findById(webhookId);
-        if (hook == null || !hook.getStoreId().equals(storeId) || !hook.isActive()) {
+        if (hook == null || !hook.getStoreId().equals(storeId) || !hook.isActive()
+                || hook.getAppInstallationId().length() > 0) {
             return null;
         }
         return queue(hook, topic, payloadJson);
@@ -324,9 +338,130 @@ public class Webhooks {
         List<Webhook> all = hooks.findByStoreId(storeId);
         List<WebhookDto> out = new ArrayList<WebhookDto>();
         for (int iter = 0; iter < all.size(); iter++) {
-            out.add(dto(all.get(iter)));
+            if (all.get(iter).getAppInstallationId().length() == 0) {
+                out.add(dto(all.get(iter)));
+            }
         }
         return out;
+    }
+
+    // ------------------------------------------------------------------ apps
+
+    /// An app installation's own subscriptions, the mandatory ones left out.
+    @Transactional(readOnly = true)
+    public List<WebhookDto> appList(String installationId) {
+        List<Webhook> all = hooks.findByAppInstallationId(installationId);
+        List<WebhookDto> out = new ArrayList<WebhookDto>();
+        for (int iter = 0; iter < all.size(); iter++) {
+            Webhook h = all.get(iter);
+            if (!MANDATORY.contains(h.getTopic())) {
+                out.add(appDto(h));
+            }
+        }
+        return out;
+    }
+
+    /// Subscribes an app installation to a topic, signed with the app's key
+    /// `signingKey`. The topic and address are checked as a staff hook's are.
+    @Transactional(rollbackFor = IOException.class)
+    public WebhookDto appCreate(String storeId, String installationId, String signingKey,
+            WebhookDto wanted) throws IOException {
+        if (hooks.findByAppInstallationId(installationId).size() >= 50) {
+            throw new ResponseStatusException(400, "An app has at most 50 subscriptions a store");
+        }
+        Webhook hook = new Webhook();
+        hook.setId(Ids.next());
+        hook.setStoreId(storeId);
+        hook.setAppInstallationId(installationId);
+        hook.setCreatedAt(Instant.now());
+        apply(hook, new WebhookDto(null, wanted == null ? null : wanted.topic(),
+                wanted == null ? null : wanted.url(), signingKey, true, 0));
+        hooks.insert(hook);
+        return appDto(hook);
+    }
+
+    /// Removes one of an app installation's subscriptions; 404 for anybody
+    /// else's, a mandatory one included.
+    @Transactional(rollbackFor = IOException.class)
+    public List<WebhookDto> appRemove(String installationId, String webhookId) {
+        Webhook hook = webhookId == null ? null : hooks.findById(webhookId);
+        if (hook == null || !installationId.equals(hook.getAppInstallationId())
+                || MANDATORY.contains(hook.getTopic())) {
+            throw new ResponseStatusException(404, "No such webhook");
+        }
+        hooks.delete(hook);
+        return appList(installationId);
+    }
+
+    /// Makes (or points again and turns on) an installation's hooks for the
+    /// mandatory topics, and turns its own subscriptions back on.
+    @Transactional(rollbackFor = IOException.class)
+    public void appActivate(String storeId, String installationId, String url,
+            String signingKey) throws IOException {
+        List<Webhook> mine = hooks.findByAppInstallationId(installationId);
+        for (int t = 0; t < MANDATORY.size(); t++) {
+            Webhook found = null;
+            for (int iter = 0; iter < mine.size(); iter++) {
+                if (MANDATORY.get(t).equals(mine.get(iter).getTopic())) {
+                    found = mine.get(iter);
+                }
+            }
+            if (found == null) {
+                found = new Webhook();
+                found.setId(Ids.next());
+                found.setStoreId(storeId);
+                found.setAppInstallationId(installationId);
+                found.setTopic(MANDATORY.get(t));
+                found.setCreatedAt(Instant.now());
+                found.setUrl(url);
+                found.setSecret(signingKey);
+                found.setActive(true);
+                hooks.insert(found);
+            }
+        }
+        mine = hooks.findByAppInstallationId(installationId);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            Webhook h = mine.get(iter);
+            if (MANDATORY.contains(h.getTopic())) {
+                h.setUrl(url);
+            }
+            h.setSecret(signingKey);
+            h.setActive(true);
+            hooks.save(h);
+        }
+    }
+
+    /// Turns off every hook of an installation; the rows stay, so that what
+    /// is owed after removal (`app/uninstalled`, `shop/redact`) still has
+    /// somewhere to go through [#appQueue].
+    @Transactional(rollbackFor = IOException.class)
+    public void appDeactivate(String installationId) {
+        List<Webhook> mine = hooks.findByAppInstallationId(installationId);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            mine.get(iter).setActive(false);
+            hooks.save(mine.get(iter));
+        }
+    }
+
+    /// Queues `topic` to an installation's hook for it, on or off: the one
+    /// way a delivery reaches an app that has been removed.
+    @Transactional(rollbackFor = IOException.class)
+    public WebhookDelivery appQueue(String installationId, String topic, String payloadJson)
+            throws IOException {
+        List<Webhook> mine = hooks.findByAppInstallationId(installationId);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            if (topic.equals(mine.get(iter).getTopic())) {
+                return queue(mine.get(iter), topic, payloadJson);
+            }
+        }
+        return null;
+    }
+
+    /// An app's view of its hook: the signing key is the app's own, so it is
+    /// never answered.
+    private static WebhookDto appDto(Webhook h) {
+        return new WebhookDto(h.getId(), h.getTopic(), h.getUrl(), "", h.isActive(),
+                h.getCreatedAt().toEpochMilli());
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -414,7 +549,9 @@ public class Webhooks {
 
     private Webhook mine(String storeId, String webhookId) {
         Webhook hook = webhookId == null ? null : hooks.findById(webhookId);
-        if (hook == null || !hook.getStoreId().equals(storeId)) {
+        // An app's hook is the app's: staff neither see nor change it.
+        if (hook == null || !hook.getStoreId().equals(storeId)
+                || hook.getAppInstallationId().length() > 0) {
             throw new ResponseStatusException(404, "No such webhook");
         }
         return hook;

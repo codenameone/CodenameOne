@@ -133,14 +133,15 @@ public class SecurityConfig {
     public SecurityFilterChain api(HttpSecurity http, JwkSource signingKeys,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer,
             JdbcUserDetailsManager users, Throttle throttle,
-            com.codenameone.examples.bazaar.platform.StoreApiKeys storeKeys) throws IOException {
+            com.codenameone.examples.bazaar.platform.StoreApiKeys storeKeys,
+            com.codenameone.examples.bazaar.platform.AppCallLimits appLimits) throws IOException {
         http.securityMatcher("/api/**")
             // A store's API key: `Authorization: Bearer bzk_...` or
             // `X-API-Key`. It carries scopes and no role, and KeyApiOnly keeps
             // it to /api/v1, the key API, where each route checks the scope.
             .apiKey(k -> k.repository(storeKeys)
                     .prefix(com.codenameone.examples.bazaar.platform.StoreApiKeys.PREFIX))
-            .addFilterAfter(new com.codenameone.examples.bazaar.platform.KeyApiOnly(),
+            .addFilterAfter(new com.codenameone.examples.bazaar.platform.KeyApiOnly(appLimits),
                     com.codename1.backend.security.ApiKeyAuthenticationFilter.class)
             .rateLimit("/api/v1/**", RateLimitKeys.firstOf(RateLimitKeys.apiKeyId(),
                     RateLimitKeys.clientAddress()), throttle.limiter("keyapi"))
@@ -209,6 +210,10 @@ public class SecurityConfig {
             // The carrier's tracking events: signed, not signed in.
             .rateLimit(com.codenameone.examples.bazaar.carrier.CarrierWebhook.PATH,
                     RateLimitKeys.clientAddress(), new InMemoryRateLimiter(120, 60))
+            // Apps trading install codes for tokens: a client secret is the
+            // credential, so guessing one is held to a slow pace per address.
+            .rateLimit(com.codenameone.examples.bazaar.platform.AppOAuth.TOKEN_PATH,
+                    RateLimitKeys.clientAddress(), new InMemoryRateLimiter(60, 60))
             // tag::bazaar-api-rules[]
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
@@ -230,6 +235,8 @@ public class SecurityConfig {
                             com.codenameone.examples.bazaar.channel.ChannelWebhook.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             com.codenameone.examples.bazaar.carrier.CarrierWebhook.PATH)).permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
+                            com.codenameone.examples.bazaar.platform.AppOAuth.TOKEN_PATH)).permitAll()
                     .requestMatchers("/api/v1/**").authenticated()
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
                     .requestMatchers("/api/merchant/**").hasRole(Roles.MERCHANT)

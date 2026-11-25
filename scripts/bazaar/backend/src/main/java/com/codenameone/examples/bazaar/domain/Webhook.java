@@ -49,7 +49,21 @@ public class Webhook {
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
+    /// The app installation that subscribed this hook, or empty for one the
+    /// store's staff made. An app's hooks are signed with the app's key and
+    /// are neither listed to nor changed by staff.
+    @Column(nullable = false, type = "VARCHAR(32)")
+    private String appInstallationId = "";
+
     public Webhook() {
+    }
+
+    public String getAppInstallationId() {
+        return appInstallationId;
+    }
+
+    public void setAppInstallationId(String appInstallationId) {
+        this.appInstallationId = appInstallationId;
     }
 
     public String getId() {

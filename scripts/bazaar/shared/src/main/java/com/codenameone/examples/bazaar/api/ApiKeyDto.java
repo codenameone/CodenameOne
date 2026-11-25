@@ -26,7 +26,8 @@ import java.util.List;
 /// is made and empty ever after; `display` is its prefix and last four
 /// characters, which is all of it a list shows.
 ///
-/// @param scopes Some of `read_products`, `write_products` and `read_orders`.
+/// @param scopes Some of the read_/write_ scopes of products, orders, customers,
+///        inventory, discounts, fulfillments and metafields, and `read_analytics`.
 /// @param lastUsedAt When a request last presented it, or 0.
 /// @param revokedAt When it was withdrawn, or 0.
 @Mapped

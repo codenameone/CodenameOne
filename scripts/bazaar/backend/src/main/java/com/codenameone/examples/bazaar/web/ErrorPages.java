@@ -53,7 +53,8 @@ import java.io.IOException;
 @ControllerAdvice(basePackages = "com.codenameone.examples.bazaar.web")
 public class ErrorPages {
     private static final Logger LOG = Logger.getLogger(ErrorPages.class);
-    private static final String CSS = "/static/shop.d26a8cb8.css";
+    /// The storefront stylesheet, which the plain pages outside the templates share.
+    public static final String CSS = "/static/shop.d26a8cb8.css";
 
     private static String page(String code, String title, String text) {
         return "<!doctype html><html lang=\"en\"><head>"

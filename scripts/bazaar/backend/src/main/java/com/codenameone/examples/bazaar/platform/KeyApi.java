@@ -157,7 +157,7 @@ public class KeyApi {
                 BulkJobDto.class);
         String kind = wanted == null ? null : wanted.kind();
         StoreApiKeys.Key key = keys.require(storeId, BulkJobs.scopeOf(kind));
-        return json(jobs.start(storeId, StoreApiKeys.OWNER_PREFIX + key.id, wanted));
+        return json(jobs.start(storeId, key.owner(), wanted));
     }
 
     @GetMapping("/api/v1/stores/{storeId}/bulk-operations/{jobId}")

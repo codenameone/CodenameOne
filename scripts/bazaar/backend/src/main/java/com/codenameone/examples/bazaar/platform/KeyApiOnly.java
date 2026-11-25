@@ -24,16 +24,30 @@ import com.codename1.backend.security.FilterChain;
 import com.codename1.backend.security.SecurityContext;
 import com.codename1.backend.security.SecurityContextHolder;
 import com.codename1.backend.security.SecurityFilter;
+import com.codename1.backend.security.apikey.ApiKey;
 import com.codename1.backend.security.apikey.ApiKeyAuthenticationToken;
 
 /// Keeps an API key to the key API. A key signs a request in with no role,
 /// so the staff and admin routes refuse it already; this refuses it on the
 /// rest of `/api` too -- the account, cards, carts -- which only ask that
 /// somebody be signed in, and would otherwise act for an account named
-/// `apikey:...`. Runs right after the filter that accepts keys.
+/// `apikey:...`. Runs right after the filter that accepts keys, and holds an
+/// app's token to its call allowance too.
 public final class KeyApiOnly implements SecurityFilter {
     /// What every key API path starts with.
     public static final String PATH = "/api/v1/";
+
+    private final AppCallLimits limits;
+
+    public KeyApiOnly() {
+        this(null);
+    }
+
+    /// With `limits`, an app installation's token is also held to its call
+    /// allowance ([AppCallLimits]), and every answer to it says where it stands.
+    public KeyApiOnly(AppCallLimits limits) {
+        this.limits = limits;
+    }
 
     @Override
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
@@ -50,6 +64,21 @@ public final class KeyApiOnly implements SecurityFilter {
                 || path.indexOf('\\') >= 0)) {
             return HttpServer.Response.json(403,
                     "{\"error\":\"An API key reaches only the key API under /api/v1\"}");
+        }
+        if (limits != null && a instanceof ApiKeyAuthenticationToken) {
+            ApiKey key = ((ApiKeyAuthenticationToken) a).getApiKey();
+            if (key.getOwner().startsWith(StoreApiKeys.APP_OWNER_PREFIX)) {
+                int level = limits.take(key.getId());
+                String header = (level < 0 ? limits.capacity() : level) + "/" + limits.capacity();
+                if (level < 0) {
+                    return HttpServer.Response.json(429,
+                            "{\"error\":\"The app's call limit is used up; retry later\"}")
+                            .header("Retry-After", String.valueOf(-level))
+                            .header(AppCallLimits.HEADER, header);
+                }
+                HttpServer.Response answer = chain.doFilter(request);
+                return answer == null ? null : answer.header(AppCallLimits.HEADER, header);
+            }
         }
         return chain.doFilter(request);
     }

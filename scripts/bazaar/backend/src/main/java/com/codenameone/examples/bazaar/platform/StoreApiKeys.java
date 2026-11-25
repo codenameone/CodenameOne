@@ -63,11 +63,32 @@ public class StoreApiKeys implements ApiKeyRepository {
     public static final String READ_PRODUCTS = "read_products";
     public static final String WRITE_PRODUCTS = "write_products";
     public static final String READ_ORDERS = "read_orders";
-    /// Every scope a key may be given.
+    public static final String WRITE_ORDERS = "write_orders";
+    public static final String READ_CUSTOMERS = "read_customers";
+    public static final String WRITE_CUSTOMERS = "write_customers";
+    public static final String READ_INVENTORY = "read_inventory";
+    public static final String WRITE_INVENTORY = "write_inventory";
+    public static final String READ_DISCOUNTS = "read_discounts";
+    public static final String WRITE_DISCOUNTS = "write_discounts";
+    public static final String READ_FULFILLMENTS = "read_fulfillments";
+    public static final String WRITE_FULFILLMENTS = "write_fulfillments";
+    public static final String READ_METAFIELDS = "read_metafields";
+    public static final String WRITE_METAFIELDS = "write_metafields";
+    public static final String READ_ANALYTICS = "read_analytics";
+    /// Every scope a key or an app may be given. A `write_x` scope also
+    /// grants `read_x` ([#has]).
     public static final List<String> SCOPES = Collections.unmodifiableList(Arrays.asList(
-            READ_PRODUCTS, WRITE_PRODUCTS, READ_ORDERS));
+            READ_PRODUCTS, WRITE_PRODUCTS, READ_ORDERS, WRITE_ORDERS, READ_CUSTOMERS,
+            WRITE_CUSTOMERS, READ_INVENTORY, WRITE_INVENTORY, READ_DISCOUNTS, WRITE_DISCOUNTS,
+            READ_FULFILLMENTS, WRITE_FULFILLMENTS, READ_METAFIELDS, WRITE_METAFIELDS,
+            READ_ANALYTICS));
     /// What a key's owner name starts with: no account name has a colon.
     static final String OWNER_PREFIX = "apikey:";
+    /// What an app installation's token signs in as: `app:<installationId>`.
+    public static final String APP_OWNER_PREFIX = "app:";
+    /// What an app installation's access token starts with. It is a key
+    /// prefix too, so the same filter accepts it and asks [#findByHash].
+    public static final String APP_TOKEN_PREFIX = PREFIX + "app_";
     /// How many live keys one store may hold.
     static final int MAX_KEYS = 25;
     private static final long TOUCH_MILLIS = 60000L;
@@ -83,15 +104,33 @@ public class StoreApiKeys implements ApiKeyRepository {
 
     /// A key a request presented, as the key API sees it.
     public static final class Key {
+        /// The key's id, or the app installation's.
         public final String id;
         public final String storeId;
         public final List<String> scopes;
+        /// The app the token was issued to, or null for a store's own key.
+        public final String appId;
 
-        Key(String id, String storeId, List<String> scopes) {
+        Key(String id, String storeId, List<String> scopes, String appId) {
             this.id = id;
             this.storeId = storeId;
             this.scopes = scopes;
+            this.appId = appId;
         }
+
+        /// Who a record this request makes is made by: `apikey:<id>` or
+        /// `app:<installationId>`.
+        public String owner() {
+            return (appId == null ? OWNER_PREFIX : APP_OWNER_PREFIX) + id;
+        }
+    }
+
+    /// Whether `granted` covers `scope`: a `write_x` covers `read_x` too.
+    public static boolean has(List<String> granted, String scope) {
+        if (granted.contains(scope)) {
+            return true;
+        }
+        return scope.startsWith("read_") && granted.contains("write_" + scope.substring(5));
     }
 
     // ------------------------------------------------------------- lookups
@@ -104,7 +143,7 @@ public class StoreApiKeys implements ApiKeyRepository {
                     + "revoked_at AS revoked_at, last_used_at AS last_used_at "
                     + "FROM store_api_key WHERE key_hash = ?", new Object[] {hash});
             if (row == null) {
-                return null;
+                return appToken(hash);
             }
             String id = Rows.text(row.get("id"));
             long now = System.currentTimeMillis();
@@ -122,10 +161,27 @@ public class StoreApiKeys implements ApiKeyRepository {
         }
     }
 
+    /// An app installation's access token, looked up by the same hash: an
+    /// installation that was removed has no hash any more, so its token is
+    /// unknown at once. The installation's scopes are read on every request,
+    /// so a narrowed grant takes effect without a new token.
+    private ApiKey appToken(String hash) throws IOException {
+        Map row = db.queryOne("SELECT id AS id, scopes AS scopes, token_last_four AS last_four "
+                + "FROM app_installation WHERE token_hash = ? AND status = ?",
+                new Object[] {hash, Apps.INSTALLED});
+        if (row == null) {
+            return null;
+        }
+        String id = Rows.text(row.get("id"));
+        return new ApiKey(id, APP_OWNER_PREFIX + id, scopes(Rows.text(row.get("scopes"))), hash,
+                APP_TOKEN_PREFIX, Rows.text(row.get("last_four")), false);
+    }
+
     /// The key this request was signed in with, its store and the scope the
     /// route needs: 401 for a request that was not made with a key, 404 for
     /// a store that is not the key's (as for a store that does not exist),
-    /// and 403 for a key without the scope.
+    /// and 403 for a key without the scope. An app installation's token is
+    /// held to exactly the same checks, against the installation's grant.
     public Key require(String storeId, String scope) throws IOException {
         SecurityContext context = SecurityContextHolder.getContext();
         Authentication a = context == null ? null : context.getAuthentication();
@@ -133,19 +189,45 @@ public class StoreApiKeys implements ApiKeyRepository {
             throw new ResponseStatusException(401, "This API takes an API key");
         }
         ApiKey key = ((ApiKeyAuthenticationToken) a).getApiKey();
-        Map row = db.queryOne("SELECT store_id AS store_id, revoked_at AS revoked_at "
-                + "FROM store_api_key WHERE id = ?", new Object[] {key.getId()});
-        if (row == null || Rows.number(row.get("revoked_at")) > 0) {
-            throw new ResponseStatusException(401, "The API key is not valid");
+        String keyStore;
+        String appId = null;
+        List<String> granted;
+        if (key.getOwner().startsWith(APP_OWNER_PREFIX)) {
+            Map row = db.queryOne("SELECT store_id AS store_id, app_id AS app_id, "
+                    + "scopes AS scopes, status AS status FROM app_installation WHERE id = ?",
+                    new Object[] {key.getId()});
+            if (row == null || !Apps.INSTALLED.equals(Rows.text(row.get("status")))) {
+                throw new ResponseStatusException(401, "The access token is not valid");
+            }
+            keyStore = Rows.text(row.get("store_id"));
+            appId = Rows.text(row.get("app_id"));
+            granted = scopes(Rows.text(row.get("scopes")));
+        } else {
+            Map row = db.queryOne("SELECT store_id AS store_id, revoked_at AS revoked_at "
+                    + "FROM store_api_key WHERE id = ?", new Object[] {key.getId()});
+            if (row == null || Rows.number(row.get("revoked_at")) > 0) {
+                throw new ResponseStatusException(401, "The API key is not valid");
+            }
+            keyStore = Rows.text(row.get("store_id"));
+            granted = key.getScopes();
         }
-        String keyStore = Rows.text(row.get("store_id"));
         if (storeId == null || !keyStore.equals(storeId)) {
             throw new ResponseStatusException(404, "No such store");
         }
-        if (scope != null && !key.getScopes().contains(scope)) {
-            throw new ResponseStatusException(403, "The API key lacks the scope " + scope);
+        if (scope != null && !has(granted, scope)) {
+            throw new ResponseStatusException(403, (appId == null ? "The API key" : "The app")
+                    + " lacks the scope " + scope);
         }
-        return new Key(key.getId(), keyStore, key.getScopes());
+        return new Key(key.getId(), keyStore, granted, appId);
+    }
+
+    /// [#require], for a route only an app's token may call.
+    public Key requireApp(String storeId, String scope) throws IOException {
+        Key k = require(storeId, scope);
+        if (k.appId == null) {
+            throw new ResponseStatusException(403, "Only an app's access token may do this");
+        }
+        return k;
     }
 
     // ------------------------------------------------------------- owners

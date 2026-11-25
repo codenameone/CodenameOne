@@ -29,5 +29,7 @@ import java.util.List;
 public interface WebhookRepository extends CrudRepository<Webhook, String> {
     List<Webhook> findByStoreId(String storeId);
 
+    List<Webhook> findByAppInstallationId(String appInstallationId);
+
     List<Webhook> findByStoreIdAndTopic(String storeId, String topic);
 }

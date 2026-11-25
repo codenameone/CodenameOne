@@ -119,6 +119,7 @@ public class CustomerData {
     private final StoreRepository stores;
     private final StoreAccess access;
     private final StoreCredit credit;
+    private final com.codenameone.examples.bazaar.platform.Apps apps;
 
     public CustomerData(CustomerRepository customers, StoreOrderRepository orders,
             CustomerAddressRepository addresses, GiftCardRepository giftCards,
@@ -128,7 +129,7 @@ public class CustomerData {
             ReviewRepository reviews, WishlistRepository wishlist, ProductViewRepository views,
             ReviewRequestRepository reviewRequests, DataRequestRepository requests,
             AuditEventRepository audits, StoreRepository stores, StoreAccess access,
-            StoreCredit credit) {
+            StoreCredit credit, com.codenameone.examples.bazaar.platform.Apps apps) {
         this.customers = customers;
         this.orders = orders;
         this.addresses = addresses;
@@ -148,6 +149,7 @@ public class CustomerData {
         this.stores = stores;
         this.access = access;
         this.credit = credit;
+        this.apps = apps;
     }
 
     // ---------------------------------------------------------------- merge
@@ -574,6 +576,8 @@ public class CustomerData {
             requests.save(d);
         }
         audit(storeId, username, "CUSTOMER_ERASED", c.getId(), "Personal data erased");
+        // Every installed app holds its own copy; each is told to erase it.
+        apps.customerRedact(storeId, c.getId());
         return Customers.dto(c, 0);
     }
 
@@ -605,6 +609,10 @@ public class CustomerData {
             d.setStatus(OPEN);
             d.setCreatedAt(Instant.now());
             requests.insert(d);
+            if (EXPORT.equals(kind)) {
+                // Installed apps answer for what they hold of the customer.
+                apps.customerDataRequest(storeId, c.getId(), d.getId());
+            }
         }
         return dto(d, c);
     }
