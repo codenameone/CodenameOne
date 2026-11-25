@@ -160,9 +160,17 @@ public final class VirtualThread {
     private static native void freeImpl(long handle);
     private static native boolean isVirtualImpl();
     private static native long currentImpl();
+    private static native long currentSerialImpl();
     private static native boolean supportedImpl();
     private static native void yieldImpl();
     private static native void reportImpl();
+
+    /// A number naming the current virtual thread that no later virtual thread
+    /// will ever have, or 0 off one. Unlike [#current], which is an address and
+    /// is reused once a virtual thread is freed.
+    public static long currentSerial() {
+        return currentSerialImpl();
+    }
 
     /// Print created/finished/freed counts to stderr, for diagnosis.
     public static void report() {

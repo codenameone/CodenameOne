@@ -10,12 +10,24 @@
 // build's own repositories after it as the fallback. Nothing is removed.
 def mirrorUrl = 'https://maven-central.storage-download.googleapis.com/maven2/'
 
+// Codename One's own artifacts are published to repo.codenameone.com only -- never to
+// Central or the Plugin Portal -- and a CI build resolves this checkout's 8.0-SNAPSHOT
+// from a local file repository. Neither repository added here can have them, so they
+// are never asked: Gradle ends a lookup at the first repository that answers with an
+// error rather than a clean 404, so a throttled portal searched BEFORE the local
+// repository failed the settings plugin with "Plugin [id: 'com.codenameone'] was not
+// found" (python-project, intermittently), the local repository never read.
+def notCodenameOne = { ArtifactRepository r ->
+    r.content { it.excludeGroupByRegex('com\\.codenameone(\\..*)?') }
+}
+
 def addMirror = { RepositoryHandler repos ->
     if (repos.find { it instanceof MavenArtifactRepository && it.url.toString() == mirrorUrl } == null) {
         def m = repos.maven {
             name = 'GoogleCentralMirror'
             url = mirrorUrl
         }
+        notCodenameOne(m)
         // maven {} appends; move it to the front so it is searched first.
         repos.remove(m)
         repos.addFirst(m)
@@ -34,7 +46,7 @@ beforeSettings { settings ->
     boolean hadNone = pluginRepos.isEmpty()
     addMirror(pluginRepos)
     if (hadNone) {
-        pluginRepos.gradlePluginPortal()
+        notCodenameOne(pluginRepos.gradlePluginPortal())
     }
     addMirror(settings.buildscript.repositories)
 }

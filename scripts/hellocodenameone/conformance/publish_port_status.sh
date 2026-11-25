@@ -32,6 +32,7 @@ if [ "${accept_status}" -ne 0 ]; then
   case "${accept_status}" in
     11) reason="built against a different test contract; waiting for a run on the current one" ;;
     12) reason="not usable by the website" ;;
+    13) reason="not judged: the checked-in Port Status contract on this commit is invalid" ;;
     *) reason="rejected by the publication gate (status ${accept_status})" ;;
   esac
   echo "Not publishing the ${port} report: ${reason}; preserving the last published one."

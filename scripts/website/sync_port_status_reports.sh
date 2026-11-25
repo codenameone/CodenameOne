@@ -49,6 +49,16 @@ if ! git -C "${REPO_ROOT}" fetch --quiet --no-tags --depth=1 origin "${DATA_REF}
   exit 0
 fi
 
+# Validate the tree's own contract once, before any persisted report is read.
+# accept validates it too, and a failure there used to surface as "Persisted
+# <port> report is unusable" for whichever port happened to be judged -- tvos
+# took the blame for errata the watch report was missing. Judging the contract
+# here first names the real culprit, and fails before eleven fetches.
+if ! python3 "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate >/dev/null; then
+  echo "The checked-in Port Status contract is invalid (see above); this is not a defect in any persisted report." >&2
+  exit 1
+fi
+
 synced=0
 unusable=0
 fallback=()
@@ -75,6 +85,13 @@ while IFS= read -r port; do
       echo "Persisted ${port} report predates the current test contract; keeping the checked-in report." >&2
       fallback+=("${port} (waiting for a run on the current contract)")
       continue
+      ;;
+    13)
+      # Only reachable if a report accepted earlier in this loop changed the
+      # checked-in directory into an invalid contract; accept now refuses a
+      # report with an undocumented skip, so this should not happen.
+      echo "The Port Status contract became invalid while judging ${port}; reports synced so far: ${synced}. This is not a defect in the ${port} report." >&2
+      exit 1
       ;;
     *)
       echo "Persisted ${port} report is unusable; keeping the checked-in report." >&2

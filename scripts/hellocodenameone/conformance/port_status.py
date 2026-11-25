@@ -29,6 +29,10 @@ STRICT_GATE_FAILED = 10
 # only an unusable report is a defect worth failing the website build over.
 ACCEPT_CONTRACT_DRIFT = 11
 ACCEPT_UNUSABLE = 12
+# The tree's own contract failed validate() before the report was even read.
+# Not this port's defect, and reporting it as "the <port> report is unusable"
+# is how a watchOS skip without an erratum was blamed on tvOS.
+ACCEPT_CONTRACT_INVALID = 13
 
 # Producers and this checker can disagree by a little without anything
 # being wrong -- runner clocks drift, and a report is stamped slightly
@@ -274,6 +278,10 @@ def validate(manifest: dict) -> dict:
     missing_skip_reasons = sorted((skipped_tests & set(mapped)) - set(skip_reason_tests))
     if missing_skip_reasons:
         problems.append("Skipped tests without errata: " + ", ".join(missing_skip_reasons))
+    if mapped:
+        # The static half: a skip the suite source can emit needs its erratum in
+        # the same pull request, long before any port publishes it.
+        problems.extend(source_skip_problems(manifest, supplement))
     for item in supplement.get("skip_reasons", []):
         required = ("test", "reason", "platform_support", "verification")
         if not all(item.get(field) for field in required):
@@ -420,6 +428,159 @@ def validate(manifest: dict) -> dict:
         "deployment_platforms": len(deployment_rows),
         "browser_engines": len(browsers),
     }
+
+
+# Skip markers as the suite source spells them. A marker is often split over
+# several literals -- `"test=" + testName() + " status=SKIPPED reason=" + why`,
+# or `"... status=SKIPPED "` then `+ "reason=..."` on the next line -- so the
+# scan joins adjacent literals (`" + "`) around each `status=SKIPPED` first and
+# only then reads the test and the reason out of the joined text.
+SOURCE_SKIP_MARK_RE = re.compile(r"status=SKIPPED")
+SOURCE_LITERAL_JOIN_RE = re.compile(r'"\s*\+\s*"')
+SOURCE_SKIP_TEST_RE = re.compile(r'([A-Za-z0-9_]*)(")?')
+SOURCE_SKIP_REASON_RE = re.compile(r'^[^"]*?reason=([A-Za-z0-9_.:-]*)(")?')
+SOURCE_CLASS_RE = re.compile(r"\bclass\s+([A-Za-z0-9_]+)(?:\s+extends\s+([A-Za-z0-9_.]+))?")
+
+
+def source_skip_problems(manifest: dict, supplement: dict | None = None) -> list[str]:
+    """Every skip the suite SOURCE can report must already have an erratum.
+
+    Without this, the first place an undocumented skip surfaced was the website
+    build, hours after the pull request that added it had merged: the watch run
+    published the skip, and the next port the website sync accepted failed
+    "Skipped tests without errata" under its own name (tvos, for four
+    Document*ScreenshotTests that only watchOS skips). The markers are string
+    literals in the test classes, so the pull request that writes one can be
+    held to its erratum before any device runs.
+
+    The test is the literal ``test=Name`` when there is one. When the name is
+    computed (``"test=" + getImageName()``) it is the class the marker is in,
+    or -- for a helper base class that is not itself a registered test -- every
+    registered subclass of it. A marker none of that can place is reported:
+    an unreadable marker must not read as a documented one.
+
+    Statically the port a reason applies to is unknown, so a reason code's
+    ``ports`` list is not consulted here; publication checks that against the
+    real report (publishable_report_problems). A reason built at run time is
+    checked by its literal start: some code must be compatible with it.
+    """
+    if supplement is None:
+        supplement = read_json(SUPPLEMENT)
+    mapped = set(test_to_feature(manifest))
+    registered = set(registered_tests())
+    errata: dict[str, list[dict]] = {}
+    for item in supplement.get("skip_reasons", []):
+        errata.setdefault(item.get("test"), []).append(item)
+
+    sources: dict[Path, str] = {}
+    problems: list[str] = []
+    for path in sorted(COMMON_SOURCES.rglob("*.java")):
+        try:
+            sources[path] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            problems.append(f"cannot read {path.relative_to(REPO_ROOT)}: {exc}")
+    # Direct subclasses by simple name; enough for the suite's one-level
+    # helper bases (BackendAuthTestBase and friends).
+    subclasses: dict[str, set[str]] = {}
+    for text in sources.values():
+        for name, parent in SOURCE_CLASS_RE.findall(text):
+            if parent:
+                subclasses.setdefault(parent.rsplit(".", 1)[-1], set()).add(name)
+
+    def registered_below(name: str, seen: set[str]) -> set[str]:
+        found: set[str] = set()
+        for child in subclasses.get(name, ()):
+            if child in seen:
+                continue
+            seen.add(child)
+            if child in registered:
+                found.add(child)
+            found |= registered_below(child, seen)
+        return found
+
+    for path, text in sources.items():
+        where_file = path.relative_to(REPO_ROOT)
+        own_class = path.stem
+        for mark in SOURCE_SKIP_MARK_RE.finditer(text):
+            line = text.count("\n", 0, mark.start()) + 1
+            where = f"{where_file}:{line}"
+            # The statement around the marker, literals joined.
+            before = SOURCE_LITERAL_JOIN_RE.sub("", text[max(0, mark.start() - 400):mark.start()])
+            after = SOURCE_LITERAL_JOIN_RE.sub("", text[mark.end():mark.end() + 400])
+            if "CN1SS" not in before[-300:] and "test=" not in before[-300:]:
+                # Prose about the marker (a comment, a parser), not an emitter.
+                continue
+            if own_class not in registered and not registered_below(own_class, {own_class}):
+                # Not something Cn1ssDeviceRunner runs (a JavaSE-only harness),
+                # so its markers never reach a port report.
+                continue
+            at = before.rfind("test=")
+            test_match = None if at < 0 else SOURCE_SKIP_TEST_RE.match(before, at + 5)
+            if test_match is None:
+                problems.append(f"{where} skip marker names no test= before status=SKIPPED")
+                continue
+            if test_match.group(1) and not test_match.group(2):
+                name = test_match.group(1)
+                test = name if name in mapped else screenshot_test(manifest, name)
+                if test not in mapped:
+                    # parse_logs refuses an unattributable marker at run time.
+                    problems.append(f"{where} skip marker test={name} names no registered test")
+                    continue
+                tests = {test}
+            elif own_class in mapped:
+                tests = {own_class}
+            else:
+                tests = registered_below(own_class, {own_class})
+                if not tests:
+                    problems.append(
+                        f"{where} skip marker computes its test name in {own_class}, "
+                        "which is neither a registered test nor a base of one"
+                    )
+                    continue
+            reason_match = SOURCE_SKIP_REASON_RE.search(after)
+            if reason_match is None:
+                reason, complete = "", True
+            else:
+                reason = reason_match.group(1)
+                # `reason=" + why`: the literal closes on an empty reason,
+                # which only ever means the value is concatenated after it.
+                complete = bool(reason_match.group(2)) and bool(reason)
+                if not reason_match.group(2) and not reason:
+                    complete = False
+            for test in sorted(tests):
+                if not source_skip_documented(errata.get(test, []), reason, complete):
+                    shown = reason if complete else reason + "..."
+                    problems.append(
+                        f"{where} {test} can skip with reason {shown or '<none>'} "
+                        "but docs/website/data/port_status_supplement.json has no "
+                        "skip erratum covering it"
+                    )
+    return problems
+
+
+def source_skip_documented(items: list[dict], reason: str, complete: bool) -> bool:
+    if not complete and not reason:
+        # The whole reason is computed (`"reason=" + reason`), so nothing about
+        # it is visible here. Demand that the test has an erratum at all and
+        # leave the codes to publication, which sees the real value.
+        return bool(items)
+    for item in items:
+        codes = item.get("reason_codes")
+        if not codes:
+            # Same rule as skip_is_documented: an erratum without reason codes
+            # documents every skip of its test.
+            return True
+        for code in codes:
+            prefix = code.get("prefix")
+            if not isinstance(prefix, str) or not prefix:
+                continue
+            if reason.startswith(prefix):
+                return True
+            # A run-time reason starting with `reason` can still match a longer
+            # prefix; whether it does on a given port is publication's call.
+            if not complete and prefix.startswith(reason):
+                return True
+    return False
 
 
 def stored_report_problems(manifest: dict) -> tuple[set[str], list[str], list[str]]:
@@ -1108,7 +1269,7 @@ def describe_workload_gap(seen: list[str], expected: list[str]) -> str:
 
 
 def publishable_report_problems(
-    manifest: dict, port_id: str, report: dict
+    manifest: dict, port_id: str, report: dict, supplement: dict | None = None
 ) -> tuple[list[str], list[str]]:
     """Decide whether a persisted report may replace the checked-in fallback.
 
@@ -1122,6 +1283,8 @@ def publishable_report_problems(
     """
     drift: list[str] = []
     malformed: list[str] = []
+    if supplement is None:
+        supplement = read_json(SUPPLEMENT)
 
     if report.get("schema_version") != manifest.get("schema_version"):
         malformed.append(
@@ -1193,6 +1356,20 @@ def publishable_report_problems(
             malformed.append(f"{test} reasons is not an array of strings")
             continue
         statuses[result["status"]] += 1
+        # A skip must be explained by an erratum before the report is
+        # published, and the defect belongs to THIS port. Leaving it to
+        # validate() meant the watch report published four undocumented
+        # Document*ScreenshotTest skips, the website sync copied it into the
+        # checked-in report directory, and the contract check run for the NEXT
+        # port it accepted failed on them -- naming tvos, which runs all four.
+        # Only tests this contract still defines: a retired test is drift.
+        if result["status"] == "skip" and test in expected and not skip_is_documented(
+            supplement, port_id, test, reasons or []
+        ):
+            malformed.append(
+                f"{test} skipped (reasons: {', '.join(reasons or []) or 'none'}) with no "
+                f"erratum in {SUPPLEMENT.relative_to(REPO_ROOT)} covering it on {port_id}"
+            )
     expected_summary = {
         key: statuses.get(key, 0) for key in ("pass", "fail", "skip", "not-run")
     }
@@ -1425,7 +1602,20 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         manifest = read_json(args.manifest)
-        counts = validate(manifest)
+        if args.command == "accept":
+            try:
+                validate(manifest)
+            except ContractError as exc:
+                print(
+                    f"port-status: the checked-in Port Status contract is invalid, "
+                    f"so no report can be judged (not a defect in the {args.port} "
+                    f"report): {exc}",
+                    file=sys.stderr,
+                )
+                return ACCEPT_CONTRACT_INVALID
+            counts = None
+        else:
+            counts = validate(manifest)
         if args.command == "validate":
             print(
                 "Port status contract is valid: "

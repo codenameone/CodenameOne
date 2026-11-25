@@ -7469,7 +7469,7 @@ static void cn1GcReportStaleIndexSkip(void) {
 #endif
     if(skips >= next) {
         next *= 2;
-        fprintf(stderr, "CN1 GC: page resolver index could not be rebuilt; skipped the "
+        fprintf(stderr, "[GC] page resolver index could not be rebuilt; skipped the "
                         "sweep to avoid freeing on an incomplete mark (%ld so far)\n",
                 skips);
         fflush(stderr);
@@ -7498,7 +7498,7 @@ void codenameOneGCSweep() {
     // threadBlockedByGC is waiting on the collector, not on the reclaim, and leaving it
     // parked because the index could not be built would hang the app instead.
     if(cn1GcRootsIncomplete) {
-        fprintf(stderr, "CN1 GC: incomplete native root capture; skipped sweep\n");
+        fprintf(stderr, "[GC] incomplete native root capture; skipped sweep\n");
         // Which captures failed. Sites: 1-2 forced-stop capture, 3 no stack bounds,
         // 4 and 6 a virtual thread's resumer outside its host stack, 5 the thread could
         // not be stopped (stopErr says why), 7 stack pointer outside the stack, 8 no
@@ -7534,7 +7534,7 @@ void codenameOneGCSweep() {
                 unlockCriticalSection();
             }
 #endif
-            fprintf(stderr, "CN1 GC:   site=%d thread=%ld lightweight=%d stopErr=%d name=%s\n",
+            fprintf(stderr, "[GC]   site=%d thread=%ld lightweight=%d stopErr=%d name=%s\n",
                     cn1GcRootMiss[__m].site, cn1GcRootMiss[__m].threadId,
                     cn1GcRootMiss[__m].lightweight, cn1GcRootMiss[__m].stopError, __name);
         }
@@ -10077,7 +10077,7 @@ static void cn1BibopTrimFreePool(void) {
         static int reported = 0;
         if(!reported) {
             reported = 1;
-            fprintf(stderr, "CN1 GC: page release unavailable on this host "
+            fprintf(stderr, "[GC] page release unavailable on this host "
                             "(system page %ld, BiBOP page %d); the footprint "
                             "will not fall\n",
                     (long)getpagesize(), (int)CN1_BIBOP_PAGE_SIZE);
