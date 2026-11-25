@@ -1,0 +1,130 @@
+[[graphics-documents]]
+== Graphics Documents: SVG, PSD, Sketch and Figma at Run Time
+
+The build-time transcoder in the previous chapter is the cheapest way to ship an icon or an
+illustration you have when you build the app. Some artwork only arrives at run time: a user
+opens a Photoshop file, a design is pulled from Figma, or the app lets people draw. The
+`com.codename1.art` package handles those cases. It reads layered documents into one tree,
+renders them the same way on every platform, lets code and users change them, and writes
+them back.
+
+[cols="1,1,1,3",options="header"]
+|===
+| Format | Read | Write | Notes
+| SVG | yes | yes | Static SVG 1.1 / Tiny 1.2: shapes, paths, `use`, gradients, patterns, clip paths, masks, text, images, CSS and filters
+| Photoshop PSD / PSB | yes | yes | Layers, groups, masks, vector masks, clipping, layer styles, adjustment layers; the writer produces layered 8-bit RGB
+| Sketch | yes | no | The ZIP format of Sketch 43 and later: pages, artboards, symbols with overrides, styles
+| Figma | yes | no | The REST API's file JSON, fetched with `FigmaClient`
+| `.cn1gfx` | yes | yes | Lossless native format: a ZIP of JSON and PNG
+|===
+
+=== Loading and rendering
+
+`ArtFormats.read` detects the format from the content, so a file name is never needed:
+
+[source,java]
+----
+ArtDocument doc = ArtFormats.read(in);
+Image image = ArtRenderer.toImage(doc, 2);   // two pixels per document unit
+----
+
+Rendering is done in software by `ArtRenderer`. That is slower than drawing a
+`GeneratedSVGImage`, but it means a document has the same pixels on iOS, Android, the
+desktop and the web, with every blend mode and effect. Render once at the size you need and
+keep the `Image`.
+
+`SvgImage` is an `Image` backed by a document that renders itself at whatever size it is
+drawn. `Image.createSVG` falls back to it on platforms with no native SVG renderer, so code
+that called `createSVG` before now works everywhere.
+
+=== Effects
+
+Every effect a supported format defines has a renderer; none is kept in the model and
+ignored. That covers drop and inner shadows, outer and inner glows, Gaussian, motion, zoom
+and background blurs, strokes, color, gradient and pattern overlays, bevel and emboss
+(stroke emboss too), satin,
+Photoshop's adjustment layers (levels, curves, hue/saturation, color balance, selective
+color, gradient maps and the rest), and the whole SVG filter primitive set. Effects live in
+`com.codename1.art.effects` as `Effect` objects with named parameters, so an editor can
+add, change and remove them.
+
+Geometry is treated the same way. Sketch's subtract, intersect and difference operations keep
+exactly the region they describe, and SVG text on a path follows its path.
+
+Formats that cannot hold an effect get it baked in. A PSD written from a document keeps
+groups and blend modes as Photoshop layers; a node with effects becomes a rendered layer,
+and an adjustment is applied to the pixels below it.
+
+=== Import notes
+
+What a reader cannot represent is recorded on the document instead of being dropped
+silently. Read `ArtDocument.getNotes()` after a load to tell users what changed:
+
+* SVG animation and script are ignored, since a document is static.
+* Photoshop smart objects and text layers are shown as the pixels the file stores for them.
+* A Figma file fetched without `geometry=paths` has no vector outlines; `FigmaClient` always
+  asks for them.
+* Sketch files older than version 43 (a SQLite database) are rejected.
+
+=== Figma
+
+Figma documents come from its REST API. Pass a token the user supplies. `FigmaClient` never
+stores it:
+
+[source,java]
+----
+FigmaClient figma = new FigmaClient(token);
+ArtDocument doc = figma.fetch("FILE_KEY");   // blocks; call it off the EDT or with invokeAndBlock
+----
+
+`fetch` requests the file with its geometry, then downloads the image fills it uses.
+Images are fetched over HTTPS only, and the token is not sent with them. Call `setOAuth(true)`
+for an OAuth access token instead of a personal access token. To read a file you
+downloaded yourself, use `FigmaReader.read(json, images)`; `FigmaReader.imageRefs` lists the
+image references the JSON needs.
+
+=== Editing
+
+`ArtModel` wraps a document for editing. Every change goes through it, so it can be undone,
+and listeners hear about it:
+
+[source,java]
+----
+ArtModel model = new ArtModel(doc);
+ShapeNode box = ShapeNode.rect(10, 10, 100, 60, 8);
+box.fill(new SolidPaint(0xff1e88e5));
+model.add(box);
+model.setBlendMode(box, BlendMode.MULTIPLY);
+model.addEffect(box, Effects.dropShadow(0x80000000, 4, 4, 8, 0));
+model.undo();
+----
+
+Changes made inside `beginGroup()` / `endGroup()` are a single undo step. Undo snapshots share
+pixel data with the document, so code that paints into a `RasterNode` must give the node a
+copy of its raster first: `node.setImage(node.getImage().copy())`.
+
+=== The editor
+
+`ArtEditor` is a ready-made drawing editor: an `ArtView` with a tool bar, a layers panel and
+an inspector.
+
+[source,java]
+----
+ArtEditor editor = new ArtEditor(new ArtModel(doc));
+Form form = new Form("Draw", new BorderLayout());
+form.add(BorderLayout.CENTER, editor);
+form.show();
+----
+
+Its tools select, move and resize; pan; draw rectangles, ellipses, lines, Bezier paths and
+freehand strokes; paint and erase pixels; place text; pick colors; and fill shapes or pixel
+regions. Pinch zooms the view. `exportSvg`, `exportPsd`, `exportPng` and `exportNative`
+save the result. The layers panel and the inspector are ordinary containers
+(`getLayersPanel`, `getInspector`). `ArtView` can be used by itself to show a document with
+pan, zoom and hit testing.
+
+=== Limits
+
+The readers are written for files from untrusted sources. Image dimensions, layer counts,
+decompressed sizes, ZIP entries and the depth of `use` and symbol references are capped. A
+file over the limits fails with an `IOException`; it never exhausts memory.

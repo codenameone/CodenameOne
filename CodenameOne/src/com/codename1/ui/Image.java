@@ -101,18 +101,21 @@ public class Image implements ActionSource {
         return out;
     }
 
-    /// Indicates whether the underlying platform supports creating an SVG Image
+    /// Indicates whether the platform renders SVG natively. `createSVG` works either way: a
+    /// platform without native support renders the document with
+    /// `com.codename1.art.SvgImage`.
     ///
     /// #### Returns
     ///
-    /// @return true if the method create SVG image would return a valid image object
-    /// from an SVG Input stream
+    /// true if the platform has its own SVG renderer
     public static boolean isSVGSupported() {
         return Display.impl.isSVGSupported();
     }
 
-    /// Creates an SVG Image from the given byte array data and the base URL, this method
-    /// will throw an exception if SVG is unsupported.
+    /// Creates an SVG Image from the given byte array data and the base URL. A platform with
+    /// native SVG support renders it natively; any other renders it with
+    /// `com.codename1.art.SvgImage`, a software renderer that draws the image at whatever size
+    /// it is painted.
     ///
     /// #### Parameters
     ///
@@ -120,7 +123,7 @@ public class Image implements ActionSource {
     ///
     /// - `animated`: indicates if the SVG features an animation
     ///
-    /// - `data`: the conten of the SVG file
+    /// - `data`: the content of the SVG file
     ///
     /// #### Returns
     ///
@@ -128,8 +131,11 @@ public class Image implements ActionSource {
     ///
     /// #### Throws
     ///
-    /// - `IOException`: if resource lookup fail SVG is unsupported
+    /// - `IOException`: if the data is not an SVG document
     public static Image createSVG(String baseURL, boolean animated, byte[] data) throws IOException {
+        if (!Display.impl.isSVGSupported()) {
+            return com.codename1.art.SvgImage.create(data);
+        }
         Image i = new Image(Display.impl.createSVGImage(baseURL, data));
         i.animated = animated;
         i.svgBaseURL = baseURL;
