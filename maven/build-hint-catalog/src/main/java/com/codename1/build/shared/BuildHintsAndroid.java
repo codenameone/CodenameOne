@@ -164,6 +164,7 @@ final class BuildHintsAndroid {
         h.add(new Hint("android.debugGuard.checks")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
+                .def("debugger")
                 .platform("android"));
 
         h.add(new Hint("android.debugGuard.mode")

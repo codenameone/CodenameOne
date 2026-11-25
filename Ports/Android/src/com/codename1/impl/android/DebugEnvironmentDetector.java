@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
@@ -35,11 +35,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 /// Local device-posture signals that complement RootBeer and the Frida check: an attached
-/// debugger, Developer Options, USB debugging, method-hooking frameworks (Xposed/LSPosed) and
-/// the traces root-hiding tools (Magisk, Zygisk, KernelSU, Shamiko) leave behind.
+/// debugger, Developer Options, USB debugging, Xposed-family method hooking and the traces a
+/// root tool (Magisk, KernelSU, APatch) leaves when it is installed without hiding itself.
 ///
-/// Every check here is a best-effort local signal and can be defeated by an attacker who
-/// controls the device. The control that holds is server-verified attestation (Play Integrity,
+/// What these checks do NOT see, so nobody reads more into them: Zygisk-based LSPosed maps its
+/// bridge from anonymous memory under obfuscated names, and Magisk's DenyList or Shamiko removes
+/// the root mounts from the app's namespace. Catching those is attestation's job -- a
+/// strong-integrity Play Integrity verdict verified on the server. Every check here is a
+/// best-effort local signal and can be defeated by an attacker who controls the device. The control that holds is server-verified attestation (Play Integrity,
 /// App Shield); these exist so a compromised environment is visible to the app and so the
 /// launch gates have something to act on. No method throws: a check that cannot run answers
 /// "not detected".
@@ -54,22 +57,24 @@ public final class DebugEnvironmentDetector {
     /// Classes only present when an Xposed-family framework is loaded into the process.
     private static final String[] HOOK_CLASSES = {
             "de.robv.android.xposed.XposedBridge",
-            "de.robv.android.xposed.XposedHelpers",
-            "org.lsposed.lspd.core.Main",
-            "io.github.libxposed.api.XposedInterface"
+            "de.robv.android.xposed.XposedHelpers"
     };
 
-    /// Fragments of `/proc/self/maps` lines that name a hooking framework's native or dex code.
-    private static final String[] HOOK_MAPS = {
-            "XposedBridge",
+    /// Prefixes of the FILE NAME (never the directory) of a `/proc/self/maps` entry that belong
+    /// to a hooking framework, lower case. File names only, because the directory of every
+    /// installed APK carries 22 random base64 characters (`/data/app/~~...==/pkg-...==/`), and a
+    /// short needle matched against the whole line hits those on a measurable share of stock
+    /// devices -- which would kill a legitimate app at launch until it is reinstalled.
+    private static final String[] HOOK_FILES = {
+            "xposedbridge",
             "liblspd",
-            "libxposed",
-            "lspatch",
-            "edxp",
+            "liblspatch",
+            "libxposed_art",
+            "libedxp",
             "libsandhook",
             "libwhale",
             "libriru",
-            "substrate"
+            "libsubstrate"
     };
 
     /// Manager apps of root/root-hiding tools. Android 11+ hides packages the manifest does not
@@ -96,14 +101,20 @@ public final class DebugEnvironmentDetector {
             "/dev/.magisk.unblock"
     };
 
-    /// Fragments of `/proc/self/mounts` and `/proc/self/maps` that name a root tool's overlay
-    /// or injected code.
-    private static final String[] ROOT_MOUNTS = {
+    /// Mount sources (the first field of a `/proc/self/mounts` line) that root tools use for
+    /// their overlays, compared whole. A whole-field match, not a substring, so an app or vendor
+    /// mount whose name merely contains one of these is never reported.
+    private static final String[] ROOT_MOUNT_SOURCES = {
             "magisk",
-            "/data/adb",
-            "zygisk",
-            "kernelsu",
-            "shamiko"
+            "KSU",
+            "APatch"
+    };
+
+    /// Prefixes of a mount point or mount source path that only root tools create.
+    private static final String[] ROOT_MOUNT_PATHS = {
+            "/data/adb/",
+            "/debug_ramdisk/",
+            "/sbin/.magisk/"
     };
 
     private DebugEnvironmentDetector() {
@@ -188,7 +199,7 @@ public final class DebugEnvironmentDetector {
         } catch (Throwable t) {
             // ignore
         }
-        String hit = findInFile("/proc/self/maps", HOOK_MAPS);
+        String hit = findMappedFile(HOOK_FILES);
         if (hit != null) {
             Log.e(TAG, "Hooking library mapped: " + hit);
             return true;
@@ -196,8 +207,10 @@ public final class DebugEnvironmentDetector {
         return false;
     }
 
-    /// True when a root tool that hides itself from RootBeer-style checks (Magisk with
-    /// Zygisk/DenyList or Shamiko, KernelSU, APatch) has left a visible trace.
+    /// True when a root tool (Magisk, KernelSU, APatch) has left a trace RootBeer does not look
+    /// for: its manager app (visible from API 30 only when the manifest declares it in
+    /// `<queries>`, which `android.rootCheck` does), its overlay mounts, or its paths. A tool
+    /// that hides itself from this app (DenyList, Shamiko) is not seen; see the class comment.
     public static boolean isRootHidingDetected(Context context) {
         if (context != null) {
             try {
@@ -225,59 +238,67 @@ public final class DebugEnvironmentDetector {
                 // ignore
             }
         }
-        String hit = findInFile("/proc/self/mounts", ROOT_MOUNTS);
-        if (hit == null) {
-            hit = findInFile("/proc/self/maps", ROOT_MOUNTS);
-        }
+        String hit = findRootMount();
         if (hit != null) {
-            Log.e(TAG, "Root tool trace in process: " + hit);
+            Log.e(TAG, "Root tool mount: " + hit);
             return true;
         }
         return false;
     }
 
     /// The launch gate written by `android.debugGuard`. `checks` is a comma separated subset of
-    /// `debugger`, `developerOptions` and `usbDebugging`; `exit` terminates the process when any
-    /// selected check trips, otherwise the finding is only logged. Never throws.
+    /// `debugger`, `developerOptions` and `usbDebugging` (the builders validate it and default it
+    /// to `debugger`); `exit` terminates the process when any selected check trips, otherwise the
+    /// findings are only logged. A debuggable build only logs, so a developer can still run and
+    /// debug their own app from the IDE. Never throws.
     public static void runDebugGuard(Context context, String checks, boolean exit) {
         try {
-            String found = null;
+            StringBuilder found = new StringBuilder();
             if (selected(checks, "debugger") && isDebuggerAttached()) {
-                found = "debugger";
-            } else if (selected(checks, "developerOptions") && isDeveloperOptionsEnabled(context)) {
-                found = "developerOptions";
-            } else if (selected(checks, "usbDebugging") && isUsbDebuggingEnabled(context)) {
-                found = "usbDebugging";
+                found.append("debugger ");
             }
-            if (found != null) {
-                Log.e(TAG, "Debug guard: " + found + " detected" + (exit ? ". Exiting app." : ""));
-                if (exit) {
-                    System.exit(0);
-                }
+            if (selected(checks, "developerOptions") && isDeveloperOptionsEnabled(context)) {
+                found.append("developerOptions ");
+            }
+            if (selected(checks, "usbDebugging") && isUsbDebuggingEnabled(context)) {
+                found.append("usbDebugging ");
+            }
+            if (found.length() == 0) {
+                return;
+            }
+            boolean terminate = exit && !isDebuggableBuild(context);
+            Log.e(TAG, "Debug guard detected: " + found.toString().trim()
+                    + (terminate ? ". Exiting app." : ""));
+            if (terminate) {
+                System.exit(0);
             }
         } catch (Throwable t) {
             Log.e(TAG, "Debug guard error", t);
         }
     }
 
+    private static boolean isDebuggableBuild(Context context) {
+        try {
+            return context != null && (context.getApplicationInfo().flags
+                    & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// True when `name` is one of the comma separated `checks`. An empty or null list selects
+    /// nothing: the builders always pass an explicit, validated list.
     static boolean selected(String checks, String name) {
         if (checks == null) {
-            return true;
+            return false;
         }
         String[] parts = checks.split(",");
-        boolean any = false;
         for (int i = 0; i < parts.length; i++) {
-            String p = parts[i].trim();
-            if (p.length() == 0) {
-                continue;
-            }
-            any = true;
-            if (p.equalsIgnoreCase(name)) {
+            if (parts[i].trim().equals(name)) {
                 return true;
             }
         }
-        // an empty list means "all"
-        return !any;
+        return false;
     }
 
     private static boolean classVisible(String name) {
@@ -295,37 +316,73 @@ public final class DebugEnvironmentDetector {
         }
     }
 
-    /// Returns the first line of `path` containing any of `needles` (case-insensitive ASCII),
-    /// or null when none does or the file is unreadable.
-    private static String findInFile(String path, String[] needles) {
+    /// Returns the path of the first `/proc/self/maps` entry whose file name starts with one of
+    /// `prefixes` (lower case), or null when none does or the file is unreadable.
+    private static String findMappedFile(String[] prefixes) {
         BufferedReader reader = null;
         try {
             reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(new File(path)), "UTF-8"));
+                    new FileInputStream(new File("/proc/self/maps")), "UTF-8"));
             String line;
             while ((line = reader.readLine()) != null) {
-                for (int i = 0; i < needles.length; i++) {
-                    if (containsIgnoreCase(line, needles[i])) {
-                        return line.trim();
+                int slash = line.lastIndexOf('/');
+                if (slash < 0) {
+                    continue;
+                }
+                String file = asciiLower(line.substring(slash + 1));
+                for (int i = 0; i < prefixes.length; i++) {
+                    if (file.startsWith(prefixes[i])) {
+                        return line.substring(line.indexOf('/'));
                     }
                 }
             }
         } catch (Throwable t) {
-            // unreadable: not detected
+            return null;
         } finally {
             close(reader);
         }
         return null;
     }
 
-    private static boolean containsIgnoreCase(String hay, String needle) {
-        int max = hay.length() - needle.length();
-        for (int i = 0; i <= max; i++) {
-            if (hay.regionMatches(true, i, needle, 0, needle.length())) {
-                return true;
+    /// Returns the first `/proc/self/mounts` line a root tool created, or null.
+    private static String findRootMount() {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(
+                    new FileInputStream(new File("/proc/self/mounts")), "UTF-8"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] fields = line.split(" ");
+                if (fields.length < 2) {
+                    continue;
+                }
+                for (int i = 0; i < ROOT_MOUNT_SOURCES.length; i++) {
+                    if (fields[0].equals(ROOT_MOUNT_SOURCES[i])) {
+                        return line;
+                    }
+                }
+                for (int i = 0; i < ROOT_MOUNT_PATHS.length; i++) {
+                    if (fields[0].startsWith(ROOT_MOUNT_PATHS[i]) || fields[1].startsWith(ROOT_MOUNT_PATHS[i])) {
+                        return line;
+                    }
+                }
             }
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            close(reader);
         }
-        return false;
+        return null;
+    }
+
+    /// Locale-independent lower case: a Turkish locale would fold `I` to a dotless i.
+    private static String asciiLower(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            b.append(c >= 'A' && c <= 'Z' ? (char) (c + 32) : c);
+        }
+        return b.toString();
     }
 
     private static void close(BufferedReader reader) {

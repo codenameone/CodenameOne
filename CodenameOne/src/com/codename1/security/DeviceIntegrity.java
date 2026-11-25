@@ -61,8 +61,8 @@ import com.codename1.util.AsyncResource;
 ///   gates that exit on a compromised device. [#isDeviceCompromised()] reports the same signals
 ///   without exiting.
 /// - `android.debugGuard=true` (optionally `android.debugGuard.checks=<csv of debugger,
-///   developerOptions,usbDebugging>` and `android.debugGuard.mode=exit|warn`) -- checks for an
-///   attached debugger, Developer Options and USB debugging at launch and exits (or logs).
+///   developerOptions,usbDebugging>`, default `debugger`, and `android.debugGuard.mode=exit|warn`)
+///   -- checks at launch and exits (or logs); a debuggable build only logs.
 /// - `android.accessibilityGuard=true` (optionally `android.accessibilityGuard.allow=<csv packages>`
 ///   and `android.accessibilityGuard.mode=exit|warn`) -- checks the enabled accessibility services at
 ///   launch and exits (or logs) when an untrusted one is active.

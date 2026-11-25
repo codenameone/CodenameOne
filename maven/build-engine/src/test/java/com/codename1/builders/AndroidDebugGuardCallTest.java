@@ -25,6 +25,7 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /// The `android.debugGuard` launch gate the builder writes into the generated activity.
 class AndroidDebugGuardCallTest {
@@ -36,20 +37,30 @@ class AndroidDebugGuardCallTest {
     }
 
     @Test
-    void defaultModeExitsOnEveryCheck() {
-        assertEquals("        com.codename1.impl.android.DebugEnvironmentDetector.runDebugGuard(this, \"\", true);\n",
+    void defaultsToTheDebuggerAloneAndExits() {
+        assertEquals("        com.codename1.impl.android.DebugEnvironmentDetector.runDebugGuard(this, \"debugger\", true);\n",
                 AndroidGradleBuilder.debugGuardCall("true", "", "exit"));
+        assertEquals("debugger", AndroidGradleBuilder.debugGuardChecks(" , "));
+    }
+
+    @Test
+    void anUnknownCheckFailsTheBuild() {
+        // a typo must not switch the gate off silently
+        assertThrows(IllegalArgumentException.class,
+                () -> AndroidGradleBuilder.debugGuardCall("true", "debuger", "exit"));
+        assertThrows(IllegalArgumentException.class,
+                () -> AndroidGradleBuilder.debugGuardChecks("DEBUGGER"));
+    }
+
+    @Test
+    void checksAreNormalized() {
+        assertEquals("debugger,developerOptions,usbDebugging",
+                AndroidGradleBuilder.debugGuardChecks(" debugger , developerOptions,usbDebugging,"));
     }
 
     @Test
     void warnModeOnlyLogs() {
         assertEquals("        com.codename1.impl.android.DebugEnvironmentDetector.runDebugGuard(this, \"debugger,usbDebugging\", false);\n",
                 AndroidGradleBuilder.debugGuardCall("true", "debugger,usbDebugging", "warn"));
-    }
-
-    @Test
-    void checksAreEscapedIntoTheJavaLiteral() {
-        assertEquals("        com.codename1.impl.android.DebugEnvironmentDetector.runDebugGuard(this, \"a\\\"b\\\\c\", true);\n",
-                AndroidGradleBuilder.debugGuardCall("true", "a\"b\\c", "exit"));
     }
 }

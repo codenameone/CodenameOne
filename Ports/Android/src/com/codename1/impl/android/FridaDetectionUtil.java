@@ -140,7 +140,7 @@ public class FridaDetectionUtil {
             Log.e(TAG, "Instrumentation detected! Exiting app.");
             System.exit(0);
         } else {
-            Log.i(TAG, "No Frida detection evidence found.");
+            Log.i(TAG, "No instrumentation detected.");
         }
     }
 }
