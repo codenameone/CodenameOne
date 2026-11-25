@@ -117,4 +117,15 @@ class SlideRenderingTest extends UITestBase {
         assertTrue(l.shrink < 1);
         assertTrue(l.usedHeight <= 60 * 1.05f, "used " + l.usedHeight);
     }
+
+    @Test
+    void scatterPlotsEverySeriesAgainstTheCategories() {
+        ChartElement c = new ChartElement("c", null, ChartElement.SCATTER, 0, 0, 200, 100, 0,
+                null, false, false, new String[] {"1", "2.5", "x"}, new String[] {"a"},
+                new double[][] {{5, 6, 7}}, null);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new double[] {1, 2.5, 3},
+                c.xValues(), 0);
+        org.junit.jupiter.api.Assertions.assertEquals(1, c.toChart().getSeries().size(),
+                "a one series scatter keeps its series");
+    }
 }

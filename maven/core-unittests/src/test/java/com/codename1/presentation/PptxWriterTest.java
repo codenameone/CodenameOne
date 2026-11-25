@@ -74,6 +74,10 @@ class PptxWriterTest extends UITestBase {
         Map<String, byte[]> parts = unzip(p.toBytes(Presentation.Format.PPTX));
         String types = new String(parts.get("[Content_Types].xml"), "UTF-8");
         for (String name : parts.keySet()) {
+            // CT_BuildList needs at least one child
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    new String(parts.get(name), "ISO-8859-1").contains("<p:bldLst></p:bldLst>"),
+                    name + " has an empty build list");
             Document d = null;
             if (name.endsWith(".xml") || name.endsWith(".rels")) {
                 d = parse(parts.get(name));

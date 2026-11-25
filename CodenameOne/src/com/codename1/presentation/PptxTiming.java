@@ -57,15 +57,22 @@ final class PptxTiming {
         }
         new PptxTiming(x).sequence(usable, ids);
         List<String> listed = new ArrayList<String>();
-        x.raw("<p:bldLst>");
         for (Build b : usable) {
             if (text.containsKey(b.elementId) && !listed.contains(b.elementId)) {
                 listed.add(b.elementId);
-                x.raw("<p:bldP").attr("spid", ids.get(b.elementId).toString())
-                        .attr("grpId", "0").attr("animBg", "1").raw("/>");
             }
         }
-        x.raw("</p:bldLst></p:timing>");
+        // p:bldLst must hold at least one entry, so a slide whose builds are all on shapes
+        // without text (which PowerPoint lists nowhere) leaves it out
+        if (!listed.isEmpty()) {
+            x.raw("<p:bldLst>");
+            for (String id : listed) {
+                x.raw("<p:bldP").attr("spid", ids.get(id).toString())
+                        .attr("grpId", "0").attr("animBg", "1").raw("/>");
+            }
+            x.raw("</p:bldLst>");
+        }
+        x.raw("</p:timing>");
     }
 
     private void sequence(List<Build> builds, Map<String, Integer> ids) throws IOException {

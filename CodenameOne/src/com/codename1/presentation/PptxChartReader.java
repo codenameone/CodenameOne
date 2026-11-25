@@ -93,6 +93,9 @@ final class PptxChartReader {
         if (grouping != null) {
             String g = grouping.attr("val");
             stacked = "stacked".equals(g) || "percentStacked".equals(g);
+            if ("percentStacked".equals(g)) {
+                r.warn("A 100% stacked chart was read as a stacked chart of its values");
+            }
         }
         List<PptxNode> sers = type.all("ser");
         int n = Math.min(MAX_SERIES, sers.size());

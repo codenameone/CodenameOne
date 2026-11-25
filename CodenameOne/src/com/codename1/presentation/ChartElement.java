@@ -58,7 +58,8 @@ public final class ChartElement extends SlideElement {
     /// A pie with a hole.
     public static final String DOUGHNUT = "doughnut";
 
-    /// Points, the first series as x and every other series as y.
+    /// Points: the categories, read as numbers, are x and every series is y; see
+    /// [#xValues()].
     public static final String SCATTER = "scatter";
 
     /// A radar (spider) chart.
@@ -186,6 +187,30 @@ public final class ChartElement extends SlideElement {
             }
         }
         return COLUMN;
+    }
+
+    /// The x values of a scatter chart: its categories read as numbers, as PPTX's xVal and
+    /// ODF's x range hold them, or 1, 2, 3... where a category is not a number.
+    ///
+    /// #### Returns
+    ///
+    /// one x value per category
+    public double[] xValues() {
+        int n = maxLength();
+        double[] xs = new double[n];
+        for (int j = 0; j < n; j++) {
+            String s = j < categories.length ? categories[j] : null;
+            double v = j + 1;
+            if (s != null) {
+                try {
+                    v = Double.parseDouble(s.trim());
+                } catch (NumberFormatException e) {
+                    v = j + 1;
+                }
+            }
+            xs[j] = Double.isNaN(v) || Double.isInfinite(v) ? j + 1 : v;
+        }
+        return xs;
     }
 
     /// The number of categories.
@@ -372,8 +397,8 @@ public final class ChartElement extends SlideElement {
         if (SCATTER.equals(kind)) {
             c.setXAxis(new NumberAxis(Axis.BOTTOM));
             c.setYAxis(new NumberAxis(Axis.LEFT));
-            double[] xs = values.length > 0 ? values[0] : new double[0];
-            for (int i = 1; i < values.length; i++) {
+            double[] xs = xValues();
+            for (int i = 0; i < values.length; i++) {
                 int n = Math.min(xs.length, values[i].length);
                 double[] px = new double[n];
                 double[] py = new double[n];

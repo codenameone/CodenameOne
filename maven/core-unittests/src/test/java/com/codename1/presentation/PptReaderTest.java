@@ -317,4 +317,12 @@ class PptReaderTest extends UITestBase {
         IOException e = assertThrows(IOException.class, () -> read(streams(o)));
         assertTrue(e.getMessage().contains("encrypted"), e.getMessage());
     }
+
+    @Test
+    void aQuarterTurnedAnchorIsSwappedBack() {
+        float[] r = PptReader.upright(new float[] {100, 100, 50, 200}, 90);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new float[] {25, 175, 200, 50}, r, 0);
+        float[] s = PptReader.upright(new float[] {100, 100, 50, 200}, 30);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new float[] {100, 100, 50, 200}, s, 0);
+    }
 }

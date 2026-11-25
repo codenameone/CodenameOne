@@ -992,9 +992,25 @@ final class PptReader {
             }
             float x = frame.ox + l * frame.sx;
             float y = frame.oy + tp * frame.sy;
-            return new float[]{x, y, Math.max(0, (r - l) * frame.sx), Math.max(0, (b - tp) * frame.sy)}; // NOPMD AvoidBranchingStatementAsLastInLoop - the first anchor wins
+            return upright(new float[]{x, y, Math.max(0, (r - l) * frame.sx), Math.max(0, (b - tp) * frame.sy)}, rotation(sp)); // NOPMD AvoidBranchingStatementAsLastInLoop - the first anchor wins
         }
         return null;
+    }
+
+    /// [MS-ODRAW] stores the anchor of a shape turned by 45 to 135 or 225 to 315 degrees
+    /// as the box it covers once turned a quarter: swapped back about its centre here, so
+    /// the model's box and rotation say what PowerPoint draws.
+    static float[] upright(float[] r, float rot) {
+        float a = ((rot % 360) + 360) % 360;
+        if (a >= 45 && a < 135 || a >= 225 && a < 315) {
+            float w = r[2];
+            float h = r[3];
+            r[0] += (w - h) / 2;
+            r[1] += (h - w) / 2;
+            r[2] = h;
+            r[3] = w;
+        }
+        return r;
     }
 
     private float rotation(int sp) throws IOException {
