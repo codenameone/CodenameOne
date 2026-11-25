@@ -280,6 +280,8 @@ The facts about a currency itself come from the standard `java.util.Currency`, w
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CurrencySnippets.java[tag=currency-java,indent=0]
 ----
 
+`L10NManager` formats with the platform's own conventions on every port: Android, iOS, macOS, the browser and the simulator format natively, and native Windows and Linux read the user's locale settings and place the symbol accordingly. A Linux image without locale data falls back to a leading symbol and American English separators.
+
 On iOS, the JavaScript port and the native desktop ports `Currency` knows two symbols per currency: the one used at home (`$` for the dollar in America) and the one American English writes everywhere else (`US$`). Its display names are in English. Use `L10NManager` when the user should see a symbol or an amount in their own language.
 
 On iOS `getCurrencySymbol()` returns the symbol (`$`), as on the other platforms; it used to return the ISO code (`USD`). Code that needs the code calls `getCurrencyCode()`.

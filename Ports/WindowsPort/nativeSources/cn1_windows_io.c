@@ -597,6 +597,30 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_storageDir___R_java_lang_St
     return cn1WinWideToJavaString(threadStateData, dir);
 }
 
+/* The user locale's monetary conventions as six lines: decimal separator, grouping
+ * separator, local symbol, ISO 4217 code, 1 when the symbol precedes the amount, 1
+ * when a space separates them. LOCALE_ICURRENCY is 0 "$1", 1 "1$", 2 "$ 1", 3 "1 $".
+ * JAVA_NULL when Windows does not answer, and Java keeps its table-driven formatting. */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_localeCurrency___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    WCHAR dec[16], grp[16], sym[16], iso[16], pos[4];
+    WCHAR out[96];
+    int pattern;
+    if (GetLocaleInfoEx(LOCALE_NAME_USER_DEFAULT, LOCALE_SMONDECIMALSEP, dec, 16) == 0
+            || GetLocaleInfoEx(LOCALE_NAME_USER_DEFAULT, LOCALE_SCURRENCY, sym, 16) == 0
+            || GetLocaleInfoEx(LOCALE_NAME_USER_DEFAULT, LOCALE_SINTLSYMBOL, iso, 16) == 0
+            || GetLocaleInfoEx(LOCALE_NAME_USER_DEFAULT, LOCALE_ICURRENCY, pos, 4) == 0) {
+        return JAVA_NULL;
+    }
+    if (GetLocaleInfoEx(LOCALE_NAME_USER_DEFAULT, LOCALE_SMONTHOUSANDSEP, grp, 16) == 0) {
+        grp[0] = L'\0';
+    }
+    pattern = pos[0] - L'0';
+    _snwprintf(out, 96, L"%s\n%s\n%s\n%s\n%d\n%d", dec, grp, sym, iso,
+               (pattern == 0 || pattern == 2) ? 1 : 0, pattern >= 2 ? 1 : 0);
+    out[95] = L'\0';
+    return cn1WinWideToJavaString(threadStateData, out);
+}
+
 /* The directory containing the running executable (no trailing separator).
  * Resources shipped alongside the exe -- the native theme, app assets -- are
  * resolved relative to this by getResourceAsStream. */
