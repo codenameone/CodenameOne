@@ -39,7 +39,7 @@ include::../demos/common/src/main/snippets/developer-guide/bazaar.sh[tag=bazaar-
 
 `shared` holds the contract: the data transfer objects and the `@RestClient`
 interfaces both sides compile against. `common` is the app, one adaptive app for
-phones, tablets, desktops and browsers. `backend` is the server. Its packages
+phones, tablets, desktops, and browsers. `backend` is the server. Its packages
 follow the domain:
 
 [cols="1,3"]
@@ -109,7 +109,7 @@ buying the last unit at the same moment therefore can't both succeed:
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/inventory/Inventory.java[tag=bazaar-reserve,indent=0]
 ----
 
-Shipping a fulfilment takes the units off hand and off committed together;
+Shipping a fulfilment takes the units out of on hand and committed together;
 cancelling an order releases what it reserved. A return that's restocked writes
 a `RETURN` move. Counting a shelf writes the difference as a `COUNT` move rather
 than overwriting the number.
@@ -124,7 +124,7 @@ set aside with a reason, which `InventoryStates` subtracts from available, and
 `Tracking` keeps serials and lots: a sale that takes a lot-tracked level down
 calls `pickLots`, which draws from the lot that expires first. A variant that
 continues selling reserves with `reserveCounted`, which answers how many units
-it could not cover; the order line keeps that as `backorderedQty`.
+it couldn't cover; the order line keeps that as `backorderedQty`.
 
 [[bazaar-order-tools]]
 
@@ -133,9 +133,9 @@ image::img/bazaar-merchant-inventory-tablet.png["Inventory levels per location",
 === Pay links, returns and templates
 
 A pay link (`PayLinks`) is a row in `pay_link` holding a token of the link id,
-its expiry and an HMAC of both, so a link cannot be forged or extended and a new
+its expiry and an HMAC of both, so a link can't be forged or extended and a new
 link replaces the old. Paying claims the link first and reverts the claim if the
-card fails, so two tabs cannot pay twice. The invoice reads the stored token
+card fails, so two tabs can't pay twice. The invoice reads the stored token
 rather than calling `PayLinks`, which keeps `Documents` free of a dependency on
 email.
 
@@ -156,7 +156,7 @@ when it has component rows. Every stock call (reserve, release, ship, restock,
 the register's sale and a marketplace order) expands a bundle line into moves
 on its components, so the ledger stays the one record of stock. What a bundle
 can sell is the fewest bundles its components make at each location, summed
-over the locations; an untracked component never limits it. A product that is a
+over the locations; an untracked component never limits it. A product that's a
 component can't itself be a bundle, and a component variant can't be deleted.
 
 Each product also has a publishing window per channel in `channel_schedule`:
@@ -179,7 +179,7 @@ confirmation mail already carries the links. A link is the grant id, its expiry
 and an HMAC of both under the grant's own random secret; a forged, foreign,
 expired, used-up or revoked link answers the same 404. Each fetch is counted by
 one conditional update, so the limit holds under concurrent requests, and a
-download is never served in byte ranges. Licence keys are claimed one by one
+download is never served in byte ranges. License keys are claimed one by one
 with an update that only a free key passes, so two sales never share one; a pool
 with five or fewer keys left mails the store's low-stock alert. A line refunded
 in full, or a cancelled order, revokes its grants.
@@ -223,7 +223,7 @@ Post-purchase upsell and Buy now (`checkout.Upsells`, migration V210,
 `UpsellApi`): `store_upsell` holds one product per store; `accept` places one
 unit as a new order through `Checkouts.place` with a scratch cart, the
 original's address and the `Payment.methodId` it was paid with (no saved card,
-no offer), so it is reserved, quoted and authorized like any checkout and the
+no offer), so it's reserved, quoted and authorized like any checkout and the
 paid order is never mutated. `upsell_order` links the two and makes the offer
 single use; notes on both orders name the other. `buyNow` is the same
 single-line order to a saved address on the default card, keyed for
@@ -248,7 +248,7 @@ Wallets, pay-later and bank methods use the same provider:
 * *Express checkout* (`ExpressCheckouts`, `ExpressPages`) creates a manual
   capture intent for the cart, re-prices it through the `Quoter` on every
   address or shipping change the wallet sheet reports, and places the order
-  once with the idempotency key `express-<id>`. A repeated confirm answers the
+  once with the idempotency key `express-<id>`. A repeated confirmation answers the
   order already placed; a cart that changed since the last quote is refused.
   Stripe.js is allowed in the page's policy (`WebHeaders.allowStripe`) only on
   pages that show the button and only when the provider is Stripe.
@@ -414,7 +414,7 @@ The PDF package is shared with the backend, so the server renders invoices,
 packing slips, shipping labels with a Code 128 barcode, purchase orders, credit
 notes, shift reports and receipts with the same API the app uses. Each is a
 `GET` under the store's merchant routes ending in `.pdf`; a shopper gets the
-invoice of their own order from `/api/orders/{orderId}/invoice.pdf`. The app shows
+invoice for their own order from `/api/orders/{orderId}/invoice.pdf`. The app shows
 them with the PDF viewer, prints them where the platform has a printer, shares
 them, and on a desktop lets the user drag the file out of the window.
 
@@ -601,13 +601,13 @@ The `content` package holds what a merchant edits about the storefront itself:
   Home page blocks live on the theme row (`blocks`, one a line, kind, text and
   reference split by tabs), so a draft's blocks publish with the rest of it. A
   button links only to a site path or an `https` address and an image only to
-  one of the store's photos; a product or collection that is gone drops its
+  one of the store's photos; a product or collection that's gone drops its
   block when the page renders. The app reads them from
   `/api/shop/stores/{handle}/blocks`.
 * `Platform.organization`: the stores an owner owns (`Store.ownerUsername`), with
   counted orders and sales less refunds, behind `/api/merchant/organization`.
 * `Pages` and `RichText`: pages, the four policies and blog posts, sanitized when
-  saved, so what is stored is already clean.
+  saved, so what's stored is already clean.
 * `Navigation`: the `main` and `footer` menus, two levels deep, and the redirect
   table. `web.StorefrontRedirects` follows a redirect only where the storefront
   would answer 404, so a redirect never hides a live page, and only within the
@@ -636,7 +636,7 @@ the page showed, locked for the order. The order keeps both its totals in the
 store's currency and the presentment currency, total and rate, and refunds go
 back in what was charged. `market.Translations` answers each field from the exact
 locale, then its language, then the original. Product text is translated where
-it is shown, by `market.ProductText`, never where it is stored: an order line
+it's shown, by `market.ProductText`, never where it's stored: an order line
 and the merchant's editor keep the original, and cart, checkout, order pages and
 mail translate the line's name in the order's language. Option ids change on
 every product save, so `OPTION` translations are keyed by the product and the
@@ -659,26 +659,26 @@ totals still agree.
 
 `taxes.TaxRules` applies, in order, a product's override, its collection's, the
 EU VAT table for the product's tax category when the store has EU VAT on, and
-the US provider for a US address. The VAT table (`vat_rate`, seeded by
+the United States provider for an address in the United States. The VAT table (`vat_rate`, seeded by
 migration) is data, not code: rates change, and keeping them current is the
 operator's job. The OSS report sums goods lines by country and rate from the
-rate each line was charged; shipping keeps the cart's own rates and is not in
-it. US sales tax goes through `taxes.SalesTaxProvider`; the sample ships
+rate each line was charged; shipping keeps the cart's own rates and isn't in
+it. United States sales tax goes through `taxes.SalesTaxProvider`; the sample ships
 `SimulatedSalesTaxProvider` with a few state rates. A production store
 implements the interface over a real service such as Avalara, TaxJar or Stripe
 Tax, adds it to the providers listed in the `TaxRules` constructor, and picks
-its name in the store's tax settings. A provider that cannot answer returns -1, and the store's
+its name in the store's tax settings. A provider that can't answer returns -1, and the store's
 own rates apply.
 
 `staff.StaffSecurity`, `staff.SsoProviders` and `platform.StoreApiKeys` cover
 staff sign-in and machine access. Two-factor codes are TOTP with recovery codes,
-and a store that requires them refuses staff who have not enrolled. Single
+and a store that requires them refuses staff who haven't enrolled. Single
 sign-on is OpenID Connect with PKCE; the ID token is checked against the
 provider's JWKS, the email must be verified, and its domain picks the role. An
-account owned by one store's provider cannot be added to another store. API
+account owned by one store's provider can't be added to another store. API
 keys are 256 random bits, stored only as SHA-256 hashes and found by that hash;
 only their prefix is shown again. `platform.BulkJobs` runs export and import jobs
-in the background and requeues a job left running by a stopped server.
+in the background and puts a job left running by a stopped server back in the queue.
 
 `risk.Fraud` scores each online order once its payment is held: order value,
 velocity, recent refused payments, an unusual delivery country, and a mismatch
@@ -783,7 +783,7 @@ product).
 The merchant app's inbox (`merchant.InboxPane`) joins the same socket as one
 more member of staff: `ChatChannel` asks for a `LiveTickets` ticket over the
 authenticated API and connects with `?staff=<ticket>&store=<id>`, so the app
-and the web inbox share conversations, presence and calls. The REST list gives
+and the web inbox share conversations, presence, and calls. The REST list gives
 each conversation an `unread` count (shopper lines newer than the staff read
 mark), and the open thread sends `seen` with the newest message's server time.
 An incoming call is answered with Codename One's WebRTC package
@@ -867,8 +867,8 @@ and error state. `channel.ChannelSync` runs every 30 seconds: it pulls orders
 variant's available quantity and price when it changed and held still for 20
 seconds, and pushes shipments with their carrier and tracking. A pushed listing
 carries `listing-id:version` as its idempotency key; a pulled order becomes one
-`MARKETPLACE` order per external id, however often it is replayed. A pulled
-order the store cannot cover is still accepted, as an offline register sale is:
+`MARKETPLACE` order per external id, however often it's replayed. A pulled
+order the store can't cover is still accepted, as an offline register sale is:
 the units go below zero, the order and an audit event (`CHANNEL_OVERSOLD`) say
 so, and every listing of the variant is pushed at once. Failures back off from
 30 seconds to an hour and never touch checkout.
@@ -900,7 +900,7 @@ a checkout in another market does. A refund of such an order records what goes
 back in the buyer's currency at that locked rate. An order in a currency the
 store has no rate for is logged as an error, not imported.
 
-=== Live services: carrier, VIES, exchange rates and geolocation
+=== Live services: Carrier, VIES, exchange rates and geolocation
 
 Each of these talks to an outside service through a small interface, so the
 tests answer from canned replies and never reach the network. Each one is off,
@@ -909,7 +909,7 @@ or simulated, until configured.
 *Carrier.* `bazaar.carrier.provider=easypost` selects `EasyPostCarrier`, which
 quotes rates, buys labels and tracks parcels through EasyPost's API. It needs
 `bazaar.carrier.easypost.key` and `bazaar.carrier.easypost.webhook-secret`;
-with either missing, the server logs what is absent and refuses to buy labels.
+with either missing, the server logs what's absent and refuses to buy labels.
 `bazaar.carrier.origin.country`, `.postal`, `.city` and `.region` give the
 ship-from address. Point EasyPost's tracker webhook at
 `/api/carrier/webhooks/easypost`: the server checks the `X-Hmac-Signature`
@@ -926,14 +926,14 @@ The same carrier prices checkout. A shipping rate of type `CARRIER` in a zone
 asks the carrier, for the cart's weight from the store's first active location
 that fulfils online orders to the shipping address, and offers one option per
 service: the rate's services field lists the services to offer (comma
-separated, blank for all), the markup is added as a percentage of the carrier's
-price (stored in hundredths of a percent, half up), and the rate's price is a
+separated, blank for all), the markup is added in proportion to the carrier's
+price (stored in basis points, rounded half up), and the rate's price is a
 flat handling fee on top. The REST quote, `Checkouts` and the web checkout share
 this path. An option's id is the rate id, `~`, and the service code; placing an
 order prices the chosen id again on the server, so a client names a rate and
-never an amount, and an id the address was not offered is refused. Quotes are
+never an amount, and an id the address wasn't offered is refused. Quotes are
 cached for ten minutes per cart, weight, origin and address, so the form does
-not call the carrier per keystroke. When the carrier fails or is not
+not call the carrier per keystroke. When the carrier fails or isn't
 configured, the rate offers its fallback price if it has one, and otherwise
 nothing, while the zone's other rates stand: a carrier outage never blocks
 checkout. The simulated carrier's rates are deterministic, and it refuses
@@ -974,7 +974,7 @@ business contracts for. Plan for these before taking real orders:
 * *Custom domain DNS and TLS.* Bazaar only matches the `Host` header. Pointing a
   merchant's DNS at the server, issuing and renewing its certificate and
   terminating TLS for it are the operator's job, as is proving the merchant owns
-  the domain before it is saved.
+  the domain before it's saved.
 
 * *A real payment service provider.* The Stripe provider has to be tried against
   a test account before it handles money, and a deployment may need another
@@ -1010,8 +1010,8 @@ business contracts for. Plan for these before taking real orders:
   currency. The platform console adds store totals unconverted, which is only
   right while every store uses the same currency; reporting gross merchandise
   value across currencies needs exchange rates recorded at the time of each sale.
-* *Tax for B2B orders.* Quotes and B2B orders are priced net of tax. Reverse
-  charge and per-company tax treatment need the tax engine above.
+* *Tax for B2B orders.* Quotes and B2B orders are priced net of tax. Reverse-charge
+  and per-company tax treatment need the tax engine above.
 * *Currencies with other than two decimals.* Only two-decimal currencies are
   supported.
 * *Storefront interface text.* The storefront's own text (buttons, cart,

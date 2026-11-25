@@ -13,8 +13,8 @@ The tables read as follows.
   (the Notes column says what differs) and &#8211; means absent.
 * In the other columns, "core" means the platform includes it and "app/plugin"
   means stores commonly add it through the platform's app store or plugin
-  directory, and "no" means the platform has neither and stores generally
-  cannot add it. An empty cell means the table makes no claim either way.
+  directory, and "no" means the platform has neither and most stores
+  can't add it. An empty cell means the table makes no claim either way.
 * Where Bazaar talks to an outside service, such as a card processor or a
   shipping carrier, it does so through an interface. The sample ships a
   simulated implementation beside the real one, and the Notes say so where it
@@ -45,7 +45,7 @@ on a row.
 | Bulk editor | &#10003; | core | core | core | core | 
 | CSV import/export of products | &#10003; | core | core | core | core | 
 | Gift card products | &#10003; | core | core | core | core | 
-| Digital products / downloads | &#10003; | app/plugin | core | core | core | A digital variant ships nothing and checks out without an address; payment issues signed, expiring links with a download limit, in the order mail and on the order pages. Refunds and the owner revoke them; optional licence-key pools hand out one key per unit.
+| Digital products / downloads | &#10003; | app/plugin | core | core | core | A digital variant ships nothing and checks out without an address; payment issues signed, expiring links with a download limit, in the order mail and on the order pages. Refunds and the owner revoke them; optional license-key pools hand out one key per unit.
 | Bundles (fixed bundles / mix-and-match) | &#10003; | app/plugin | app/plugin | app/plugin | no | A bundle product sells fixed quantities of component variants at its own price; availability and every stock movement go through the components. A BUNDLE discount prices mix-and-match sets.
 | Combined listings (parent/child products) | &#10003; | core | core | no | no | Combined listings group separate products under one parent page. 
 | Metafields on products/variants | &#10003; | core | app/plugin | core | no | Typed metafield definitions; values show in a specs section on the product page. 
@@ -75,7 +75,7 @@ on a row.
 | Continue selling when out of stock (oversell) | &#10003; | core | core | core | no | Per variant: a variant set to continue selling takes orders past zero, and the shortfall shows as backordered on the order.
 | Committed / unavailable / incoming states | &#10003; | core | no | no | no | Committed (reserved by orders), unavailable with a reason (damaged, quality control, safety stock) and incoming from purchase orders.
 | Inventory value report | &#10003; | core | app/plugin | app/plugin | core | 
-| Barcode label printing | &#10003; | app/plugin | app/plugin | app/plugin | core | Code 128 label sheets as PDF: Avery 30-up letter sheets and 2x1 inch thermal labels, for chosen variants or for everything a received purchase order brought in.
+| Barcode label printing | &#10003; | app/plugin | app/plugin | app/plugin | core | Code 128 label sheets as PDF: Avery 30-up letter sheets and 2 by 1 inch thermal labels, for chosen variants or for everything a received purchase order brought in.
 | Serial / lot tracking | &#10003; | app/plugin | app/plugin | app/plugin | no | Serial numbers and lots with expiry dates; lots are picked first-expiring-first, and a serial can be looked up to its order.
 |===
 
@@ -96,8 +96,8 @@ on a row.
 | Abandoned checkout recovery | &#10003; | core | app/plugin | core | core | 
 | Checkout customization / extensibility (UI extensions) | &#8211; | core | core | core | no | 
 | Order notes / custom attributes at checkout | &#10003; | core | core | core | core | Owner-defined text, checkbox and select fields, optionally required, kept on the order and shown in its detail, the confirmation mail and the app.
-| Tipping at online checkout | &#10003; | app/plugin | app/plugin | app/plugin | core | Up to four percent or fixed presets; the tip is charged outside the order total, never taxed or discounted, and reported as Tips.
-| Post-purchase upsell | &#10003; | app/plugin | app/plugin | app/plugin | no | One product per store, picked in the product editor, is offered on the order placed screen and the web confirmation page. "Add to my order" places it as a separate order on the saved card the order was paid with, authorized like any checkout, and both orders carry a note naming the other.
+| Tipping at online checkout | &#10003; | app/plugin | app/plugin | app/plugin | core | Up to 4 presets, each a percentage or a fixed amount; the tip is charged outside the order total, never taxed or discounted, and reported as Tips.
+| Post-purchase upsell | &#10003; | app/plugin | app/plugin | app/plugin | no | One product per store, picked in the product editor, is offered on the order placed screen and the web confirmation page. One tap places it as a separate order on the saved card the order was paid with, authorized like any checkout, and both orders carry a note naming the other.
 | Marketing consent checkbox | &#10003; | core | core | core | core | 
 | Bot protection / rate limiting | &#10003; | core | core | core | core | Rate limits, honeypot fields and a timing bot guard on signup and checkout; no CAPTCHA. 
 | Server-rendered SEO cart/session | &#10003; | core | core | core | core | 
@@ -131,7 +131,7 @@ on a row.
 | Payment links for drafts | &#10003; | core | core | core | core | A signed pay link with an expiry, sent by email and paid on the storefront.
 | Manual capture / authorize-only | &#10003; | core | core | core | core | Online orders are authorized at checkout and captured when the first item ships (or earlier, when the order is refunded or edited).
 | Partial fulfillment | &#10003; | core | core | core | core | 
-| Order archiving / cancel | &#10003; | core | core | core | core | Archive and unarchive, an archived filter, and optional auto-archive once an order is fulfilled and paid.
+| Order archiving / cancel | &#10003; | core | core | core | core | Archive and unarchive, an archived filter, and optional automatic archiving once an order is fulfilled and paid.
 | Order export CSV | &#10003; | core | core | core | core | 
 | Order status page for buyer | &#10003; | core | core | core | core | 
 | Bulk order actions (bulk fulfil/print) | &#10003; | core | core | core | core | Fulfil, buy labels, print packing slips, mark paid, archive or tag many orders at once; each order reports its own result.
@@ -157,7 +157,7 @@ on a row.
 
 | Shipping zones & rates | &#10003; | core | core | core | core | 
 | Weight/price-based rates | &#10003; | core | core | core | core | 
-| Carrier-calculated rates | &#10003; | core | app/plugin | core | core | A `CARRIER` zone rate prices checkout live through the store's carrier (EasyPost, or the deterministic simulated carrier in development), per service with the merchant's markup and handling fee; the choice is re-priced on the server at order time, quotes are cached briefly, and a carrier outage falls back to a set price or the zone's other rates.
+| Carrier-calculated rates | &#10003; | core | app/plugin | core | core | A `CARRIER` zone rate prices checkout live through the store's carrier (EasyPost, or the deterministic simulated carrier in development), per service with the merchant's markup and handling fee; the choice is re-priced on the server at order time, quotes are cached for a short time, and a carrier outage falls back to a set price or the zone's other rates.
 | Buy & print shipping labels | &#10003; | core | app/plugin | app/plugin | core | Labels bought through EasyPost, with tracking from its signed webhook and polling; local PDF labels 4 by 6 inches with the simulated carrier.
 | Local pickup | &#10003; | core | core | core | core | 
 | Local delivery (radius/zip) | &#10003; | core | app/plugin | app/plugin | core | 
@@ -165,7 +165,7 @@ on a row.
 | Packing slips / pick lists | &#10003; | core | core | core | core | 
 | Tracking numbers & tracking events | &#10003; | core | core | core | core | 
 | Delivery date estimates | &#10003; | core | core | core | core | 
-| Shipping profiles (per-product rates) | &#10003; | core | core | core | no | Named profiles (such as Oversized or Fragile) group products, each with its own zones and rates; a mixed cart is quoted per profile and the prices added up, the delivery estimate following the slowest. Assigned in the back office and the app.
+| Shipping profiles (per-product rates) | &#10003; | core | core | core | no | Named profiles (such as Bulky or Fragile) group products, each with its own zones and rates; a mixed cart is quoted per profile and the prices added up, the delivery estimate following the slowest. Assigned in the back office and the app.
 | Fulfillment network / 3PL integration | &#10003; | app/plugin | app/plugin | app/plugin | no | A `FulfilmentService` interface hands paid orders for the location it runs to a third-party warehouse; the bundled simulated service accepts them and reports shipment with tracking, which creates the fulfilment, mails the shopper and fires the `orders/fulfilled` webhook.
 | Fulfillment orders / routing rules across locations | &#10003; | core | app/plugin | app/plugin | no | Ordered rules (closest location, a location priority list, most stock) pick the location of each line among those holding the units, and a setting decides whether one order may ship from several locations. Applies to checkout, the admin's orders and channel orders.
 | Ship from store / BOPIS from POS | &#10003; | core | app/plugin | app/plugin | core | Checkout offers "Pick up at <location>" only where that location has every line in stock; the register's pickup queue makes orders ready (the shopper is mailed) and hands them over.
@@ -310,12 +310,12 @@ on a row.
 | Multi-currency storefront | &#10003; | core | app/plugin | core | no | Market prices in the local currency; checkout and refunds are charged in that currency. Rates are the merchant's own or the European Central Bank's daily feed, per market, and each order keeps the rate it used. 
 | Multi-language storefront content | &#10003; | core | app/plugin | core | no | Pages, policies and posts translate per market, with hreflang alternates in the sitemap. 
 | Per-market pricing / price adjustments | &#10003; | core | app/plugin | core | no | Per-market price lists and adjustments. 
-| Duties & import taxes at checkout | &#9681; | core | app/plugin | app/plugin | no | Checkout estimates duties from HS codes and per-country rates; the carrier collects them on delivery, so they are not charged at checkout.
+| Duties & import taxes at checkout | &#9681; | core | app/plugin | app/plugin | no | Checkout estimates duties from HS codes and per-country rates; the carrier collects them on delivery, so they're not charged at checkout.
 | Domains / subfolders per market | &#8211; | core | app/plugin | core | no | One custom domain per store; markets share it and switch with a query parameter.
 | Geolocation redirects / country selector | &#10003; | core | app/plugin | app/plugin | no | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
 | Tax rates by region | &#10003; | core | core | core | core | 
 | Tax-inclusive pricing | &#10003; | core | core | core | core | 
-| Automatic tax calculation (United States and European Union) | &#10003; | core | app/plugin | core | core | An editable EU VAT table (standard, reduced, super-reduced and zero rates per country) chosen by each product's tax category; US sales tax goes through a provider interface, with a simulated provider in the sample.
+| Automatic tax calculation (United States and European Union) | &#10003; | core | app/plugin | core | core | An editable EU VAT table (standard, reduced, super-reduced and zero rates per country) chosen by each product's tax category; United States sales tax goes through a provider interface, with a simulated provider in the sample.
 | Tax overrides per product/collection | &#10003; | core | core | core | core | A rate for a product or a collection in a country or one of its regions; a product's override wins over its collection's.
 | Tax exemptions | &#10003; | core | core | core | core | Per customer, with certificate details. 
 | VAT/GST registration & reports | &#10003; | core | app/plugin | app/plugin | no | VAT numbers of business customers are verified with VIES. An OSS VAT report by country and rate for a period, as a table or CSV; it covers goods lines, not shipping. Registration itself is the merchant's.
@@ -328,7 +328,7 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | Themes / theme editor | &#10003; | core | core | core | core | Palette, font, corners, logo and section order, with a signed preview link before publishing. 
-| Theme customization (sections/blocks) | &#10003; | core | core | core | core | Home sections can be ordered and toggled; a blocks section holds ordered heading, text, image, product, collection and button blocks, shown by the storefront and the app home. No drag-and-drop editor.
+| Theme customization (sections/blocks) | &#10003; | core | core | core | core | Home sections can be ordered and toggled; a blocks section holds ordered heading, text, image, product, collection and button blocks, shown by the storefront and the app home. No visual editor that arranges blocks by dragging.
 | Custom pages | &#10003; | core | core | core | core | Sanitized rich pages and four policy pages. 
 | Blog / articles | &#10003; | core | core | core | no | Posts with tags and author, Atom and RSS feeds. 
 | Navigation menus editor | &#10003; | core | core | core | core | Two-level main and footer menus. 
@@ -389,7 +389,7 @@ on a row.
 | Custom reports / report builder | &#10003; | core | app/plugin | core | core | Pick measures, dimensions and filters; save reports. 
 | Cohort / retention analysis | &#10003; | core | app/plugin | no | no | 
 | Inventory / sell-through reports | &#10003; | core | core | core | core | Stock on hand at cost and at price, low-stock count and sell-through for the period.
-| Finance / tax / payout reports | &#10003; | core | core | core | core | Note: payout list, tax by region, the OSS VAT report and a profit and loss statement (in the app and as CSV). No processor fee line: fees are not recorded.
+| Finance / tax / payout reports | &#10003; | core | core | core | core | Note: payout list, tax by region, the OSS VAT report and a profit and loss statement (in the app and as CSV). No processor fee line: fees aren't recorded.
 | Session / traffic source analytics | &#10003; | core | core | core | core | Traffic sources from UTM tags and referrers. 
 | Benchmarks vs peers | &#8211; | core | no | no | no | 
 |===
@@ -404,7 +404,7 @@ on a row.
 | Roles & permissions | &#10003; | core | core | core | core | Granular permission sets per staff member on top of the four roles. 
 | Audit log / activity | &#10003; | core | app/plugin | core | core | 
 | Two-factor authentication | &#10003; | core | app/plugin | core | core | Authenticator-app codes (TOTP) with a QR code on the web and in the app, single-use recovery codes, and a store setting that requires them of every staff member.
-| SSO / SAML | &#10003; | core | app/plugin | core | no | OpenID Connect from any provider: authorization code with PKCE, the ID token checked against the provider's keys, and a verified email's domain mapped to a staff role. SAML is not supported.
+| SSO / SAML | &#10003; | core | app/plugin | core | no | OpenID Connect from any provider: authorization code with PKCE, the ID token checked against the provider's keys, and a verified email's domain mapped to a staff role. SAML isn't supported.
 | Organization admin across stores | &#10003; | core | app/plugin | core | core | An owner runs several stores, switches between them in the app, and sees an organization overview of sales per store; a platform administrator manages all stores.
 |===
 

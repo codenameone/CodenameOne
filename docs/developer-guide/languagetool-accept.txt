@@ -953,3 +953,8 @@ Linode
 Nominatim
 Planetiler
 Geofabrik
+# Bazaar commerce sample: payment and tax providers, store data terms.
+Avalara
+Clearpay
+[Mm]etafields?
+cacheable

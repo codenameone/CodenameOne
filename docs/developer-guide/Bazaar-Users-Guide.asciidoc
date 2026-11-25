@@ -86,9 +86,9 @@ is declined. No money moves.
 
 The app opens straight into shopping. Nobody has to sign in to look around: the
 Discover tab shows every store on the platform, what's popular and the newest
-products across all of them, and Search runs across every store. Opening a store
+products across them all, and Search runs across every store. Opening a store
 shows its own page: its banner, its collections and new arrivals, and a search
-that stays inside the store with filters for collection, price and availability.
+that stays inside the store with filters for collection, price, and availability.
 The arrow on the banner goes back to Discover.
 
 A product page shows its photos, its description and reviews, and lets the
@@ -155,13 +155,13 @@ two can differ for a period with refunds of older orders.
 The sales pipeline shows every open cart and order on one board: shoppers
 browsing, checkouts started, carts already reminded, then paid, fulfilling,
 shipped, delivered and return requested. Each cart has a purchase-intent score
-from low to high and the reasons for it, such as "Came back: 3 visits". Drag a
+from low to high and the reasons for it, such as "Came back: 3 visits" for a returning shopper. Drag a
 checkout to Reminded to send its recovery email, or an order one column on to
 pack, ship or deliver it; on a phone each card has a button for the same step.
 The back office shows the board under Sales pipeline, read only.
 
-The assistant answers questions about the store, such as "Which channel sells
-the most?" or "Which carts should I chase?", with the numbers of the last 30
+The assistant answers questions about the store, such as which channel sells
+the most or which carts are worth chasing, with the numbers of the last 30
 days. In the product editor, Draft description writes a first description from
 the title, vendor, type, tags and options for you to edit. Both use the AI
 provider the store's server is set up with, and give simpler answers without
@@ -190,7 +190,7 @@ components out of stock, and the storefront lists what it includes. A product
 can also be scheduled per channel (the online store, the register and each
 marketplace), with times to publish and unpublish it, in UTC.
 A variant marked as a digital download ships nothing: upload its file, set how
-many times and for how many days a buyer's link works, and paste licence keys
+many times and for how many days a buyer's link works, and paste license keys
 if it needs them. A cart of downloads only checks out without an address or a
 delivery option. Once the order is paid, the links (and a key per unit) appear
 in the order mail, on the confirmation page and on the buyer's order page; a
@@ -201,7 +201,7 @@ with the pictures; the storefront plays the video and shows the model in a
 viewer you can turn and zoom, and the app links the model file.
 
 A product can have a category from Google's product taxonomy, found by typing a
-word of it ("tea", "shoes") in the product editor. Shopping feeds send it, and a
+word of it, such as tea or shoes, in the product editor. Shopping feeds send it, and a
 collection page in the browser offers its products' categories as a filter.
 Each variant can also carry customs details, an HS code and a country of origin,
 which go to the carrier for a parcel that leaves the country and onto the
@@ -223,18 +223,18 @@ a supplier. A barcode scanner, the camera or a keyboard scanner on a desktop,
 finds a variant by its code. Every change is listed in the variant's history.
 
 A variant can keep selling when it runs out; the shortfall shows as backordered
-on the order. Stock that is on hand but cannot be sold is set aside as
+on the order. Stock that's on hand but can't be sold is set aside as
 unavailable with a reason: damaged, in quality control or held as safety stock.
 Variants can be tracked by serial number or by lot with an expiry date, and
 lots are picked first-expiring-first. Barcode labels print as a PDF, on Avery
-30-up sheets or 2x1 inch thermal labels, for chosen variants or for everything
+30-up sheets or 2 by 1 inch thermal labels, for chosen variants or for everything
 a purchase order brought in.
 
 image::img/bazaar-merchant-inventory-tablet.png["Inventory levels per variant and location, with transfers, purchase orders and suppliers",scaledwidth=90%]
 
 ==== Orders and fulfilment
 
-The orders list filters by status, channel and payment. An order shows its lines,
+The orders list filters by status, channel, and payment. An order shows its lines,
 payments, notes and timeline, and can be cancelled, refunded in part or in full,
 or marked paid. A draft order is an order the merchant builds by hand, for a phone
 sale; a pay link emails the buyer a checkout page for it, and the link is printed
@@ -246,7 +246,7 @@ The store's return rules set the return window, which products and collections
 are final sale, a restocking fee and a return shipping fee. A shopper asking for
 a return chooses a refund, store credit or an exchange for another variant; an
 exchange that costs more sends a pay link for the difference. Every email and the
-register's SMS receipt can be reworded per language, previewed and reset.
+register's SMS receipt can be reworded per language, previewed, and reset.
 
 The fulfilment board shows every open order as a card in To pack, Packed, Shipped
 or Delivered. Dragging a card to the next column packs it, buys a label and ships
@@ -296,8 +296,8 @@ Settings > Two-factor sign-in in the app turns on authenticator codes for the
 account: scan the QR code, enter a code, and keep the recovery codes it shows
 once. When an account has it, signing in asks for the code on its own screen.
 
-*Shipping profiles* give some products zones and rates of their own: an
-Oversized profile can charge freight while everything else ships at the usual
+*Shipping profiles* give some products zones and rates of their own: a
+Bulky profile can charge freight while everything else ships at the usual
 rates. Edit a profile and tick its products. A cart holding products from
 several profiles is quoted per profile and the prices are added up, and the
 delivery estimate is the slowest of them.
@@ -418,7 +418,7 @@ The server can host the app itself, so the whole platform runs in a browser with
 nothing installed; `backend/server.sh run --web` builds it and serves it at
 `http://localhost:8080/`. Beside the app, the same server serves a complete web
 version of every side of the platform as ordinary HTML pages, which work without
-JavaScript and load quickly on any device. The rest of this chapter describes
+JavaScript and load fast on any device. The rest of this chapter describes
 those pages; most of what they do is also on the app's screens.
 
 [[bazaar-web-shop]]
@@ -437,7 +437,7 @@ language (English, Spanish, French, German and Hebrew, each named in its own
 language) and, when the store sells in more than one market, a market menu
 beside it. A shopper who picks a market sees prices in that market's currency
 and, when the store has translated them, product names and descriptions in its
-language. Both menus work from the keyboard, and without JavaScript they are
+language. Both menus work from the keyboard, and without JavaScript they're
 plain forms. The header's *Open the app* link goes to the Bazaar app at `/app/`,
 and the platform's home page carries a card for it.
 
@@ -456,7 +456,7 @@ cart gets a reminder whose link restores that cart on any device.
 
 The chat bubble in the corner of every store page opens a conversation with
 the store. It shows whether anyone on the staff is online, when they're typing,
-and a tick for each message once it is delivered and another once it is read.
+and a tick for each message once it's delivered and another once it's read.
 The conversation follows the shopper from page to page and, once they sign in,
 to their account on another device. A shopper who leaves an email address gets
 replies there when the chat is closed. While someone on the staff is online the
@@ -511,7 +511,7 @@ A buyer the merchant has added to a company sees the company's prices in the
 store and a company section in the account. From there the buyer orders by SKU
 on a quick-order form or by uploading a CSV file of SKUs and quantities, asks
 for a quote, accepts or declines a quote the store sent, and downloads the
-invoices of orders placed on net terms. Quantities follow the price list's
+invoices for orders placed on net terms. Quantities follow the price list's
 rules, such as a minimum or cases of six.
 
 [[bazaar-web-back-office]]
@@ -573,7 +573,7 @@ destination give the shopper an estimate of import duties at checkout. The tax
 page reports tax collected by region for a period, as a CSV for filing, and
 records customers' tax exemption certificates. Tax rules turns on EU VAT from
 the rate table, which charges each product by its tax category (standard,
-reduced, super-reduced or exempt), picks the US sales-tax provider, adds rate
+reduced, super-reduced or exempt), picks the United States sales-tax provider, adds rate
 overrides for a product or a collection in a country or region, and downloads
 the OSS VAT report as CSV.
 
@@ -640,7 +640,7 @@ margin, above the table of lines. A product page, on the web and in the
 app, recommends the products most often bought in the same order, then others
 from its collections. Every storefront page starts with a "Skip to content"
 link. Permission sets give a staff member
-access to only some areas, at one location or all of them. The inbox answers
+access to only some areas, at one location or at every location. The inbox answers
 chat messages live, with assignment and saved replies: a conversation page shows
 the shopper typing and reading, and a call from the storefront rings anywhere in
 the inbox and is answered on its conversation. The app's Inbox section works
