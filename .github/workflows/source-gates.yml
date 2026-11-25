@@ -60,6 +60,17 @@ jobs:
 
       # @author and @version swallow the text after them into the tag body,
       # which the doclet then drops. See scripts/check-author-tags.py.
+      # Every skip the screenshot suite can report needs an erratum in
+      # port_status_supplement.json, and so does every skip in a checked-in
+      # report. port-status-contract.yml runs the same check, but only for the
+      # paths it lists; here it fails any pull request in seconds. Without it an
+      # undocumented skip first surfaced as a failed website build after the
+      # watch run published it -- under the name of the next port judged (tvos).
+      - name: Port Status contract and skip errata
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: python3 scripts/hellocodenameone/conformance/port_status.py validate > /dev/null
+
       - name: Reject @author and @version in documentation comments
         if: ${{ !cancelled() }}
         shell: bash

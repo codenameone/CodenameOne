@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
+import contextlib
 import copy
+import io
 import json
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 from unittest.mock import patch
 
 import port_status
@@ -1048,12 +1052,145 @@ class PortStatusTest(unittest.TestCase):
     def test_publishable_accepts_a_documented_test_skip(self):
         report = self.publishable_report("android")
         report["tests"]["CameraApiTest"]["status"] = "skip"
+        # The reason the suite really gives there. A skip with no reason is
+        # documented by nothing (the erratum lists reason codes), and accept
+        # refuses it as the producer's defect.
+        report["tests"]["CameraApiTest"]["reasons"] = ["needs-runtime-permission-on-android"]
         report["summary"]["pass"] -= 1
         report["summary"]["skip"] += 1
 
         self.assertEqual(([], []), port_status.publishable_report_problems(
             self.manifest, "android", report
         ))
+
+    def watch_report_skipping_documents(self):
+        report = self.publishable_report("watchos")
+        documents = [
+            "DocumentFormatsScreenshotTest", "DocumentLayoutScreenshotTest",
+            "DocumentPagesScreenshotTest", "DocumentReviewScreenshotTest",
+        ]
+        for test in documents:
+            report["tests"][test]["status"] = "skip"
+            report["tests"][test]["reasons"] = ["document-on-watch"]
+        report["summary"]["pass"] -= len(documents)
+        report["summary"]["skip"] += len(documents)
+        return report, documents
+
+    def supplement_without(self, *tests):
+        supplement = port_status.read_json(port_status.SUPPLEMENT)
+        supplement["skip_reasons"] = [
+            item for item in supplement["skip_reasons"] if item["test"] not in tests
+        ]
+        return supplement
+
+    def test_publishable_accepts_the_documented_watch_document_skips(self):
+        report, _ = self.watch_report_skipping_documents()
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "watchos", report
+        ))
+
+    def test_publishable_blames_the_port_that_skips_without_an_erratum(self):
+        # The incident: watchOS published these skips with no erratum, and the
+        # website sync then failed while judging tvOS. The report that carries
+        # the skip is the one refused, by name.
+        report, documents = self.watch_report_skipping_documents()
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "watchos", report, self.supplement_without(*documents)
+        )
+        self.assertEqual(len(documents), len(malformed), malformed)
+        for test in documents:
+            self.assertTrue(any(
+                problem.startswith(test + " ") and "document-on-watch" in problem
+                and problem.endswith("on watchos") for problem in malformed
+            ), (test, malformed))
+
+    def test_publishable_rejects_a_skip_documented_only_for_another_port(self):
+        report = self.publishable_report("android")
+        report["tests"]["DocumentFormatsScreenshotTest"]["status"] = "skip"
+        report["tests"]["DocumentFormatsScreenshotTest"]["reasons"] = ["document-on-watch"]
+        report["summary"]["pass"] -= 1
+        report["summary"]["skip"] += 1
+        _, malformed = port_status.publishable_report_problems(
+            self.manifest, "android", report
+        )
+        self.assertTrue(
+            any("DocumentFormatsScreenshotTest" in item and "on android" in item
+                for item in malformed), malformed)
+
+    def test_another_port_is_judged_on_its_own_report(self):
+        # tvOS runs the Document tests; nothing about the watch report's
+        # errata may reach its verdict.
+        report = self.publishable_report("tvos")
+        self.assertEqual(([], []), port_status.publishable_report_problems(
+            self.manifest, "tvos", report, self.supplement_without(
+                "DocumentFormatsScreenshotTest", "DocumentLayoutScreenshotTest",
+                "DocumentPagesScreenshotTest", "DocumentReviewScreenshotTest",
+            )
+        ))
+
+    def test_accept_reports_an_invalid_contract_as_nobodys_report(self):
+        report = self.publishable_report("tvos")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tvos.json"
+            path.write_text(json.dumps(report))
+            stderr = io.StringIO()
+            def broken(_manifest):
+                raise port_status.ContractError("Skipped tests without errata: X")
+            with mock.patch.object(port_status, "validate", broken), \
+                    mock.patch.object(sys, "argv", [
+                        "port_status.py", "accept", "--port", "tvos",
+                        "--report", str(path),
+                    ]), contextlib.redirect_stderr(stderr):
+                status = port_status.main()
+        self.assertEqual(port_status.ACCEPT_CONTRACT_INVALID, status)
+        self.assertIn("not a defect in the tvos report", stderr.getvalue())
+        self.assertNotIn("report is unusable", stderr.getvalue())
+
+    def test_suite_source_skips_all_have_errata(self):
+        self.assertEqual([], port_status.source_skip_problems(self.manifest))
+
+    def test_source_skip_without_an_erratum_names_file_and_line(self):
+        problems = port_status.source_skip_problems(
+            self.manifest, self.supplement_without("DocumentLayoutScreenshotTest")
+        )
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("DocumentLayoutScreenshotTest.java:", problems[0])
+        self.assertIn("document-on-watch", problems[0])
+
+    def test_source_scan_reads_split_and_computed_markers(self):
+        # Each shape the first scan missed, by removing the erratum it needs:
+        # a reason on the next literal (CameraApiTest), a computed test name
+        # (VideoIODecodedFrames), a helper base class (BackendAuthTestBase) and
+        # a shared reporter whose reason is wholly computed (Database*).
+        cases = {
+            "AccessibilityTest": "AccessibilityTest.java:",
+            "VideoIODecodedFramesScreenshotTest": "VideoIODecodedFramesScreenshotTest.java:",
+            "BackendAuthTest": "BackendAuthTestBase.java:",
+            "DatabaseCursorTest": "DatabaseConformanceTest.java:",
+        }
+        for test, where in cases.items():
+            with self.subTest(test=test):
+                problems = port_status.source_skip_problems(
+                    self.manifest, self.supplement_without(test)
+                )
+                self.assertTrue(
+                    any(where in item and " " + test + " " in item for item in problems),
+                    problems,
+                )
+
+    def test_source_skip_reason_matching(self):
+        items = [{"reason_codes": [{"prefix": "needs-permission-on-", "ports": ["android"]}]}]
+        documented = port_status.source_skip_documented
+        self.assertTrue(documented(items, "needs-permission-on-android", True))
+        self.assertFalse(documented(items, "no-camera", True))
+        # A literal that is only the start of a computed reason.
+        self.assertTrue(documented(items, "needs-perm", False))
+        self.assertFalse(documented(items, "other-", False))
+        # Wholly computed: an erratum must exist, its codes are publication's.
+        self.assertTrue(documented(items, "", False))
+        self.assertFalse(documented([], "", False))
+        # An erratum with no codes documents every skip of its test.
+        self.assertTrue(documented([{}], "anything", True))
 
     def test_publishable_rejects_a_timestamp_from_the_future(self):
         # A skewed producer clock poisons the data branch rather than merely
