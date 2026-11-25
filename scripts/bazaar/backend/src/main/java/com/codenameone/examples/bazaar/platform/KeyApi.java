@@ -51,7 +51,7 @@ import java.util.Map;
 /// | `GET orders`, `GET orders/{id}` | `read_orders` |
 /// | `POST bulk-operations` | by kind, see [BulkJobs#scopeOf] |
 /// | `GET bulk-operations/{id}`, `GET bulk-operations/{id}/result.jsonl` | the kind's |
-/// | `POST graphql` | `read_products` and/or `read_orders`, by what is asked |
+/// | `POST graphql` | by field, see [AppGraphQl] |
 ///
 /// Lists answer the oldest [#PAGE] after `since` (epoch milliseconds of
 /// `createdAt`, 0 when absent); the last one's `createdAt` is the next page's
@@ -188,52 +188,6 @@ public class KeyApi {
         return new HttpServer.Response(200, "application/x-ndjson; charset=utf-8",
                 body.getBytes("UTF-8")).header("Cache-Control", "no-store")
                 .header("Content-Disposition", "attachment; filename=\"bulk-" + jobId + ".jsonl\"");
-    }
-
-    // ------------------------------------------------------------ graphql
-
-    /// A read-only GraphQL endpoint over products and orders; see [MiniGraphQl]
-    /// for the subset of the language it reads.
-    @PostMapping("/api/v1/stores/{storeId}/graphql")
-    public HttpServer.Response graphql(@PathVariable("storeId") String storeId,
-            HttpServer.Request request) throws Exception {
-        keys.require(storeId, null);
-        Map body = Json.parseObject(request.getBody() == null ? "{}" : request.getBody());
-        Object query = body == null ? null : body.get("query");
-        MiniGraphQl.Field root;
-        try {
-            root = MiniGraphQl.parse(query instanceof String ? (String) query : "");
-        } catch (IllegalArgumentException bad) {
-            return HttpServer.Response.json(400, Json.write(MiniGraphQl.error(bad.getMessage())));
-        }
-        java.util.Map<String, Object> data = new java.util.LinkedHashMap<String, Object>();
-        for (int iter = 0; iter < root.children.size(); iter++) {
-            MiniGraphQl.Field f = root.children.get(iter);
-            int first = Math.max(1, Math.min(PAGE, f.intArg("first", 20)));
-            List<Object> found;
-            if ("products".equals(f.name)) {
-                keys.require(storeId, StoreApiKeys.READ_PRODUCTS);
-                found = productList(storeId, null, first);
-            } else if ("orders".equals(f.name)) {
-                keys.require(storeId, StoreApiKeys.READ_ORDERS);
-                found = orderList(storeId, null, first);
-            } else {
-                return HttpServer.Response.json(400, Json.write(MiniGraphQl.error(
-                        "Unknown field " + f.name + "; the root has products and orders")));
-            }
-            List<Object> projected = new ArrayList<Object>();
-            try {
-                for (int i = 0; i < found.size(); i++) {
-                    projected.add(MiniGraphQl.project(Json.parse(Json.write(found.get(i))), f));
-                }
-            } catch (IllegalArgumentException bad) {
-                return HttpServer.Response.json(400, Json.write(MiniGraphQl.error(bad.getMessage())));
-            }
-            data.put(f.alias, projected);
-        }
-        java.util.Map<String, Object> answer = new java.util.LinkedHashMap<String, Object>();
-        answer.put("data", data);
-        return json(answer);
     }
 
     /// `since` as a number; -1 (before everything) when absent or not a

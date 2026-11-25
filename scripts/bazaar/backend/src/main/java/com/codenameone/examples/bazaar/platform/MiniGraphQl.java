@@ -24,18 +24,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/// The small, read-only subset of GraphQL the key API reads: one query of
+/// The small subset of GraphQL the key API reads: one query or mutation of
 /// nested field selections over the JSON the REST routes answer.
 ///
 /// ```
 /// { products(first: 5) { id title variants { sku priceCents } } }
 /// query Recent { latest: orders(first: 2) { number totalCents } }
+/// mutation($in: ProductInput!) { productCreate(input: $in) { id } }
 /// ```
 ///
-/// Read: the optional `query` keyword and name, fields, aliases (`a: b`) and
-/// integer arguments. Refused, with a GraphQL error: mutations, variables,
-/// fragments, directives, string arguments, and a field the objects do not
-/// have. There is no schema to introspect; the fields are the REST
+/// Read: the optional `query` or `mutation` keyword, name and variable
+/// declarations (their types are not checked: a value is whatever JSON the
+/// request's `variables` carries), fields, aliases (`a: b`) and arguments --
+/// whole numbers, strings, booleans, null, enum words (read as strings),
+/// lists, objects and `$variables`. Refused, with a GraphQL error:
+/// subscriptions, fragments, directives, fractions, and a field the objects
+/// do not have. There is no schema to introspect; the fields are the REST
 /// resources' members, so the REST documentation is the schema.
 ///
 /// Pure, so it is tested without a server.
@@ -52,7 +56,7 @@ public final class MiniGraphQl {
     public static final class Field {
         public final String name;
         public final String alias;
-        public final Map<String, Integer> args = new LinkedHashMap<String, Integer>();
+        public final Map<String, Object> args = new LinkedHashMap<String, Object>();
         public final List<Field> children = new ArrayList<Field>();
 
         Field(String name, String alias) {
@@ -61,37 +65,80 @@ public final class MiniGraphQl {
         }
 
         public int intArg(String arg, int fallback) {
-            Integer v = args.get(arg);
-            return v == null ? fallback : v.intValue();
+            Object v = args.get(arg);
+            return v instanceof Number ? ((Number) v).intValue() : fallback;
+        }
+
+        /// A string argument, or null when absent or not a string.
+        public String stringArg(String arg) {
+            Object v = args.get(arg);
+            return v instanceof String ? (String) v : null;
+        }
+    }
+
+    /// A parsed operation: its kind and its root selection.
+    public static final class Operation {
+        /// True for a `mutation`.
+        public final boolean mutation;
+        public final Field root;
+
+        Operation(boolean mutation, Field root) {
+            this.mutation = mutation;
+            this.root = root;
         }
     }
 
     /// `{"errors":[{"message":...}]}`.
     public static Map<String, Object> error(String message) {
+        return error(message, null);
+    }
+
+    /// `{"errors":[{"message":...,"extensions":{"code":...}}]}`, without the
+    /// extensions when `code` is null.
+    public static Map<String, Object> error(String message, String code) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("message", message);
+        if (code != null) {
+            Map<String, Object> ext = new LinkedHashMap<String, Object>();
+            ext.put("code", code);
+            m.put("extensions", ext);
+        }
         Map<String, Object> out = new LinkedHashMap<String, Object>();
         out.put("errors", Collections.singletonList(m));
         return out;
     }
 
     /// The query's root selection; throws IllegalArgumentException, with a
-    /// message for the client, for anything outside the subset.
+    /// message for the client, for anything outside the subset, and for a
+    /// mutation, which [#parseOperation] reads.
     public static Field parse(String query) {
-        Parser p = new Parser(query == null ? "" : query);
-        p.skip();
-        if (p.word("mutation") || p.word("subscription")) {
-            throw new IllegalArgumentException("Only queries are supported");
+        Operation op = parseOperation(query, null);
+        if (op.mutation) {
+            throw new IllegalArgumentException("Only queries are supported here");
         }
-        if (p.word("query")) {
-            p.pos += 5;
+        return op.root;
+    }
+
+    /// A query or a mutation, its `$variables` read from `variables` (absent
+    /// ones are null).
+    public static Operation parseOperation(String query, Map variables) {
+        Parser p = new Parser(query == null ? "" : query, variables);
+        p.skip();
+        if (p.word("subscription")) {
+            throw new IllegalArgumentException("Subscriptions are not supported");
+        }
+        boolean mutation = false;
+        if (p.word("query") || p.word("mutation")) {
+            mutation = p.word("mutation");
+            p.pos += mutation ? 8 : 5;
             p.skip();
             if (p.peek() != '{' && p.peek() != '(') {
                 p.name();
                 p.skip();
             }
             if (p.peek() == '(') {
-                throw new IllegalArgumentException("Variables are not supported");
+                p.skipDeclarations();
+                p.skip();
             }
         }
         Field root = new Field("", "");
@@ -103,7 +150,7 @@ public final class MiniGraphQl {
         if (root.children.isEmpty()) {
             throw new IllegalArgumentException("Select at least one field");
         }
-        return root;
+        return new Operation(mutation, root);
     }
 
     /// `value` cut down to the fields `selection` asks for; lists are
@@ -137,11 +184,32 @@ public final class MiniGraphQl {
 
     private static final class Parser {
         final String text;
+        final Map variables;
         int pos;
         int fields;
 
-        Parser(String text) {
+        Parser(String text, Map variables) {
             this.text = text;
+            this.variables = variables;
+        }
+
+        /// Steps over `($a: T!, $b: [T] = 1)`; the types are not read.
+        void skipDeclarations() {
+            int depth = 0;
+            while (pos < text.length()) {
+                char c = text.charAt(pos);
+                if (c == '"') {
+                    string();
+                    continue;
+                }
+                pos++;
+                if (c == '(') {
+                    depth++;
+                } else if (c == ')' && --depth == 0) {
+                    return;
+                }
+            }
+            throw new IllegalArgumentException("Unclosed variable declarations");
         }
 
         char peek() {
@@ -211,7 +279,7 @@ public final class MiniGraphQl {
                     throw new IllegalArgumentException("Unclosed selection");
                 }
                 if (c == '.' || c == '@' || c == '$') {
-                    throw new IllegalArgumentException("Fragments, directives and variables "
+                    throw new IllegalArgumentException("Fragments and directives "
                             + "are not supported");
                 }
                 if (++fields > MAX_FIELDS) {
@@ -249,21 +317,122 @@ public final class MiniGraphQl {
                 }
                 String arg = name();
                 expect(':');
-                skip();
-                int start = pos;
-                if (peek() == '-') {
-                    pos++;
+                f.args.put(arg, value(0));
+            }
+        }
+
+        /// One argument value.
+        Object value(int depth) {
+            if (depth >= MAX_DEPTH) {
+                throw new IllegalArgumentException("An argument nests too deeply");
+            }
+            skip();
+            char c = peek();
+            if (c == '$') {
+                pos++;
+                String v = name();
+                return variables == null ? null : variables.get(v);
+            }
+            if (c == '"') {
+                return string();
+            }
+            if (c == '[') {
+                pos++;
+                List<Object> list = new ArrayList<Object>();
+                while (true) {
+                    skip();
+                    if (peek() == ']') {
+                        pos++;
+                        return list;
+                    }
+                    if (peek() == '\0') {
+                        throw new IllegalArgumentException("Unclosed list");
+                    }
+                    list.add(value(depth + 1));
                 }
+            }
+            if (c == '{') {
+                pos++;
+                Map<String, Object> object = new LinkedHashMap<String, Object>();
+                while (true) {
+                    skip();
+                    if (peek() == '}') {
+                        pos++;
+                        return object;
+                    }
+                    String key = name();
+                    expect(':');
+                    object.put(key, value(depth + 1));
+                }
+            }
+            if (c == '-' || (c >= '0' && c <= '9')) {
+                int start = pos;
+                pos++;
                 while (pos < text.length() && text.charAt(pos) >= '0' && text.charAt(pos) <= '9') {
                     pos++;
                 }
                 String digits = text.substring(start, pos);
-                if (digits.length() == 0 || "-".equals(digits) || digits.length() > 9) {
-                    throw new IllegalArgumentException("Argument " + arg
-                            + " must be a whole number");
+                if ("-".equals(digits) || digits.length() > 18 || peek() == '.'
+                        || peek() == 'e' || peek() == 'E') {
+                    throw new IllegalArgumentException("Numbers are whole and under 18 digits");
                 }
-                f.args.put(arg, Integer.valueOf(Integer.parseInt(digits)));
+                long n = Long.parseLong(digits);
+                if (n >= Integer.MIN_VALUE && n <= Integer.MAX_VALUE) {
+                    return Integer.valueOf((int) n);
+                }
+                return Long.valueOf(n);
             }
+            String word = name();
+            if ("true".equals(word)) {
+                return Boolean.TRUE;
+            }
+            if ("false".equals(word)) {
+                return Boolean.FALSE;
+            }
+            if ("null".equals(word)) {
+                return null;
+            }
+            return word;
+        }
+
+        /// A quoted string, with JSON's escapes.
+        String string() {
+            pos++;
+            StringBuilder b = new StringBuilder();
+            while (pos < text.length()) {
+                char c = text.charAt(pos++);
+                if (c == '"') {
+                    return b.toString();
+                }
+                if (c != '\\') {
+                    b.append(c);
+                    continue;
+                }
+                if (pos >= text.length()) {
+                    break;
+                }
+                char e = text.charAt(pos++);
+                if (e == 'n') {
+                    b.append('\n');
+                } else if (e == 't') {
+                    b.append('\t');
+                } else if (e == 'r') {
+                    b.append('\r');
+                } else if (e == 'u' && pos + 4 <= text.length()) {
+                    int code = 0;
+                    for (int iter = 0; iter < 4; iter++) {
+                        int d = Character.digit(text.charAt(pos++), 16);
+                        if (d < 0) {
+                            throw new IllegalArgumentException("A bad escape in a string");
+                        }
+                        code = code * 16 + d;
+                    }
+                    b.append((char) code);
+                } else {
+                    b.append(e);
+                }
+            }
+            throw new IllegalArgumentException("Unclosed string");
         }
     }
 }

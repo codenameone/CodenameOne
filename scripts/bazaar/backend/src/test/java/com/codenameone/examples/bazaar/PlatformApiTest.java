@@ -281,9 +281,19 @@ class PlatformApiTest {
         assertThrows(IllegalArgumentException.class, () -> MiniGraphQl.parse(
                 "{ products { ...Parts } }"));
         assertThrows(IllegalArgumentException.class, () -> MiniGraphQl.parse(
-                "query($n: Int) { products { id } }"));
+                "mutation { productCreate(input: {}) { id } }"));
         assertThrows(IllegalArgumentException.class, () -> MiniGraphQl.parse(
-                "{ products(after: \"x\") { id } }"));
+                "{ products(first: 1.5) { id } }"));
+        java.util.Map<String, Object> vars = new java.util.HashMap<String, Object>();
+        vars.put("n", Integer.valueOf(3));
+        MiniGraphQl.Operation op = MiniGraphQl.parseOperation(
+                "mutation Go($n: Int!) { a: x(first: $n, s: \"q\\\"\", o: {k: [1, true, null, RED]}) }",
+                vars);
+        assertTrue(op.mutation);
+        MiniGraphQl.Field x = op.root.children.get(0);
+        assertEquals(3, x.intArg("first", 0));
+        assertEquals("q\"", x.stringArg("s"));
+        assertEquals("[1, true, null, RED]", String.valueOf(((java.util.Map) x.args.get("o")).get("k")));
         assertThrows(IllegalArgumentException.class, () -> MiniGraphQl.parse("{ products { id }"));
         StringBuilder deep = new StringBuilder();
         for (int iter = 0; iter < 20; iter++) {

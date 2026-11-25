@@ -206,6 +206,29 @@ public class StoreEvents {
         }
     }
 
+    /// Stock was adjusted by hand or through the API: `inventory/low`, with
+    /// the payload an order's sale sends, when `level` is at or under its
+    /// reorder point. No automation or mail: those follow sales.
+    public void stockAdjusted(String storeId,
+            com.codenameone.examples.bazaar.api.LevelDto level) {
+        if (level == null || level.reorderPoint() <= 0
+                || level.available() > level.reorderPoint()) {
+            return;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<String, Object>();
+            payload.put("storeId", storeId);
+            payload.put("variantId", level.variantId());
+            payload.put("locationId", level.locationId());
+            payload.put("available", Long.valueOf(level.available()));
+            payload.put("reorderPoint", Long.valueOf(level.reorderPoint()));
+            payload.put("sku", level.sku());
+            webhooks.emit(storeId, Webhooks.INVENTORY_LOW, Json.write(payload));
+        } catch (IOException | RuntimeException failed) {
+            log("inventory/low", level.variantId(), failed);
+        }
+    }
+
     /// A cart sat untouched with items in it. Automations only.
     public void cartAbandoned(Cart cart, Customer customer) {
         Map<String, String> ctx = new HashMap<String, String>();

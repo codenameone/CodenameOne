@@ -33,9 +33,20 @@ import com.codename1.backend.security.apikey.ApiKeyAuthenticationToken;
 /// somebody be signed in, and would otherwise act for an account named
 /// `apikey:...`. Runs right after the filter that accepts keys, and holds an
 /// app's token to its call allowance too.
+///
+/// It also picks the API version a key API request is served at: the one
+/// its [#VERSION_HEADER] names, or [#LATEST] without one. A version this
+/// server does not know is 400, never a guess; every answer under the key
+/// API carries the header with the version served.
 public final class KeyApiOnly implements SecurityFilter {
     /// What every key API path starts with.
     public static final String PATH = "/api/v1/";
+    /// The request header naming an API version, echoed on the answer.
+    public static final String VERSION_HEADER = "X-Bazaar-Api-Version";
+    /// The version served when a request names none.
+    public static final String LATEST = "2026-10";
+    /// Every version served; all answer alike today.
+    static final String[] VERSIONS = {"2026-07", LATEST};
 
     private final AppCallLimits limits;
 
@@ -49,8 +60,42 @@ public final class KeyApiOnly implements SecurityFilter {
         this.limits = limits;
     }
 
+    /// The version `asked` names, or null for one there is not.
+    public static String version(String asked) {
+        if (asked == null || asked.length() == 0) {
+            return LATEST;
+        }
+        for (int iter = 0; iter < VERSIONS.length; iter++) {
+            if (VERSIONS[iter].equals(asked.trim())) {
+                return VERSIONS[iter];
+            }
+        }
+        return null;
+    }
+
     @Override
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
+            throws Exception {
+        String target = request.getTarget();
+        if (target == null || !target.startsWith(PATH)) {
+            return keysOnly(request, chain);
+        }
+        String served = version(request.getHeader(VERSION_HEADER));
+        if (served == null) {
+            return HttpServer.Response.json(400, "{\"error\":\"Unknown API version; the versions are "
+                    + VERSIONS[0] + " and " + LATEST + "\"}");
+        }
+        HttpServer.Response answer;
+        try {
+            answer = keysOnly(request, chain);
+        } catch (com.codename1.backend.ResponseStatusException refused) {
+            // Answered as the server answers it, with the version on it too.
+            answer = HttpServer.Response.text(refused.getStatus(), refused.getReason());
+        }
+        return answer == null ? null : answer.header(VERSION_HEADER, served);
+    }
+
+    private HttpServer.Response keysOnly(HttpServer.Request request, FilterChain chain)
             throws Exception {
         SecurityContext context = SecurityContextHolder.getContext();
         Authentication a = context == null ? null : context.getAuthentication();
