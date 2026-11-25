@@ -119,10 +119,11 @@ public final class DebugEnvironmentDetector {
             "/sbin/.magisk/"
     };
 
-    /// Mount points root tools mount ON (Magisk's tmpfs at `/debug_ramdisk`). The directory
-    /// exists on stock builds, but nothing is mounted on it outside a debug ramdisk boot.
+    /// Mount points root tools mount ON. Not `/debug_ramdisk`, where Magisk also mounts: first
+    /// stage init mounts a tmpfs there on every device and only unmounts it later, and an OEM
+    /// build that leaves it mounted would make android.rootCheck kill every launch. Magisk's
+    /// own mount there is still caught by its `magisk` mount source.
     private static final String[] ROOT_MOUNT_POINTS = {
-            "/debug_ramdisk",
             "/sbin/.magisk"
     };
 
@@ -147,7 +148,9 @@ public final class DebugEnvironmentDetector {
     /// or packer forks to ptrace its parent (which also keeps a real debugger out). A debugger
     /// attached from outside runs as shell (adb) or root; one running as the app's uid needs
     /// `run-as`, which only works on a debuggable build, where the guard only logs anyway.
-    /// Counting the RASP's own child would kill every launch of an app that ships one.
+    /// Counting the RASP's own child would kill every launch of an app that ships one. A root
+    /// attacker can run a tracer under the app's uid and pass this; root is the other checks'
+    /// and attestation's to catch.
     private static boolean isOwnTracer(int pid) {
         BufferedReader reader = null;
         try {
@@ -226,8 +229,10 @@ public final class DebugEnvironmentDetector {
             StackTraceElement[] stack = new Throwable().getStackTrace();
             for (int i = 0; i < stack.length; i++) {
                 String cls = stack[i].getClassName();
+                // org.lsposed.lspd, not org.lsposed: hiddenapibypass and lsparanoid are
+                // ordinary libraries an app may bundle.
                 if (cls != null && (cls.startsWith("de.robv.android.xposed")
-                        || cls.startsWith("org.lsposed"))) {
+                        || cls.startsWith("org.lsposed.lspd"))) {
                     Log.e(TAG, "Hooking framework on the call stack: " + cls);
                     return true;
                 }
