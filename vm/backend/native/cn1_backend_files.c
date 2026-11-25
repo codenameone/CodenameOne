@@ -72,6 +72,41 @@
 #define CN1_HAVE_SENDFILE 1
 #endif
 
+/*
+ * Every call here that can wait on the DISK -- open, read, write, pread, mkstemp,
+ * realpath, and sendfile's read of the file -- goes through cn1BackendOffload
+ * (cn1_backend_offload.c). A regular file is always "ready" to the poller, so the
+ * call cannot park the way a socket wait does; on a virtual thread the pool runs
+ * it while the caller is parked, and the host keeps serving everything else.
+ *
+ * A job never touches the heap: strings are converted before the offload, a
+ * byte[]'s data pointer is taken before it (the caller's frame keeps the array
+ * alive and the collector does not move it), and Java results are built after.
+ * errno is per pthread, so a job that needs it classifies it itself.
+ */
+typedef void (*cn1OffloadFn)(void* arg);
+void cn1BackendOffload(cn1OffloadFn fn, void* arg);
+/* io_uring on Linux (cn1_backend_offload.c): 1 with the kernel's answer (a count
+   or descriptor, or -errno), or 0 -- not run, use the pool job. */
+int cn1BackendUringRead(int fd, void* buf, size_t len, long long offset, long long* result);
+int cn1BackendUringWrite(int fd, const void* buf, size_t len, long long* result);
+int cn1BackendUringOpenat(int dirFd, const char* path, int flags, long long* result);
+int cn1BackendUringOpenat2(int dirFd, const char* path, void* how, size_t howSize, long long* result);
+
+#ifndef _WIN32
+struct cn1FileJob {
+    int fd;
+    int fd2;
+    const char* path;
+    const char* path2;
+    char* out;
+    JAVA_ARRAY_BYTE* data;
+    size_t length;
+    long long position;
+    long long result;
+};
+#endif
+
 /* Opens for reading. Returns the descriptor, or -1. */
 /*
  * Opens a path under `root` and refuses anything that resolves outside it, in one
@@ -87,10 +122,12 @@
  * there is no window to lose. Returns -2 where the kernel or platform has no
  * openat2 -- the caller falls back to the older check rather than serving nothing.
  */
-JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT root, JAVA_OBJECT relative) {
 #if defined(__linux__) && defined(SYS_openat2)
-    const char* rootPath;
-    const char* rel;
+static void cn1ClearNonBlocking(int fd); /* see cn1OpenReadPath */
+
+static void cn1OpenBeneathJob(void* p) {
+    struct cn1FileJob* j = (struct cn1FileJob*)p;
+    const char* rel = j->path2;
     int dirFd;
     int fd;
     struct cn1_open_how {
@@ -98,21 +135,10 @@ JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_la
         uint64_t mode;
         uint64_t resolve;
     } how;
-    if(root == JAVA_NULL || relative == JAVA_NULL) {
-        return -1;
-    }
-    rootPath = stringToUTF8(threadStateData, root);
-    if(rootPath == NULL) {
-        return -1;
-    }
-    dirFd = open(rootPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    j->result = -1;
+    dirFd = open(j->path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if(dirFd < 0) {
-        return -1;
-    }
-    rel = stringToUTF8(threadStateData, relative);
-    if(rel == NULL) {
-        close(dirFd);
-        return -1;
+        return;
     }
     /* RESOLVE_BENEATH rejects an absolute path outright, and the caller's target
        always starts at the root. */
@@ -121,23 +147,113 @@ JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_la
     }
     if(*rel == 0) {
         close(dirFd);
-        return -1;
+        return;
     }
     memset(&how, 0, sizeof(how));
-    how.flags = (uint64_t)(O_RDONLY | O_CLOEXEC);
+    how.flags = (uint64_t)(O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     how.resolve = (uint64_t)CN1_RESOLVE_BENEATH;
     fd = (int)syscall(SYS_openat2, dirFd, rel, &how, sizeof(how));
     close(dirFd);
+    if(fd >= 0) {
+        cn1ClearNonBlocking(fd);
+    }
     if(fd < 0) {
         /* An old kernel knows the number but not the struct, or does not know the
            call at all. Either way this cannot answer, so say so rather than let the
            caller read a refusal as "file missing". */
         if(errno == ENOSYS || errno == EINVAL || errno == E2BIG) {
-            return -2;
+            j->result = -2;
         }
+        return;
+    }
+    j->result = fd;
+}
+
+/*
+ * The same open through io_uring: the directory, then openat2 beneath it, each
+ * an operation on the ring. 1 when it answered; 0 when the ring did not run a
+ * step, and the pool job (which starts over) has to.
+ */
+static int cn1OpenBeneathUring(struct cn1FileJob* j) {
+    const char* rel = j->path2;
+    long long dirFd;
+    long long fd;
+    struct cn1_open_how {
+        uint64_t flags;
+        uint64_t mode;
+        uint64_t resolve;
+    } how;
+    if(!cn1BackendUringOpenat(AT_FDCWD, j->path, O_RDONLY | O_DIRECTORY | O_CLOEXEC, &dirFd)) {
+        return 0;
+    }
+    j->result = -1;
+    if(dirFd < 0) {
+        return 1;
+    }
+    while(*rel == '/') {
+        rel++;
+    }
+    if(*rel == 0) {
+        close((int)dirFd);
+        return 1;
+    }
+    memset(&how, 0, sizeof(how));
+    how.flags = (uint64_t)(O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+    how.resolve = (uint64_t)CN1_RESOLVE_BENEATH;
+    if(!cn1BackendUringOpenat2((int)dirFd, rel, &how, sizeof(how), &fd)) {
+        close((int)dirFd);
+        return 0;
+    }
+    close((int)dirFd);
+    if(fd >= 0) {
+        cn1ClearNonBlocking((int)fd);
+    }
+    if(fd < 0) {
+        if(fd == -ENOSYS || fd == -EINVAL || fd == -E2BIG) {
+            j->result = -2;
+        }
+        return 1;
+    }
+    j->result = fd;
+    return 1;
+}
+#endif
+
+JAVA_INT com_codename1_backend_FileIo_openBeneathImpl___java_lang_String_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT root, JAVA_OBJECT relative) {
+#if defined(__linux__) && defined(SYS_openat2)
+    const char* rootPath;
+    const char* rel;
+    if(root == JAVA_NULL || relative == JAVA_NULL) {
         return -1;
     }
-    return fd;
+    rootPath = stringToUTF8(threadStateData, root);
+    if(rootPath == NULL) {
+        return -1;
+    }
+    /* Copied: stringToUTF8 reuses one buffer per thread, so the second call
+       would overwrite the first. */
+    {
+        char rootCopy[PATH_MAX];
+        struct cn1FileJob job;
+        size_t rootLen = strlen(rootPath);
+        if(rootLen >= sizeof(rootCopy)) {
+            return -1;
+        }
+        memcpy(rootCopy, rootPath, rootLen + 1);
+        rel = stringToUTF8(threadStateData, relative);
+        if(rel == NULL) {
+            return -1;
+        }
+        memset(&job, 0, sizeof(job));
+        job.path = rootCopy;
+        job.path2 = rel;
+        CN1_YIELD_THREAD;
+        if(!cn1OpenBeneathUring(&job)) {
+            cn1BackendOffload(cn1OpenBeneathJob, &job);
+        }
+        CN1_RESUME_THREAD;
+        return (JAVA_INT)job.result;
+    }
 #else
     (void)root; (void)relative;
     return -2;
@@ -182,16 +298,32 @@ static int cn1BackendDanglingLinkIn(const char* path) {
     return 0;
 }
 
-JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
-#ifdef _WIN32
-    (void)path;
-    return -1;
-#else
-    const char* p = path == JAVA_NULL ? NULL : stringToUTF8(threadStateData, path);
-    if(p == NULL) {
-        return -1;
+#ifndef _WIN32
+/*
+ * NO OPEN HERE WAITS FOR A FIFO'S WRITER. A plain O_RDONLY open of a FIFO
+ * blocks until something opens the other end, so a FIFO in a static root held a
+ * request -- and, on the I/O pool, a pool thread -- for as long as nobody wrote
+ * to it: four such requests stopped every disk call in the process. io_uring
+ * does not block there at all (it tries the open non-blocking first), so the two
+ * paths also disagreed. Every open is O_NONBLOCK, which a regular file ignores,
+ * and the flag is cleared again at once so reads behave exactly as before. A
+ * pipe handed over as a file -- a process substitution, which already has its
+ * writer -- still reads normally; StaticFiles refuses anything that is not a
+ * regular file (FileIo.stat).
+ */
+static void cn1ClearNonBlocking(int fd) {
+    int flags = fcntl(fd, F_GETFL);
+    if(flags >= 0 && (flags & O_NONBLOCK) != 0) {
+        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
     }
-    int fd = open(p, O_RDONLY | O_CLOEXEC);
+}
+
+/* The open and its classification, on whichever thread cn1BackendOffload picks. */
+static int cn1OpenReadPath(const char* p) {
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+    if(fd >= 0) {
+        cn1ClearNonBlocking(fd);
+    }
     if(fd < 0) {
         /*
          * -1 means THERE IS NO SUCH FILE and -2 means there is one and it could
@@ -235,11 +367,36 @@ JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODE
         return -2;
     }
     return fd;
+}
+
+static void cn1OpenReadJob(void* arg) {
+    struct cn1FileJob* j = (struct cn1FileJob*)arg;
+    j->result = cn1OpenReadPath(j->path);
+}
+#endif
+
+JAVA_INT com_codename1_backend_FileIo_openReadImpl___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
+#ifdef _WIN32
+    (void)path;
+    return -1;
+#else
+    struct cn1FileJob job;
+    const char* p = path == JAVA_NULL ? NULL : stringToUTF8(threadStateData, path);
+    if(p == NULL) {
+        return -1;
+    }
+    memset(&job, 0, sizeof(job));
+    job.path = p;
+    CN1_YIELD_THREAD;
+    cn1BackendOffload(cn1OpenReadJob, &job);
+    CN1_RESUME_THREAD;
+    return (JAVA_INT)job.result;
 #endif
 }
 
 /*
- * Fills out[0]=size, out[1]=modified-time-millis, out[2]=1 when it is a directory.
+ * Fills out[0]=size, out[1]=modified-time-millis, out[2]=1 when it is a directory
+ * and 2 when it is neither a directory nor a regular file.
  * One call rather than three so a request costs one stat, and taken from the OPEN
  * DESCRIPTOR rather than the path: stat-then-open lets the file change underneath
  * between the two, which is how a length header ends up disagreeing with the body.
@@ -275,7 +432,8 @@ JAVA_INT com_codename1_backend_FileIo_statImpl___int_long_1ARRAY_R_int(CODENAME_
 #else
     data[1] = (JAVA_LONG)st.st_mtime * 1000LL;
 #endif
-    data[2] = S_ISDIR(st.st_mode) ? 1 : 0;
+    /* 2: neither -- a FIFO, socket or device, which nothing serves as a file. */
+    data[2] = S_ISDIR(st.st_mode) ? 1 : (S_ISREG(st.st_mode) ? 0 : 2);
     if(((JAVA_ARRAY)out)->length > 3) {
         /* THE INODE, as a third component of the ETag. Size and mtime alone name
            the representation only as well as the filesystem's timestamps allow:
@@ -331,6 +489,34 @@ static int cn1AwaitSocketWritable(int fd) {
     return rc == 0 ? 0 : 1;
 }
 
+#ifdef CN1_HAVE_SENDFILE
+/* One sendfile() call, on whichever thread cn1BackendOffload picks. */
+struct cn1SendFileJob {
+    int outFd;
+    int inFd;
+    off_t off;              /* Linux: in-out offset */
+    off_t len;              /* BSD: bytes moved */
+    long long count;
+    long long result;
+    int err;
+};
+
+static void cn1SendFileJobRun(void* arg) {
+    struct cn1SendFileJob* j = (struct cn1SendFileJob*)arg;
+#if defined(__linux__)
+    ssize_t n = sendfile(j->outFd, j->inFd, &j->off, (size_t)j->count);
+    j->err = n < 0 ? errno : 0;
+    j->result = (long long)n;
+#else
+    int rc;
+    j->len = (off_t)j->count;
+    rc = sendfile(j->inFd, j->outFd, j->off, &j->len, NULL, 0);
+    j->err = rc < 0 ? errno : 0;
+    j->result = rc;
+#endif
+}
+#endif
+
 JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT outFd, JAVA_INT inFd, JAVA_LONG offset, JAVA_LONG count) {
 #if defined(CN1_HAVE_SENDFILE) && defined(__linux__)
     off_t off = (off_t)offset;
@@ -340,14 +526,26 @@ JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(C
     }
     CN1_YIELD_THREAD;
     for(;;) {
-        n = sendfile(outFd, inFd, &off, (size_t)count);
+        /* Offloaded: the socket is non-blocking in virtual-thread mode, but the
+           FILE side reads from disk for every uncached page. errno comes back in
+           the job, since the pool thread's errno is not this one's. */
+        struct cn1SendFileJob job;
+        int sendErrno;
+        job.outFd = outFd;
+        job.inFd = inFd;
+        job.off = off;
+        job.count = (long long)count;
+        cn1BackendOffload(cn1SendFileJobRun, &job);
+        n = (ssize_t)job.result;
+        off = job.off;
+        sendErrno = job.err;
         if(n >= 0) {
             break;
         }
-        if(errno == EINTR) {
+        if(sendErrno == EINTR) {
             continue;
         }
-        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+        if(sendErrno == EAGAIN || sendErrno == EWOULDBLOCK) {
             /* The client's window is full, not an error. The descriptor is
                non-blocking in virtual-thread mode, so this is the ordinary way a
                large download to a slow client proceeds -- and reporting it as -1
@@ -387,13 +585,18 @@ JAVA_LONG com_codename1_backend_FileIo_sendFileImpl___int_int_long_long_R_long(C
                had been overwritten by the count it had sent. An interrupted call
                that moved bytes is progress, and the caller advances on it: the
                test below breaks out and the tail returns it. */
-            len = (off_t)count;
-            rc = sendfile(inFd, outFd, (off_t)offset, &len, NULL, 0);
-        } while(rc < 0 && errno == EINTR && len == 0);
-        /* Captured before CN1_RESUME_THREAD: the resume is a GC safepoint and can
-           park this thread on a timed wait, which overwrites errno. Read after
-           it, this classified a real sendfile failure by the WAIT's errno. */
-        sendErrno = errno;
+            /* Offloaded: the FILE side reads from disk for every uncached page.
+               errno comes back in the job, since the pool thread's is not ours. */
+            struct cn1SendFileJob job;
+            job.outFd = outFd;
+            job.inFd = inFd;
+            job.off = (off_t)offset;
+            job.count = (long long)count;
+            cn1BackendOffload(cn1SendFileJobRun, &job);
+            rc = (int)job.result;
+            len = job.len;
+            sendErrno = job.err;
+        } while(rc < 0 && sendErrno == EINTR && len == 0);
         /* Anything except "the buffer was full and nothing moved" is an answer:
            success, a real error, or a partial send the caller can advance on. */
         if(rc >= 0 || sendErrno != EAGAIN || len > 0) {
@@ -428,6 +631,62 @@ JAVA_BOOLEAN com_codename1_backend_FileIo_hasSendFileImpl___R_boolean(CODENAME_O
 #endif
 }
 
+#ifndef _WIN32
+static void cn1ReadJob(void* arg) {
+    struct cn1FileJob* j = (struct cn1FileJob*)arg;
+    ssize_t n;
+    do {
+        n = read(j->fd, j->data, j->length);
+    } while(n < 0 && errno == EINTR);
+    j->result = n < 0 ? -1 : (long long)n;
+}
+
+static void cn1PreadJob(void* arg) {
+    struct cn1FileJob* j = (struct cn1FileJob*)arg;
+    ssize_t n;
+    do {
+        n = pread(j->fd, j->data, j->length, (off_t)j->position);
+    } while(n < 0 && errno == EINTR);
+    j->result = n < 0 ? -1 : (long long)n;
+}
+
+/* All of the slice or -1. */
+static void cn1WriteJob(void* arg) {
+    struct cn1FileJob* j = (struct cn1FileJob*)arg;
+    size_t done = 0;
+    while(done < j->length) {
+        ssize_t n = write(j->fd, j->data + done, j->length - done);
+        if(n < 0 && errno == EINTR) {
+            continue;
+        }
+        if(n <= 0) {
+            j->result = -1;
+            return;
+        }
+        done += (size_t)n;
+    }
+    j->result = (long long)done;
+}
+
+static void cn1RealPathJob(void* arg) {
+    struct cn1FileJob* j = (struct cn1FileJob*)arg;
+    j->result = realpath(j->path, j->out) == NULL ? -1 : 0;
+}
+
+/* `out` holds the mkstemp template and receives the name, which is unlinked at once. */
+static void cn1CreateTempJob(void* arg) {
+    struct cn1FileJob* j = (struct cn1FileJob*)arg;
+    int fd = mkstemp(j->out);
+    if(fd < 0) {
+        j->result = -1;
+        return;
+    }
+    unlink(j->out);
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    j->result = fd;
+}
+#endif
+
 /* Plain read, for the TLS path and for platforms with no sendfile. */
 JAVA_INT com_codename1_backend_FileIo_readImpl___int_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT fd, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
 #ifdef _WIN32
@@ -435,17 +694,25 @@ JAVA_INT com_codename1_backend_FileIo_readImpl___int_byte_1ARRAY_int_int_R_int(C
     return -1;
 #else
     JAVA_ARRAY_BYTE* data;
-    ssize_t n;
     if(fd < 0 || buffer == JAVA_NULL) {
         return -1;
     }
+    struct cn1FileJob job;
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+    memset(&job, 0, sizeof(job));
+    job.fd = fd;
+    job.data = &data[offset];
+    job.length = (size_t)length;
     CN1_YIELD_THREAD;
-    do {
-        n = read(fd, &data[offset], (size_t)length);
-    } while(n < 0 && errno == EINTR);
+    if(cn1BackendUringRead(fd, job.data, job.length, -1, &job.result)) {
+        if(job.result < 0) {
+            job.result = -1;
+        }
+    } else {
+        cn1BackendOffload(cn1ReadJob, &job);
+    }
     CN1_RESUME_THREAD;
-    return n < 0 ? -1 : (JAVA_INT)n;
+    return (JAVA_INT)job.result;
 #endif
 }
 
@@ -460,12 +727,19 @@ JAVA_OBJECT com_codename1_backend_FileIo_realPathImpl___java_lang_String_R_java_
     (void)path;
     return JAVA_NULL;
 #else
-    char resolved[4096];
+    char resolved[PATH_MAX > 4096 ? PATH_MAX : 4096];
+    struct cn1FileJob job;
     const char* p = path == JAVA_NULL ? NULL : stringToUTF8(threadStateData, path);
     if(p == NULL) {
         return JAVA_NULL;
     }
-    if(realpath(p, resolved) == NULL) {
+    memset(&job, 0, sizeof(job));
+    job.path = p;
+    job.out = resolved;
+    CN1_YIELD_THREAD;
+    cn1BackendOffload(cn1RealPathJob, &job);
+    CN1_RESUME_THREAD;
+    if(job.result != 0) {
         return JAVA_NULL;
     }
     return newStringFromUtf8Len(threadStateData, resolved, (int)strlen(resolved));
@@ -497,7 +771,7 @@ JAVA_INT com_codename1_backend_FileIo_createTempImpl___java_lang_String_R_int(CO
 #else
     const char* d = dir == JAVA_NULL ? NULL : stringToUTF8(threadStateData, dir);
     char path[PATH_MAX];
-    int fd;
+    struct cn1FileJob job;
     if(d == NULL || d[0] == 0) {
         d = getenv("TMPDIR");
     }
@@ -507,13 +781,12 @@ JAVA_INT com_codename1_backend_FileIo_createTempImpl___java_lang_String_R_int(CO
     if(snprintf(path, sizeof(path), "%s/cn1-spool-XXXXXX", d) >= (int)sizeof(path)) {
         return -1;
     }
-    fd = mkstemp(path);
-    if(fd < 0) {
-        return -1;
-    }
-    unlink(path);
-    fcntl(fd, F_SETFD, FD_CLOEXEC);
-    return fd;
+    memset(&job, 0, sizeof(job));
+    job.out = path;
+    CN1_YIELD_THREAD;
+    cn1BackendOffload(cn1CreateTempJob, &job);
+    CN1_RESUME_THREAD;
+    return (JAVA_INT)job.result;
 #endif
 }
 
@@ -524,25 +797,44 @@ JAVA_INT com_codename1_backend_FileIo_writeImpl___int_byte_1ARRAY_int_int_R_int(
     return -1;
 #else
     JAVA_ARRAY_BYTE* data;
-    size_t done = 0;
+    struct cn1FileJob job;
     if(fd < 0 || buffer == JAVA_NULL) {
         return -1;
     }
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+    memset(&job, 0, sizeof(job));
+    job.fd = fd;
+    job.data = &data[offset];
+    job.length = (size_t)length;
     CN1_YIELD_THREAD;
-    while(done < (size_t)length) {
-        ssize_t n = write(fd, &data[offset + done], (size_t)length - done);
-        if(n < 0 && errno == EINTR) {
-            continue;
+    {
+        /* The ring answers a short write like write() does, so loop; whatever it
+           does not take -- refused, or no ring at all -- the pool job finishes. */
+        size_t written = 0;
+        int failed = 0;
+        while(written < job.length) {
+            long long n;
+            if(!cn1BackendUringWrite(fd, job.data + written, job.length - written, &n)) {
+                break;
+            }
+            if(n <= 0) {
+                failed = 1;
+                break;
+            }
+            written += (size_t)n;
         }
-        if(n <= 0) {
-            CN1_RESUME_THREAD;
-            return -1;
+        if(failed) {
+            job.result = -1;
+        } else if(written < job.length) {
+            job.data += written;
+            job.length -= written;
+            cn1BackendOffload(cn1WriteJob, &job);
+        } else {
+            job.result = (long long)written;
         }
-        done += (size_t)n;
     }
     CN1_RESUME_THREAD;
-    return length;
+    return job.result < 0 ? -1 : length;
 #endif
 }
 
@@ -553,16 +845,25 @@ JAVA_INT com_codename1_backend_FileIo_preadImpl___int_byte_1ARRAY_int_int_long_R
     return -1;
 #else
     JAVA_ARRAY_BYTE* data;
-    ssize_t n;
     if(fd < 0 || buffer == JAVA_NULL || position < 0) {
         return -1;
     }
+    struct cn1FileJob job;
     data = (JAVA_ARRAY_BYTE*)CN1_ARRAY_DATA(buffer);
+    memset(&job, 0, sizeof(job));
+    job.fd = fd;
+    job.data = &data[offset];
+    job.length = (size_t)length;
+    job.position = (long long)position;
     CN1_YIELD_THREAD;
-    do {
-        n = pread(fd, &data[offset], (size_t)length, (off_t)position);
-    } while(n < 0 && errno == EINTR);
+    if(cn1BackendUringRead(fd, job.data, job.length, job.position, &job.result)) {
+        if(job.result < 0) {
+            job.result = -1;
+        }
+    } else {
+        cn1BackendOffload(cn1PreadJob, &job);
+    }
     CN1_RESUME_THREAD;
-    return n < 0 ? -1 : (JAVA_INT)n;
+    return (JAVA_INT)job.result;
 #endif
 }

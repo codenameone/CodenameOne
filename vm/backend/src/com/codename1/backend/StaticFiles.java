@@ -211,6 +211,12 @@ public final class StaticFiles implements HttpServer.Handler {
             if (FileIo.stat(fd, info) != 0) {
                 return HttpServer.Response.text(404, "not found");
             }
+            if (info[2] == 2) {
+                // A FIFO, socket or device: nothing a static root publishes.
+                // The open no longer waits for a FIFO's writer (openBeneathImpl),
+                // so reading one here would answer an empty or partial body.
+                return HttpServer.Response.text(404, "not found");
+            }
             if (info[2] != 0) {
                 // A directory: retry at its index file rather than listing it.
                 // Directory listings leak names nobody asked to publish.

@@ -264,9 +264,9 @@ public final class Database {
     /// position and desynchronize the sequence: that is protocol corruption, not
     /// merely one request's work committed by another's COMMIT.
     ///
-    /// The SQLite path delegates to Db, which is synchronized on its own monitor.
+    /// The SQLite path delegates to Db, which holds a gate of its own like this one.
     /// Holding this one first is safe -- the order is always Database then Db,
-    /// never the reverse -- and Db's monitor is reentrant for the callbacks.
+    /// never the reverse -- and Db's gate is reentrant for the callbacks.
     public int execute(String sql, Object[] params) throws IOException {
         enter();
         try {
