@@ -296,6 +296,13 @@
             "ios-metal",
             "android"
           ]
+        },
+        {
+          "prefix": "no-web-peer",
+          "ports": [
+            "ios-metal",
+            "android"
+          ]
         }
       ]
     },
@@ -565,6 +572,62 @@
       "reason_codes": [
         {
           "prefix": "pdf-viewer-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "DocumentFormatsScreenshotTest",
+      "reason": "This baseline is the same rich content read back from HTML, DOCX, ODT and Markdown in a phone- or desktop-sized document view. A watch screen cannot show a document page legibly, so the test captures nothing on watchOS rather than baseline an unreadable crop.",
+      "platform_support": "The word processing API (com.codename1.wordprocessing) is part of core and compiles and runs on watchOS; only this page-sized screenshot does not apply to the watch form factor.",
+      "verification": "Every phone, tablet, TV, desktop and browser leg renders the document in both light and dark themes and compares it against stored goldens; the document model and formats are also covered by core unit tests.",
+      "reason_codes": [
+        {
+          "prefix": "document-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "DocumentLayoutScreenshotTest",
+      "reason": "This baseline is paragraph and page layout of a multi-page document in a phone- or desktop-sized document view. A watch screen cannot show a document page legibly, so the test captures nothing on watchOS rather than baseline an unreadable crop.",
+      "platform_support": "The word processing API (com.codename1.wordprocessing) is part of core and compiles and runs on watchOS; only this page-sized screenshot does not apply to the watch form factor.",
+      "verification": "Every phone, tablet, TV, desktop and browser leg renders the document in both light and dark themes and compares it against stored goldens; the document model and formats are also covered by core unit tests.",
+      "reason_codes": [
+        {
+          "prefix": "document-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "DocumentPagesScreenshotTest",
+      "reason": "This baseline is page furniture and geometry (running headers and footers, a table of contents, a floating picture and balanced columns) in a phone- or desktop-sized document view. A watch screen cannot show a document page legibly, so the test captures nothing on watchOS rather than baseline an unreadable crop.",
+      "platform_support": "The word processing API (com.codename1.wordprocessing) is part of core and compiles and runs on watchOS; only this page-sized screenshot does not apply to the watch form factor.",
+      "verification": "Every phone, tablet, TV, desktop and browser leg renders the document in both light and dark themes and compares it against stored goldens; the document model and formats are also covered by core unit tests.",
+      "reason_codes": [
+        {
+          "prefix": "document-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "DocumentReviewScreenshotTest",
+      "reason": "This baseline is a document with tracked changes and review comments in a phone- or desktop-sized document view. A watch screen cannot show a document page legibly, so the test captures nothing on watchOS rather than baseline an unreadable crop.",
+      "platform_support": "The word processing API (com.codename1.wordprocessing) is part of core and compiles and runs on watchOS; only this page-sized screenshot does not apply to the watch form factor.",
+      "verification": "Every phone, tablet, TV, desktop and browser leg renders the document in both light and dark themes and compares it against stored goldens; the document model and formats are also covered by core unit tests.",
+      "reason_codes": [
+        {
+          "prefix": "document-on-watch",
           "ports": [
             "watchos"
           ]

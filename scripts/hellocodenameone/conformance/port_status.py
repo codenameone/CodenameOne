@@ -29,6 +29,10 @@ STRICT_GATE_FAILED = 10
 # only an unusable report is a defect worth failing the website build over.
 ACCEPT_CONTRACT_DRIFT = 11
 ACCEPT_UNUSABLE = 12
+# The tree's own contract failed validate() before the report was even read.
+# Not this port's defect, and reporting it as "the <port> report is unusable"
+# is how a watchOS skip without an erratum was blamed on tvOS.
+ACCEPT_CONTRACT_INVALID = 13
 
 # Producers and this checker can disagree by a little without anything
 # being wrong -- runner clocks drift, and a report is stamped slightly
@@ -274,6 +278,10 @@ def validate(manifest: dict) -> dict:
     missing_skip_reasons = sorted((skipped_tests & set(mapped)) - set(skip_reason_tests))
     if missing_skip_reasons:
         problems.append("Skipped tests without errata: " + ", ".join(missing_skip_reasons))
+    if mapped:
+        # The static half: a skip the suite source can emit needs its erratum in
+        # the same pull request, long before any port publishes it.
+        problems.extend(source_skip_problems(manifest, supplement))
     for item in supplement.get("skip_reasons", []):
         required = ("test", "reason", "platform_support", "verification")
         if not all(item.get(field) for field in required):
@@ -420,6 +428,98 @@ def validate(manifest: dict) -> dict:
         "deployment_platforms": len(deployment_rows),
         "browser_engines": len(browsers),
     }
+
+
+# A skip marker as the suite source spells it. The reason is captured up to the
+# first character a reason code cannot contain; a closing quote straight after
+# it means the literal is the whole reason, anything else (`" + port`) means the
+# literal is only the start of a reason assembled at run time.
+SOURCE_SKIP_RE = re.compile(
+    r'test=([A-Za-z0-9_]+) status=SKIPPED reason=([A-Za-z0-9_.:-]*)(")?'
+)
+
+
+def source_skip_problems(manifest: dict, supplement: dict | None = None) -> list[str]:
+    """Every skip the suite SOURCE can report must already have an erratum.
+
+    Without this, the first place an undocumented skip surfaced was the website
+    build, hours after the pull request that added it had merged: the watch run
+    published the skip, and the next port the website sync accepted failed
+    "Skipped tests without errata" under its own name (tvos, for four
+    Document*ScreenshotTests that only watchOS skips). The skip markers are
+    string literals in the test classes, so the pull request that writes one can
+    be held to its erratum before any device runs.
+
+    Statically the port a reason applies to is unknown, so a reason code's
+    ``ports`` list is not consulted here; publication checks that against the
+    real report (see publishable_report_problems). A reason built at run time is
+    checked by its literal start: some code must be compatible with it.
+    Markers that do not name their test literally are out of reach and left to
+    publication.
+    """
+    if supplement is None:
+        supplement = read_json(SUPPLEMENT)
+    mapped = set(test_to_feature(manifest))
+    errata: dict[str, list[dict]] = {}
+    for item in supplement.get("skip_reasons", []):
+        errata.setdefault(item.get("test"), []).append(item)
+    problems: list[str] = []
+    for path in sorted(COMMON_SOURCES.rglob("*.java")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            problems.append(f"cannot read {path.relative_to(REPO_ROOT)}: {exc}")
+            continue
+        for match in SOURCE_SKIP_RE.finditer(text):
+            name, reason, closed = match.group(1), match.group(2), match.group(3)
+            test = name if name in mapped else screenshot_test(manifest, name)
+            if test not in mapped:
+                # The runtime parser refuses an unattributable marker
+                # (parse_logs), so a source that would emit one is a defect now
+                # rather than a failed nightly later.
+                line = text.count("\n", 0, match.start()) + 1
+                problems.append(
+                    f"{path.relative_to(REPO_ROOT)}:{line} skip marker test={name} "
+                    "names no registered test"
+                )
+                continue
+            # `reason=" + reason`: the literal closes on an empty reason, which
+            # only ever means the value is concatenated after it.
+            complete = bool(closed) and bool(reason)
+            if not source_skip_documented(errata.get(test, []), reason, complete):
+                line = text.count("\n", 0, match.start()) + 1
+                shown = reason if complete else reason + "..."
+                problems.append(
+                    f"{path.relative_to(REPO_ROOT)}:{line} {test} can skip with reason "
+                    f"{shown or '<none>'} but docs/website/data/port_status_supplement.json "
+                    "has no skip erratum covering it"
+                )
+    return problems
+
+
+def source_skip_documented(items: list[dict], reason: str, complete: bool) -> bool:
+    if not complete and not reason:
+        # The whole reason is computed (`"reason=" + reason`), so nothing about
+        # it is visible here. Demand that the test has an erratum at all and
+        # leave the codes to publication, which sees the real value.
+        return bool(items)
+    for item in items:
+        codes = item.get("reason_codes")
+        if not codes:
+            # Same rule as skip_is_documented: an erratum without reason codes
+            # documents every skip of its test.
+            return True
+        for code in codes:
+            prefix = code.get("prefix")
+            if not isinstance(prefix, str) or not prefix:
+                continue
+            if reason.startswith(prefix):
+                return True
+            # A run-time reason starting with `reason` can still match a longer
+            # prefix; whether it does on a given port is publication's call.
+            if not complete and prefix.startswith(reason):
+                return True
+    return False
 
 
 def stored_report_problems(manifest: dict) -> tuple[set[str], list[str], list[str]]:
@@ -1108,7 +1208,7 @@ def describe_workload_gap(seen: list[str], expected: list[str]) -> str:
 
 
 def publishable_report_problems(
-    manifest: dict, port_id: str, report: dict
+    manifest: dict, port_id: str, report: dict, supplement: dict | None = None
 ) -> tuple[list[str], list[str]]:
     """Decide whether a persisted report may replace the checked-in fallback.
 
@@ -1122,6 +1222,8 @@ def publishable_report_problems(
     """
     drift: list[str] = []
     malformed: list[str] = []
+    if supplement is None:
+        supplement = read_json(SUPPLEMENT)
 
     if report.get("schema_version") != manifest.get("schema_version"):
         malformed.append(
@@ -1193,6 +1295,20 @@ def publishable_report_problems(
             malformed.append(f"{test} reasons is not an array of strings")
             continue
         statuses[result["status"]] += 1
+        # A skip must be explained by an erratum before the report is
+        # published, and the defect belongs to THIS port. Leaving it to
+        # validate() meant the watch report published four undocumented
+        # Document*ScreenshotTest skips, the website sync copied it into the
+        # checked-in report directory, and the contract check run for the NEXT
+        # port it accepted failed on them -- naming tvos, which runs all four.
+        # Only tests this contract still defines: a retired test is drift.
+        if result["status"] == "skip" and test in expected and not skip_is_documented(
+            supplement, port_id, test, reasons or []
+        ):
+            malformed.append(
+                f"{test} skipped (reasons: {', '.join(reasons or []) or 'none'}) with no "
+                f"erratum in {SUPPLEMENT.relative_to(REPO_ROOT)} covering it on {port_id}"
+            )
     expected_summary = {
         key: statuses.get(key, 0) for key in ("pass", "fail", "skip", "not-run")
     }
@@ -1425,7 +1541,20 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         manifest = read_json(args.manifest)
-        counts = validate(manifest)
+        if args.command == "accept":
+            try:
+                validate(manifest)
+            except ContractError as exc:
+                print(
+                    f"port-status: the checked-in Port Status contract is invalid, "
+                    f"so no report can be judged (not a defect in the {args.port} "
+                    f"report): {exc}",
+                    file=sys.stderr,
+                )
+                return ACCEPT_CONTRACT_INVALID
+            counts = None
+        else:
+            counts = validate(manifest)
         if args.command == "validate":
             print(
                 "Port status contract is valid: "
