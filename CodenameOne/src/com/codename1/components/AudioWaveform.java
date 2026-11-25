@@ -72,6 +72,7 @@ public class AudioWaveform extends Component {
     /// - `levels`: one loudness per bar, 0 to 1
     public AudioWaveform(float[] levels) {
         setUIID("AudioWaveform");
+        setGrabsPointerEvents(seekable);
         setLevels(levels);
     }
 
@@ -180,6 +181,8 @@ public class AudioWaveform extends Component {
     /// - `seekable`: false for a display only waveform
     public void setSeekable(boolean seekable) {
         this.seekable = seekable;
+        // A plain Component is skipped by hit testing unless it asks for pointer events.
+        setGrabsPointerEvents(seekable);
     }
 
     /// True while the user drags across the waveform.

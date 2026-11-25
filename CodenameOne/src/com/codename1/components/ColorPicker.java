@@ -165,6 +165,7 @@ public class ColorPicker extends Container {
             final int color = presets[i];
             Swatch swatch = new Swatch(false);
             swatch.color = color;
+            swatch.setGrabsPointerEvents(true);
             swatch.onTap = new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
@@ -333,6 +334,8 @@ public class ColorPicker extends Container {
 
         SaturationArea() {
             setUIID("Container");
+            // A plain Component is skipped by hit testing unless it asks for pointer events.
+            setGrabsPointerEvents(true);
             getAllStyles().setBgTransparency(0);
             getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
             getAllStyles().setMargin(0, 1, 0, 0);
@@ -404,6 +407,8 @@ public class ColorPicker extends Container {
 
         HueStrip() {
             setUIID("Container");
+            // A plain Component is skipped by hit testing unless it asks for pointer events.
+            setGrabsPointerEvents(true);
             getAllStyles().setBgTransparency(0);
             getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
             getAllStyles().setMargin(1, 1, 0, 0);
