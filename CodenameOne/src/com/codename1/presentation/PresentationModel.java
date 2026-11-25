@@ -386,12 +386,39 @@ public final class PresentationModel {
     /// false when the slide has no element with that id
     public boolean replaceElement(int slide, SlideElement element) {
         Slide s = getSlide(slide);
-        int i = s.indexOf(element.id);
-        if (i < 0) {
+        // inside groups too: find() looks there, so every edit that finds an element must
+        // be able to put it back
+        List<SlideElement> out = replaceDeep(s.elements, element, 0);
+        if (out == null) {
             return false;
         }
-        setSlide(slide, s.withElement(i, element));
+        setSlide(slide, s.withElements(out));
         return true;
+    }
+
+    /// The list with the element of the same id replaced, rebuilding the groups on its
+    /// path; null when it is not there.
+    private static List<SlideElement> replaceDeep(List<SlideElement> list, SlideElement element,
+            int depth) {
+        for (int i = 0; i < list.size(); i++) {
+            SlideElement e = list.get(i);
+            SlideElement r = null;
+            if (e.id.equals(element.id)) {
+                r = element;
+            } else if (e instanceof GroupElement && depth < 64) {
+                List<SlideElement> inner = replaceDeep(((GroupElement) e).children, element,
+                        depth + 1);
+                if (inner != null) {
+                    r = ((GroupElement) e).withChildren(inner);
+                }
+            }
+            if (r != null) {
+                List<SlideElement> out = new ArrayList<SlideElement>(list);
+                out.set(i, r);
+                return out;
+            }
+        }
+        return null;
     }
 
     /// Removes an element and its builds.

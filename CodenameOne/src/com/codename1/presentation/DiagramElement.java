@@ -33,7 +33,9 @@ import com.codename1.graph.arrange.TreeArrangement;
 import com.codename1.wordprocessing.TextStyle;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /// A diagram on a slide -- a process, a hierarchy, a cycle -- kept as what it means: nodes,
 /// the edges between them and how they are arranged. Edit the nodes and the diagram lays
@@ -186,7 +188,9 @@ public final class DiagramElement extends SlideElement {
         this.arrangement = HIERARCHY.equals(arrangement) || CYCLE.equals(arrangement)
                 || RADIAL.equals(arrangement) ? arrangement : PROCESS;
         List<Node> n = new ArrayList<Node>();
-        List<String> ids = new ArrayList<String>();
+        // a set: a diagram read from a file may hold many nodes, and a list lookup per node
+        // and per edge would be quadratic
+        Set<String> ids = new HashSet<String>();
         if (nodes != null) {
             for (Node node : nodes) {
                 if (node != null && !ids.contains(node.id)) {
@@ -319,7 +323,7 @@ public final class DiagramElement extends SlideElement {
         }
         List<SlideElement> out = new ArrayList<SlideElement>();
         if (count == 0) {
-            out.add(new ShapeElement(id + "empty", "rect", x, y, width, height, null,
+            out.add(new ShapeElement(id + "#empty", "rect", x, y, width, height, null,
                     new LineStyle(0x9aa3ad, 1).withDash(LineStyle.DASH), null));
             return new GroupElement(id, name, out, x, y, width, height, rotation, false, false);
         }
@@ -340,7 +344,7 @@ public final class DiagramElement extends SlideElement {
             float[] b = boxes[index(e[1])];
             float[] p = edgePoint(a, b);
             float[] q = edgePoint(b, a);
-            out.add(ShapeElement.line(id + "e" + (k++), p[0], p[1], q[0], q[1],
+            out.add(ShapeElement.line(id + "#e" + (k++), p[0], p[1], q[0], q[1],
                     new LineStyle(0x7b8794, stroke).withArrows(LineStyle.ARROW_NONE,
                             LineStyle.ARROW_TRIANGLE)));
         }
@@ -350,9 +354,9 @@ public final class DiagramElement extends SlideElement {
         for (int i = 0; i < count; i++) {
             Node n = nodes.get(i);
             float[] r = boxes[i];
-            TextFrame t = TextFrame.of(id + n.id + "p", n.label, style, "center")
+            TextFrame t = TextFrame.of(id + "#n" + n.id + "p", n.label, style, "center")
                     .withAnchor(TextFrame.MIDDLE).withAutofit(TextFrame.FIT_SHRINK);
-            out.add(new ShapeElement(id + n.id, n.label, geometryOf(n.shape), r[0], r[1], r[2],
+            out.add(new ShapeElement(id + "#n" + n.id, n.label, geometryOf(n.shape), r[0], r[1], r[2],
                     r[3], 0, false, false, Fill.solid(n.color < 0 ? color : n.color), null, t,
                     null, null));
         }

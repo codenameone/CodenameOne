@@ -78,6 +78,33 @@ class PresentationModelTest extends UITestBase {
     }
 
     @Test
+    void anElementInsideAGroupCanBeEdited() {
+        ShapeElement inner = new ShapeElement("in", "rect", 10, 10, 40, 40,
+                Fill.solid(0xff0000), null, null);
+        java.util.List<SlideElement> kids = new java.util.ArrayList<SlideElement>();
+        kids.add(inner);
+        java.util.List<SlideElement> els = new java.util.ArrayList<SlideElement>();
+        els.add(GroupElement.of("g", kids));
+        PresentationModel m = new PresentationModel(Decks.everything());
+        m.setSlide(0, m.getSlide(0).withElements(els));
+        assertTrue(m.setBounds(0, "in", 20, 30, 40, 40));
+        assertEquals(30, m.getSlide(0).find("in").y, 0);
+    }
+
+    @Test
+    void diagramShapeIdsNeverCollide() {
+        java.util.List<DiagramElement.Node> nodes = new java.util.ArrayList<DiagramElement.Node>();
+        nodes.add(new DiagramElement.Node("e0", "a", null, -1));
+        nodes.add(new DiagramElement.Node("e1", "b", null, -1));
+        GroupElement g = new DiagramElement("d", null, DiagramElement.PROCESS, 0, 0, 400, 200, 0,
+                nodes, null, -1, -1).toGroup();
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        for (SlideElement e : g.children) {
+            assertTrue(seen.add(e.id), "duplicate " + e.id);
+        }
+    }
+
+    @Test
     void slidesAddMoveDuplicateRemove() {
         PresentationModel m = new PresentationModel(Decks.everything());
         String id = m.addSlide(-1);

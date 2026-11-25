@@ -43,6 +43,9 @@ import java.util.Set;
 /// notes, tables and pictures are written in the `.cn1doc` vocabulary through `BlockXml`,
 /// so a slide's text and a document's text are one format.
 final class NativeSlidesFormat {
+    /// The most nodes, and the most edges, a diagram may have.
+    static final int MAX_DIAGRAM_ITEMS = 2000;
+
     private static final String ENTRY = "presentation.xml";
     private static final int MAX_DEPTH = 32;
     private static final int MAX_SERIES_VALUES = 100000;
@@ -583,6 +586,10 @@ final class NativeSlidesFormat {
                         edges.add(new String[] {x.attr("from"), x.attr("to")});
                     }
                     x.skipElement();
+                    // a diagram is laid out as a whole when it paints: bounded like a chart
+                    if (nodes.size() > MAX_DIAGRAM_ITEMS || edges.size() > MAX_DIAGRAM_ITEMS) {
+                        throw new IOException("Diagram too large");
+                    }
                 }
                 return new DiagramElement(id, name, arrangement, ex, ey, ew, eh, rot, nodes,
                         edges, color, textColor);
@@ -624,7 +631,7 @@ final class NativeSlidesFormat {
             if (i > st) {
                 try {
                     float v = Float.parseFloat(s.substring(st, i));
-                    l.add(Float.valueOf(Float.isNaN(v) ? 0 : v));
+                    l.add(Float.valueOf(Float.isNaN(v) || Float.isInfinite(v) ? 0 : v));
                 } catch (NumberFormatException e) {
                     return null;
                 }

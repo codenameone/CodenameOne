@@ -122,7 +122,10 @@ public final class ShapeGeometry {
     }
 
     private static float adj(ShapeElement s, int i, float fallback) {
-        return s == null ? fallback : s.adjust(i, fallback);
+        float v = s == null ? fallback : s.adjust(i, fallback);
+        // whatever a file says, a path stays finite: no preset reads an adjustment as more
+        // than twice the size it scales
+        return Float.isNaN(v) || Float.isInfinite(v) ? fallback : Math.max(0, Math.min(2, v));
     }
 
     private static GeneralPath path(String name, float w, float h, ShapeElement s) {
