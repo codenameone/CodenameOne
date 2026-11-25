@@ -43,6 +43,8 @@ import java.util.Map;
 public final class ShopState {
     private static final String STORE_KEY = "bazaar.shop.store";
     private static final String TOKEN_KEY = "bazaar.shop.cart.";
+    /// The store something was last added to the cart of: see [#cartStore].
+    private static final String CART_STORE_KEY = "bazaar.shop.cartStore";
     private static final String WISH_KEY = "bazaar.shop.wish.";
     private static final String ADDRESS_KEY = "bazaar.shop.addresses.";
 
@@ -69,6 +71,13 @@ public final class ShopState {
     /// The shopper is in `chosen` now: remembered, the cart and the search of
     /// the last store dropped.
     public static void useStore(StoreDto chosen) {
+        useStore(chosen, false);
+    }
+
+    /// [#useStore], keeping the search when `keepSearch`: a product opened
+    /// from a search of every store enters its store, and coming back must
+    /// find the search the shopper typed, not every product of every store.
+    private static void useStore(StoreDto chosen, boolean keepSearch) {
         boolean changed = store == null || chosen == null || !store.id().equals(chosen.id());
         store = chosen;
         if (chosen != null) {
@@ -76,8 +85,10 @@ public final class ShopState {
         }
         if (changed) {
             cart = null;
-            QUERY.clearFilters();
-            QUERY.q = "";
+            if (!keepSearch) {
+                QUERY.clearFilters();
+                QUERY.q = "";
+            }
             fire(STORE_LISTENERS);
             fire(CART_LISTENERS);
             loadCart(null);
@@ -166,10 +177,66 @@ public final class ShopState {
     /// not already: a product of another store is opened, and its cart is the
     /// one it goes into.
     static void enter(String storeId) {
-        StoreDto s = known(storeId);
-        if (s != null && (store == null || !store.id().equals(s.id()))) {
-            useStore(s);
+        enter(storeId, null);
+    }
+
+    /// [#enter], then `done` once the store is the current one. A store no
+    /// listing has shown yet -- one opened after the home screen fetched the
+    /// list, or reached from a search before home was ever shown -- is
+    /// looked up first; `done` is not run when it cannot be found.
+    static void enter(final String storeId, final Runnable done) {
+        enter(storeId, done, null);
+    }
+
+    /// [#enter], running `missing` instead of `done` when the store cannot
+    /// be found.
+    static void enter(final String storeId, final Runnable done, final Runnable missing) {
+        switch (entering(store == null ? null : store.id(), storeId, known(storeId) != null)) {
+            case ENTER_STAY:
+                run(done);
+                return;
+            case ENTER_SWITCH:
+                useStore(known(storeId), true);
+                run(done);
+                return;
+            case ENTER_LOOKUP:
+                Api.stores().stores(Net.to(list -> {
+                    know(list);
+                    StoreDto s = known(storeId);
+                    if (s != null) {
+                        if (store == null || !store.id().equals(s.id())) {
+                            useStore(s, true);
+                        }
+                        run(done);
+                    } else {
+                        run(missing);
+                    }
+                }, (status, message) -> run(missing)));
+                return;
+            default:
+                run(missing);
+                return;
         }
+    }
+
+    static final int ENTER_NONE = 0;
+    static final int ENTER_STAY = 1;
+    static final int ENTER_SWITCH = 2;
+    static final int ENTER_LOOKUP = 3;
+
+    /// What [#enter] does for a product of `wanted` while `current` is the
+    /// current store (null for none), `known` saying whether a listing has
+    /// shown `wanted`. An unknown store is looked up, never ignored: ignored,
+    /// the shopper stayed in the last store (or in none) and the product went
+    /// into that store's cart -- or into no cart at all.
+    static int entering(String current, String wanted, boolean known) {
+        if (wanted == null || wanted.length() == 0) {
+            return ENTER_NONE;
+        }
+        if (wanted.equals(current)) {
+            return ENTER_STAY;
+        }
+        return known ? ENTER_SWITCH : ENTER_LOOKUP;
     }
 
     // ------------------------------------------------------------- follows
@@ -286,6 +353,40 @@ public final class ShopState {
         fire(CART_LISTENERS);
     }
 
+    /// The id of the store whose cart the Cart section shows: the one the
+    /// shopper last added to, else the current store. The cart is kept per
+    /// store, and the current store follows every product opened; showing
+    /// the current one alone, a shopper who filled a cart in one store,
+    /// signed in and looked at a product of another found the Cart section
+    /// empty, with their cart still on the server and nowhere on screen.
+    static String cartStore(String current, String lastFilled) {
+        return lastFilled != null && lastFilled.length() > 0 ? lastFilled : current;
+    }
+
+    /// Enters the store [#cartStore] names, then fetches its cart.
+    public static void loadShownCart(final Runnable done) {
+        String wanted = cartStore(store == null ? null : store.id(),
+                Preferences.get(CART_STORE_KEY, ""));
+        if (wanted == null) {
+            run(done);
+            return;
+        }
+        enter(wanted, () -> loadCart(done), () -> {
+            // That store is gone: show the current one's cart.
+            Preferences.delete(CART_STORE_KEY);
+            if (store != null) {
+                loadCart(done);
+            } else {
+                run(done);
+            }
+        });
+    }
+
+    /// The id of the store last added to; empty for none.
+    public static String cartStoreId() {
+        return Preferences.get(CART_STORE_KEY, "");
+    }
+
     /// Fetches the cart of the current store. A guest cart left from before
     /// sign-in is merged into the account's first, and its token forgotten.
     public static void loadCart(final Runnable done) {
@@ -322,14 +423,28 @@ public final class ShopState {
         }, (status, message) -> run(done)));
     }
 
+    /// Adds `quantity` of a variant of a product of the store `storeId` to
+    /// that store's cart, entering the store first when it is not the
+    /// current one ([#enter]).
+    public static void addTo(String storeId, final String variantId, final int quantity,
+            final Runnable done, final Net.Failed failed) {
+        if (storeId == null || storeId.length() == 0) {
+            add(variantId, quantity, done, failed);
+            return;
+        }
+        enter(storeId, () -> add(variantId, quantity, done, failed));
+    }
+
     /// Adds `quantity` of a variant to the cart.
     public static void add(String variantId, int quantity, final Runnable done,
             Net.Failed failed) {
         if (store == null) {
             return;
         }
-        Api.cart().add(store.id(), token(), new CartLineChangeDto(variantId, quantity),
+        final String into = store.id();
+        Api.cart().add(into, token(), new CartLineChangeDto(variantId, quantity),
                 Net.to(changed -> {
+                    Preferences.set(CART_STORE_KEY, into);
                     setCart(changed);
                     run(done);
                 }, failed));

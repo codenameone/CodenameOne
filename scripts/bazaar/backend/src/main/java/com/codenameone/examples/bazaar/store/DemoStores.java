@@ -756,23 +756,41 @@ public class DemoStores {
     public static final String FENNEL_FIG = "fennelfig";
 
     private static final String[][] FENNEL_FIG_PRODUCTS = {
-        {"Glass Pantry Jar", "Storage", "Fennel & Fig", "glass, pantry, gift", "1800", "",
-            "Borosilicate glass with a bamboo lid; holds a kilo of flour."},
-        {"Enamel Milk Pan", "Cookware", "Fennel & Fig", "enamel, stovetop, bestseller", "3400",
-            "C", "A one-litre pan with a pouring lip for milk, sauces and porridge."},
-        {"Steel Spice Tins", "Storage", "Fennel & Fig", "steel, spices, gift", "2600", "",
-            "Six magnetic tins with window lids for the spices you reach for most."},
+        // Every product here has a seed photo of its own kind (named by its
+        // handle in seed-media): the demo shows no drawn placeholder.
+        {"Olive Oil Cruet", "Pantry", "Fennel & Fig", "glass, pantry, gift", "2400", "",
+            "A half-litre glass cruet with a cork stopper and a drip-free spout."},
+        {"Pour-Over Coffee Dripper", "Coffee & tea", "Fennel & Fig", "coffee, bestseller",
+            "3400", "", "A cone, a glass server and a scale: a slow cup, made well."},
+        {"Salt Cellar", "Pantry", "Fennel & Fig", "stoneware, gift", "1800", "",
+            "A lidded stoneware cellar with a little wooden spoon."},
         {"Linen Tea Towel", "Linens", "Fennel & Fig", "linen, gift", "1400", "C",
             "Stonewashed linen that dries a glass without a streak."},
         {"Cast Iron Skillet", "Cookware", "Fennel & Fig", "iron, stovetop, oven", "4800", "",
             "A 26 cm skillet, seasoned and ready for its first egg."},
-        {"Olive Wood Spoon", "Utensils", "Fennel & Fig", "wood, gift", "1200", "",
-            "Hand-carved from a single piece of olive wood."},
-        {"Copper Measuring Cups", "Utensils", "Fennel & Fig", "copper", "2900", "",
-            "A nesting set of four, quarter cup to a whole one."},
-        {"Herb Keeper", "Storage", "Fennel & Fig", "glass, fresh", "2200", "",
-            "Keeps parsley and coriander fresh for two weeks in the fridge."},
+        {"Teapot", "Coffee & tea", "Fennel & Fig", "porcelain, tea", "3900", "",
+            "A white porcelain pot for four cups, with a lid that stays put as you pour."},
+        {"Butter Dish", "Tableware", "Fennel & Fig", "stoneware, gift", "2600", "",
+            "Speckled stoneware with a domed lid; holds a standard block."},
+        {"Travel Tumbler", "Drinkware", "Fennel & Fig", "steel, insulated", "2900", "",
+            "Double-walled steel that keeps coffee hot through the morning commute."},
     };
+
+    /// The handles of seeded products, in every store, with no seed photo:
+    /// each would show the drawn placeholder. The demo wants none.
+    public static List<String> productsWithoutPhotos() {
+        List<String> missing = new ArrayList<String>();
+        String[][][] all = {NORTHWIND_PRODUCTS, LITTLE_CLAY_PRODUCTS, FENNEL_FIG_PRODUCTS};
+        for (int s = 0; s < all.length; s++) {
+            for (int iter = 0; iter < all[s].length; iter++) {
+                String handle = Catalog.slug(all[s][iter][0]);
+                if (DemoStores.class.getResource("/seed-media/" + handle + ".jpg") == null) {
+                    missing.add(handle);
+                }
+            }
+        }
+        return missing;
+    }
 
     /// Seeds [#FENNEL_FIG] once, owned by `owner`.
     public void fennelFig(String owner) throws IOException {

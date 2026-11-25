@@ -64,11 +64,11 @@ final class CartPane extends ShopPane {
 
     @Override
     void reload() {
-        if (ShopState.store() == null) {
+        if (ShopState.store() == null && ShopState.cartStoreId().length() == 0) {
             draw();
             return;
         }
-        ShopState.loadCart(this::draw);
+        ShopState.loadShownCart(this::draw);
     }
 
     @Override

@@ -64,6 +64,13 @@ class ShopperDemoTest {
     private com.codenameone.examples.bazaar.repository.StoreRepository storeRows;
 
     @Test
+    void everySeededProductHasAPhotoOfItsOwn() {
+        // A product with no seed photo shows the drawn placeholder in the
+        // walkthroughs; six of the third store's once did.
+        assertEquals("[]", DemoStores.productsWithoutPhotos().toString());
+    }
+
+    @Test
     void seedsAHistoryTheRewardsCountAndFollowsAnOrderToTheDoor() throws Exception {
         assertFalse(demo.enabled(), "never on unless bazaar.demo.shopper asks");
         demoStores.seed(DemoAccounts.MERCHANT, DemoAccounts.CASHIER);

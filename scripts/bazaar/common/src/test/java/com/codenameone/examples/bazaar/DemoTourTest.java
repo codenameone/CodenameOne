@@ -94,6 +94,22 @@ public class DemoTourTest extends E2e {
 
     // ------------------------------------------------------------------ tours
 
+    /// What the shopper's cart is right now, for the run's log: the store
+    /// it belongs to, how many lines it holds and whether a guest token
+    /// carries it.
+    private void logCart(String when) {
+        onEdt(() -> {
+            com.codenameone.examples.bazaar.api.StoreDto st =
+                    com.codenameone.examples.bazaar.shop.ShopState.store();
+            com.codenameone.examples.bazaar.api.CartDto c =
+                    com.codenameone.examples.bazaar.shop.ShopState.cart();
+            log("shop-cart " + when + ": store=" + (st == null ? "none" : st.handle())
+                    + " lines=" + (c == null || c.lines() == null ? -1 : c.lines().size())
+                    + " token=" + (c != null && c.token() != null && c.token().length() > 0)
+                    + " signedIn=" + (com.codenameone.examples.bazaar.net.Session.user() != null));
+        });
+    }
+
     private void shopper() throws Exception {
         // The run's light or dark look, for the captures and the video alike.
         visualTheme();
@@ -134,6 +150,7 @@ public class DemoTourTest extends E2e {
             mark("add-to-cart");
             tap("add-to-cart");
             pause(2400);
+            logCart("after add");
             scrollDown(1);
             pause(1600);
             safeBack();
@@ -146,9 +163,11 @@ public class DemoTourTest extends E2e {
         tapFirst("line-more-");
         pause(1800);
         shotAs("shop-cart");
+        logCart("before sign-in");
         go(Sections.ACCOUNT);
         pause(1500);
         signInVisible(CUSTOMER, "home-shop");
+        logCart("after sign-in");
         // Signing in applies the account's saved theme; the run's mode wins.
         visualTheme();
         // Signed in, the heart saves: the same product, wishlisted.
@@ -156,6 +175,7 @@ public class DemoTourTest extends E2e {
         pause(1500);
         if (tapChild("product-grid", 0)) {
             pause(2500);
+            logCart("on the wishlist product");
             mark("wishlist");
             tap("wishlist");
             pause(1800);
@@ -171,6 +191,7 @@ public class DemoTourTest extends E2e {
         shotAs("shop-account-more");
         go(Sections.CART);
         pause(1500);
+        logCart("before checkout");
         if (tap("checkout")) {
             caption("Checkout: address, shipping, payment, review", 3000);
             pause(1500);
@@ -408,13 +429,26 @@ public class DemoTourTest extends E2e {
                 tapNth("pos-grid-", i);
             }
             pause(1200);
-            tapFirst("pos-variant-");
-            pause(800);
+            // A product with options opens its picker: shown for a moment,
+            // then added with its own button. Tapping the first
+            // "pos-variant-" name hit the price label, and the sheet stayed
+            // open for the rest of the tour under the next captions.
+            if (findByName("pos-variant-add") != null) {
+                if (i == 0) {
+                    caption("Products with options open a quick picker", 2400);
+                }
+                pause(1800);
+                tap("pos-variant-add");
+                pause(900);
+            }
         }
+        // Photos have arrived before the cart is shown, not drawn tiles.
         pause(1500);
         shotAs("pos-cart");
-        caption("Charge: cash, card on the reader, gift card or split", 3000);
-        if (tap("pos-pay") || tap("pos-tender")) {
+        // On a phone the pay bar opens the cart sheet and its own button the
+        // tender; tapping only the bar left the sheet up under every caption.
+        if (openTender()) {
+            caption("Charge: cash, card on the reader, gift card or split", 3000);
             pause(2500);
             shotAs("pos-tender");
             tapFirst("pos-tip-none");
@@ -508,7 +542,9 @@ public class DemoTourTest extends E2e {
                 tapNth("pos-grid-", i);
             }
             pause(1000);
-            tapFirst("pos-variant-");
+            if (findByName("pos-variant-add") != null) {
+                tap("pos-variant-add");
+            }
             pause(700);
         }
         pause(1200);
@@ -1631,7 +1667,9 @@ private void screens() throws Exception {
             return;
         }
         if (desktopRun()) {
-            onEdt(() -> Display.getInstance().setWindowSize(1680, 1050));
+            // The size the design captures are taken at (visual/capture.sh),
+            // in 16:10: at 1680 the app's type was small inside the frame.
+            onEdt(() -> Display.getInstance().setWindowSize(1440, 900));
             waitFor(2500);
         }
         recorder = JavaSEPort.instance.getSimulatorRecorder();

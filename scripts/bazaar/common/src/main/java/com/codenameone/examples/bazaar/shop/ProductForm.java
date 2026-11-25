@@ -146,7 +146,7 @@ final class ProductForm {
         Api.catalog().product(id, Net.to(p -> {
             List<VariantDto> variants = p.variants();
             if (variants != null && variants.size() == 1 && Variants.buyable(variants.get(0))) {
-                ShopState.add(variants.get(0).id(), 1, () -> {
+                ShopState.addTo(p.storeId(), variants.get(0).id(), 1, () -> {
                     ShopUi.tap();
                     ShopUi.badge(CN.getCurrentForm());
                     ShopUi.added(p.title());
@@ -601,7 +601,7 @@ final class ProductForm {
             return;
         }
         add.setEnabled(false);
-        ShopState.add(v.id(), quantity, () -> {
+        ShopState.addTo(product.storeId(), v.id(), quantity, () -> {
             add.setEnabled(true);
             ShopUi.tap();
             final Form form = host != null ? host : CN.getCurrentForm();

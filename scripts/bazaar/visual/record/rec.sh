@@ -16,8 +16,14 @@ if [ "${2:-}" != "--inside" ]; then
     [ "$skin" = - ] || cp "${SKINS:-$HOME/.codenameone}/$skin.skin" "$WORK/"
   done
   podman build -q -t localhost/bazaar-visual-sim "$HERE/visual" >/dev/null
-  podman run --name "$NAME" --rm -e "RUNS=$RUNS" -e "FPS=${FPS:-60}" -e "PORTRAIT=${PORTRAIT:-}" -e "TABLET_SCALE=${TABLET_SCALE:-0.625}" -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
-    bash -c 'cp -a /ro-repo /repo && (Xvfb :99 -screen 0 1920x1200x24 -nolisten tcp &) && sleep 2 && DISPLAY=:99 bash /app/visual/record/rec.sh /repo --inside'
+  # The build fetches UpdateCodenameOne.jar and reads the build client; lent
+  # read-only from the host, as capture.sh lends the client, so a container
+  # with no network still builds.
+  LEND=()
+  [ -f "$HOME/.codenameone/CodeNameOneBuildClient.jar" ] && LEND+=(-v "$HOME/.codenameone/CodeNameOneBuildClient.jar:/root/.codenameone/CodeNameOneBuildClient.jar:ro")
+  [ -f "$HOME/.codenameone/UpdateCodenameOne.jar" ] && LEND+=(-v "$HOME/.codenameone/UpdateCodenameOne.jar:/lend/UpdateCodenameOne.jar:ro")
+  podman run --name "$NAME" --rm "${LEND[@]}" -e "RUNS=$RUNS" -e "FPS=${FPS:-60}" -e "PORTRAIT=${PORTRAIT:-}" -e "TABLET_SCALE=${TABLET_SCALE:-0.625}" -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
+    bash -c 'cp -a /ro-repo /repo && { [ ! -f /lend/UpdateCodenameOne.jar ] || { cp /lend/UpdateCodenameOne.jar /root/ && chmod 644 /root/UpdateCodenameOne.jar; }; } && (Xvfb :99 -screen 0 1920x1200x24 -nolisten tcp &) && sleep 2 && DISPLAY=:99 bash /app/visual/record/rec.sh /repo --inside'
   exit 0
 fi
 PORT=18093
