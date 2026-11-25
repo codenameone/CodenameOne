@@ -150,6 +150,11 @@ public class RewardsEndpoint implements RewardsApiServer {
                     orderBalance = balances.get(iter).points();
                 }
             }
+            // "Balance after" on that card: an estimate is not in the ledger
+            // yet, so it is added here; a credited order is already counted.
+            if (earned == null) {
+                orderBalance += orderPoints;
+            }
         }
         StoreBalanceDto top = balances.isEmpty() ? null : balances.get(0);
         return new RewardsDto(best == null ? 0 : best.balance(),
