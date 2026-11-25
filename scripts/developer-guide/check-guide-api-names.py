@@ -81,6 +81,9 @@ APP_ROOTS = [
 #
 # scripts/fieldline is the same for the Fieldline implementor's guide: its
 # TravelModel, the scheduler's driving-time hook, is a near miss for TravelMode.
+#
+# scripts/bazaar is the same for the Bazaar implementor's guide: its Quoter,
+# Carts, Clubs and BotGuard are near misses for Quote, Calls, Class and PopGuard.
 IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                     for d in ('CodenameOne', 'Ports', 'vm', 'maven',
                               os.path.join('docs', 'demos'),
@@ -89,7 +92,8 @@ IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                               os.path.join('scripts', 'dash'),
                               os.path.join('scripts', 'splat'),
                               os.path.join('scripts', 'papercut'),
-                              os.path.join('scripts', 'fieldline'))]
+                              os.path.join('scripts', 'fieldline'),
+                              os.path.join('scripts', 'bazaar'))]
 # '.py' because the Python support ships real Python packages under maven/
 # (starlette's TestClient is one edit from RestClient and is a real class).
 IDENTIFIER_SUFFIXES = ('.java', '.m', '.h', '.mm', '.kt', '.js', '.c', '.cpp',
