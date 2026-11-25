@@ -24,7 +24,6 @@ package com.codenameone.developerguide.snippets;
 
 import com.codename1.l10n.L10NManager;
 
-import java.text.NumberFormat;
 import java.util.Currency;
 import java.util.Locale;
 
@@ -47,7 +46,7 @@ public class CurrencySnippets {
         int digits = yen.getDefaultFractionDigits();       // 0: no sen in prices
         Currency local = Currency.getInstance(new Locale("de", "DE")); // EUR
 
-        NumberFormat format = NumberFormat.getCurrencyInstance();
+        java.text.NumberFormat format = java.text.NumberFormat.getCurrencyInstance();
         format.setCurrency(local);
         String text = format.format(minorUnits / 100.0);
         // end::currency-java[]
