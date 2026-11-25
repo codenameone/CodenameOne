@@ -129,6 +129,14 @@ public class ArtModel {
         return r;
     }
 
+    private ShapeNode liveShape(ShapeNode s) {
+        ArtNode r = live(s);
+        if (!(r instanceof ShapeNode)) {
+            throw new IllegalArgumentException("Not a shape: " + s.getId());
+        }
+        return (ShapeNode) r;
+    }
+
     private ArtNode liveGroup(GroupNode g) {
         ArtNode r = live(g);
         if (!(r instanceof GroupNode)) {
@@ -155,6 +163,9 @@ public class ArtModel {
                 id = "n" + nextId++;
             } while (document.findById(id) != null);
             n.setId(id);
+        }
+        if (n.getMask() != null) {
+            assignIds(n.getMask());
         }
         if (n instanceof GroupNode) {
             List<ArtNode> ch = ((GroupNode) n).getChildren();
@@ -488,6 +499,10 @@ public class ArtModel {
             if (c == n || c instanceof GroupNode && contains((GroupNode) c, n)) { // NOPMD CompareObjectsWithEquals - node identity
                 return true;
             }
+            if (c.getMask() != null && (c.getMask() == n // NOPMD CompareObjectsWithEquals - node identity
+                    || c.getMask() instanceof GroupNode && contains((GroupNode) c.getMask(), n))) {
+                return true;
+            }
         }
         return false;
     }
@@ -524,6 +539,11 @@ public class ArtModel {
         if (nodes.isEmpty()) {
             return null;
         }
+        List<ArtNode> resolved = new ArrayList<ArtNode>(nodes.size());
+        for (ArtNode n : nodes) {
+            resolved.add(live(n));
+        }
+        nodes = resolved;
         checkpoint();
         ArtNode first = nodes.get(0);
         GroupNode parent = parentOf(first);
@@ -565,6 +585,7 @@ public class ArtModel {
     ///
     /// - `g`: the group
     public void ungroup(GroupNode g) {
+        g = (GroupNode) liveGroup(g);
         GroupNode p = parentOf(g);
         if (p == null) {
             return;
@@ -698,6 +719,7 @@ public class ArtModel {
     /// - `s`: the shape
     /// - `paint`: the fill, or null for none
     public void setFill(ShapeNode s, ArtPaint paint) {
+        s = liveShape(s);
         checkpoint();
         s.getFills().clear();
         if (paint != null) {
@@ -713,6 +735,7 @@ public class ArtModel {
     /// - `s`: the shape
     /// - `stroke`: the stroke, or null for none
     public void setStroke(ShapeNode s, StrokeStyle stroke) {
+        s = liveShape(s);
         checkpoint();
         s.getStrokes().clear();
         if (stroke != null) {
@@ -775,6 +798,11 @@ public class ArtModel {
     /// - `t`: the text node
     /// - `text`: the characters
     public void setText(TextNode t, String text) {
+        ArtNode lt = live(t);
+        if (!(lt instanceof TextNode)) {
+            throw new IllegalArgumentException("Not a text node: " + t.getId());
+        }
+        t = (TextNode) lt;
         checkpoint();
         TextRun first = t.getRuns().isEmpty() ? new TextRun("", null, 24, new SolidPaint(0xff000000))
                 : t.getRuns().get(0);

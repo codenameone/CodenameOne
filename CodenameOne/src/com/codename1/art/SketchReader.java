@@ -166,6 +166,23 @@ public final class SketchReader {
         if (ls == null) {
             return;
         }
+        if (nesting >= MAX_NESTING) {
+            throw new IOException("Sketch layers nest deeper than " + MAX_NESTING);
+        }
+        nesting++;
+        try {
+            childLayers(ls, into);
+        } finally {
+            nesting--;
+        }
+    }
+
+    /// How deep groups may nest before a file is refused.
+    public static final int MAX_NESTING = 256;
+
+    private int nesting;
+
+    private void childLayers(List<Object> ls, GroupNode into) throws IOException {
         GroupNode clipGroup = null;
         for (int i = 0; i < ls.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: no iterator allocation
             Map<String, Object> l = Json.asObj(ls.get(i));

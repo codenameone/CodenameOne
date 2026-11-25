@@ -141,4 +141,29 @@ class ArtModelTest {
         assertEquals(0xff000000, g.getColors()[0]);
         assertEquals(0xffffffff, g.getColors()[1]);
     }
+
+    @Test
+    void groupUngroupAndFillUseTheLiveNodes() {
+        ArtModel m = new ArtModel(new ArtDocument(100, 100));
+        ShapeNode a = ShapeNode.rect(0, 0, 10, 10, 0);
+        ShapeNode b = ShapeNode.rect(20, 0, 10, 10, 0);
+        m.add(a);
+        m.add(b);
+        m.setOpacity(a, 0.5f);
+        m.undo();
+        List<ArtNode> both = new ArrayList<ArtNode>();
+        both.add(a);
+        both.add(b);
+        GroupNode g = m.group(both);
+        assertEquals(1, m.getDocument().getRoot().getChildren().size());
+        assertEquals(2, g.getChildren().size());
+        m.undo();
+        m.redo();
+        m.ungroup(g);
+        assertEquals(2, m.getDocument().getRoot().getChildren().size());
+        m.setFill(a, new SolidPaint(0xff00ff00));
+        ArtNode live = m.findById(a.getId());
+        assertTrue(live instanceof ShapeNode);
+        assertEquals(1, ((ShapeNode) live).getFills().size());
+    }
 }

@@ -123,6 +123,13 @@ public final class ArtDocument {
         if (id.equals(n.getId())) {
             return n;
         }
+        // Mask content is part of the document too, and editable through ArtModel.
+        if (n.getMask() != null) {
+            ArtNode m = find(n.getMask(), id);
+            if (m != null) {
+                return m;
+            }
+        }
         if (n instanceof GroupNode) {
             List<ArtNode> c = ((GroupNode) n).getChildren();
             for (int i = 0; i < c.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: no iterator allocation

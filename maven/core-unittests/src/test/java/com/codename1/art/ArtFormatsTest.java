@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Readers, writers and the renderer of `com.codename1.art`.
@@ -589,5 +590,16 @@ class ArtFormatsTest {
         assertFalse(img.isSVG());
         assertThrows(IOException.class, () -> ArtImages.renderSvg(utf8(
                 "<svg xmlns='http://www.w3.org/2000/svg' width='9000' height='10'/>")));
+    }
+
+    @Test
+    void hostileDashPatternsDrawSolid() {
+        Polylines line = new Polylines();
+        line.lines.add(new double[]{0, 0, 5000, 0});
+        line.closed.add(Boolean.FALSE);
+        assertSame(line, Stroker.dash(line, new float[]{-1, 1}, 0, 1));
+        assertSame(line, Stroker.dash(line, new float[]{1e-6f, 1e-6f}, 0, 1));
+        assertSame(line, Stroker.dash(line, new float[]{Float.NaN, 1}, 0, 1));
+        assertTrue(Stroker.dash(line, new float[]{10, 10}, 0, 1).lines.size() > 100);
     }
 }

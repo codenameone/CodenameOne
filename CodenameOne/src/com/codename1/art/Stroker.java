@@ -177,13 +177,30 @@ final class Stroker {
         out.closed.add(Boolean.TRUE);
     }
 
+    static final double MAX_DASH_PIECES = 200000;
+
     static Polylines dash(Polylines in, float[] dash, float offset, double scale) {
         Polylines out = new Polylines();
         double total = 0;
         for (int i = 0; i < dash.length; i++) { // NOPMD ForLoopCanBeForeach - indexed: no iterator allocation
-            total += Math.max(0, dash[i]) * scale;
+            // A negative or NaN entry makes the pattern invalid, as SVG says; draw it solid.
+            if (!(dash[i] >= 0)) { // NOPMD LogicInversion - true for NaN too
+                return in;
+            }
+            total += dash[i] * scale;
         }
-        if (total <= 0) {
+        if (!(total > 0)) { // NOPMD LogicInversion - true for NaN too
+            return in;
+        }
+        // A pattern far finer than the path would emit millions of pieces; draw it solid.
+        double pathLen = 0;
+        for (int li = 0; li < in.lines.size(); li++) {
+            double[] l = in.lines.get(li);
+            for (int i = 2; i + 1 < l.length; i += 2) {
+                pathLen += Math.abs(l[i] - l[i - 2]) + Math.abs(l[i + 1] - l[i - 1]);
+            }
+        }
+        if (pathLen / total * dash.length > MAX_DASH_PIECES) {
             return in;
         }
         List<double[]> lines = in.lines;
