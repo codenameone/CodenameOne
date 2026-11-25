@@ -502,6 +502,18 @@
       ]
     },
     {
+      "id": "documents",
+      "category": "Rich components",
+      "name": "Word processing documents",
+      "description": "Checks a reviewed document with lists, a formula table, a footnote, an embedded slider, tracked changes, a comment and proofing squiggles, HTML read back through DOCX and ODT beside Markdown, and paragraph and page layout: alignment, justification, indents, nested lists, scripts, an inline picture, merged cells and a page break, and pages with sections, columns, headers and footers and floating pictures.",
+      "tests": [
+        "DocumentFormatsScreenshotTest",
+        "DocumentLayoutScreenshotTest",
+        "DocumentPagesScreenshotTest",
+        "DocumentReviewScreenshotTest"
+      ]
+    },
+    {
       "id": "spreadsheet",
       "category": "Rich components",
       "name": "Spreadsheet files and formulas",
@@ -691,6 +703,17 @@
         "LottieAnimatedScreenshotTest",
         "SVGAnimatedScreenshotTest",
         "SVGStaticScreenshotTest"
+      ]
+    },
+    {
+      "id": "rive",
+      "category": "Media and graphics",
+      "name": "Rive",
+      "description": "Checks Rive animations, state machines, text, layouts, data binding and GPU meshes.",
+      "tests": [
+        "RiveAnimatedScreenshotTest",
+        "RiveFeaturesScreenshotTest",
+        "RiveGpuScreenshotTest"
       ]
     },
     {
@@ -996,6 +1019,15 @@
       "description": "Checks immutable tensor and model-source contracts, inference options, runtime capability reporting, and deterministic unsupported fallback behavior.",
       "tests": [
         "InferenceOnDeviceApiTest"
+      ]
+    },
+    {
+      "id": "on-device-system-llm",
+      "category": "On-device AI",
+      "name": "Operating system language model",
+      "description": "Checks that the build keeps the platform's own language model backend (Gemini Nano, Apple Foundation Models), that every feature reports a status in bounded time, and that a device without the model refuses a request instead of hanging.",
+      "tests": [
+        "SystemLlmOnDeviceApiTest"
       ]
     },
     {
@@ -1720,6 +1752,22 @@
       "test": "TreeGridThemeScreenshotTest"
     },
     {
+      "pattern": "DocumentReview*",
+      "test": "DocumentReviewScreenshotTest"
+    },
+    {
+      "pattern": "DocumentFormats*",
+      "test": "DocumentFormatsScreenshotTest"
+    },
+    {
+      "pattern": "DocumentPages*",
+      "test": "DocumentPagesScreenshotTest"
+    },
+    {
+      "pattern": "DocumentLayout*",
+      "test": "DocumentLayoutScreenshotTest"
+    },
+    {
       "pattern": "NodeGraphTheme*",
       "test": "NodeGraphThemeScreenshotTest"
     },
@@ -1842,6 +1890,18 @@
     {
       "pattern": "LottieAnimatedScreenshotTest",
       "test": "LottieAnimatedScreenshotTest"
+    },
+    {
+      "pattern": "RiveAnimatedScreenshotTest",
+      "test": "RiveAnimatedScreenshotTest"
+    },
+    {
+      "pattern": "RiveFeatures",
+      "test": "RiveFeaturesScreenshotTest"
+    },
+    {
+      "pattern": "RiveGpu",
+      "test": "RiveGpuScreenshotTest"
     },
     {
       "pattern": "Gpu3DCube",

@@ -151,7 +151,7 @@ class CsvParsingFigure implements GuideFigure {
         columnNames[iter] = "Col " + (iter + 1);
         }
         TableModel tm = new DefaultTableModel(columnNames, data);
-        hi.add(BorderLayout.CENTER, new Table(tm));
+        hi.add(BorderLayout.CENTER, new com.codename1.ui.table.Table(tm));
         } catch(IOException err) {
         Log.e(err);
         }

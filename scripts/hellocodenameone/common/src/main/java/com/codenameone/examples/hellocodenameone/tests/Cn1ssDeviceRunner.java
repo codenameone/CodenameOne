@@ -205,7 +205,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || testClass instanceof GpuRenderTargetScreenshotTest
                 || testClass instanceof GpuShaderGalleryScreenshotTest
                 || testClass instanceof GpuShaderHarbourScreenshotTest
-                || testClass instanceof GpuSkinningScreenshotTest) {
+                || testClass instanceof GpuSkinningScreenshotTest
+                // RiveGpu waits for its image's first GPU frame, capped at
+                // 20s inside RiveGpuScreenshotTest
+                || testClass instanceof RiveGpuScreenshotTest) {
             return TEST_TIMEOUT_MS_NATIVE;
         }
         if (testClass instanceof BackendClientTest) {
@@ -539,6 +542,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SchedulerResourceThemeScreenshotTest(),
             new GanttThemeScreenshotTest(),
             new DataGridThemeScreenshotTest(),
+            new DocumentReviewScreenshotTest(),
+            new DocumentFormatsScreenshotTest(),
+            new DocumentLayoutScreenshotTest(),
+            new DocumentPagesScreenshotTest(),
             new TreeGridThemeScreenshotTest(),
             new NodeGraphThemeScreenshotTest(),
             new FlowChartThemeScreenshotTest(),
@@ -606,6 +613,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Build-time Lottie transcoder -- same pipeline as SVG, lowers
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
+            // Rive files as images: each .riv next to theme.css is read with
+            // Resources.getImage; paths, gradients, strokes and clipping on one strip.
+            new RiveAnimatedScreenshotTest(),
+            // one still per Rive feature family, and a mesh shown in a label
+            new RiveFeaturesScreenshotTest(),
+            new RiveGpuScreenshotTest(),
             new AudioMixerApiTest(),
             new AudioGraphApiTest(),
             // Portable 3D / shader API (com.codename1.gpu): a Phong-lit cube, a
@@ -671,6 +684,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VisionOnDeviceApiTest(),
             new LanguageOnDeviceApiTest(),
             new InferenceOnDeviceApiTest(),
+            // LlmClient.system(): proves the builders kept the Gemini Nano
+            // backend on Android and injected the Foundation Models bridge on
+            // iOS, and that status queries and an unsupported request settle.
+            new SystemLlmOnDeviceApiTest(),
             // Exercises com.codename1.ar end-to-end: the unsupported
             // contract on the CI platforms (none has an AR runtime) and a
             // full session round trip when a backend is present.

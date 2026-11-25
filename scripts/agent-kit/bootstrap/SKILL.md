@@ -91,16 +91,17 @@ For each screen in the spec:
    ```bash
    ./mvnw cn1:agent &                 # keep it running in the background
    S=.agent-skills/codename-one/tools/Sim.java
-   java $S wait && java $S screenshot target/screen-<name>.png
+   java $S wait && java $S freeze && java $S screenshot target/screen-<name>.png
    ```
    PowerShell:
    ```powershell
    Start-Process -NoNewWindow -FilePath .\mvnw.cmd -ArgumentList 'cn1:agent'
    $S = '.agent-skills\codename-one\tools\Sim.java'
-   java $S wait; java $S screenshot target\screen-<name>.png
+   java $S wait; java $S freeze; java $S screenshot target\screen-<name>.png
    ```
    Open the PNG and compare it with the spec. Drive the flow with
-   `java $S tap`, `java $S type`; the project skill's tools
+   `java $S tap`, `java $S type`, and `java $S settle` after each tap that
+   navigates (never sleep); the project skill's tools
    (`GuiLint`, `AlignmentCheck`, `CompareToMockup`) catch layout mistakes.
 3. Fix until it matches, then move on.
 
@@ -161,6 +162,10 @@ with the link:
 
 Never tell the user to install Xcode, Android Studio or Maven: the cloud
 builds both platforms from any OS.
+
+After release, offer to turn on Crash Protection (Pro and above). Crashes then
+arrive as symbolicated GitHub issues you can read with `gh` and fix:
+`.agent-skills/codename-one/references/crash-triage.md` in the project.
 
 ## The browser IDE path (no shell)
 

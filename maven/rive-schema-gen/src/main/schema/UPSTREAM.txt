@@ -1,0 +1,4 @@
+rive-runtime generated headers
+Upstream: https://github.com/rive-app/rive-runtime
+Commit: e2b1f234d24e8a485befe24970a11f956e23a7a4
+Contents: include/rive/generated/**/*_base.hpp and core_registry.hpp, unmodified, plus the upstream LICENSE (MIT).

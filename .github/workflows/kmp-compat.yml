@@ -23,6 +23,8 @@ on:
     branches: [ master ]
     paths:
       - 'maven/compose-compat/**'
+      - 'maven/rive-runtime/**'
+      - 'maven/rive-schema-gen/**'
       - 'maven/compat-testing/**'
       - 'maven/build-engine/**'
       - 'maven/codenameone-maven-plugin/**'
@@ -40,6 +42,8 @@ on:
     branches: [ master ]
     paths:
       - 'maven/compose-compat/**'
+      - 'maven/rive-runtime/**'
+      - 'maven/rive-schema-gen/**'
       - 'maven/compat-testing/**'
       - 'maven/build-engine/**'
       - 'maven/codenameone-maven-plugin/**'

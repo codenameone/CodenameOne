@@ -47,6 +47,8 @@ DEFAULT_ROOTS=(
   # The Python runtime ships inside every application with Python sources.
   "maven/python-runtime/target/classes"
   "maven/compose-compat/target/classes"
+  # The Rive runtime ships inside every application with .riv files.
+  "maven/rive-runtime/target/classes"
   # The Luau interpreter and the engine API over it ship inside every
   # application that plays place files (scripts/brickyard).
 )

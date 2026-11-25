@@ -133,8 +133,19 @@
                       overwrite="true"/>
                 <copy todir="${project.build.outputDirectory}/archetype-resources/.cn1-backend-only" overwrite="true">
                   <fileset dir="${project.basedir}/../build-engine/src/main/resources/com/codename1/project/templates/gradle/backend"
-                           includes="Api.java.txt,Greeter.java.txt,application.properties.txt,application-dev.properties.txt"/>
+                           includes="Api.java.txt,Greeter.java.txt,ApiTest.java.txt,ServedApiTest.java.txt,application.properties.txt,application-dev.properties.txt"/>
                 </copy>
+                <!-- projectType=command-line: the Initializr's command-line tool, from the same templates. -->
+                <copy todir="${project.build.outputDirectory}/archetype-resources/.cn1-backend-only/cli" overwrite="true">
+                  <fileset dir="${project.basedir}/../build-engine/src/main/resources/com/codename1/project/templates/gradle/cli"
+                           includes="Hello.java.txt,HelloTest.java.txt,application.properties.txt"/>
+                </copy>
+                <!-- language=kotlin: the Initializr's Kotlin main class, unpacked from its template. -->
+                <unzip src="${project.basedir}/../../scripts/initializr/common/src/main/resources/kotlin-src.zip"
+                       dest="${project.build.outputDirectory}/archetype-resources/.cn1-kotlin" overwrite="true">
+                  <patternset includes="kotlin/com/example/myapp/MyAppName.kt"/>
+                  <mapper type="flatten"/>
+                </unzip>
                 <loadfile property="cn1.hostedPlatformProfiles"
                           srcFile="${project.basedir}/../../scripts/initializr/common/src/main/resources/common-hosted-platform-profiles.xml"
                           encoding="UTF-8"/>

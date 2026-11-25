@@ -197,6 +197,8 @@ public class SideMenuBar extends MenuBar {
     protected Button createOpenButton() {
         Button ob = new Button();
         ob.setUIID("MenuButton");
+        // Icon-only: without a label a screen reader announces nothing.
+        ob.setAccessibilityText(UIManager.getInstance().localize("Menu", "Menu"));
         UIManager uim = parent.getUIManager();
         Image i = uim.getThemeImageConstant("sideMenuImage");
         if (i != null) {
@@ -834,6 +836,7 @@ public class SideMenuBar extends MenuBar {
             }
             rightSideButton = new Button();
             rightSideButton.setUIID("MenuButtonRight");
+            rightSideButton.setAccessibilityText(UIManager.getInstance().localize("Menu", "Menu"));
             UIManager uim = parent.getUIManager();
             Image i = uim.getThemeImageConstant("rightSideMenuImage");
             if (i != null) {

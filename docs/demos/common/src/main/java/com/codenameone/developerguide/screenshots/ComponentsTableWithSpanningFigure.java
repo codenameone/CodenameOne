@@ -77,7 +77,7 @@ class ComponentsTableWithSpanningFigure implements GuideFigure {
         return col != 0;
         }
         };
-        Table table = new Table(model) {
+        com.codename1.ui.table.Table table = new com.codename1.ui.table.Table(model) {
         @Override
         protected TableLayout.Constraint createCellConstraint(Object value, int row, int column) {
         TableLayout.Constraint con = super.createCellConstraint(value, row, column);

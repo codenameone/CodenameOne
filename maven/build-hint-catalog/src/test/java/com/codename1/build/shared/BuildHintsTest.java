@@ -288,4 +288,34 @@ class BuildHintsTest {
         }
         return "'" + s.replace("\n", "\\n") + "'";
     }
+
+    @Test
+    void anUnknownHintNamesTheDeclaredOneItMisspells() {
+        assertTrue(BuildHints.isKnown("codename1.arg.ios.background_modes"));
+        assertTrue(BuildHints.isKnown("android.permission.CAMERA"), "a dynamic family covers it");
+        assertTrue(BuildHints.isKnown("var.server"), "a dynamic family covers it");
+        assertEquals(null, BuildHints.advice("ios.background_modes"));
+        String advice = BuildHints.advice("codename1.arg.ios.backgroundmodes");
+        assertTrue(advice.startsWith("[CN1-HINT-UNKNOWN] codename1.arg.ios.backgroundmodes is not"), advice);
+        assertTrue(advice.contains("Did you mean codename1.arg.ios.background_modes?"), advice);
+        String far = BuildHints.advice("zzzz.nothing.like.anything.declared.here");
+        assertFalse(far.contains("Did you mean"), far);
+    }
+
+    /// This module's tests run without cn1-build-hints.json, which is the Gradle
+    /// plugin's situation: every annotation-declared hint is missing from the catalog,
+    /// so no name may be called unknown.
+    @Test
+    void withoutTheAnnotatedHintsNothingIsCalledUnknown() {
+        assertEquals(null, BuildHints.unknownHintAdvice("codename1.arg.ios.plistInject"));
+        assertEquals(null, BuildHints.unknownHintAdvice("codename1.arg.ios.backgroundmodes"));
+    }
+
+    @Test
+    void familyPatternsMatchOneOrMoreCharactersPerStar() {
+        assertTrue(BuildHints.globMatches("harden.*.enabled", "harden.ios.enabled"));
+        assertFalse(BuildHints.globMatches("harden.*.enabled", "harden..enabled"));
+        assertFalse(BuildHints.globMatches("var.*", "var."));
+        assertEquals(1, BuildHints.distance("abc", "abd"));
+    }
 }

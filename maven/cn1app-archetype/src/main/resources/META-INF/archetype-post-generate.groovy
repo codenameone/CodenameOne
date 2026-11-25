@@ -9,20 +9,32 @@ applyJavaVersionTransforms(rootDir, rootPom, resolvedJava);
 
 def projectType = (request.getProperties().getProperty("projectType", "app") ?: "app").trim()
 def platformModules = (request.getProperties().getProperty("platformModules", "none") ?: "none").trim()
-if (!(projectType in ["app", "app-with-backend", "backend-only"])) {
-    throw new IllegalArgumentException("projectType must be app, app-with-backend or backend-only, not '"
+if (!(projectType in ["app", "app-with-backend", "backend-only", "command-line"])) {
+    throw new IllegalArgumentException("projectType must be app, app-with-backend, backend-only or command-line, not '"
             + projectType + "'")
 }
+def language = (request.getProperties().getProperty("language", "java") ?: "java").trim()
+if (!(language in ["java", "kotlin"])) {
+    throw new IllegalArgumentException("language must be java or kotlin, not '" + language + "'")
+}
+def serverOnly = projectType in ["backend-only", "command-line"]
+if (serverOnly && language == "kotlin") {
+    throw new IllegalArgumentException("A " + projectType + " project is Java only; drop -Dlanguage=kotlin")
+}
 def keptModules = parsePlatformModules(platformModules)
-if (projectType == "backend-only") {
+if (serverOnly) {
     if (!keptModules.isEmpty()) {
-        throw new IllegalArgumentException("A backend-only project has no platform modules; drop -DplatformModules")
+        throw new IllegalArgumentException("A " + projectType + " project has no platform modules; drop -DplatformModules")
     }
-    assembleBackendOnly(rootDir, request)
+    assembleBackendOnly(rootDir, request, projectType == "command-line")
 } else {
     pruneModules(rootDir, rootPom, keptModules, projectType == "app-with-backend")
+    if (language == "kotlin") {
+        useKotlinMain(rootDir, request)
+    }
 }
 deleteRecursively(new java.io.File(rootDir, ".cn1-backend-only"))
+deleteRecursively(new java.io.File(rootDir, ".cn1-kotlin"))
 
 /**
  * There are a few scripts that need to be executable (or should be)
@@ -34,7 +46,7 @@ deleteRecursively(new java.io.File(rootDir, ".cn1-backend-only"))
     }
 }
 
-if (projectType != "backend-only" && request.getProperties().getProperty("ide", null) == "netbeans") {
+if (!serverOnly && request.getProperties().getProperty("ide", null) == "netbeans") {
     def netbeansDir = new java.io.File(rootDir, "tools/netbeans");
     if (netbeansDir.exists()) {
         netbeansDir.listFiles().each {
@@ -269,15 +281,19 @@ def pruneModules(rootDir, rootPom, keptModules, keepBackend) {
  * at the root. Its files are the ones the initializr and the Gradle generators
  * use, staged into .cn1-backend-only/ when the archetype is built.
  */
-def assembleBackendOnly(rootDir, request) {
+def assembleBackendOnly(rootDir, request, boolean cli) {
     def staged = new java.io.File(rootDir, ".cn1-backend-only")
     def pkg = request.getPackage()
     def props = request.getProperties()
     def maven = { String text ->
         text.replace("./gradlew __BACKEND__runBackend", "./mvnw cn1:backend")
             .replace("./gradlew __BACKEND__backendPackage", "./mvnw cn1:backend-package")
+            .replace("-Pcn1.backend.args", "-Dcn1.backend.args")
+            .replace("./gradlew __BACKEND__backendTest", "./mvnw test -Dcn1.backend.compiledTests=true")
+            .replace("./gradlew __BACKEND__test", "./mvnw test")
             .replace("under `runBackend`", "under `cn1:backend`")
             .replace("\${package}", pkg)
+            .replace("__PROJECT_NAME__", request.getArtifactId().toLowerCase(java.util.Locale.ROOT))
     }
     def pom = new java.io.File(staged, "backend-only-pom.xml").getText("UTF-8")
             .replace("<groupId>com.example.myapp</groupId>", "<groupId>" + request.getGroupId() + "</groupId>")
@@ -295,21 +311,45 @@ def assembleBackendOnly(rootDir, request) {
         }
     }
     new java.io.File(rootDir, "pom.xml").newWriter("UTF-8").withWriter { w -> w << pom }
+    def write = { java.io.File dir, String name, String template ->
+        dir.mkdirs()
+        new java.io.File(dir, name).newWriter("UTF-8").withWriter { w ->
+            w << maven(new java.io.File(staged, template).getText("UTF-8"))
+        }
+    }
+    def srcDir = new java.io.File(rootDir, "src/main/java/" + pkg.replace('.', '/'))
+    def testDir = new java.io.File(rootDir, "src/test/java/" + pkg.replace('.', '/'))
+    def gitignore = new java.io.File(rootDir, ".gitignore")
+    if (!gitignore.exists()) {
+        gitignore.newWriter("UTF-8").withWriter { w -> w << "target/\n" }
+    }
+    if (cli) {
+        // The Initializr's command-line tool: the backend's module and packaging,
+        // holding a @Command class in place of the controller.
+        write(rootDir, "application.properties", "cli/application.properties.txt")
+        write(srcDir, "Hello.java", "cli/Hello.java.txt")
+        write(testDir, "HelloTest.java", "cli/HelloTest.java.txt")
+        new java.io.File(rootDir, "README.md").newWriter("UTF-8").withWriter { w ->
+            w << "# " + request.getArtifactId() + "\n\n" +
+                 "A Codename One command-line tool. The commands are the @Command classes under src/main/java.\n\n" +
+                 "    ./mvnw cn1:backend -Dcn1.backend.args=\"--help\"   # run it on this JVM\n" +
+                 "    ./mvnw test                                       # run the tests\n" +
+                 "    ./mvnw cn1:backend-package                        # build a native executable\n"
+        }
+        return
+    }
+    write(testDir, "ApiTest.java", "ApiTest.java.txt")
+    write(testDir, "ServedApiTest.java", "ServedApiTest.java.txt")
     ["application.properties", "application-dev.properties"].each { name ->
         new java.io.File(rootDir, name).newWriter("UTF-8").withWriter { w ->
             w << maven(new java.io.File(staged, name + ".txt").getText("UTF-8"))
         }
     }
-    def srcDir = new java.io.File(rootDir, "src/main/java/" + pkg.replace('.', '/'))
     srcDir.mkdirs()
     ["Api", "Greeter"].each { name ->
         new java.io.File(srcDir, name + ".java").newWriter("UTF-8").withWriter { w ->
             w << maven(new java.io.File(staged, name + ".java.txt").getText("UTF-8"))
         }
-    }
-    def gitignore = new java.io.File(rootDir, ".gitignore")
-    if (!gitignore.exists()) {
-        gitignore.newWriter("UTF-8").withWriter { w -> w << "target/\n" }
     }
     new java.io.File(rootDir, "README.md").newWriter("UTF-8").withWriter { w ->
         w << "# " + request.getArtifactId() + "\n\n" +
@@ -319,6 +359,27 @@ def assembleBackendOnly(rootDir, request) {
              "    ./mvnw cn1:backend-package           # build a single native binary\n\n" +
              "Settings are read from application.properties, beside this file.\n"
     }
+}
+
+/**
+ * language=kotlin: the main class becomes the Initializr's Kotlin one, under
+ * common/src/main/kotlin, which is what activates common/pom.xml's kotlin profile.
+ */
+def useKotlinMain(rootDir, request) {
+    def pkg = request.getPackage()
+    def mainName = request.getProperties().getProperty("mainName")
+    def kt = new java.io.File(rootDir, ".cn1-kotlin/MyAppName.kt").getText("UTF-8")
+            .replace("package com.example.myapp", "package " + pkg)
+            .replace("MyAppName", mainName)
+    def javaMain = new java.io.File(rootDir, "common/src/main/java/" + pkg.replace('.', '/') + "/" + mainName + ".java")
+    if (!javaMain.delete()) {
+        throw new IllegalStateException("No Java main class at " + javaMain)
+    }
+    def ktDir = new java.io.File(rootDir, "common/src/main/kotlin/" + pkg.replace('.', '/'))
+    ktDir.mkdirs()
+    new java.io.File(ktDir, mainName + ".kt").newWriter("UTF-8").withWriter { w -> w << kt }
+    def settings = new java.io.File(rootDir, "common/codenameone_settings.properties")
+    settings.setText(settings.getText("UTF-8").replace("codename1.kotlin=false", "codename1.kotlin=true"), "UTF-8")
 }
 
 def setupModules(pomFile) {

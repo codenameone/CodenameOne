@@ -34,6 +34,7 @@ import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
@@ -97,6 +98,12 @@ public abstract class Cn1BuildTask extends Cn1Task {
     @PathSensitive(PathSensitivity.NAME_ONLY)
     public abstract ConfigurableFileCollection getPortJars();
 
+    /// Artifacts the builder fetches only when the application needs them -- the spell
+    /// checking dictionaries, for an application that uses `SpellChecker`. Internal on
+    /// purpose: an input would be resolved, and downloaded, before every build.
+    @Internal
+    public abstract ConfigurableFileCollection getOnDemandJars();
+
     /// The source roots the project compiles.
     @Input
     public abstract ListProperty<String> getSourceRoots();
@@ -122,7 +129,7 @@ public abstract class Cn1BuildTask extends Cn1Task {
                 getFinalName().get(), getGroupId().getOrElse(""), getProjectProperties().get(),
                 getUserProperties().get(), getUploadClasspath(), getSourceRoots().get(), getArtifacts().get(),
                 getFrameworkJars(), getCodenameOneVersion().get(),
-                AppBuilder.portArtifacts(getBuildTarget().get()), getPortJars()), work);
+                AppBuilder.portArtifacts(getBuildTarget().get()), getPortJars(), getOnDemandJars()), work);
         builder.platform(getPlatform().get())
                 .buildTarget(getBuildTarget().get())
                 .automated(getAutomated().get())

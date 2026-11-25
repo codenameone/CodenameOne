@@ -1,0 +1,521 @@
+[[deployment]]
+== Deploying an application end to end
+
+This chapter takes a project with an app and a backend from a laptop to
+production: the server on a rented machine or a cloud account, the app in the
+browser, in the two mobile stores and on desktops. Each step links to the
+chapter that covers it in depth; this one gives the order and the parts that
+connect them.
+
+A deployed Codename One application has these parts:
+
+* *The server*, one native executable, on a Linux machine you rent from any
+  provider or in a container.
+* *A database*, managed by the provider or on the same machine.
+* *HTTPS in front*, either a reverse proxy or the server itself.
+* *The browser app*, served by the same server from the same address.
+* *The mobile apps*, built by the build cloud, signed and submitted to the App
+  Store and Google Play.
+* *The desktop apps*, native executables for macOS, Windows and Linux, which
+  the server can host for download.
+
+The order matters, because the apps need the server's final address before
+they're built for release:
+
+. Build the server for Linux.
+. Rent a machine, prepare it, and give it a domain name.
+. Create the database and the production settings.
+. Run the server under systemd with HTTPS in front.
+. Build the browser app into the server, and ship both.
+. Point the apps at the server's address, then build, sign and submit them.
+. Build the desktop apps and publish them.
+. Automate the server half in CI.
+
+The examples use a project named `myapp` at `app.example.com`. Replace both.
+
+=== Building the server for Linux
+
+`cn1:backend-package` compiles the server with the C compiler of the machine it
+runs on, for that machine. It doesn't cross-compile, and asking it to with
+`-Dcn1.backend.target` fails with a message rather than producing a binary for
+the wrong system. A Mac produces a macOS executable, and a server needs a Linux
+one, so the package step has to run on Linux.
+
+There are three places it can run, and they produce the same binary:
+
+* A Linux machine or a CI runner of the server's CPU. GitHub's `ubuntu-24.04`
+  runner is the usual choice for x86-64; <<Automating the server half>> shows
+  the workflow. This is the fast path.
+* A Linux container on a Mac or Windows machine, with Podman or Docker.
+* The server itself. This works, but a small plan's memory is tight for the C
+  compile, and the server then carries a compiler and a JDK it doesn't need.
+
+On Ubuntu or Debian the build needs a JDK, Clang and the development headers of
+the three libraries the server links:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-build-on-linux,indent=0]
+----
+
+From a Mac or Windows machine, the same commands run in a container. A
+container of your own CPU builds in minutes; one of a different CPU runs
+emulated, and an x86-64 build on an Apple Silicon Mac can take most of an hour,
+so for that pair prefer CI or an x86-64 Linux machine. The
+`.m2-linux` directory keeps the container's Maven downloads in the project, so
+the second build doesn't fetch them again; add it to `.gitignore`:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-build-in-container,indent=0]
+----
+
+The binary is named after the server module's artifactId:
+`backend/target/myapp-backend` for a Maven project named `myapp`
+(`target/myapp` in a backend-only project), and in the subproject's `build`
+directory from Gradle's `:backend:backendPackage`. The script below
+copies it to the server as `myapp`.
+
+It's linked dynamically against the system's OpenSSL and nghttp2, and it loads
+libcurl the first time the server makes an outbound request. *Build it on the
+same distribution release the server runs*: a binary built on Ubuntu 24.04
+runs on Ubuntu 24.04, and may refuse to start on an older release whose system
+libraries are older than the ones it was linked against. The container image
+and the CI runner above name the release for that reason.
+
+The fully static musl build described in <<backend-operations>> carries those
+libraries inside it and runs on any Linux of its CPU, in a container built
+`FROM scratch`. It's produced by `vm/backend/package.sh` in the Codename One
+repository, not by the project's build.
+
+The CPU matters as much as the release. Most plans are x86-64; AWS Graviton,
+Hetzner's Ampere plans and Oracle's Ampere shapes are arm64, and are often
+cheaper for the same capacity. Build on, or emulate, the CPU you rent.
+
+=== Choosing a machine
+
+Any provider that rents a Linux virtual machine with a public address works,
+and the steps from here on are the same on each: Akamai Cloud (Linode),
+DigitalOcean, Hetzner Cloud, Vultr, OVHcloud, AWS Lightsail and EC2, Google
+Compute Engine and Azure Virtual Machines. Pick Ubuntu 24.04 LTS as the image so
+it matches the build.
+
+The server is small. It holds 10 to 40 MB under load and starts in milliseconds,
+so the smallest plan a provider sells runs it; the database, if it shares the
+machine, is what needs the memory. A 1 GB plan runs both for a modest
+application, and 2 GB leaves room.
+
+What differs between providers is around the machine, not on it:
+
+[cols="1,2", options="header"]
+|===
+| Provider | What to know
+
+| Akamai Cloud (Linode), DigitalOcean, Vultr, Hetzner
+| The machine has a public address and an open network; the firewall below is
+  the only one unless you add the provider's cloud firewall too. All four sell
+  managed PostgreSQL and MySQL.
+
+| AWS Lightsail
+| The same shape as the providers above, at a fixed price. Ports are opened in
+  the instance's _Networking_ tab, which applies before the machine's own
+  firewall.
+
+| AWS EC2
+| Ports are opened in the instance's security group. Allocate an Elastic IP, so
+  the address survives a stop. RDS is the managed database, reached inside the
+  same VPC.
+
+| Google Compute Engine, Azure
+| Ports are opened in a VPC firewall rule (Google) or a network security group
+  (Azure). Cloud SQL and Azure Database are the managed databases.
+|===
+
+Give the machine an SSH key when you create it rather than a password, then
+point a DNS `A` record for `app.example.com` (and `AAAA`, if the machine has an
+IPv6 address) at it. The certificate step further down needs the name to resolve.
+
+=== Preparing the server
+
+Once, as root:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-server-setup,indent=0]
+----
+
+That installs the server's three runtime libraries and Caddy, which terminates
+HTTPS (see <<Serving HTTPS>>). It creates two users: `myapp`, which runs the
+server and can't log in, and `deploy`, which copies releases over SSH with the
+key you logged in with, may read the server's log, and may restart the service
+and nothing else. Finally it
+lets in only SSH, HTTP, and HTTPS. The server's own port, 8080, stays closed to
+the outside; Caddy reaches it on the loopback address. On Debian 12 the library
+packages are named `libssl3`, `libnghttp2-14` and `libcurl4`.
+
+Each release goes into a directory of its own, and a link named `current`
+points at the one that runs. Rolling back is moving the link:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-layout,indent=0]
+----
+
+The server reads `application.properties` and the `webapp` directory relative to
+its working directory, which is why the unit below starts it in `current`
+instead of naming the binary from somewhere else.
+
+=== The database and the production settings
+
+A managed database is the less work of the two choices: the provider patches
+it, backs it up and gives you a URL. Create a database and a user, and allow the
+server's address to connect. The URL goes into `DATABASE_URL`. Ask for TLS on a
+database reached over a network, with `sslmode=require` on the URL; see
+<<backend-data>> for each engine's URL and TLS settings.
+
+PostgreSQL on the same machine (`apt-get install postgresql`) is a reasonable
+start for a small application, with a URL naming `localhost`. Back it up
+yourself. A SQLite file is also a production database for one server: point
+`cn1.datasource.url` at a file under `/var/lib/myapp` and add
+`StateDirectory=myapp` to the unit, which creates that directory writable by the
+server even with the file system otherwise read-only.
+
+Outside a development profile the server doesn't create tables, so the schema
+comes from migrations, which run at start-up (see <<backend-schema-migrations>>).
+It also refuses to start when the tables don't match the entities, which is what
+you want to learn from a deployment rather than from the first request that
+reads a missing column.
+
+Secrets go into an environment file that only root can read, and systemd hands
+them to the server:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-env,indent=0]
+----
+
+Every setting maps to an environment variable by replacing dots with
+underscores and upper-casing it, so `cn1.server.trustedProxies` is
+`CN1_SERVER_TRUSTEDPROXIES`. The table in <<Configuration and profiles>> lists
+the server's settings. The file above makes the server listen on the loopback
+address only, and believe the client address and scheme the proxy forwards (see
+<<backend-security-proxies>>); without that, every request looks as if it came
+from the proxy over plain HTTP and rate limits key on one address.
+`CN1_SESSION_SECURE=true` marks the session cookie `Secure`, which the server
+does by itself only when it terminates TLS (see <<backend-sessions>>).
+
+The health checks below need the management endpoints, and those are linked
+into the binary only when the build sees `cn1.management.enabled=true` in the
+committed `application.properties` (see <<backend-build-time-settings>>).
+Outside a development profile they then also need `cn1.management.token`; the
+probes don't, because a load balancer has no token to send.
+
+=== Running it under systemd
+
+The systemd service manager starts the server at boot, restarts it if it exits, collects its output
+and stops it cleanly during a deployment:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-unit,indent=0]
+----
+
+Then `systemctl daemon-reload && systemctl enable myapp` once.
+
+A stop sends SIGTERM. The server answers it by failing its readiness probe,
+refusing new connections and finishing the requests in flight within
+`cn1.server.shutdownTimeoutMillis`, ten seconds by default (see
+<<backend-observability>>). `TimeoutStopSec` is set a little longer than that,
+so systemd doesn't kill a server that's still draining.
+
+The `Protect*` lines keep a compromised server from writing anywhere but its
+`StateDirectory` and `/tmp`. If the server writes files elsewhere, for uploads
+for example, name the directory in `ReadWritePaths=`.
+
+[[deploy-https]]
+=== Serving HTTPS
+
+The apps need HTTPS: iOS refuses plain HTTP connections unless the app opts
+out, Android does the same from API 28, and browsers won't send `Secure`
+cookies over it. There are two ways to terminate it.
+
+*Caddy in front*, the default here. It obtains a certificate over ACME, from the free
+Let{apos}s Encrypt authority, on its first request, renews it unattended
+and forwards to the server:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-caddyfile,indent=0]
+----
+
+Then `systemctl reload caddy`. nginx with certbot does the same job if your team
+already runs it; the server's settings are the same either way.
+
+*The server itself* serves TLS and HTTP/2 when given a PEM certificate and key.
+It reads them when it starts and doesn't watch them, so a renewed certificate
+takes effect at the next restart, which a certbot deploy hook does:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-native-tls,indent=0]
+----
+
+Install certbot (`apt-get install -y certbot`) and obtain the certificate with
+`certbot certonly --standalone -d app.example.com`
+before the server first starts, since both need port 80 or 443 at that moment,
+then run the hook once by hand: certbot runs deploy hooks on renewals, and the
+first copy has to be made too. The hook copies each renewal where the server can read it, because
+certbot's own copies are readable by root only. Drop `CN1_SERVER_ADDRESS`,
+`CN1_SERVER_FORWARDHEADERS`, `CN1_SERVER_TRUSTEDPROXIES` and
+`CN1_SESSION_SECURE` from the environment file in this setup: there's no proxy.
+
+Prefer Caddy unless you have a reason not to. A restart is a short refusal of
+new connections, and a proxy also gives you compression and one place to add a
+second server later.
+
+=== Shipping and rolling back
+
+Build the browser app into the server's `webapp` directory first, when the
+server hosts it (see <<Hosting the browser app>>):
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-webapp,indent=0]
+----
+
+A deployment copies a release to the server, moves the link and restarts:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-ship,indent=0]
+----
+
+The loop at the end fails the deployment when the new server doesn't become
+ready through its public address within two minutes. It retries because
+readiness answers 503 while migrations run at start-up, and because Caddy may
+hold the restarted server out of rotation until its next health check. A
+release that fails to start, or starts and fails its checks, goes back with the
+link. The one-liner moves `current` to the release before it and deletes the
+failed one:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-rollback,indent=0]
+----
+
+A migration that changed the schema doesn't roll back with the link. Write
+migrations the previous release can also run against (add a column before using
+it, drop one a release after nothing reads it), and the link stays a real
+rollback.
+
+To see what a running server is doing:
+
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-check,indent=0]
+----
+
+<<backend-observability>> covers metrics, traces and the other management
+endpoints, which take the token from the environment file.
+
+=== Containers, AWS and other platforms
+
+The same binary runs in a container, which is the unit most platforms deploy:
+Amazon ECS on Fargate, AWS App Runner, Lightsail container services, Google
+Cloud Run, Azure Container Apps, DigitalOcean App Platform, Fly.io and any
+Kubernetes cluster. Build the image from the release the binary was built on:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-dockerfile,indent=0]
+----
+
+Leave out the `webapp` line when the server hosts no browser app. The platform
+supplies the rest of what the VPS steps did:
+
+* *Settings*: the platform's environment variables or secrets in place of
+  `/etc/myapp/env`. The server reads `PORT` and `DATABASE_URL` directly, which
+  most platforms set.
+* *HTTPS*: the platform's load balancer terminates it, so set
+  `CN1_SERVER_FORWARDHEADERS=true` and list the load balancer's addresses in
+  `CN1_SERVER_TRUSTEDPROXIES`.
+* *Health*: point the readiness check (the target group's health check on AWS)
+  at `/manage/health/readiness` and a liveness check, where the platform has
+  one, at `/manage/health/liveness`.
+* *Stopping*: give the platform's termination grace period a few seconds more
+  than `cn1.server.shutdownTimeoutMillis`, as `TimeoutStopSec` did.
+
+AWS Lambda is a different model: the function receives one event at a time
+instead of listening on a port. `com.codename1.backend.LambdaRuntime`
+implements Lambda's custom-runtime loop (see <<backend-operations>>). For an
+HTTP API that the apps call continuously, a container or a VPS is the simpler
+fit.
+
+=== Running more than one server
+
+A process runs one backend; more capacity is more processes behind a load
+balancer, on one machine or several. Two settings make that safe:
+
+* Keep sessions in the database with `cn1.session.store=db`, so a client's next
+  request can land on any server (see <<backend-sessions>>).
+* Give scheduled jobs a lock, so each runs once rather than once per server
+  (see <<backend-scheduling>>).
+
+The load balancer's health check is the readiness probe, as in the container
+case. A deployment then restarts the servers one at a time, each draining before it
+stops, and the application stays up through it.
+
+[[deploy-web-app]]
+=== Hosting the browser app
+
+The browser build of the app is served by the server that runs its API, from
+the same address, so there's nothing else to host and no cross-origin requests
+to configure. `cn1:backend-webapp` builds it into the server module, the deployment
+copies it beside the binary, and the server answers `/` with it after every
+route; <<backend-hosting-the-app>> has the details and settings.
+
+A browser app served this way should talk to the page's own origin rather than
+a configured address. Its origin is
+`CN.getProperty("browser.window.location.origin", null)`, which is null outside
+a browser; the Wayline demo's `AppConfig.serverUrl()` uses it this way.
+
+A browser build hosted elsewhere, on a CDN or another domain, is a static
+directory like any other. The server then has to answer cross-origin requests
+from that origin, which the `cn1.cors` settings in <<backend-web>> allow.
+
+=== Pointing the apps at the server
+
+The installed apps can't ask the page where their server is, so the address is
+part of the build. Keep it in one place, a constant or a value read at start-up,
+so a release build and a development run differ in one line:
+
+* Release builds use `https://app.example.com`.
+* The simulator uses `http://127.0.0.1:8080` against `cn1:backend`. The Android
+  emulator reaches the same server on port 8080 of `10.0.2.2`, its address for the
+  host machine.
+
+Wayline's `AppConfig` shows one way: a system property for tests, then an
+address saved from a settings screen, then the page's origin in a browser, then
+a default constant.
+
+Use the HTTPS address in every release build. An `http://` address in a release
+build fails on iOS and on current Android, and the cause isn't obvious from the
+error the app shows.
+
+When the app uses push notifications, the server that sends them needs the push
+credentials described in <<push-notifications-section>>; keep them in the
+environment file with the other secrets.
+
+=== Building, signing and submitting the mobile apps
+
+The build cloud compiles the iOS and Android apps, so a release needs no Mac and
+no Android SDK on your machine. Each platform needs its signing identity first:
+
+* *iOS*: an Apple Developer account, a distribution certificate and an App
+  Store provisioning profile. The Certificate Wizard creates and installs both
+  (see <<certificate-wizard>>, and <<signing-section-top-heading>> for doing it
+  by hand).
+* *Android*: a keystore that signs every release of the app for as long as it's
+  on Google Play. Generate it once and keep it, and its passwords, backed up.
+  Without it, no update to the app can be published under its name.
+
+Then build:
+
+[cols="1,2,2", options="header"]
+|===
+| Platform | Maven | Gradle
+
+| Android, for Google Play
+| `mvn package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device`
+| `./gradlew buildAndroid`
+
+| iOS, for the App Store
+| `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-device-release`
+| `./gradlew buildIosRelease`
+|===
+
+A finished build is submitted from the build console, which shows a _Submit_
+action for each store the build can go to, using the App Store Connect API key
+and the Google Play service account you connected once. <<app-store-submission>>
+covers those credentials, the store listings kept as code, and the review rules
+each store applies. A new personal Google Play developer account has to run a closed test before
+its first production release, so start that early.
+
+Plan the order around review. The stores review against the production server,
+so it has to be deployed, reachable and holding a reviewer account before you
+submit. A server change the shipped app depends on goes out before the app
+update that needs it, and the server keeps answering the previous app's
+requests: users update over weeks, not at once.
+
+=== Building and publishing the desktop apps
+
+Desktop builds are native executables with no JVM to install. The build cloud
+produces them like the mobile ones:
+
+[cols="1,2,2", options="header"]
+|===
+| Platform | Maven | Gradle
+
+| macOS
+| `mvn package -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-os-x-native`
+| `./gradlew buildMacNative`
+
+| Windows
+| `mvn package -Dcodename1.platform=win -Dcodename1.buildTarget=windows-device`
+| `./gradlew buildWindowsDevice`
+
+| Linux
+| `mvn package -Dcodename1.platform=linux -Dcodename1.buildTarget=linux-device`
+| `./gradlew buildLinuxDevice`
+|===
+
+Each operating system has its own rules for an app downloaded from the web:
+
+* *macOS* opens a downloaded app only if it's signed with a Developer ID
+  certificate and notarized by Apple, or it goes through the Mac App Store; see
+  <<Working with macOS>>.
+* *Windows* warns about an unsigned executable, and an MSIX package can go
+  through the Microsoft Store; see <<Working with the native Windows port>>.
+* *Linux* has no central requirement; see <<Working with the native Linux port>>.
+
+The server can host the downloads itself. Put the installers in a directory on
+the server and set `cn1.static.root` to it, and they're served under `/static`
+with the same HTTPS certificate as the app. A download page in the browser app
+can then link to them.
+
+=== Automating the server half
+
+The server's build and deployment fit one CI job. Give it a key of its own:
+generate one with `ssh-keygen -t ed25519 -f deploy_key -N ''`, append
+`deploy_key.pub` to `/home/deploy/.ssh/authorized_keys` on the server, and store
+the private half as the repository secret `DEPLOY_KEY`. Store the server's host
+key as `KNOWN_HOSTS`, from `ssh-keyscan app.example.com` checked against the
+provider's console once, so the job never trusts whatever answers. A GitHub
+Actions workflow on the same Ubuntu release as the server:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-github-actions,indent=0]
+----
+
+The mobile and desktop builds can run from CI too: `-Dautomated=true` on a cloud
+build (`-Pautomated=true` from Gradle) runs it without a browser sign-in, takes
+the account's API token, and downloads the result into `target`. That mode needs
+an Enterprise subscription. These builds are slower than the server's and
+usually run per release rather than per push.
+
+=== Before the first release
+
+* The server binary was built on the server's distribution release and CPU.
+* `DATABASE_URL` points at a database with backups, and migrations create its
+  schema.
+* The secrets are in an environment file readable by root only, or in the
+  platform's secret store, and not in the repository.
+* HTTPS works at the final domain, and `forwardHeaders` and `trustedProxies`
+  are set when a proxy terminates it.
+* `cn1.management.enabled=true` is committed, a token is set, and the
+  readiness probe answers 200.
+* A deployment, a restart and a rollback have each been run once.
+* Every release build of the apps uses the HTTPS address.
+* The Android keystore and the iOS certificates are backed up.
+* The stores' reviewer account exists on the production server.

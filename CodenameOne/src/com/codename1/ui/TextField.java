@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
@@ -164,7 +165,7 @@ public class TextField extends TextArea {
     private static char[] symbolTable = DEFAULT_SYMBOL_TABLE;
     private final Command DELETE_COMMAND = new CommandHandler(clearText, 1);
     private final Command T9_COMMAND = new CommandHandler(t9Text, 2);
-    private long cursorBlinkTime = System.currentTimeMillis();
+    private long cursorBlinkTime = AnimationTime.now();
     private boolean drawCursor = true;
     private int cursorY = 0;
     private int cursorX = -1;
@@ -1802,7 +1803,7 @@ public class TextField extends TextArea {
             return ani;
         }
         if (hasFocus() && isVisible()) {
-            long currentTime = System.currentTimeMillis();
+            long currentTime = AnimationTime.now();
             if (drawCursor) {
                 if ((currentTime - cursorBlinkTime) > blinkOnTime) {
                     cursorBlinkTime = currentTime;

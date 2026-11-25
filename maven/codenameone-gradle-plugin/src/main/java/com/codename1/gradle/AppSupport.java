@@ -126,6 +126,14 @@ final class AppSupport {
                 com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir()))) {
             addFramework(project, "implementation", version, com.codename1.maven.KmpProjectImporter.COMPOSE_ARTIFACT);
         }
+        // Rive files (*.riv next to the theme CSS, like SVGs) become RiveFile
+        // subclasses. The runtime is not part of the core; the plugin adds it
+        // here, at its own version, so a project never declares it -- the
+        // Gradle counterpart of the Maven goal copying it into target/classes.
+        if (com.codename1.maven.SvgTranscodeRunner.hasRiveSources(layout.projectDir())) {
+            addFramework(project, "implementation", version,
+                    com.codename1.maven.SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT);
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);
@@ -190,7 +198,7 @@ final class AppSupport {
 
         TaskProvider<TranscodeSvgTask> svg = project.getTasks().register("transcodeSvg", TranscodeSvgTask.class, t -> {
             common(t, project, layout, ext, userProperties);
-            t.setDescription("Transcodes SVG and Lottie assets into Java sources");
+            t.setDescription("Transcodes SVG, Lottie and Rive assets into Java sources");
             // Every directory the transcoder reads, or adding an asset to one of
             // them leaves the task up to date and its generated classes stale.
             t.getSources().from(layout.cssDir(), new File(layout.projectDir(), "src/main/svg"),
@@ -805,6 +813,22 @@ final class AppSupport {
             return out;
         })).orElse(Collections.<org.gradle.api.artifacts.Dependency>emptyList()));
 
+        // Data only an application that uses SpellChecker needs. Not an input: the task
+        // reads these files only when the builder has found the class in the application,
+        // so no other build ever resolves -- or downloads -- them.
+        final Configuration onDemand = resolvable(project, "cn1OnDemand"
+                + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
+                "Artifacts a local build of " + name + " fetches only when the application needs them");
+        onDemand.setTransitive(false);
+        onDemand.getDependencies().addAllLater(targetProvider.flatMap(target -> portVersion.map(v -> {
+            List<org.gradle.api.artifacts.Dependency> out = new ArrayList<org.gradle.api.artifacts.Dependency>();
+            if (!com.codename1.maven.AppBuilder.portArtifacts(target).isEmpty()) {
+                out.add(project.getDependencies().create(PluginInfo.GROUP + ":"
+                        + com.codename1.maven.AppBuilder.SPELLCHECK_DICTIONARIES + ":" + v));
+            }
+            return out;
+        })).orElse(Collections.<org.gradle.api.artifacts.Dependency>emptyList()));
+
         project.getTasks().register(name, Cn1BuildTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setGroup(BUILD_GROUP);
@@ -824,6 +848,7 @@ final class AppSupport {
             t.getOpen().set(ext.getOpenGeneratedProjects());
             t.getFrameworkJars().from(framework);
             t.getPortJars().from(ports);
+            t.getOnDemandJars().from(onDemand);
             // Resolve after build-script configuration, including Kotlin and added/generated roots.
             t.getSourceRoots().set(project.provider(() -> sourceRoots(main, layout)));
             t.getFinalName().set(project.getName());

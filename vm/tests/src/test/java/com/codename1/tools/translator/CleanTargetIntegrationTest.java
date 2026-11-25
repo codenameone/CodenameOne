@@ -2157,12 +2157,22 @@ class CleanTargetIntegrationTest {
         // The Compose screens added about 1,600 more (the Compose runtime and
         // kotlinx.coroutines), and a healthy build then ran past 45 minutes at
         // 7,024 of 7,025 steps.
-        // This is a guard against a hang, not a performance budget: the perf
-        // gate is what judges speed.
+        // The Rive screens added about 700 more, and an x64 build that was still
+        // compiling (step 7,586 of 7,737) was killed by the old fixed 80-minute
+        // deadline.
+        // A silence window cannot guard this build: the last step is the
+        // -flto=thin link of every object, which prints nothing until it ends,
+        // and it stayed silent past 15 and then 50 minutes on healthy Linux
+        // builds (master's whole build takes about 76 minutes). So only a total
+        // cap remains, kept under the job's 140-minute timeout so the test,
+        // not the runner, reports a build that never ends. This is a guard
+        // against a hang, not a performance budget: the perf gate judges speed.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
-        return runCommand(builder, 80, java.util.concurrent.TimeUnit.MINUTES);
+        return runCommand(builder, BUILD_CAP_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
     }
+
+    private static final long BUILD_CAP_MINUTES = 125;
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);

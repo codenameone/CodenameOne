@@ -106,6 +106,10 @@
         <module>compose-compat</module>
         <module>fxml-compiler</module>
         <module>lottie-transcoder</module>
+        <!-- Rive: the schema generator runs in the builds of the two after it. -->
+        <module>rive-schema-gen</module>
+        <module>rive-transcoder</module>
+        <module>rive-runtime</module>
         <!--
           dart-runtime and flutter-runtime are NOT here: they compile at
           release 17 and the framework's own build runs on JDK 8, so a JDK 8
@@ -143,6 +147,7 @@
              on the plugin's classpath (it carries its own ProGuard/ASM). -->
         <module>cn1-hardening</module>
         <module>designer</module>
+        <module>spellcheck-dictionaries</module>
         <module>build-engine</module>
         <module>codenameone-maven-plugin</module>
         <module>codenameone-gradle-plugin</module>

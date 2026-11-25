@@ -36,11 +36,19 @@
       <defaultValue>none</defaultValue>
     </requiredProperty>
     <requiredProperty key="projectType">
-      <!-- app (the default), app-with-backend (adds the backend/ module), or
-           backend-only (a single-module server at the root, no app).
+      <!-- app (the default), app-with-backend (adds the backend/ module),
+           backend-only (a single-module server at the root, no app), or
+           command-line (the same single module holding a @Command tool, built to a
+           native executable). The same four types the Initializr offers.
            -DplatformModules=all -DprojectType=app-with-backend is the layout every
            project used to get. -->
       <defaultValue>app</defaultValue>
+    </requiredProperty>
+
+    <requiredProperty key="language">
+      <!-- java (the default) or kotlin: the main class is written in Kotlin under
+           common/src/main/kotlin, as the Initializr's Kotlin template does. -->
+      <defaultValue>java</defaultValue>
     </requiredProperty>
 
     <requiredProperty key="mainName">
@@ -94,6 +102,12 @@
       archetype-post-generate.groovy assembles them for -DprojectType=backend-only
       and always deletes this directory.
     -->
+    <fileSet encoding="UTF-8">
+      <directory>.cn1-kotlin</directory>
+      <includes>
+        <include>**</include>
+      </includes>
+    </fileSet>
     <fileSet encoding="UTF-8">
       <directory>.cn1-backend-only</directory>
       <includes>

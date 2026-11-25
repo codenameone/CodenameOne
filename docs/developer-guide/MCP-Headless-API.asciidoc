@@ -116,6 +116,39 @@ a blocking modal dialog, its nested event loop can return a snapshot with `pendi
 use subsequent calls to inspect and dismiss the dialog, then verify the resulting state. A pending
 response isn't confirmation that the original action completed successfully.
 
+==== The agent clock
+
+Animations make a screen a moving target: a screenshot taken after a tap may catch half a transition, and a script that sleeps to wait for one gives different pictures on a fast machine and a slow one. `ui_clock_freeze` stops animation time instead. Motions, form transitions, `UITimer`, dialog timeouts, tickers and the caret blink all read `AnimationTime`, so while it's frozen they move only when the agent moves them:
+
+* `ui_clock_settle` steps frame by frame until no transition is running and the screen stops changing, then returns. `maxMs` (5000 by default) bounds it, and `settled:false` reports an endless animation, such as a spinner, that reached the bound first.
+* `ui_clock_advance` with `{"ms": 300}` moves time forward by exactly that much, painting each 16 ms frame, to look at a point inside an animation or to make a timer fire.
+* `ui_clock_release` lets time run again at the wall clock's pace, from where the frozen clock stood, so animations and timers carry on without a jump.
+
+Input timing (long press, double tap, fling velocity) keeps reading the wall clock, so taps and drags behave as they do with the clock running. While the clock is frozen, a tool called during a form transition answers with advice to call `ui_clock_settle` instead of waiting for a transition that can't end. An action that starts one returns its outcome with a `note` saying the same.
+
+A typical frozen loop is `ui_clock_freeze` once, then `ui_activate`, `ui_clock_settle` and `ui_snapshot` for each step.
+
+In the simulator, `sim_record_film` films an animation the same way: called right after the tap that starts it, with `{"path": "/tmp/open.png", "overMs": 600, "everyMs": 50}`, it steps the frozen clock and writes one contact-sheet PNG of the frames as they were shown, form transitions included. Each frame sits at the same point of the animation on every run, however fast the machine.
+
+=== Checking a screen: `sim_verify` and `cn1:verify`
+
+`sim_verify` with `{"dir": "target/cn1-verify"}` checks the screen the simulator shows under four conditions: light mode, dark mode, landscape, and the largest text size. For each one it applies the setting, settles the agent clock, takes a screenshot and reports:
+
+* `unlabeled-control`: something a user can activate that has no accessible label, so a screen reader announces nothing.
+* `zero-size-control`: something a user can activate that has no area.
+* `truncated-text`: a label narrower than its text, which it therefore cuts off.
+* `low-contrast`: text whose color has less than 3:1 contrast with the solid background behind it. Image and gradient backgrounds aren't judged.
+* `overflows-parent` (a warning): a component that runs past a parent that can't scroll sideways.
+* `no-dark-theme` (a warning): dark mode draws exactly what light mode draws.
+
+The largest-text condition is skipped, and says so, when the application hasn't opted into larger text, because the setting would change nothing. The tool writes `report.json`, `report.html` and the screenshots into the directory, puts every setting back and leaves the clock as it found it.
+
+`mvn cn1:verify` runs the same check without an agent: it starts the simulator hidden, verifies the first form, writes `common/target/cn1-verify/report.html` and fails the build when the report has an error. Pass `-Dcn1.verify.failOnError=false` to only write the report. To check the other screens, navigate to each one in `cn1:agent` and call `sim_verify` there.
+
+=== Reporting friction
+
+When Codename One itself gets in an agent's way (an error that didn't say how to fix it, a missing API, a step that took several tries), the project skill asks the agent to check with the developer and then file a GitHub issue at https://github.com/codenameone/CodenameOne/issues. The issue names what the agent was doing, the error ID if there was one, and the versions involved, and leaves out the app's source code. A public issue is something the team can answer and track.
+
 === Publishing application tools
 
 An application publishes its own data and actions as MCP tools. A `Tool` has a name, a description, a JSON schema for its parameters, and a handler:
@@ -159,7 +192,7 @@ A typical script calls these tools in order:
 . `sim_tap` with the `nodeId` of the email field, found with `ui_find`.
 . `sim_keyboard_type` with `{"text": "ada@example.com"}`, then `sim_keyboard_key` with `{"key": "next"}`.
 . `sim_keyboard_type` with `{"text": "42"}`, then `sim_keyboard_key` with `{"key": "done"}`.
-. `sim_wait` with `{"ms": 800}` to let the last frame settle.
+. `sim_wait` with `{"ms": 800}` to hold the last frame for the viewer.
 . `sim_record_stop`, which returns the file's path and length.
 
 `sim_rotate` switches between portrait and landscape, and `sim_keyboard_state` reports whether the keyboard is showing, its height, the layout, and the screen size the application currently sees.
@@ -201,3 +234,7 @@ The TOML file is edited as text rather than parsed and written back. Only the li
 A configuration the editor can't make sense of is left untouched, and the reason is logged. That covers a file that isn't valid TOML, and the shapes it won't rewrite: the server declared through a dotted key or an inline table, `mcp_servers` declared as an array of tables, or the same server declared twice. Losing a Codex configuration is a worse outcome than not registering.
 
 The host reads its configuration at startup, so a host that's already running needs a restart before the new server appears.
+
+=== Beyond the running application
+
+The tools in this chapter serve one running application, on your machine or a device attached to it. Cloud builds, signing, push setup and store submission are served by a second MCP server, the build console at `https://cloud.codenameone.com/api/v1/mcp`, which every generated project already names in its `.mcp.json`. See <<buildcloud-mcp>>.

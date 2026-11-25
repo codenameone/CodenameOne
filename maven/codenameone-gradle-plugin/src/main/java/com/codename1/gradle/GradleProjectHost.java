@@ -29,6 +29,7 @@ import com.codename1.project.ProjectLayout;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.result.ResolvedArtifactResult;
+import org.gradle.api.file.FileCollection;
 
 import java.io.File;
 import java.io.IOException;
@@ -240,9 +241,33 @@ final class GradleProjectHost implements ProjectHost {
         this.portJars = resolved;
     }
 
+    private FileCollection onDemandJars;
+
+    /// Artifacts resolved only when the builder asks for one by name.
+    void onDemandJars(FileCollection value) {
+        this.onDemandJars = value;
+    }
+
     @Override
     public File getPortJar(String artifactId, String classifier) {
         File f = portJars.get(classifier == null ? artifactId : artifactId + ":" + classifier);
+        if (f == null && classifier == null && onDemandJars != null
+                && com.codename1.maven.AppBuilder.SPELLCHECK_DICTIONARIES.equals(artifactId)) {
+            // Only for the artifact the configuration holds: iterating resolves it, and any other
+            // port jar a target looks up here must not make every build fetch the dictionaries.
+            // A repository without them is "not available", which the builder reports, not a
+            // failed build.
+            List<String> wanted = Collections.singletonList(artifactId);
+            try {
+                for (File candidate : onDemandJars) {
+                    if (GradleHostFactory.portOf(candidate.getName(), wanted) != null) {
+                        return candidate;
+                    }
+                }
+            } catch (RuntimeException unresolved) {
+                return null;
+            }
+        }
         return f != null ? f : getJar("com.codenameone", artifactId, classifier);
     }
 

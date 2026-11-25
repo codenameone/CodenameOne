@@ -932,6 +932,9 @@ northwind
 Kanban
 fulfilment
 fulfilments
+# Rive: the canvas a Rive file draws on.
+artboard
+artboards
 leaderstat
 Papercut
 Gochi
@@ -941,3 +944,12 @@ treemap
 Treemap
 sparklines
 Sparklines
+Vultr
+OVHcloud
+certbot
+Fargate
+Lightsail
+Linode
+Nominatim
+Planetiler
+Geofabrik

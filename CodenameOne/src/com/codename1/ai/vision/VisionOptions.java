@@ -43,6 +43,8 @@ public final class VisionOptions {
     private int maximumResults;
     private TextScript textScript;
     private String[] barcodeFormats = new String[0];
+    private boolean strictBarcodes;
+    private boolean strictBarcodesSet;
 
     /// @param value selector, or {@code null} to restore automatic selection
     /// @return this options object
@@ -108,6 +110,60 @@ public final class VisionOptions {
         return this;
     }
 
+    /// Makes a {@link BarcodeScanner} report a code only once two frames have
+    /// read it identically. By default this applies to PDF417 codes in camera
+    /// frames alone, and every other code, and any code in a still image, is
+    /// reported as soon as it decodes;
+    /// {@code true} extends it to every symbology, {@code false} turns it off
+    /// for PDF417 as well.
+    ///
+    /// Turn this on for codes printed with little or no error correction. A
+    /// PDF417 at error correction level 0 carries two check codewords, which
+    /// is enough to "correct" one wrong codeword but not to notice when a
+    /// blurred frame got several wrong: the decoder then repairs the frame
+    /// into a different, valid-looking payload with a few wrong characters.
+    /// That happens on a measurable share of frames, and differently on each,
+    /// so two frames that agree byte for byte filter those reads out, at the
+    /// cost of one more frame.
+    ///
+    /// This is state kept by the scanner between calls to
+    /// {@link BarcodeScanner#process(VisionImage)}, which is what a camera
+    /// pipeline ({@link VisionCameraView}, {@link CodeScanner}) does once per
+    /// frame. A frame with no code keeps the pending read for up to 15 frames,
+    /// and every code in a
+    /// frame is checked against every code of the pending frame, so codes in
+    /// view whose order changes between frames still confirm. With this set to
+    /// {@code true} a single still image processed once reports nothing.
+    ///
+    /// @param value whether a code must be read identically twice
+    /// @return this options object
+    public VisionOptions strictBarcodes(boolean value) {
+        strictBarcodes = value;
+        strictBarcodesSet = true;
+        return this;
+    }
+
+    /// @return whether every symbology must be read identically twice; see
+    ///         {@link #isStrictBarcode(String)} for the PDF417 default
+    public boolean isStrictBarcodes() {
+        return strictBarcodes;
+    }
+
+    /// Whether a code of the given format must be read identically twice.
+    /// Unless {@link #strictBarcodes(boolean)} was called, that is true of
+    /// PDF417 alone: it is the symbology printed at error correction level 0
+    /// (payment slips), where a blurred frame decodes into a plausible wrong
+    /// payload on a large share of frames.
+    ///
+    /// @param format a {@link BarcodeFormat} constant
+    /// @return whether that format is confirmed by a second frame
+    public boolean isStrictBarcode(String format) {
+        if (strictBarcodesSet) {
+            return strictBarcodes;
+        }
+        return BarcodeFormat.PDF417.equals(format);
+    }
+
     /// @return defensive copy of the barcode formats to detect; empty detects
     ///         every format
     public String[] getBarcodeFormats() {
@@ -142,6 +198,13 @@ public final class VisionOptions {
                 .minimumConfidence(minimumConfidence)
                 .maximumResults(maximumResults)
                 .textScript(textScript)
-                .barcodeFormats(barcodeFormats);
+                .barcodeFormats(barcodeFormats)
+                .copyStrict(this);
+    }
+
+    private VisionOptions copyStrict(VisionOptions from) {
+        strictBarcodes = from.strictBarcodes;
+        strictBarcodesSet = from.strictBarcodesSet;
+        return this;
     }
 }

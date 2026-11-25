@@ -232,6 +232,10 @@ public class RichPureEditor extends PureEditor {
             return null;
         }
         try {
+            com.codename1.ui.Image registered = com.codename1.ui.RichTextArea.loadRegisteredImage(url);
+            if (registered != null) {
+                return registered;
+            }
             if (url.startsWith("gen:")) {
                 // gen:WxH:RRGGBB - a generated solid color image (handy for demos / placeholders)
                 String s = url.substring(4);

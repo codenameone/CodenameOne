@@ -1251,11 +1251,60 @@ which may be asked for with any port, because a desktop application can't know
 which port it will get. A request whose client or redirect address is wrong is
 answered 400 and never a redirect.
 
-A client is never granted a scope it wasn't registered with. There's no
+A client is never granted a scope it wasn't registered with. Unless the
+client's settings or `authorizationConsent(...)` ask for one, there's no
 consent page: registering a client with a scope is the consent.
 
 `JdbcRegisteredClientRepository` keeps the clients in the
 `cn1_oauth2_registered_client` table instead.
+
+==== Asking the user for consent
+
+`authorizationConsent(policy, consentPage)` makes the signed-in user approve
+an authorization before a code is issued. It applies to every client whose
+`ClientSettings` sets `requireAuthorizationConsent`, and to any other client
+the policy picks. Pass `null` as the policy to ask only for those clients. The
+user sees the client's name, the site it will send them to and each scope it
+asked for, and the grant carries only the scopes they leave ticked. A request
+with `prompt=none` is then answered `consent_required`. Pass `null` as the
+page to use the built-in one, or the path or `https` address of your own page.
+
+A consent isn't remembered: the user is asked again on every authorization.
+
+==== Clients that register themselves
+
+`clientRegistration(policy)` opens the registration endpoint of RFC 7591 at
+`/oauth2/register`, and the server's metadata names it as
+`registration_endpoint`. It's off until it's called. An MCP client is the usual
+caller: it finds the server and registers itself without anyone setting it up
+first. It needs a client repository that keeps clients outside the process,
+such as `JdbcRegisteredClientRepository`; with the in-memory repository the
+server doesn't start.
+
+Anybody can call the endpoint, so a client registered there is always
+restricted, whatever the policy says:
+
+* It's public. It has no secret, because a secret would prove nothing about who
+  registered it.
+* It must use PKCE with `S256`, and the user is asked for consent on every
+  authorization, so a client nobody checked never gets anything the user
+  didn't approve.
+* It may use only the `authorization_code` grant, with `refresh_token` if it
+  asks for that.
+* It may give one to five redirect addresses. Each must be an `https` address,
+  or an `http` address on `127.0.0.1` or `[::1]`, which may then use any port.
+
+The `ClientRegistrationPolicy` names the scopes a registered client may have
+(`allowedScopes()`, required and never empty). A request that names no scope
+gets every one of them, and one that names a scope outside them is refused. Its
+`validate` method sees each request after these checks. It refuses a
+registration by throwing `ClientRegistrationException`, or it returns the
+client to save, possibly with fewer redirects, scopes or token lifetime. Count
+registrations per address there and refuse past a limit: every registration the
+endpoint accepts is a saved client, so a policy that accepts everything lets
+anyone fill the client table.
+
+The registration management endpoint of RFC 7592 isn't provided.
 
 ==== Grants
 
@@ -2419,9 +2468,6 @@ read by the build, because it decides what's linked into the server.
 * **New passwords use `{pbkdf2-sha256}`,** not `{bcrypt}`. `bcrypt` is written
   in Java here and costs more of a thread, so it's kept for verifying.
 * **`{noop}` works on a development profile only.**
-* **The authorization server has no consent page.** A client is authorized for
-  the scopes it was registered with, and `requireAuthorizationConsent` accepts
-  `false` only.
 * **`OAuth2AuthorizationService` isn't Spring's interface.** It has no `save`
   and `findByToken` pair. A store uses a secret up in one atomic call.
 * **The security context stays on the request's thread.** It isn't propagated
@@ -2440,16 +2486,19 @@ read by the build, because it decides what's linked into the server.
   remembered.
 * **Concurrent-session control.** `sessionManagement` sets the creation policy
   and the fixation strategy, and nothing else.
-* **SAML and LDAP.** The ways of signing in are the ones in this chapter.
-  Anything else is a filter or an `AuthenticationProvider` of your own.
+* **Ways of signing in beyond this chapter's.** Form, HTTP Basic, OAuth2 and
+  OpenID Connect, SAML 2.0, LDAP and Active Directory, passkeys, API keys,
+  bearer tokens (JWTs) and `remember-me` are covered. Anything else is a filter
+  or an `AuthenticationProvider` of your own.
 * **Other password schemes.** The delegating encoder knows `{pbkdf2-sha256}`,
   `{bcrypt}`, the two Spring PBKDF2 schemes and `{noop}`. A password stored
   under another id, such as `{argon2}` or `{scrypt}`, is refused unless you register
   an encoder for it.
 * **Opaque access tokens and token introspection.** A resource server verifies
   JWTs, and the authorization server issues them.
-* **In the authorization server:** dynamic client registration,
-  `private_key_jwt` and mutual TLS client authentication, pushed authorization
+* **In the authorization server:** remembered consent, the RFC 7592
+  registration management endpoint, `private_key_jwt` and mutual TLS client
+  authentication, pushed authorization
   requests, DPoP, encrypted tokens, the implicit and password grants, and
   back-channel or RP-initiated logout.
 * **Passkey attestation beyond `none` and self-signed `packed`.** Other

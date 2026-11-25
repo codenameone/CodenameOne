@@ -370,19 +370,36 @@ camera to focus at the middle of the frame when it opens, and again
 every few seconds until it reads a code, so a small code held close is
 in focus even when continuous focus has settled on the background.
 
+A code printed with little error correction can misread and still decode.
+A PDF417 at error correction level 0, common on payment slips, has two
+check codewords: enough to repair one wrong codeword, but not to notice a
+blurred frame with several, which the decoder then "repairs" into a
+plausible payload with a few wrong characters. A PDF417 seen by the
+camera is therefore reported only once two frames have read it byte for byte the
+same, at the cost of one more frame; a still image is reported as decoded.
+`CodeScannerOptions.strict(true)` (`VisionOptions.strictBarcodes(true)` on
+a `BarcodeScanner`) extends that to every symbology, and `strict(false)`
+turns it off.
+
 `BarcodeScanner` used directly takes the same restriction through
-`VisionOptions.barcodeFormats(...)`.
+`VisionOptions.barcodeFormats(...)`, and `CodeScannerOptions.getVisionOptions()`
+returns options that carry the formats and strict mode for a scanner of your
+own: `new BarcodeScanner(options.getVisionOptions())` detects exactly what
+`CodeScanner.scan(options)` would.
 
 A code's payload is bytes, and `getValue()` is those bytes read as text.
-On Android, a PDF417 whose payload isn't valid in the character set ML Kit
-assumes is read as UTF-8 when it's valid UTF-8 and as ISO-8859-1
-otherwise, so it's never dropped for its encoding; `getRawBytes()`
-always carries the exact payload. A PDF417 in another character set, such as
-ISO-8859-2, reads correctly once the application names that character set
-before scanning. The named character set never overrides a payload that's
-valid UTF-8 with non-ASCII text, so one application reads codes from issuers
-that use either encoding. On iOS the system picks the character set itself, so the
-property is Android only:
+For a PDF417 the platform's own text can't be trusted: Apple Vision
+reads every payload as ISO-8859-1, and ML Kit on Android drops one that
+isn't valid in the character set it assumes. Codename One decodes such a
+payload from its bytes: as UTF-8 when they're valid UTF-8, and as
+ISO-8859-1, the PDF417 default, otherwise, so a code is never dropped or
+garbled for its encoding;
+`getRawBytes()` always carries the exact payload. A PDF417 in another
+character set, such as the windows-1250 of many Croatian payment slips,
+reads correctly once the application names that character set before
+scanning. The named character set never overrides a payload that's valid
+UTF-8 with non-ASCII text, so one application reads codes from issuers that
+use either encoding. The older `android.barcodeCharset` name still works:
 
 [source,java]
 ----
@@ -774,6 +791,49 @@ pair.
 Mac native and the other unsupported targets return `false` from the
 language service `isSupported()` checks. Completion and failure callbacks
 arrive on the EDT.
+
+=== The operating system's language model
+
+Recent phones and Macs ship a language model as part of the operating
+system: Apple Intelligence's Foundation Models on iOS and macOS, and Gemini
+Nano on Android devices that carry Google's AICore service, including
+current Pixel and Samsung Galaxy phones. `LlmClient.system()` reaches
+whichever one the device has. Nothing is bundled with the app, no API key
+is involved, and the prompt never leaves the device.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechSystemLlmSnippet.java[tag=ai-and-speech-system-llm,indent=0]
+----
+
+Availability is a property of the device, not of the app, so ask before
+offering the feature. `getStatus(feature)` answers `AVAILABLE`,
+`DOWNLOADABLE` or `DOWNLOADING` when the model isn't on the device yet,
+`DISABLED` when the user switched Apple Intelligence off, or
+`UNSUPPORTED`. `getStatusReason(feature)` explains the answer in words
+fit for a log, and `getSupportedFeatures()` lists what the device offers.
+On Android, `download(feature)` asks AICore to fetch a model that's
+downloadable.
+
+Besides chat and streaming chat, the client has task methods:
+`summarize(text, bullets)`, `proofread(text)`, `rewrite(text, style)` and
+`describeImage(image)`. On Android each maps to ML Kit's dedicated task
+API, which has its own model and its own status; on Apple targets
+summarize, proofread and rewrite are prompts to the same model, and image
+description reports `UNSUPPORTED`. Embeddings, tool calling and JSON mode
+aren't offered by these models and fail with `INVALID_REQUEST`.
+
+The builders add this only to apps that call `LlmClient.system()`; an
+app that only checks the status gets
+`UNSUPPORTED`. On Android they add the
+ML Kit GenAI artifacts and raise the minimum SDK to 23; the model
+itself needs Android 8, and older versions report `UNSUPPORTED`. On iOS and macOS
+they inject a small Swift bridge into the project; it compiles to a stub
+with an Xcode whose SDK lacks Foundation Models, and the framework is
+linked as optional, so the app still installs and runs on older OS versions
+and reports `UNSUPPORTED` there. The simulator, JavaScript, Windows,
+Linux, watchOS and tvOS report `UNSUPPORTED`; `LlmClient.ollama()` is the
+usual stand-in while developing in the simulator.
 
 === Platform availability
 

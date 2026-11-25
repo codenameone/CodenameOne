@@ -115,7 +115,8 @@ and the app's platform builds as in `references/build-and-run.md`. Before
 deploying, switch the app's base URL to the real server, and give the backend its
 production settings through the environment (`DATABASE_URL`, `PORT`,
 `cn1.mcp.token` if it publishes `@McpTool` methods). The development MCP tools are
-not compiled into the packaged binary.
+not compiled into the packaged binary. `references/deployment.md` is the whole
+procedure: packaging for Linux, the server, HTTPS, health checks and rollback.
 
 If you cannot run the backend or the simulator in your environment, **say so** in
 your report rather than claiming the flow works.

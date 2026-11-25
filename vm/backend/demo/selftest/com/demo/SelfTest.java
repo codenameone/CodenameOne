@@ -42,6 +42,10 @@ import com.codename1.backend.Reactor;
 import com.codename1.backend.Http1Date;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.Json;
+import com.codename1.backend.MapTiles;
+import com.codename1.backend.osm.OsmExtract;
+import com.codename1.backend.osm.OsmGeocoding;
+import com.codename1.backend.osm.OsmRouting;
 import com.codename1.impl.backend.JsonCodec;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.ServerSocket;
@@ -236,6 +240,7 @@ public class SelfTest {
         jsonCodec();
         cache();
         pdf();
+        maps();
 
         System.out.println("passed=" + passed + " failed=" + failures.size());
         for(int iter = 0 ; iter < failures.size() ; iter++) {
@@ -7020,5 +7025,401 @@ public class SelfTest {
             out.append("0123456789abcdef".charAt(v & 15));
         }
         return out.toString();
+    }
+
+    // ------------------------------------------------------------------
+    // Maps: MapTiles over a PMTiles archive, and routing and geocoding over
+    // an OpenStreetMap extract, both written here so nothing is downloaded.
+
+    private static final String MAP_CAFE = "Caf\u00e9 Central";
+
+    private static void maps() throws Exception {
+        String dir = "/tmp/cn1-selftest-maps-" + System.currentTimeMillis();
+        new java.io.File(dir).mkdirs();
+        int filesBefore = FileCountProbe.openFiles();
+        try {
+            mapTiles(dir, false);
+            mapTiles(dir, true);
+            osmRoutingAndGeocoding(dir);
+        } finally {
+            String[] left = new java.io.File(dir).list();
+            for(int iter = 0 ; left != null && iter < left.length ; iter++) {
+                new java.io.File(dir + "/" + left[iter]).delete();
+            }
+            new java.io.File(dir).delete();
+        }
+        long deadline = System.currentTimeMillis() + 5000;
+        while(FileCountProbe.openFiles() > filesBefore && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+        check("maps leave no file open", String.valueOf(filesBefore),
+                String.valueOf(FileCountProbe.openFiles()));
+    }
+
+    /** Status line code and body of one GET; the body inflated when gzipped. */
+    private static String[] mapGet(int port, String target, boolean gzip) throws Exception {
+        Tcp conn = Tcp.connect("127.0.0.1", port, 15000);
+        try {
+            byte[] request = ("GET " + target + " HTTP/1.1\r\nHost: maps.test\r\n"
+                    + (gzip ? "Accept-Encoding: gzip\r\n" : "")
+                    + "Connection: close\r\n\r\n").getBytes("UTF-8");
+            conn.write(request, 0, request.length);
+            ByteArrayOutputStream all = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            while(true) {
+                int n = conn.read(chunk, 0, chunk.length);
+                if(n <= 0) {
+                    break;
+                }
+                all.write(chunk, 0, n);
+            }
+            byte[] raw = all.toByteArray();
+            int end = -1;
+            for(int iter = 0 ; iter + 3 < raw.length ; iter++) {
+                if(raw[iter] == '\r' && raw[iter + 1] == '\n' && raw[iter + 2] == '\r' && raw[iter + 3] == '\n') {
+                    end = iter;
+                    break;
+                }
+            }
+            if(end < 0) {
+                return new String[] {"<none>", ""};
+            }
+            String head = new String(raw, 0, end, "UTF-8");
+            byte[] body = new byte[raw.length - end - 4];
+            System.arraycopy(raw, end + 4, body, 0, body.length);
+            if(head.indexOf("ontent-Encoding: gzip") >= 0 || head.indexOf("ontent-encoding: gzip") >= 0) {
+                java.util.zip.GZIPInputStream in = new java.util.zip.GZIPInputStream(
+                        new java.io.ByteArrayInputStream(body));
+                ByteArrayOutputStream plain = new ByteArrayOutputStream();
+                int n;
+                while((n = in.read(chunk, 0, chunk.length)) > 0) {
+                    plain.write(chunk, 0, n);
+                }
+                in.close();
+                body = plain.toByteArray();
+            }
+            return new String[] {head.substring(9, 12), new String(body, "UTF-8")};
+        } finally {
+            conn.close();
+        }
+    }
+
+    private static void mapTiles(String dir, boolean gzipTiles) throws Exception {
+        String path = dir + "/tiles-" + gzipTiles + ".pmtiles";
+        writePmtiles(path, gzipTiles);
+        final MapTiles tiles = new MapTiles(path, "/tiles");
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response served = tiles.handle(request);
+                return served == null ? HttpServer.Response.text(404, "no") : served;
+            }
+        });
+        String label = gzipTiles ? "gzip map tiles" : "plain map tiles";
+        try {
+            int port = server.getPort();
+            String[] r = mapGet(port, "/tiles/0/0/0.mvt", false);
+            check(label + ": a root tile", "200 tile-z0", r[0] + " " + r[1]);
+            r = mapGet(port, "/tiles/1/1/1.mvt", true);
+            check(label + ": a tile in a run", "200 tile-run", r[0] + " " + r[1]);
+            r = mapGet(port, "/tiles/2/0/0.mvt", false);
+            check(label + ": a tile behind a leaf directory", "200 tile-leaf", r[0] + " " + r[1]);
+            r = mapGet(port, "/tiles/2/3/3.mvt", false);
+            check(label + ": a missing tile", "204", r[0]);
+            r = mapGet(port, "/tiles/3/0/0.mvt", false);
+            check(label + ": past the maximum zoom", "404", r[0]);
+            r = mapGet(port, "/tiles/tiles.json", false);
+            check(label + ": the TileJSON template", "true",
+                    String.valueOf(r[1].indexOf("http://maps.test/tiles/{z}/{x}/{y}.mvt") >= 0
+                            && r[1].indexOf("OpenStreetMap contributors") >= 0));
+        } finally {
+            server.stop(2000);
+        }
+    }
+
+    // Zooms 0-2: tile 0 and a run over 1..3 in the root directory, tile 5
+    // (2/0/0) behind a leaf directory. Directories are always gzipped.
+    private static void writePmtiles(String path, boolean gzipTiles) throws Exception {
+        byte[] t0 = mapMaybeGzip("tile-z0".getBytes("UTF-8"), gzipTiles);
+        byte[] tRun = mapMaybeGzip("tile-run".getBytes("UTF-8"), gzipTiles);
+        byte[] tLeaf = mapMaybeGzip("tile-leaf".getBytes("UTF-8"), gzipTiles);
+        byte[] leafDir = mapMaybeGzip(pmDirectory(new long[][] {{5, 1, tLeaf.length, t0.length + tRun.length}}), true);
+        byte[] rootDir = mapMaybeGzip(pmDirectory(new long[][] {
+            {0, 1, t0.length, 0}, {1, 3, tRun.length, t0.length}, {5, 0, leafDir.length, 0}}), true);
+        byte[] meta = mapMaybeGzip("{\"name\":\"t\",\"attribution\":\"(c) OpenStreetMap contributors\"}"
+                .getBytes("UTF-8"), true);
+        long rootOff = 127;
+        long metaOff = rootOff + rootDir.length;
+        long leafOff = metaOff + meta.length;
+        long dataOff = leafOff + leafDir.length;
+        byte[] h = new byte[127];
+        byte[] magic = "PMTiles".getBytes("UTF-8");
+        System.arraycopy(magic, 0, h, 0, 7);
+        h[7] = 3;
+        long[] fields = {rootOff, rootDir.length, metaOff, meta.length, leafOff, leafDir.length,
+            dataOff, t0.length + tRun.length + tLeaf.length};
+        for(int f = 0 ; f < fields.length ; f++) {
+            for(int b = 0 ; b < 8 ; b++) {
+                h[8 + f * 8 + b] = (byte)(fields[f] >>> (8 * b));
+            }
+        }
+        h[96] = 1;
+        h[97] = 2;
+        h[98] = (byte)(gzipTiles ? 2 : 1);
+        h[99] = 1;
+        h[100] = 0;
+        h[101] = 2;
+        java.io.FileOutputStream out = new java.io.FileOutputStream(path);
+        try {
+            out.write(h);
+            out.write(rootDir);
+            out.write(meta);
+            out.write(leafDir);
+            out.write(t0);
+            out.write(tRun);
+            out.write(tLeaf);
+        } finally {
+            out.close();
+        }
+    }
+
+    private static byte[] mapMaybeGzip(byte[] in, boolean gzip) throws Exception {
+        if(!gzip) {
+            return in;
+        }
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        java.util.zip.GZIPOutputStream g = new java.util.zip.GZIPOutputStream(b);
+        g.write(in, 0, in.length);
+        g.close();
+        return b.toByteArray();
+    }
+
+    private static byte[] pmDirectory(long[][] entries) {
+        ByteArrayOutputStream o = new ByteArrayOutputStream();
+        pbVarint(o, entries.length);
+        long last = 0;
+        for(int iter = 0 ; iter < entries.length ; iter++) {
+            pbVarint(o, entries[iter][0] - last);
+            last = entries[iter][0];
+        }
+        for(int iter = 0 ; iter < entries.length ; iter++) {
+            pbVarint(o, entries[iter][1]);
+        }
+        for(int iter = 0 ; iter < entries.length ; iter++) {
+            pbVarint(o, entries[iter][2]);
+        }
+        for(int iter = 0 ; iter < entries.length ; iter++) {
+            pbVarint(o, entries[iter][3] + 1);
+        }
+        return o.toByteArray();
+    }
+
+    private static void pbVarint(ByteArrayOutputStream o, long v) {
+        while((v & ~0x7fL) != 0) {
+            o.write((int)((v & 0x7f) | 0x80));
+            v >>>= 7;
+        }
+        o.write((int)v);
+    }
+
+    private static void pbBytes(ByteArrayOutputStream o, int field, byte[] b) {
+        pbVarint(o, (long)field << 3 | 2);
+        pbVarint(o, b.length);
+        o.write(b, 0, b.length);
+    }
+
+    private static int pbString(List strings, String s) {
+        int at = strings.indexOf(s);
+        if(at < 0) {
+            strings.add(s);
+            at = strings.size() - 1;
+        }
+        return at;
+    }
+
+    private static void pbWay(ByteArrayOutputStream group, List strings, long id, long[] refs,
+            String[] tags) {
+        ByteArrayOutputStream w = new ByteArrayOutputStream();
+        pbVarint(w, 1 << 3);
+        pbVarint(w, id);
+        ByteArrayOutputStream keys = new ByteArrayOutputStream();
+        ByteArrayOutputStream vals = new ByteArrayOutputStream();
+        for(int iter = 0 ; iter < tags.length ; iter += 2) {
+            pbVarint(keys, pbString(strings, tags[iter]));
+            pbVarint(vals, pbString(strings, tags[iter + 1]));
+        }
+        pbBytes(w, 2, keys.toByteArray());
+        pbBytes(w, 3, vals.toByteArray());
+        ByteArrayOutputStream r = new ByteArrayOutputStream();
+        long last = 0;
+        for(int iter = 0 ; iter < refs.length ; iter++) {
+            long d = refs[iter] - last;
+            pbVarint(r, (d << 1) ^ (d >> 63));
+            last = refs[iter];
+        }
+        pbBytes(w, 8, r.toByteArray());
+        pbBytes(group, 3, w.toByteArray());
+    }
+
+    private static void pbBlob(ByteArrayOutputStream file, String type, byte[] raw) throws Exception {
+        java.util.zip.Deflater d = new java.util.zip.Deflater();
+        d.setInput(raw);
+        d.finish();
+        byte[] buf = new byte[raw.length + 1024];
+        int n = d.deflate(buf);
+        d.end();
+        byte[] z = new byte[n];
+        System.arraycopy(buf, 0, z, 0, n);
+        ByteArrayOutputStream blob = new ByteArrayOutputStream();
+        pbVarint(blob, 2 << 3);
+        pbVarint(blob, raw.length);
+        pbBytes(blob, 3, z);
+        byte[] b = blob.toByteArray();
+        ByteArrayOutputStream h = new ByteArrayOutputStream();
+        pbBytes(h, 1, type.getBytes("UTF-8"));
+        pbVarint(h, 3 << 3);
+        pbVarint(h, b.length);
+        byte[] hb = h.toByteArray();
+        file.write(hb.length >>> 24);
+        file.write(hb.length >>> 16);
+        file.write(hb.length >>> 8);
+        file.write(hb.length);
+        file.write(hb, 0, hb.length);
+        file.write(b, 0, b.length);
+    }
+
+    /** The town of OsmExtractTest's fixture: a 3x3 street grid at (10, 10). */
+    private static void writeOsmTown(String path) throws Exception {
+        List strings = new ArrayList();
+        strings.add("");
+        long[] ids = {1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 30, 31, 32};
+        long[] lat = new long[ids.length];
+        long[] lon = new long[ids.length];
+        for(int iter = 0 ; iter < 9 ; iter++) {
+            lat[iter] = 100000000L + 10000L * (iter / 3);
+            lon[iter] = 100000000L + 10000L * (iter % 3);
+        }
+        lat[9] = 100020000L;
+        lon[9] = 100040000L;
+        lat[10] = 100011000L;
+        lon[10] = 100011000L;
+        lat[11] = 100001000L;
+        lon[11] = 100012000L;
+        lat[12] = 100010000L;
+        lon[12] = 100010000L;
+        String[][] nodeTags = new String[ids.length][];
+        nodeTags[10] = new String[] {"amenity", "cafe", "name", MAP_CAFE};
+        nodeTags[11] = new String[] {"addr:housenumber", "12", "addr:street", "First Street",
+            "addr:city", "Testville"};
+        nodeTags[12] = new String[] {"place", "town", "name", "Testville"};
+        ByteArrayOutputStream idCol = new ByteArrayOutputStream();
+        ByteArrayOutputStream latCol = new ByteArrayOutputStream();
+        ByteArrayOutputStream lonCol = new ByteArrayOutputStream();
+        ByteArrayOutputStream kv = new ByteArrayOutputStream();
+        long[] last = new long[3];
+        for(int iter = 0 ; iter < ids.length ; iter++) {
+            long[] now = {ids[iter], lat[iter], lon[iter]};
+            ByteArrayOutputStream[] cols = {idCol, latCol, lonCol};
+            for(int c = 0 ; c < 3 ; c++) {
+                long d = now[c] - last[c];
+                pbVarint(cols[c], (d << 1) ^ (d >> 63));
+                last[c] = now[c];
+            }
+            if(nodeTags[iter] != null) {
+                for(int t = 0 ; t < nodeTags[iter].length ; t++) {
+                    pbVarint(kv, pbString(strings, nodeTags[iter][t]));
+                }
+            }
+            pbVarint(kv, 0);
+        }
+        ByteArrayOutputStream dense = new ByteArrayOutputStream();
+        pbBytes(dense, 1, idCol.toByteArray());
+        pbBytes(dense, 8, latCol.toByteArray());
+        pbBytes(dense, 9, lonCol.toByteArray());
+        pbBytes(dense, 10, kv.toByteArray());
+        ByteArrayOutputStream nodeGroup = new ByteArrayOutputStream();
+        pbBytes(nodeGroup, 2, dense.toByteArray());
+        ByteArrayOutputStream wayGroup = new ByteArrayOutputStream();
+        pbWay(wayGroup, strings, 100, new long[] {1, 2, 3}, new String[] {"highway", "residential", "name", "First Street"});
+        pbWay(wayGroup, strings, 101, new long[] {4, 5, 6}, new String[] {"highway", "residential", "name", "Second Street"});
+        pbWay(wayGroup, strings, 102, new long[] {7, 8, 9}, new String[] {"highway", "residential", "name", "Third Street"});
+        pbWay(wayGroup, strings, 103, new long[] {1, 4, 7}, new String[] {"highway", "residential", "name", "West Avenue"});
+        pbWay(wayGroup, strings, 104, new long[] {2, 5, 8}, new String[] {"highway", "residential", "name", "Middle Avenue",
+            "oneway", "yes"});
+        pbWay(wayGroup, strings, 105, new long[] {3, 6, 9}, new String[] {"highway", "residential", "name", "East Avenue"});
+        pbWay(wayGroup, strings, 106, new long[] {9, 11}, new String[] {"highway", "footway", "name", "Garden Path"});
+        ByteArrayOutputStream st = new ByteArrayOutputStream();
+        for(int iter = 0 ; iter < strings.size() ; iter++) {
+            pbBytes(st, 1, ((String)strings.get(iter)).getBytes("UTF-8"));
+        }
+        ByteArrayOutputStream block = new ByteArrayOutputStream();
+        pbBytes(block, 1, st.toByteArray());
+        pbBytes(block, 2, nodeGroup.toByteArray());
+        pbBytes(block, 2, wayGroup.toByteArray());
+        ByteArrayOutputStream header = new ByteArrayOutputStream();
+        pbBytes(header, 4, "OsmSchema-V0.6".getBytes("UTF-8"));
+        pbBytes(header, 4, "DenseNodes".getBytes("UTF-8"));
+        ByteArrayOutputStream file = new ByteArrayOutputStream();
+        pbBlob(file, "OSMHeader", header.toByteArray());
+        pbBlob(file, "OSMData", block.toByteArray());
+        java.io.FileOutputStream out = new java.io.FileOutputStream(path);
+        try {
+            out.write(file.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
+    private static void osmRoutingAndGeocoding(String dir) throws Exception {
+        String path = dir + "/town.osm.pbf";
+        writeOsmTown(path);
+        OsmExtract extract = OsmExtract.load(path);
+        check("the extract's road vertices", "10", String.valueOf(extract.getRoadVertexCount()));
+        check("the extract's places", "10", String.valueOf(extract.getPlaceCount()));
+        final OsmRouting routing = new OsmRouting(extract, "/osrm");
+        final OsmGeocoding geocoding = new OsmGeocoding(extract, "/geo");
+        HttpServer server = HttpServer.start("127.0.0.1", 0, 16, 1, new HttpServer.Handler() {
+            public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+                HttpServer.Response r = routing.handle(request);
+                if(r == null) {
+                    r = geocoding.handle(request);
+                }
+                return r == null ? HttpServer.Response.text(404, "no") : r;
+            }
+        });
+        try {
+            int port = server.getPort();
+            Map doc = (Map)Json.parse(mapGet(port, "/osrm/route/v1/driving/10,10;10.002,10.002?steps=true", false)[1]);
+            check("a route is found", "Ok", String.valueOf(doc.get("code")));
+            Map route = (Map)((List)doc.get("routes")).get(0);
+            double distance = ((Number)route.get("distance")).doubleValue();
+            check("the route is two blocks by two", "true", String.valueOf(distance > 430 && distance < 450));
+            List steps = (List)((Map)((List)route.get("legs")).get(0)).get("steps");
+            String firstType = String.valueOf(((Map)((Map)steps.get(0)).get("maneuver")).get("type"));
+            String lastType = String.valueOf(((Map)((Map)steps.get(steps.size() - 1)).get("maneuver")).get("type"));
+            check("the route departs and arrives", "depart/arrive", firstType + "/" + lastType);
+            check("the route geometry starts at the origin", "_c`|@_c`|@",
+                    String.valueOf(route.get("geometry")).substring(0, 10));
+            Map walk = (Map)((List)((Map)Json.parse(mapGet(port,
+                    "/osrm/route/v1/walking/10.001,10.002;10.001,10", false)[1])).get("routes")).get(0);
+            Map drive = (Map)((List)((Map)Json.parse(mapGet(port,
+                    "/osrm/route/v1/driving/10.001,10.002;10.001,10", false)[1])).get("routes")).get(0);
+            check("a car keeps to the one-way street", "true",
+                    String.valueOf(((Number)drive.get("distance")).doubleValue()
+                            > ((Number)walk.get("distance")).doubleValue() + 150));
+            String[] far = mapGet(port, "/osrm/route/v1/driving/10,10;20,20", false);
+            check("a point far from any road", "400 NoSegment",
+                    far[0] + " " + ((Map)Json.parse(far[1])).get("code"));
+            List found = (List)Json.parse(mapGet(port, "/geo/search?q=CAFE", false)[1]);
+            check("a search ignores case and accents", MAP_CAFE,
+                    found.size() == 1 ? String.valueOf(((Map)found.get(0)).get("display_name")) : "<" + found.size() + ">");
+            found = (List)Json.parse(mapGet(port, "/geo/search?q=12%20first", false)[1]);
+            check("an address is found", "12 First Street, Testville",
+                    found.size() == 1 ? String.valueOf(((Map)found.get(0)).get("display_name")) : "<" + found.size() + ">");
+            Map near = (Map)Json.parse(mapGet(port, "/geo/reverse?lat=10.0001&lon=10.00121", false)[1]);
+            check("a reverse lookup finds the address", "12 First Street, Testville",
+                    String.valueOf(near.get("display_name")));
+        } finally {
+            server.stop(2000);
+        }
     }
 }

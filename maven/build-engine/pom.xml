@@ -136,6 +136,11 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-rive-transcoder</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
             <artifactId>codenameone-android-res-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -275,6 +280,14 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-parparvm</artifactId>
             <classifier>bundle</classifier>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <!-- Hunspell dictionaries, read like a port: see AppBuilder.SPELLCHECK_DICTIONARIES. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-spellcheck-dictionaries</artifactId>
+            <version>${project.version}</version>
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>

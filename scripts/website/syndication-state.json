@@ -3529,6 +3529,35 @@
         "url": "https://dev.to/codenameone/kafka-listeners-mail-and-live-streams-in-your-backend-with-records-as-entities-13ae",
         "syndicated_at": "2026-11-23T15:48:51+00:00"
       }
+    },
+    "ship-your-java-game-on-steam": {
+      "devto": {
+        "id": 5103853,
+        "url": "https://dev.to/codenameone/ship-your-game-on-steam-and-why-the-art-matters-more-than-the-engine-1n28",
+        "syndicated_at": "2026-11-24T00:48:37+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/ship-your-game-on-steam-and-why-the-art-matters-more-than-the-engine",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b04e19de88cf3b5d2c6096c",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-24T01:01:10+00:00"
+      }
+    },
+    "windows-kiosks-and-command-line-apps": {
+      "hashnode": {
+        "url": "https://debugagent.com/windows-kiosks-and-command-line-tools-built-from-java",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b06331b15a414f719e18630",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-25T01:01:09+00:00"
+      }
     }
   }
 }

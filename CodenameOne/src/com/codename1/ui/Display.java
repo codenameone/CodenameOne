@@ -4549,6 +4549,96 @@ public final class Display extends CN1Constants {
         return Math.round(impl.convertToPixels((int) (dipCount * 1000), true) / 1000.0f);
     }
 
+    /// Whether the platform can route keyboard and input method text straight into a
+    /// `TextInputClient`, for components that draw and edit their own text.
+    ///
+    /// #### Returns
+    ///
+    /// true when `startTextInput` is supported
+    public boolean isTextInputSupported() {
+        return impl.isTextInputSupported();
+    }
+
+    /// Binds a component that edits its own text to the platform's keyboard and input methods.
+    ///
+    /// #### Parameters
+    ///
+    /// - `client`: the component receiving text
+    ///
+    /// - `config`: the keyboard configuration
+    ///
+    /// #### Returns
+    ///
+    /// a handle for `updateTextInputState` and `stopTextInput`, or null when unsupported
+    public Object startTextInput(TextInputClient client, TextInputConfig config) {
+        return impl.startTextInput(client, config);
+    }
+
+    /// Tells the platform the edited text or selection changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: from `startTextInput`
+    ///
+    /// - `state`: the new state
+    public void updateTextInputState(Object handle, TextInputState state) {
+        impl.updateTextInputState(handle, state);
+    }
+
+    /// Unbinds a client bound with `startTextInput`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: from `startTextInput`
+    public void stopTextInput(Object handle) {
+        impl.stopTextInput(handle);
+    }
+
+    /// Can the platform's own spell checker check a language?
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: a language tag such as `en_US`, or null for the device's language
+    ///
+    /// #### Returns
+    ///
+    /// true when the port has a checker for it
+    public boolean isNativeSpellCheckSupported(String language) {
+        return impl.isNativeSpellCheckSupported(language);
+    }
+
+    /// Asks the platform's spell checker about a word.
+    ///
+    /// #### Parameters
+    ///
+    /// - `word`: the word
+    ///
+    /// - `language`: the language tag, or null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is spelled correctly
+    public boolean isNativeSpelledCorrectly(String word, String language) {
+        return impl.isNativeSpelledCorrectly(word, language);
+    }
+
+    /// Asks the platform's spell checker for replacements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `word`: the misspelled word
+    ///
+    /// - `language`: the language tag, or null
+    ///
+    /// - `max`: the most to return
+    ///
+    /// #### Returns
+    ///
+    /// the suggestions, or null for none
+    public String[] getNativeSpellingSuggestions(String word, String language, int max) {
+        return impl.getNativeSpellingSuggestions(word, language, max);
+    }
+
     /// Checks to see if the platform supports a native image cache.
     ///
     /// #### Returns
@@ -8722,6 +8812,14 @@ public final class Display extends CN1Constants {
     /// @hidden
     public com.codename1.impl.LocalLlmImpl getLocalLlmBackend() {
         return impl.createLocalLlmImpl();
+    }
+
+    /// Returns the bridge behind `com.codename1.ai.SystemLlmClient`, or `null`
+    /// where none is linked.
+    ///
+    /// @hidden
+    public com.codename1.impl.SystemLlmImpl getSystemLlmBackend() {
+        return impl.createSystemLlmImpl();
     }
 
     /// Creates a fresh backend for `com.codename1.ai.inference`.

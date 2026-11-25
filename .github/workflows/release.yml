@@ -200,9 +200,10 @@ jobs:
           # this keeps the release green even if that rule is ever removed.
           set -e
           for artifact in codenameone-core codenameone-maven-plugin codenameone-annotation-processor \
-                          codenameone-platform-feature-catalog \
+                          codenameone-platform-feature-catalog codenameone-spellcheck-dictionaries \
                           codenameone-build-hint-catalog codenameone-build-hint-tools \
                           codenameone-cil-translator codenameone-unity-compat \
+                          codenameone-rive-runtime codenameone-rive-transcoder \
                           cn1app-archetype cn1lib-archetype \
                           cn1-app-kit-common cn1-app-kit-backend cn1-app-kit-lib; do
             url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
