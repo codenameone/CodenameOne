@@ -1885,6 +1885,7 @@ public class Toolbar extends Container {
                                 showOnTopSidemenu(-1, false);
                             }
                         });
+                        labelMenuButton(findCommandComponent(cmd), "Menu");
                         Image p = parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
                         if (p != null) {
                             findCommandComponent(cmd).setPressedIcon(p);
@@ -1900,6 +1901,7 @@ public class Toolbar extends Container {
                                 showOnTopSidemenu(-1, false);
                             }
                         });
+                        labelMenuButton(findCommandComponent(leftSideMenuCommand), "Menu");
                     }
                 }
             } else {
@@ -1938,6 +1940,7 @@ public class Toolbar extends Container {
                                 showOnTopRightSidemenu(-1, false);
                             }
                         });
+                        labelMenuButton(findCommandComponent(cmd), "Menu");
                         Image p = parent.getUIManager().getThemeImageConstant("rightSideMenuPressImage");
                         if (p != null) {
                             findCommandComponent(cmd).setPressedIcon(p);
@@ -1953,6 +1956,7 @@ public class Toolbar extends Container {
                                 showOnTopRightSidemenu(-1, false);
                             }
                         });
+                        labelMenuButton(findCommandComponent(rightSideMenuCommand), "Menu");
                     }
                 }
             }
@@ -3662,6 +3666,7 @@ public class Toolbar extends Container {
                     menuButton.setMaterialIcon(FontImage.MATERIAL_MORE_VERT);
                 }
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
+                labelMenuButton(menuButton, "More options");
                 menuButton.setUIID("TitleCommand");
                 menuButton.setName("OverflowButton");
                 Layout l = getTitleAreaContainer().getLayout();
@@ -3781,5 +3786,14 @@ public class Toolbar extends Container {
             Toolbar.this.initTitleBarStatus();
         }
 
+    }
+
+    /// The side menu and overflow buttons are icon-only, so without this a screen reader
+    /// announces nothing for them. An explicit accessibility text an app set wins; the
+    /// default is localizable under the same key.
+    private static void labelMenuButton(Component button, String text) {
+        if (button != null && button.getAccessibilityText() == null) {
+            button.setAccessibilityText(UIManager.getInstance().localize(text, text));
+        }
     }
 }

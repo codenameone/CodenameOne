@@ -88,26 +88,43 @@ public final class DbPool {
 
     /// Takes a connection, blocking until one is free. Always release it in a
     /// finally, or prefer [#withConnection], which cannot leak one.
-    public synchronized Db borrow() throws IOException {
-        // Checked before the idle list, not only when it is empty. close() can run
-        // while a borrower still holds a connection, and that borrower's finally
-        // releases afterwards -- so the list can be non-empty after closing, and a
-        // check that only guards the empty case hands out a closed connection.
-        if (closed) {
-            throw new IOException("Pool is closed");
-        }
-        while (idle.isEmpty()) {
-            if (closed) {
-                throw new IOException("Pool is closed");
+    ///
+    /// NOT synchronized, and a virtual thread does not wait() for a connection:
+    /// monitor ownership and Object.wait belong to the HOST pthread, so a virtual
+    /// thread waiting inside this monitor held its host -- and every request
+    /// scheduled there -- until another borrower released, which on a busy pool
+    /// is the borrower that cannot run because its host is the one held. It naps
+    /// outside the monitor instead, as Database's gate and Cache do; a platform
+    /// thread still waits on the monitor.
+    public Db borrow() throws IOException {
+        boolean virtual = VirtualThread.isVirtual();
+        long nap = 1;
+        while (true) {
+            synchronized (this) {
+                // Checked before the idle list, not only when it is empty. close()
+                // can run while a borrower still holds a connection, and that
+                // borrower's finally releases afterwards -- so the list can be
+                // non-empty after closing, and a check that only guards the empty
+                // case hands out a closed connection.
+                if (closed) {
+                    throw new IOException("Pool is closed");
+                }
+                if (!idle.isEmpty()) {
+                    return (Db) idle.remove(idle.size() - 1);
+                }
+                if (!virtual) {
+                    try {
+                        wait();
+                    } catch (InterruptedException err) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Interrupted while waiting for a connection", err);
+                    }
+                    continue;
+                }
             }
-            try {
-                wait();
-            } catch (InterruptedException err) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted while waiting for a connection", err);
-            }
+            HttpServer.napUntil(System.currentTimeMillis() + nap);
+            nap = Math.min(20, nap * 2);
         }
-        return (Db) idle.remove(idle.size() - 1);
     }
 
     public synchronized void release(Db db) {

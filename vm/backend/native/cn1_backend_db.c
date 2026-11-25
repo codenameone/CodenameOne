@@ -136,29 +136,131 @@ JAVA_LONG com_codename1_backend_Db_lastInsertRowIdImpl___long_R_long(CODENAME_ON
 
 #include "cn1_sqlite3.h"
 
+/*
+ * Every call that can touch the disk or wait on a lock -- open, prepare (it reads
+ * the schema), step, close (it checkpoints) -- runs through cn1BackendOffload: on
+ * a virtual thread the pool runs it while the caller is PARKED, so a slow query or
+ * a busy_timeout wait does not hold the host and every request scheduled there.
+ * The engine is built SQLITE_THREADSAFE=1 (cn1_sqlite3.c), so a connection may be
+ * driven from a pool thread; Db's gate keeps it to one call at a time.
+ *
+ * Strings are converted BEFORE the offload (a job may not touch the heap) and the
+ * buffer stringToUTF8 returns belongs to the calling virtual thread's own state,
+ * which nothing else writes while it is parked.
+ */
+typedef void (*cn1OffloadFn)(void* arg);
+void cn1BackendOffload(cn1OffloadFn fn, void* arg);
+
+struct cn1DbJob {
+    const char* text;
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+    int rc;
+    long long nanos; /* how long sqlite3_step itself took */
+};
+
+static void cn1DbOpenJob(void* p) {
+    struct cn1DbJob* j = (struct cn1DbJob*)p;
+    j->rc = sqlite3_open(j->text, &j->db);
+    if(j->rc != SQLITE_OK && j->db != NULL) {
+        /* sqlite3_open allocates a handle even on failure so the error can be read;
+           close it here rather than leaking one per failed open. */
+        sqlite3_close(j->db);
+        j->db = NULL;
+    }
+}
+
+static void cn1DbCloseJob(void* p) {
+    struct cn1DbJob* j = (struct cn1DbJob*)p;
+    j->rc = sqlite3_close(j->db);
+}
+
+static void cn1DbPrepareJob(void* p) {
+    struct cn1DbJob* j = (struct cn1DbJob*)p;
+    j->rc = sqlite3_prepare_v2(j->db, j->text, -1, &j->stmt, NULL);
+}
+
+#ifndef _WIN32
+#include <time.h>
+static long long cn1DbNowNanos(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+#else
+static long long cn1DbNowNanos(void) { return 0; }
+#endif
+
+static void cn1DbStepJob(void* p) {
+    struct cn1DbJob* j = (struct cn1DbJob*)p;
+    long long start = cn1DbNowNanos();
+    j->rc = sqlite3_step(j->stmt);
+    j->nanos = cn1DbNowNanos() - start;
+}
+
+/*
+ * WHICH STEPS GO TO THE I/O POOL. Measured: one pool round trip per
+ * sqlite3_step made a 10,000-row SELECT 15-25x slower than the inline call,
+ * because a cached row costs a microsecond and the hop costs tens of them.
+ * Offloading every step is therefore wrong, and so is offloading none -- a sort,
+ * an aggregate or a cold scan can hold one step for seconds.
+ *
+ * So a statement's FIRST step (sqlite3_stmt_busy is false: never stepped since
+ * prepare or reset) always goes to the pool: that is where a sort, a GROUP BY or
+ * an aggregate does all of its work. Every later step runs inline as long as the
+ * previous one of the same statement finished under CN1_DB_INLINE_STEP_NANOS,
+ * and goes back to the pool as soon as one did not. The worst a host can be held
+ * is one step that turned slow after a fast one.
+ *
+ * The hint table is a direct-mapped cache per host thread, keyed by the
+ * statement's address. A miss, a collision or a reused address only picks the
+ * other path for one step; it can never make a step wrong.
+ */
+#define CN1_DB_INLINE_STEP_NANOS 100000LL
+#define CN1_DB_STEP_HINTS 64
+struct cn1DbStepHint {
+    sqlite3_stmt* stmt;
+    int fast;
+};
+#ifndef _WIN32
+static __thread struct cn1DbStepHint cn1DbStepHints[CN1_DB_STEP_HINTS];
+#else
+static struct cn1DbStepHint cn1DbStepHints[CN1_DB_STEP_HINTS];
+#endif
+
+static struct cn1DbStepHint* cn1DbHintFor(sqlite3_stmt* stmt) {
+    return &cn1DbStepHints[((uintptr_t)stmt >> 4) % CN1_DB_STEP_HINTS];
+}
+
 JAVA_LONG com_codename1_backend_Db_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
-    sqlite3* db = NULL;
+    struct cn1DbJob job;
     const char* p = path == JAVA_NULL ? NULL : stringToUTF8(threadStateData, path);
     if(p == NULL) {
         return 0;
     }
-    if(sqlite3_open(p, &db) != SQLITE_OK) {
-        /* sqlite3_open allocates a handle even on failure so the error can be read;
-           close it here rather than leaking one per failed open. */
-        if(db != NULL) {
-            sqlite3_close(db);
-        }
+    memset(&job, 0, sizeof(job));
+    job.text = p;
+    CN1_YIELD_THREAD;
+    cn1BackendOffload(cn1DbOpenJob, &job);
+    CN1_RESUME_THREAD;
+    if(job.rc != SQLITE_OK || job.db == NULL) {
         return 0;
     }
-    return (JAVA_LONG)(intptr_t)db;
+    return (JAVA_LONG)(intptr_t)job.db;
 }
 
 JAVA_INT com_codename1_backend_Db_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    struct cn1DbJob job;
     sqlite3* db = (sqlite3*)(intptr_t)handle;
     if(db == NULL) {
         return 0;
     }
-    return sqlite3_close(db) == SQLITE_OK ? 0 : -1;
+    memset(&job, 0, sizeof(job));
+    job.db = db;
+    CN1_YIELD_THREAD;
+    cn1BackendOffload(cn1DbCloseJob, &job);
+    CN1_RESUME_THREAD;
+    return job.rc == SQLITE_OK ? 0 : -1;
 }
 
 JAVA_OBJECT com_codename1_backend_Db_errorImpl___long_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
@@ -170,16 +272,22 @@ JAVA_OBJECT com_codename1_backend_Db_errorImpl___long_R_java_lang_String(CODENAM
 }
 
 JAVA_LONG com_codename1_backend_Db_prepareImpl___long_java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT sql) {
+    struct cn1DbJob job;
     sqlite3* db = (sqlite3*)(intptr_t)handle;
-    sqlite3_stmt* stmt = NULL;
     const char* text = sql == JAVA_NULL ? NULL : stringToUTF8(threadStateData, sql);
     if(db == NULL || text == NULL) {
         return 0;
     }
-    if(sqlite3_prepare_v2(db, text, -1, &stmt, NULL) != SQLITE_OK) {
+    memset(&job, 0, sizeof(job));
+    job.db = db;
+    job.text = text;
+    CN1_YIELD_THREAD;
+    cn1BackendOffload(cn1DbPrepareJob, &job);
+    CN1_RESUME_THREAD;
+    if(job.rc != SQLITE_OK) {
         return 0;
     }
-    return (JAVA_LONG)(intptr_t)stmt;
+    return (JAVA_LONG)(intptr_t)job.stmt;
 }
 
 JAVA_INT com_codename1_backend_Db_bindStringImpl___long_int_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index, JAVA_OBJECT value) {
@@ -239,13 +347,30 @@ JAVA_INT com_codename1_backend_Db_bindNullImpl___long_int_R_int(CODENAME_ONE_THR
 /* 1 = a row is available, 0 = finished, -1 = error. */
 JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
+    struct cn1DbJob job;
+    struct cn1DbStepHint* hint;
     int rc;
     if(stmt == NULL) {
         return -1;
     }
+    memset(&job, 0, sizeof(job));
+    job.stmt = stmt;
+    hint = cn1DbHintFor(stmt);
     CN1_YIELD_THREAD;
-    rc = sqlite3_step(stmt);
+    /* Inline only for a READ-ONLY statement already part-way through its rows:
+       a write can meet a lock and sleep in the busy handler for the whole busy
+       timeout, holding every virtual thread on this host. A reader mid-iteration
+       holds its snapshot and does not wait on a lock. */
+    if(sqlite3_stmt_busy(stmt) && sqlite3_stmt_readonly(stmt)
+            && hint->stmt == stmt && hint->fast) {
+        cn1DbStepJob(&job);
+    } else {
+        cn1BackendOffload(cn1DbStepJob, &job);
+    }
     CN1_RESUME_THREAD;
+    hint->stmt = stmt;
+    hint->fast = job.nanos < CN1_DB_INLINE_STEP_NANOS;
+    rc = job.rc;
     if(rc == SQLITE_ROW) {
         return 1;
     }

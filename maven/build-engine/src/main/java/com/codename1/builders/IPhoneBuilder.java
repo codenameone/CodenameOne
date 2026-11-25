@@ -492,6 +492,25 @@ public class IPhoneBuilder extends Executor {
                 + escapePlistText(value.trim()) + "</string>";
     }
 
+    /// Ruby expression (using `xcproj`, `rel_path` and `swift_path`) that finds the project's existing file reference for a
+    /// Swift file under `<Main>-src`, or creates one.
+    ///
+    /// The translator writes a source it already knows (every `.swift` staged
+    /// beside the port natives, such as `CN1SystemLanguageModel.swift`) with the
+    /// bare file name as its `path`, inside the `-src` group. Matching on the
+    /// project-relative path alone missed it, created a second reference and a
+    /// second Compile Sources entry, and Xcode 27 warns "Skipping duplicate
+    /// build file". Match on the resolved location as well.
+    static String swiftReferenceLookupRuby() {
+        // Matched by where the reference resolves, never by bare file name:
+        // the watch slice keeps same-named copies of these files in a group of
+        // its own, and reusing one of those would put it in the app target.
+        return "xcproj.files.find{|f| f.path == rel_path"
+                + " || (begin; File.expand_path(f.real_path.to_s) == File.expand_path(swift_path);"
+                + " rescue; false; end)}"
+                + " || xcproj.main_group.new_file(rel_path)";
+    }
+
     private void enableNearbyDefine(File buildinRes, String name)
             throws BuildException {
         enableFeatureDefine(buildinRes, name, "com.codename1.nearby");
@@ -7906,7 +7925,7 @@ public class IPhoneBuilder extends Executor {
                             + "    end\n"
                             + "    swift_paths.each do |swift_path|\n"
                             + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
-                            + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
+                            + "      ref = " + swiftReferenceLookupRuby() + "\n"
                             + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
                             + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
                             + "      end\n"

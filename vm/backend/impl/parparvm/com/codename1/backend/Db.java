@@ -89,7 +89,7 @@ public final class Db {
     }
 
     /// Runs a statement that returns no rows. Returns the number of rows changed.
-    public synchronized int execute(String sql, Object[] params) throws IOException {
+    private int executeLocked(String sql, Object[] params) throws IOException {
         long stmt = prepare(sql, params);
         try {
             int rc = stepImpl(stmt);
@@ -111,7 +111,7 @@ public final class Db {
 
     /// Runs a query and returns every row as a column-name to value map. Values are
     /// String, Long, Double or null, which is exactly what the JSON writer accepts.
-    public synchronized List query(String sql, Object[] params) throws IOException {
+    private List queryLocked(String sql, Object[] params) throws IOException {
         long stmt = prepare(sql, params);
         try {
             int columns = columnCountImpl(stmt);
@@ -143,7 +143,7 @@ public final class Db {
     // if it throws. A half-applied multi-statement change is the failure mode this
     // exists to prevent, and getting the rollback right by hand at every call site
     // is how it gets missed.
-    /// Synchronized because a TRANSACTION is not one call.
+    /// Gated because a TRANSACTION is not one call.
     ///
     /// SQLite serializes each API call on a connection, which is what made "one
     /// shared connection is correct, and SQLite serializes it" look true. It
@@ -153,12 +153,12 @@ public final class Db {
     /// knows nothing about it, or meet "cannot start a transaction within a
     /// transaction" and fail for a reason its own code cannot explain.
     ///
-    /// The monitor is reentrant, which is what makes this work: transaction() holds
+    /// The gate is reentrant, which is what makes this work: transaction() holds
     /// it for the whole callback and the execute() calls inside it re-enter freely.
     /// A pooled connection is used by one thread at a time anyway, so the cost
     /// there is an uncontended lock; a shared one is serialized, which is exactly
     /// what correctness requires of it.
-    public synchronized Object transaction(Work body) throws Exception {
+    private Object transactionLocked(Work body) throws Exception {
         execute("BEGIN IMMEDIATE", null);
         boolean committed = false;
         try {
@@ -176,6 +176,163 @@ public final class Db {
                     System.err.println("rollback failed: " + err);
                 }
             }
+        }
+    }
+
+
+    /// THE CONNECTION GATE, held by every operation instead of this object's
+    /// monitor -- the same flag Database holds, for the same reason.
+    ///
+    /// sqlite3_step and friends run on the native I/O pool while a virtual
+    /// thread waits for them PARKED, so the host serves other requests meanwhile
+    /// (cn1_backend_offload.c). A virtual thread holding a monitor cannot park:
+    /// monitor ownership is the host's, so the runtime pins it instead, and a
+    /// `synchronized` method here held the host for the whole query -- the
+    /// offload would have run and changed nothing. The exclusion the connection
+    /// needs (one call at a time, a transaction reserved to its caller, close not
+    /// freeing the handle under a reader) is this flag, taken and given back under
+    /// a monitor held only for that instant. Reentrant, so transaction()'s
+    /// callback re-enters execute() freely. A virtual thread waiting for it naps;
+    /// anything else waits on the monitor.
+    private final Object gate = new Object();
+    private Object gateOwner;
+    private int gateHolds;
+    /// A close asked for while another caller held the gate; that caller runs it
+    /// when its outermost hold ends. See [#close].
+    private boolean closePending;
+
+    /// Who is asking: the virtual thread, or the platform thread. Not
+    /// Thread.currentThread() alone, which every virtual thread on a host shares,
+    /// and not the virtual thread's address, which a server stop can free while
+    /// it holds this gate and a later virtual thread can then reuse -- that one
+    /// would walk into a gate it never took, on a connection mid-transaction.
+    private static Object caller() {
+        long virtual = VirtualThread.currentSerial();
+        return virtual != 0 ? (Object) Long.valueOf(virtual) : Thread.currentThread();
+    }
+
+    /// Takes the gate, reentrantly; an interrupt is kept for the caller rather
+    /// than ending the wait, as a monitor would.
+    private void enter() {
+        Object me = caller();
+        boolean virtual = VirtualThread.isVirtual();
+        boolean interrupted = false;
+        long nap = 1;
+        while (true) {
+            synchronized (gate) {
+                if (gateOwner == null || gateOwner.equals(me)) {
+                    gateOwner = me;
+                    gateHolds++;
+                    break;
+                }
+                if (!virtual) {
+                    try {
+                        gate.wait();
+                    } catch (InterruptedException error) {
+                        interrupted = true;
+                    }
+                    continue;
+                }
+            }
+            HttpServer.napUntil(System.currentTimeMillis() + nap);
+            nap = Math.min(20, nap * 2);
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void exit() {
+        boolean closeNow = false;
+        synchronized (gate) {
+            gateHolds--;
+            if (gateHolds <= 0) {
+                gateHolds = 0;
+                if (closePending) {
+                    // Still the owner: the deferred close runs below, outside the
+                    // monitor, so its offloaded sqlite3_close can park.
+                    closePending = false;
+                    closeNow = true;
+                } else {
+                    gateOwner = null;
+                    gate.notifyAll();
+                }
+            }
+        }
+        if (closeNow) {
+            try {
+                closeLocked();
+            } finally {
+                synchronized (gate) {
+                    gateOwner = null;
+                    gate.notifyAll();
+                }
+            }
+        }
+    }
+
+    /// Holds the connection gate (see [#enter]) for [#executeLocked].
+    public int execute(String sql, Object[] params) throws IOException {
+        enter();
+        try {
+            return executeLocked(sql, params);
+        } finally {
+            exit();
+        }
+    }
+
+    /// Holds the connection gate (see [#enter]) for [#queryLocked].
+    public List query(String sql, Object[] params) throws IOException {
+        enter();
+        try {
+            return queryLocked(sql, params);
+        } finally {
+            exit();
+        }
+    }
+
+    /// Holds the connection gate (see [#enter]) for [#transactionLocked].
+    public Object transaction(Work body) throws Exception {
+        enter();
+        try {
+            return transactionLocked(body);
+        } finally {
+            exit();
+        }
+    }
+
+    /// Holds the connection gate (see [#enter]) for [#lastInsertIdLocked].
+    public long lastInsertId() {
+        enter();
+        try {
+            return lastInsertIdLocked();
+        } finally {
+            exit();
+        }
+    }
+
+    /// Holds the connection gate (see [#enter]) for [#closeLocked].
+    ///
+    /// NEVER WAITS FOR ANOTHER CALLER. When the connection is in use, the close is
+    /// recorded and the user runs it as its outermost operation ends -- after a
+    /// transaction, not in the middle of one. Waiting was a hang at shutdown:
+    /// HttpServer.stop() lets go of a virtual thread whose query outlived the
+    /// drain window while its sqlite3_step is still on the I/O pool, and that
+    /// thread holds the gate and never runs again, so a pool.close() that waited
+    /// for it waited for ever. Such a connection is left to the process exit.
+    public void close() {
+        Object me = caller();
+        synchronized (gate) {
+            if (gateOwner != null && !gateOwner.equals(me)) {
+                closePending = true;
+                return;
+            }
+        }
+        enter();
+        try {
+            closeLocked();
+        } finally {
+            exit();
         }
     }
 
@@ -201,18 +358,18 @@ public final class Db {
 
     /// The rowid the most recent insert produced.
     ///
-    /// SYNCHRONIZED, like execute, query, transaction and close -- it was the
+    /// GATED, like execute, query, transaction and close -- it was the
     /// one operation here that was not, and the only one that hands the native
     /// handle over without holding the lock that guards it. close() frees the
     /// sqlite3 connection and then zeroes the field, so a reader that had already
     /// loaded the handle called sqlite3_last_insert_rowid on freed memory. The
     /// native's own null check cannot help with that: the pointer it is given is
     /// not null, it is dangling.
-    public synchronized long lastInsertId() {
+    private long lastInsertIdLocked() {
         return lastInsertRowIdImpl(handle);
     }
 
-    /// SYNCHRONIZED, like execute, query and transaction, and it keeps the handle
+    /// GATED, like execute, query and transaction, and it keeps the handle
     /// when the close does not take.
     ///
     /// sqlite3_close answers SQLITE_BUSY when a prepared statement is still
@@ -221,10 +378,11 @@ public final class Db {
     /// open, so nothing could ever close it again -- the native connection and
     /// everything it owns leaked, once per shutdown that raced a borrower.
     ///
-    /// The lock is what makes that rare rather than merely recoverable: a
-    /// DbPool.close() arriving while a borrowed connection is mid-query now waits
-    /// for the query instead of closing underneath it.
-    public synchronized void close() {
+    /// The gate is what makes that rare rather than merely recoverable: a
+    /// DbPool.close() arriving while a borrowed connection is mid-query never
+    /// closes underneath it -- [#close] defers to the borrower, which closes the
+    /// connection as its query ends.
+    private void closeLocked() {
         if (handle != 0) {
             if (closeImpl(handle) == 0) {
                 handle = 0;

@@ -305,7 +305,9 @@ final class MailQueue {
         }
         if (failure == null) {
             MailMetrics.sent();
-            settle(item);
+            // Settled only once its row is gone: pending() at zero promises
+            // the table is final, and a database call that parks (the
+            // backend's I/O offload) made the gap long enough to observe.
             if (item.id != null) {
                 try {
                     db.execute("DELETE FROM " + TABLE + " WHERE id = ?", new Object[]{item.id});
@@ -314,6 +316,7 @@ final class MailQueue {
                             + "sent again: " + err.getMessage());
                 }
             }
+            settle(item);
             return;
         }
         boolean permanent = failure instanceof MailException
@@ -330,8 +333,9 @@ final class MailQueue {
         item.attempt++;
         if (permanent || item.attempt >= retry.getMaxAttempts()) {
             MailMetrics.failed(permanent);
-            settle(item);
+            // After the move to the dead table, for the reason given above.
             bury(item, failure, permanent);
+            settle(item);
             return;
         }
         MailMetrics.retried();

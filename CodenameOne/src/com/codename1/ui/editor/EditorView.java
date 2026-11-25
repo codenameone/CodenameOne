@@ -23,6 +23,7 @@
 
 package com.codename1.ui.editor;
 
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.util.Bidi;
 import com.codename1.util.UndoHistory;
 import com.codename1.util.UndoableEdit;
@@ -1384,7 +1385,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
 
     private void resetBlink() {
         caretOn = true;
-        lastBlink = System.currentTimeMillis();
+        lastBlink = AnimationTime.now();
     }
 
     @Override
@@ -1505,7 +1506,7 @@ public class EditorView extends Component implements TextInputClient, TextInputC
     public boolean animate() {
         boolean sup = super.animate();
         if (hasFocus()) {
-            long now = System.currentTimeMillis();
+            long now = AnimationTime.now();
             if (now - lastBlink >= 500) {
                 caretOn = !caretOn;
                 lastBlink = now;

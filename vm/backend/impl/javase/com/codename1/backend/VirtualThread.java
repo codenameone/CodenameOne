@@ -82,6 +82,10 @@ public final class VirtualThread {
         return 0;
     }
 
+    public static long currentSerial() {
+        return 0;
+    }
+
     public static boolean isVirtual() {
         return false;
     }

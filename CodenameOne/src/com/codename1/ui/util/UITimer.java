@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.util;
 
+import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -150,7 +151,7 @@ public class UITimer {
     ///
     /// - `bound`: the top level the timer is bound to
     public void schedule(int timeMillis, boolean repeat, TopLevelContainer bound) {
-        lastEllapse = System.currentTimeMillis();
+        lastEllapse = AnimationTime.now();
         ms = timeMillis;
         this.repeat = repeat;
         this.bound = bound;
@@ -166,7 +167,7 @@ public class UITimer {
 
 
     void testEllapse() {
-        long t = System.currentTimeMillis();
+        long t = AnimationTime.now();
         if (t - lastEllapse >= ms) {
             if (!repeat) {
                 // Deregistered from whatever this timer was bound to, not from the

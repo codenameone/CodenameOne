@@ -13,9 +13,13 @@ yourself in the background and talk to it with the bundled command-line client:
 ./mvnw cn1:agent &                 # Gradle: ./gradlew cn1Agent &   (Linux, no display: xvfb-run -a ./gradlew cn1Agent &)
 S=.agent-skills/codename-one/tools/Sim.java
 java $S wait                    # blocks until the first form answers
+java $S freeze                  # animation time now moves only when you move it
 java $S snapshot                # ui_snapshot
 java $S find "Email"            # ui_find by label
 java $S tap "Sign In"           # ui_activate, by label or node id
+java $S settle                  # run the transition/animations to rest, then read the screen
+java $S advance 300             # or look 300 ms into an animation, or make a timer fire
+java $S film target/anim.png 600 50   # right after a tap: the animation as a contact sheet
 java $S type "Email" alice@example.com   # ui_set_text
 java $S screenshot target/s.png # the current form as a PNG -- open it and look
 java $S record-start target/flow.mp4 ; java $S caption "Sign in" ; java $S record-stop
@@ -124,6 +128,7 @@ Every server publishes these, with no work from the app:
 | `ui_activate` | Tap or click a node (`nodeId` from a snapshot or a find). |
 | `ui_set_text` | Type into an editable node (`nodeId`, `text`). |
 | `ui_perform_action` | Any other action a node advertises: `longPress`, `increment`, `decrement`, `focus`, `expand`, `scrollForward`, and so on. |
+| `ui_clock_freeze` / `ui_clock_settle` / `ui_clock_advance` / `ui_clock_release` | The agent clock. Frozen, animation time (motions, transitions, `UITimer`, dialog timeouts, tickers, caret blink) moves only when you move it, so screenshots are deterministic and never race an animation. `settle` steps until no transition runs and the screen stops changing (`settled:false` means an endless animation hit `maxMs`). Input timing is unaffected. While frozen, a tool called during a transition answers "call ui_clock_settle" instead of waiting. |
 
 Every action runs on the Codename One EDT and returns whether it succeeded **plus a fresh snapshot**, so one call tells you what the screen became. The server also exposes a screenshot of the current form as an MCP image resource, which is worth reading when the semantic tree looks right and you suspect a layout or styling problem instead.
 
@@ -154,3 +159,31 @@ The server merges these with the built-in UI tools when a host lists what is ava
 - **Do not leave a starter in shipping code** on the assumption the gate will catch it. The JavaSE port cannot tell a packaged desktop app from the simulator, so it reports a development build in every case and the gate does not protect a desktop release.
 - **Watch what you are doing.** `MCP -> Debug Logging` echoes the conversation to the Codename One log; `SUMMARY` gives one line per call, `FULL` gives every request and response.
 - **Say when you could not check -- after trying.** A headless environment is not a reason: `cn1:agent` runs there. Report "could not verify" only when a step failed, and quote the failure.
+
+## Error IDs
+
+Build and compile errors carry a stable ID in square brackets. Key on the ID, not on the wording, and apply the fix the message names:
+
+| ID | Where | What to do |
+|---|---|---|
+| `CN1-CSS-PROPERTY` | CSS compile | The property isn't supported. Use the one the message suggests ("Did you mean text-align?"). |
+| `CN1-CSS-COLOR` | CSS compile | The value isn't a color. Use the suggested name, `#rrggbb` or `rgb()`/`rgba()`. |
+| `CN1-HINT-UNKNOWN` | Any build (a warning) | No builder reads this build hint, so it does nothing. Rename it to the suggested hint. |
+| `CN1-API-JDK` | Compliance check | A JDK API a device doesn't have. The report's `Instead:` line names the replacement. |
+| `CN1-LANGUAGE` | Compliance check | A Java feature compiled to something a device can't run. Rewrite it as the report says. |
+| `CN1-LIBRARY-MISSING` | Compliance check | A class from a library that isn't in the application. Add the dependency or remove the use. |
+| `CN1-API-TOOLKIT`, `CN1-API-UI-LIBRARY` | Compliance check | Swing, AWT, JavaFX or UI-library API the compatibility layers lack. |
+| `CN1-API-OTHER` | Compliance check | Anything else a device lacks; read the `Instead:` line. |
+
+A failed build's log gets its ID from `java .agent-skills/codename-one/tools/BuildLog.java <log>`, which reads the toolchains' own messages and prints the fix:
+
+| ID | What failed |
+|---|---|
+| `CN1-SIGN-CERT` | iOS certificate missing, expired, revoked, not matching its key, or a wrong P12 password. |
+| `CN1-SIGN-PROFILE` | Provisioning profile with the wrong bundle ID, certificate or kind, or expired. |
+| `CN1-SIGN-ENTITLEMENT` | A capability the app uses that its profile doesn't grant. |
+| `CN1-ANDROID-KEYSTORE` | Wrong keystore, password or alias. |
+| `CN1-BUILD-NATIVE` | A native interface or cn1lib native that didn't compile or link. |
+| `CN1-BUILD-DEPENDENCY` | A Gradle/Maven artifact, CocoaPod or Swift package that didn't resolve. |
+| `CN1-BUILD-QUOTA` | Out of build credits, or the upload is over the plan's size. |
+| `CN1-BUILD-TIMEOUT` | The build ran out of time on the server. |
