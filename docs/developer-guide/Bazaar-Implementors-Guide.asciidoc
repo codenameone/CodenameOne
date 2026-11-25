@@ -629,8 +629,13 @@ cookie (which makes the page private), and the language from the market or
 
 `market.Markets` prices a variant for a market from a fixed price, or else the
 store price at the merchant's own exchange rate plus an adjustment in basis
-points, rounded as the market asks, all in integer cents. Only two-decimal
-currencies are supported. When a shopper checks out in a market, prices are
+points, rounded as the market asks, all in integers. Every amount is a whole
+number of its currency's minor unit, with the number of decimals taken from
+`java.util.Currency.getDefaultFractionDigits()`: cents for dollars, yen for
+yen, fils for Bahraini dinars. `ops.Amounts` (in the shared module) formats,
+parses, rescales and converts them; columns and fields named `...Cents` hold
+minor units of the order's or store's currency. The Fennel & Fig demo store
+sells in yen. When a shopper checks out in a market, prices are
 worked out in the store's currency and the amount due is converted at the rate
 the page showed, locked for the order. The order keeps both its totals in the
 store's currency and the presentment currency, total and rate, and refunds go
@@ -1006,14 +1011,19 @@ business contracts for. Plan for these before taking real orders:
   simulated tender and prints through the platform's print service. Card readers
   and receipt or label printers each need their vendor's SDK, wrapped as a
   native interface.
-* *Currency conversion for platform totals.* Each store sells in its own
-  currency. The platform console adds store totals unconverted, which is only
-  right while every store uses the same currency; reporting gross merchandise
-  value across currencies needs exchange rates recorded at the time of each sale.
+* *Live exchange rates for platform totals.* Every order records the rate from
+  its store's currency into the platform's reporting currency
+  (`bazaar.fx.reporting.currency`, US dollars by default) when it is placed,
+  and the platform console's GMV converts at those rates. The rates come from
+  `market.ExchangeRates`: a fixed demo table by default, or the European Central
+  Bank's daily reference rates with `bazaar.fx.reporting.provider=ecb`. A
+  production platform would take rates from its payment processor or a paid
+  feed with intraday rates and an audit trail.
 * *Tax for B2B orders.* Quotes and B2B orders are priced net of tax. Reverse-charge
   and per-company tax treatment need the tax engine above.
-* *Currencies with other than two decimals.* Only two-decimal currencies are
-  supported.
+* *Three-decimal currencies at Stripe.* Amounts in a three-decimal currency
+  such as BHD are sent to Stripe as stored; Stripe asks for those to end in 0,
+  and Bazaar does not round a charge away from the order's total.
 * *Storefront interface text.* The storefront's own text (buttons, cart,
   checkout labels and errors, the consent banner, chat, sign-in and sign-up,
   and the signed-in account pages: orders, returns, addresses, wishlist,

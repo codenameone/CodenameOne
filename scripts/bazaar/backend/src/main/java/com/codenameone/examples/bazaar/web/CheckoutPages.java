@@ -612,8 +612,7 @@ public class CheckoutPages {
                 // Charged in the shopper's currency at the rate the prices were
                 // shown in (Checkouts.place); worked out in the store's.
                 view.marketNote = "This order is charged in " + shown.currency() + ": "
-                        + Money.format(com.codenameone.examples.bazaar.checkout.Checkouts.atRate(
-                            dto.dueCents(), shown.rateMicros()), shown.currency())
+                        + Money.format(shown.charge(dto.dueCents()), shown.currency())
                         + " for " + Money.format(dto.dueCents(), currency) + ".";
             }
             view.nothingDue = dto.dueCents() <= 0;

@@ -64,6 +64,14 @@ import java.util.Map;
 /// Everything Stripe-specific is in [#form] strings and the reading of the
 /// answers. The network is behind [Transport], which is what lets the tests
 /// hold both to canned answers without a key.
+///
+/// Amounts go to Stripe exactly as stored: Stripe's `amount` is the
+/// currency's minor unit, which is what every Bazaar amount already is
+/// ([com.codenameone.examples.bazaar.ops.Amounts]). Nothing here multiplies
+/// by 100, so a yen order of 1250 is sent as 1250 yen. Stripe further wants
+/// a three-decimal currency's amount (BHD, KWD) to end in 0; that is not
+/// rounded here, since charging other than the order's total would be worse
+/// than the refusal Stripe answers with.
 public class StripePayments implements PaymentProvider {
     private static final String API = "https://api.stripe.com";
 

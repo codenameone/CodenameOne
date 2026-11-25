@@ -18,45 +18,24 @@
  */
 package com.codenameone.examples.bazaar.web;
 
-/// Prices as a page shows them. Amounts are minor units (cents).
+import com.codenameone.examples.bazaar.ops.Amounts;
+
+/// Prices as a page shows them. Amounts are minor units of their currency
+/// ([Amounts]): cents, yen or fils.
 public final class Money {
     private Money() {
     }
 
-    /// `1250, USD` -> `$12.50`; a currency without a symbol here is spelled
-    /// out in front: `CHF 12.50`.
-    public static String format(long cents, String currency) {
-        String symbol = symbol(currency);
-        String amount = plain(Math.abs(cents));
-        String sign = cents < 0 ? "-" : "";
-        return symbol.length() > 0 ? sign + symbol + amount : sign + currency + " " + amount;
+    /// `1250, USD` -> `$12.50`, `1250, JPY` -> yen sign and `1250`; a currency
+    /// without a symbol is spelled out in front: `CHF 12.50`, `BHD 1.250`.
+    public static String format(long minor, String currency) {
+        return Amounts.format(minor, currency);
     }
 
-    /// `1250` -> `12.50`: what structured data wants for a price.
-    public static String plain(long cents) {
-        long a = Math.abs(cents);
-        long frac = a % 100;
-        return (cents < 0 ? "-" : "") + (a / 100) + "." + (frac < 10 ? "0" : "") + frac;
-    }
-
-    private static String symbol(String currency) {
-        if ("USD".equalsIgnoreCase(currency) || "CAD".equalsIgnoreCase(currency)
-                || "AUD".equalsIgnoreCase(currency) || "NZD".equalsIgnoreCase(currency)) {
-            return "$";
-        }
-        if ("EUR".equalsIgnoreCase(currency)) {
-            return "\u20ac";
-        }
-        if ("GBP".equalsIgnoreCase(currency)) {
-            return "\u00a3";
-        }
-        if ("ILS".equalsIgnoreCase(currency)) {
-            return "\u20aa";
-        }
-        if ("JPY".equalsIgnoreCase(currency)) {
-            return "\u00a5";
-        }
-        return "";
+    /// `1250, USD` -> `12.50`, `1250, JPY` -> `1250`: what structured data
+    /// and exports want for a price.
+    public static String plain(long minor, String currency) {
+        return Amounts.plain(minor, currency);
     }
 
     /// Basis points as a percentage: 1000 is "10", 1250 is "12.5".

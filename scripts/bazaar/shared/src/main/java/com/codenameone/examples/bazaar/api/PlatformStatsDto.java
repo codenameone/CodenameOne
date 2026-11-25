@@ -32,5 +32,6 @@ public record PlatformStatsDto(
         int orders,
         int ordersToday,
         long gmvCents,
-        List<StoreStatsDto> perStore) {
+        List<StoreStatsDto> perStore,
+        String reportingCurrency) {
 }

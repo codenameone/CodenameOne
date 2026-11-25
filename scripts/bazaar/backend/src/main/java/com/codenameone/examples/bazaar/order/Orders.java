@@ -152,6 +152,8 @@ public class Orders {
 
     private final com.codenameone.examples.bazaar.routing.OrderRouting routing;
 
+    private final com.codenameone.examples.bazaar.market.ReportingRates reporting;
+
     public Orders(StoreOrderRepository orders, OrderLineRepository lines,
             OrderEventRepository events, TenderRepository tenders,
             FulfillmentRepository fulfillments, RefundRepository refunds,
@@ -161,7 +163,9 @@ public class Orders {
             Quoter quoter, StoreEvents storeEvents, CustomerRepository customers, SaleEvents saleEvents,
             com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings,
             com.codenameone.examples.bazaar.routing.OrderRouting routing,
-            com.codenameone.examples.bazaar.repository.TrialOrderRepository trialOrders) {
+            com.codenameone.examples.bazaar.repository.TrialOrderRepository trialOrders,
+            com.codenameone.examples.bazaar.market.ReportingRates reporting) {
+        this.reporting = reporting;
         this.trialOrders = trialOrders;
         this.routing = routing;
         this.saleEvents = saleEvents;
@@ -1269,6 +1273,8 @@ public class Orders {
     private StoreOrder insertTx(StoreOrder order, Writer rest) throws IOException {
         StoreOrder last = orders.findFirstByStoreIdOrderByNumberDesc(order.getStoreId());
         order.setNumber(last == null ? 1001 : last.getNumber() + 1);
+        // The rate into the platform's reporting currency, as of this sale.
+        reporting.stamp(order);
         orders.insert(order);
         rest.write(order);
         return order;

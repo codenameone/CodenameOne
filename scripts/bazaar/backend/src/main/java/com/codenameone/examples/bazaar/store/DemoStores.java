@@ -265,6 +265,8 @@ public class DemoStores {
         {"Worth it", "You can tell it was made with care. Shipping was quick too."},
     };
 
+    private final com.codenameone.examples.bazaar.market.ReportingRates reporting;
+
     public DemoStores(StoreRepository stores, StoreStaffRepository staff,
             LocationRepository locations, ProductRepository products,
             ProductOptionRepository options, VariantRepository variants,
@@ -280,7 +282,9 @@ public class DemoStores {
             PhotoRepository photos, ProductPhotoRepository gallery, ReviewRepository reviews,
             DemoFunnel funnel,
             com.codenameone.examples.bazaar.repository.RefundRepository refunds,
-            com.codenameone.examples.bazaar.repository.PaymentRepository payments) {
+            com.codenameone.examples.bazaar.repository.PaymentRepository payments,
+            com.codenameone.examples.bazaar.market.ReportingRates reporting) {
+        this.reporting = reporting;
         this.payments = payments;
         this.funnel = funnel;
         this.refunds = refunds;
@@ -553,6 +557,7 @@ public class DemoStores {
             }
         }
         for (int iter = 0; iter < made.size(); iter++) {
+            reporting.stamp(made.get(iter));
             sales.insert(made.get(iter));
         }
         saleLines.saveAll(madeLines);
@@ -865,6 +870,11 @@ public class DemoStores {
     /// Seeds [#FENNEL_FIG] once, owned by `owner`.
     private final com.codenameone.examples.bazaar.repository.PaymentRepository payments;
 
+    /// Fennel & Fig sells in yen, the one demo store whose currency has no
+    /// decimals: its prices, shipping and history are whole yen, and the
+    /// platform's totals convert it at the rate each order recorded.
+    public static final String FENNEL_FIG_CURRENCY = "JPY";
+
     public void fennelFig(String owner) throws IOException {
         if (exists(FENNEL_FIG)) {
             return;
@@ -874,6 +884,8 @@ public class DemoStores {
                 + "Everything ships from our shop in Portland.", 0x3f7d4e, owner,
                 "18 Alder St, Portland, OR", 45.5202, -122.6742);
         List<Location> places = new ArrayList<Location>();
+        store.setCurrency(FENNEL_FIG_CURRENCY);
+        stores.save(store);
         places.add(location(store, "Alder St shop", "RETAIL", "18 Alder St, Portland, OR", true,
                 0));
         locations.saveAll(places);
@@ -1009,7 +1021,10 @@ public class DemoStores {
             if (secondName != null) {
                 optionRows.add(option(product, secondName, second, 1));
             }
-            long price = Long.parseLong(row[4]);
+            // The table is US cents; a store in another currency gets the
+            // same prices in its own minor units.
+            long price = com.codenameone.examples.bazaar.pricing.DemoMoney.local(
+                    Long.parseLong(row[4]), store.getCurrency());
             int position = 0;
             for (int a = 0; a < first.length; a++) {
                 for (int b = 0; b < second.length; b++) {
@@ -1027,7 +1042,8 @@ public class DemoStores {
                             + (second[b].length() == 0 ? "" : "-" + code(second[b])));
                     v.setBarcode(ean13((apparel ? "20012" : "20034") + pad(serial, 7)));
                     // XL costs a little more, as it does in most shops.
-                    v.setPriceCents("XL".equals(first[a]) ? price + 500 : price);
+                    v.setPriceCents("XL".equals(first[a]) ? price + com.codenameone.examples.bazaar.pricing.DemoMoney.local(500,
+                            store.getCurrency()) : price);
                     v.setCompareAtCents(iter % 7 == 2 ? price + price / 4 : 0);
                     v.setCostCents(price * 42 / 100);
                     v.setWeightGrams(apparel ? 250 + iter * 37 % 900 : 300 + iter * 53 % 1200);

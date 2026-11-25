@@ -464,7 +464,7 @@ public class StorefrontPages {
             long cents = pricer == null ? chosen.priceCents()
                     : pricer.price(chosen.id(), chosen.priceCents());
             view.price = Money.format(cents, shown);
-            view.amount = Money.plain(cents);
+            view.amount = Money.plain(cents, shown);
             // Per the price actually shown, so a market's price has its own.
             long unit = com.codenameone.examples.bazaar.ops.UnitPricing.unitPriceCents(cents,
                     chosen.unitQuantity(), chosen.unitName(), chosen.unitReference(),
@@ -473,7 +473,7 @@ public class StorefrontPages {
                 view.unitPrice = Money.format(unit, shown) + " / "
                         + com.codenameone.examples.bazaar.ops.UnitPricing.per(
                             chosen.unitReference(), chosen.unitReferenceName());
-                view.unitAmount = Money.plain(unit);
+                view.unitAmount = Money.plain(unit, shown);
                 view.unitReference = chosen.unitReference();
                 view.unitReferenceName = chosen.unitReferenceName();
             }

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.content;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -59,6 +60,7 @@ public class Metafields {
     public static final String[] TYPES = {"text", "number", "money", "date", "boolean", "reference"};
     static final int MAX_FIELDS = 100;
 
+    private final com.codenameone.examples.bazaar.repository.StoreRepository stores;
     private final MetafieldDefRepository defs;
     private final MetafieldValueRepository values;
     private final MetaobjectTypeRepository types;
@@ -69,7 +71,9 @@ public class Metafields {
 
     public Metafields(MetafieldDefRepository defs, MetafieldValueRepository values,
             MetaobjectTypeRepository types, MetaobjectEntryRepository entries,
-            StoreAccess access, MetafieldOwners owners, com.codenameone.examples.bazaar.market.Translations translations) {
+            StoreAccess access, MetafieldOwners owners, com.codenameone.examples.bazaar.market.Translations translations,
+            com.codenameone.examples.bazaar.repository.StoreRepository stores) {
+        this.stores = stores;
         this.translations = translations;
         this.defs = defs;
         this.values = values;
@@ -289,7 +293,7 @@ public class Metafields {
             number = whole(raw, "a whole number");
             text = Long.toString(number);
         } else if ("money".equals(type)) {
-            number = cents(raw);
+            number = cents(raw, Amounts.digits(currencyOf(storeId)));
             text = Long.toString(number);
         } else if ("date".equals(type)) {
             number = date(raw);
@@ -320,10 +324,7 @@ public class Metafields {
     private String display(MetafieldDef d, MetafieldValue v) throws IOException {
         String type = d.getFieldType();
         if ("money".equals(type)) {
-            long c = v.getNumberValue();
-            long abs = Math.abs(c);
-            long frac = abs % 100;
-            return (c < 0 ? "-" : "") + abs / 100 + "." + (frac < 10 ? "0" : "") + frac;
+            return Amounts.plain(v.getNumberValue(), currencyOf(d.getStoreId()));
         }
         if ("boolean".equals(type)) {
             return v.getNumberValue() == 1 ? "Yes" : "No";
@@ -352,20 +353,29 @@ public class Metafields {
     }
 
     /// `12`, `12.5` or `12.50` as cents.
-    static long cents(String raw) {
+    /// The store's currency, whose decimals a money field is written in.
+    private String currencyOf(String storeId) {
+        com.codenameone.examples.bazaar.domain.Store s = storeId == null ? null
+                : stores.findById(storeId);
+        return s == null ? "" : s.getCurrency();
+    }
+
+    /// Minor units of a decimal amount written with at most `digits` decimals.
+    static long cents(String raw, int digits) {
         int dot = raw.indexOf('.');
+        long unit = Amounts.unit(digits);
         if (dot < 0) {
-            return Math.multiplyExact(whole(raw, "an amount"), 100L);
+            return Math.multiplyExact(whole(raw, "an amount"), unit);
         }
         String frac = raw.substring(dot + 1);
-        if (frac.length() == 0 || frac.length() > 2 || frac.startsWith("-")) {
+        if (frac.length() == 0 || frac.length() > digits || frac.startsWith("-")) {
             throw new ResponseStatusException(400, "That is not an amount");
         }
         String head = raw.substring(0, dot);
         boolean negative = head.startsWith("-");
         long units = head.length() == 0 || "-".equals(head) ? 0 : whole(head, "an amount");
-        long f = whole(frac, "an amount") * (frac.length() == 1 ? 10 : 1);
-        long abs = Math.addExact(Math.multiplyExact(Math.abs(units), 100L), f);
+        long f = whole(frac, "an amount") * Amounts.unit(digits - frac.length());
+        long abs = Math.addExact(Math.multiplyExact(Math.abs(units), unit), f);
         return negative ? -abs : abs;
     }
 

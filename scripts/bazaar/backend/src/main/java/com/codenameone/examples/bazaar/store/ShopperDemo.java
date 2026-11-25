@@ -120,11 +120,15 @@ public class ShopperDemo {
     private final long started = System.currentTimeMillis();
     private boolean seeded;
 
+    private final com.codenameone.examples.bazaar.market.ReportingRates reporting;
+
     public ShopperDemo(Config config, StoreRepository stores, LocationRepository locations,
             VariantRepository variants, StoreOrderRepository orders, OrderLineRepository lines,
             FulfillmentRepository fulfillments, WishlistRepository wishlists,
             Orders orderService, Fulfillments fulfil, Loyalty loyalty, Shoppers shoppers,
-            DemoStores demoStores, CustomerAddressRepository addresses) {
+            DemoStores demoStores, CustomerAddressRepository addresses,
+            com.codenameone.examples.bazaar.market.ReportingRates reporting) {
+        this.reporting = reporting;
         this.config = config;
         this.stores = stores;
         this.locations = locations;
@@ -406,10 +410,14 @@ public class ShopperDemo {
             made.add(line);
         }
         o.setSubtotalCents(subtotal);
-        o.setShippingCents(subtotal > 7500 ? 0 : 595);
+        // Free over $75, else $5.95, in the store's own currency.
+        o.setShippingCents(subtotal > com.codenameone.examples.bazaar.pricing.DemoMoney.local(7500,
+                o.getCurrency()) ? 0 : com.codenameone.examples.bazaar.pricing.DemoMoney.local(595,
+                o.getCurrency()));
         o.setTotalCents(subtotal + o.getShippingCents());
         o.setCreatedAt(when);
         o.setUpdatedAt(when);
+        reporting.stamp(o);
         orders.insert(o);
         lines.saveAll(made);
         return o;

@@ -497,7 +497,8 @@ public class TaxRules {
             OssRowDto r = rows.get(iter);
             b.append(r.country()).append(',').append(percent(r.basisPoints())).append(',')
                     .append(r.currency()).append(',').append(r.orders()).append(',')
-                    .append(money(r.netCents())).append(',').append(money(r.taxCents()))
+                    .append(money(r.netCents(), r.currency())).append(',')
+                    .append(money(r.taxCents(), r.currency()))
                     .append('\n');
         }
         return b.toString();
@@ -508,10 +509,9 @@ public class TaxRules {
         return (bp / 100) + "." + frac;
     }
 
-    static String money(long cents) {
-        long abs = Math.abs(cents);
-        String frac = Long.toString(abs % 100 + 100).substring(1);
-        return (cents < 0 ? "-" : "") + (abs / 100) + "." + frac;
+    /// Minor units in `currency`'s own decimals.
+    static String money(long cents, String currency) {
+        return com.codenameone.examples.bazaar.ops.Amounts.plain(cents, currency);
     }
 
     private static String[] splitKey(String key) {

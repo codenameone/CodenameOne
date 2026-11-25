@@ -387,8 +387,8 @@ public class Checkouts {
         if (pricer != null && !pricer.currency().equals(quote.store.getCurrency())) {
             rate = pricer.rateMicros();
             chargeCurrency = pricer.currency();
-            charge = atRate(due, rate);
-            presentmentTotal = atRate(quote.totalCents, rate);
+            charge = pricer.charge(due);
+            presentmentTotal = pricer.charge(quote.totalCents);
         }
         if (due > 0) {
             String method = empty(req.paymentMethodId()) ? payments.defaultMethod(username)
@@ -521,10 +521,29 @@ public class Checkouts {
         uses.deleteByOrderId(orderId);
     }
 
-    /// Store cents at a rate in millionths, half up; a total too large is a 400.
+    /// Store cents at a rate in millionths, half up, between two currencies
+    /// with two decimals; a total too large is a 400.
     public static long atRate(long cents, long rateMicros) {
+        return atRate(cents, "", "", rateMicros);
+    }
+
+    /// Minor units of `from` in minor units of `to` at `rateMicros` (units of
+    /// `to` per unit of `from`), half up, each in its own decimals: a dollar
+    /// charged in yen at 150 is 150 yen, not 15000. A total too large is a 400.
+    public static long atRate(long cents, String from, String to, long rateMicros) {
         try {
-            return Math.addExact(Math.multiplyExact(cents, rateMicros), 500000L) / 1000000L;
+            int df = com.codenameone.examples.bazaar.ops.Amounts.digits(from);
+            int dt = com.codenameone.examples.bazaar.ops.Amounts.digits(to);
+            long num = Math.multiplyExact(cents, rateMicros);
+            long den = 1000000L;
+            if (dt >= df) {
+                num = Math.multiplyExact(num,
+                        com.codenameone.examples.bazaar.ops.Amounts.unit(dt - df));
+            } else {
+                den = Math.multiplyExact(den,
+                        com.codenameone.examples.bazaar.ops.Amounts.unit(df - dt));
+            }
+            return Math.addExact(num, den / 2) / den;
         } catch (ArithmeticException overflow) {
             throw new ResponseStatusException(400, "That order is too large to convert");
         }

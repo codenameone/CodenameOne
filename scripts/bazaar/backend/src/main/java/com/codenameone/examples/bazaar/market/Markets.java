@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.market;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -541,10 +542,12 @@ public class Markets {
     public static final class Pricer {
         final Market market;
         final long rateMicros;
+        final String storeCurrency;
         final String source;
         final Map<String, Long> fixed = new HashMap<String, Long>();
 
-        Pricer(Market market, long rateMicros, String source) {
+        Pricer(Market market, long rateMicros, String source, String storeCurrency) {
+            this.storeCurrency = storeCurrency == null ? "" : storeCurrency;
             this.market = market;
             this.rateMicros = rateMicros;
             this.source = source;
@@ -574,7 +577,21 @@ public class Markets {
             if (f != null) {
                 return f.longValue();
             }
-            return convert(storeCents, rateMicros, market.getAdjustBps(), market.getRounding());
+            return convert(storeCents, storeCurrency, market.getCurrency(), rateMicros,
+                    market.getAdjustBps(), market.getRounding());
+        }
+
+        /// The store's currency, which [#rateMicros] converts from.
+        public String storeCurrency() {
+            return storeCurrency;
+        }
+
+        /// `storeMinor` minor units of the store's currency in the market's,
+        /// at [#rateMicros] with no adjustment or rounding rule: what a card
+        /// is charged.
+        public long charge(long storeMinor) {
+            return com.codenameone.examples.bazaar.checkout.Checkouts.atRate(storeMinor,
+                    storeCurrency, market.getCurrency(), rateMicros);
         }
     }
 
@@ -598,7 +615,7 @@ public class Markets {
                 return null;
             }
         }
-        Pricer p = new Pricer(m, rate, source);
+        Pricer p = new Pricer(m, rate, source, store.getCurrency());
         List<MarketPrice> rows = prices.findByMarketId(m.getId());
         for (int iter = 0; iter < rows.size(); iter++) {
             p.fixed.put(rows.get(iter).getVariantId(), Long.valueOf(rows.get(iter).getPriceCents()));
@@ -668,9 +685,21 @@ public class Markets {
         return null;
     }
 
-    /// `cents` at `rateMicros`, adjusted by `adjustBps` and rounded by `rounding`.
-    /// Half up at each step; an amount whose product overflows answers 400.
+    /// `cents` at `rateMicros` between two currencies with two decimals each;
+    /// see [#convert(long, String, String, long, int, String)].
     public static long convert(long cents, long rateMicros, int adjustBps, String rounding) {
+        return convert(cents, "", "", rateMicros, adjustBps, rounding);
+    }
+
+    /// `cents` minor units of `from` in minor units of `to`, at `rateMicros`
+    /// units of `to` per unit of `from`, adjusted by `adjustBps` and rounded by
+    /// `rounding` in the target currency's own unit. The decimals of both
+    /// currencies are their own ([Amounts#digits]): a dollar at 150 yen is 150
+    /// yen, not 15000. [#NINETY_NINE] needs decimals to end in; a currency
+    /// with none rounds up to the whole unit as [#WHOLE] does. Half up at each
+    /// step; an amount whose product overflows answers 400.
+    public static long convert(long cents, String from, String to, long rateMicros,
+            int adjustBps, String rounding) {
         if (rateMicros <= 0) {
             throw new ResponseStatusException(400, "A rate is more than zero");
         }
@@ -678,19 +707,29 @@ public class Markets {
             return 0;
         }
         try {
-            long converted = Math.addExact(Math.multiplyExact(cents, rateMicros), MICROS / 2)
-                    / MICROS;
+            int df = Amounts.digits(from);
+            int dt = Amounts.digits(to);
+            long num = Math.multiplyExact(cents, rateMicros);
+            long den = MICROS;
+            if (dt >= df) {
+                num = Math.multiplyExact(num, Amounts.unit(dt - df));
+            } else {
+                den = Math.multiplyExact(den, Amounts.unit(df - dt));
+            }
+            long converted = Math.addExact(num, den / 2) / den;
+            long unit = Amounts.unit(dt);
             long adjusted = converted + half(Math.multiplyExact(converted, (long) adjustBps),
                     10000L);
             if (adjusted < 0) {
                 adjusted = 0;
             }
-            if (WHOLE.equals(rounding)) {
-                return Math.multiplyExact(Math.addExact(adjusted, 99L) / 100L, 100L);
+            if (WHOLE.equals(rounding) || NINETY_NINE.equals(rounding) && unit == 1) {
+                return Math.multiplyExact(Math.addExact(adjusted, unit - 1) / unit, unit);
             }
             if (NINETY_NINE.equals(rounding)) {
-                // Up to the next x.99: 12.00 -> 12.99, 12.99 stays, 13.00 -> 13.99.
-                return Math.multiplyExact(adjusted / 100L, 100L) + 99L;
+                // Up to the next x.99: 12.00 -> 12.99, 12.99 stays, 13.00 -> 13.99
+                // (x.999 for three decimals).
+                return Math.multiplyExact(adjusted / unit, unit) + unit - 1;
             }
             return adjusted;
         } catch (ArithmeticException overflow) {

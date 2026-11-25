@@ -585,7 +585,7 @@ public class ChannelSync {
                             r.externalId.length() > 0 ? cut(r.externalId, 64)
                                 : Rows.text(l.get("external_id")), cut(r.etag, 128), OK,
                             Long.valueOf(now), id});
-                log(ch, "PUSH", p.sku, OK, qty + " available at " + Cents.format(price) + " "
+                log(ch, "PUSH", p.sku, OK, qty + " available at " + Cents.format(price, currency) + " "
                         + currency);
             } catch (ChannelException e) {
                 if (e.isAuth()) {

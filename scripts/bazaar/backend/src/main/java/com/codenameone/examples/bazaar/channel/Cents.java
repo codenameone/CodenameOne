@@ -18,51 +18,24 @@
  */
 package com.codenameone.examples.bazaar.channel;
 
-/// Decimal money strings (`"12.3"`, `"12.34"`) to cents and back, without
-/// floating point: marketplaces answer prices as decimal strings.
+import com.codenameone.examples.bazaar.ops.Amounts;
+
+/// Decimal money strings (`"12.3"`, `"12.34"`, `"1250"` for yen) to minor
+/// units of their currency and back, without floating point: marketplaces
+/// answer prices as decimal strings. The decimals are the currency's own
+/// ([Amounts#digits]).
 public final class Cents {
     private Cents() {
     }
 
-    /// Cents of a decimal string; more than two decimals are cut. 0 when it is
-    /// not a number or would not fit.
-    static long parse(Object value) {
-        String s = value == null ? "" : String.valueOf(value).trim();
-        boolean negative = s.startsWith("-");
-        int at = negative ? 1 : 0;
-        long whole = 0;
-        long frac = 0;
-        int fracDigits = 0;
-        boolean dot = false;
-        if (at >= s.length() || s.length() > 18) {
-            return 0;
-        }
-        for (; at < s.length(); at++) {
-            char c = s.charAt(at);
-            if (c == '.' && !dot) {
-                dot = true;
-            } else if (c >= '0' && c <= '9') {
-                if (!dot) {
-                    whole = whole * 10 + (c - '0');
-                } else if (fracDigits < 2) {
-                    frac = frac * 10 + (c - '0');
-                    fracDigits++;
-                }
-            } else {
-                return 0;
-            }
-        }
-        if (fracDigits == 1) {
-            frac *= 10;
-        }
-        long cents = whole * 100 + frac;
-        return negative ? -cents : cents;
+    /// Minor units of a decimal string in `currency`; decimals past the
+    /// currency's own are cut. 0 when it is not a number or would not fit.
+    static long parse(Object value, String currency) {
+        return Amounts.parse(value == null ? "" : String.valueOf(value), currency);
     }
 
-    /// `1234` as `"12.34"`.
-    public static String format(long cents) {
-        long abs = Math.abs(cents);
-        long f = abs % 100;
-        return (cents < 0 ? "-" : "") + abs / 100 + "." + (f < 10 ? "0" : "") + f;
+    /// `1234, "USD"` as `"12.34"`, `1234, "JPY"` as `"1234"`.
+    public static String format(long minor, String currency) {
+        return Amounts.plain(minor, currency);
     }
 }

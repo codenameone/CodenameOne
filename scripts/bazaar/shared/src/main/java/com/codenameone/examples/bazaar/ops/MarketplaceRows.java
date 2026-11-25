@@ -131,6 +131,16 @@ public final class MarketplaceRows {
 
     /// `12.5`, `12.50` or `$12` as cents; -1 for anything else.
     public static long cents(String text) {
+        return cents(text, 2);
+    }
+
+    /// [#cents(String)] in minor units of `currency`, with that currency's
+    /// own decimals ([Amounts#digits]): `1250` yen, `1.250` dinars.
+    public static long cents(String text, String currency) {
+        return cents(text, Amounts.digits(currency));
+    }
+
+    private static long cents(String text, int digits) {
         if (text == null) {
             return -1;
         }
@@ -151,7 +161,7 @@ public final class MarketplaceRows {
             } else if (c >= '0' && c <= '9') {
                 if (fracDigits < 0) {
                     whole = whole * 10 + (c - '0');
-                } else if (fracDigits < 2) {
+                } else if (fracDigits < digits) {
                     frac = frac * 10 + (c - '0');
                     fracDigits++;
                 } else {
@@ -161,10 +171,10 @@ public final class MarketplaceRows {
                 return -1;
             }
         }
-        if (fracDigits == 1) {
+        for (int pad = Math.max(0, fracDigits); pad < digits; pad++) {
             frac *= 10;
         }
-        return whole * 100 + frac;
+        return whole * Amounts.unit(digits) + frac;
     }
 
     private static int intOf(String text) {

@@ -59,7 +59,8 @@ public class Stores {
     public static final String PENDING = "PENDING";
     public static final String SUSPENDED = "SUSPENDED";
     private static final String[] LOCATION_KINDS = {"WAREHOUSE", "RETAIL", "POPUP"};
-    private static final String[] CURRENCIES = {"USD", "EUR", "GBP", "CAD", "AUD", "ILS", "JPY"};
+    private static final String[] CURRENCIES = {"USD", "EUR", "GBP", "CAD", "AUD", "ILS", "JPY",
+        "BHD"};
 
     private final StoreRepository stores;
     private final StoreStaffRepository staff;

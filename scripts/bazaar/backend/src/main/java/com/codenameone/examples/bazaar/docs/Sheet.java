@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.docs;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
 import com.codename1.pdf.PdfCanvas;
 import com.codename1.pdf.PdfDocument;
 import com.codename1.pdf.PdfFont;
@@ -218,7 +219,8 @@ final class Sheet {
 
     // ---------------------------------------------------------------- text
 
-    /// Cents as money: `$41.59`, `EUR 12.00`; negative with a leading minus.
+    /// Minor units as money in the currency's own decimals: `$41.59`,
+    /// `EUR 12.00`, `JPY 1,250`; negative with a leading minus.
     /// Integer arithmetic only.
     static String money(long cents, String currency) {
         StringBuilder out = new StringBuilder();
@@ -233,15 +235,19 @@ final class Sheet {
         } else {
             out.append(c).append(' ');
         }
-        String whole = Long.toString(cents / 100);
+        long unit = Amounts.unitOf(c);
+        String whole = Long.toString(cents / unit);
         for (int iter = 0; iter < whole.length(); iter++) {
             if (iter > 0 && (whole.length() - iter) % 3 == 0) {
                 out.append(',');
             }
             out.append(whole.charAt(iter));
         }
-        long rest = cents % 100;
-        out.append('.').append(rest < 10 ? "0" : "").append(rest);
+        String all = Amounts.plain(cents, c);
+        int dot = all.indexOf('.');
+        if (dot >= 0) {
+            out.append(all.substring(dot));
+        }
         return out.toString();
     }
 

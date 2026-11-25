@@ -57,11 +57,19 @@ final class Shop {
     Shop(String name, int stock, Accounts accounts, Stores stores, DemoPricing pricing,
             DataSource db, Inventory inventory, Carts carts, Checkouts checkouts, MockMvc mvc)
             throws Exception {
+        this(name, stock, "USD", 1000, accounts, stores, pricing, db, inventory, carts, checkouts,
+                mvc);
+    }
+
+    /// A store selling in `currency`, its mug at `price` minor units of it.
+    Shop(String name, int stock, String currency, long price, Accounts accounts, Stores stores,
+            DemoPricing pricing, DataSource db, Inventory inventory, Carts carts,
+            Checkouts checkouts, MockMvc mvc) throws Exception {
         this.carts = carts;
         this.checkouts = checkouts;
         this.mvc = mvc;
         owner = People.customer(accounts, name + "-owner");
-        Store store = stores.create(owner, name, name, "USD");
+        Store store = stores.create(owner, name, name, currency);
         storeId = store.getId();
         locationId = stores.addLocation(owner, storeId,
                 new LocationDto(null, "Back room", "WAREHOUSE", "9 Dock Rd", true, true, 0)).id();
@@ -77,8 +85,8 @@ final class Shop {
         db.execute("INSERT INTO variant (id, product_id, store_id, title, option1, option2, "
                 + "option3, sku, barcode, price_cents, compare_at_cents, cost_cents, weight_grams, "
                 + "taxable, track_inventory, allow_backorder, position) VALUES "
-                + "(?, ?, ?, 'Blue', '', '', '', ?, '0123456789012', 1000, 0, 400, 350, 1, 1, 0, 0)",
-                new Object[] {variantId, productId, storeId, sku});
+                + "(?, ?, ?, 'Blue', '', '', '', ?, '0123456789012', ?, 0, 400, 350, 1, 1, 0, 0)",
+                new Object[] {variantId, productId, storeId, sku, Long.valueOf(price)});
         if (stock > 0) {
             inventory.restock(storeId, variantId, locationId, stock, "opening", "test",
                     Inventory.RESTOCK);

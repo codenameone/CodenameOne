@@ -216,7 +216,7 @@ public class StoreSite {
                 .append(esc(p.getTitle())).append("</title></head><body>")
                 .append("<div class=\"bazaar-buy\"><strong>").append(esc(p.getTitle()))
                 .append("</strong> <span>").append(esc(store.getCurrency())).append(' ')
-                .append(Money.plain(range[0])).append("</span> <a href=\"")
+                .append(Money.plain(range[0], store.getCurrency())).append("</span> <a href=\"")
                 .append(esc(link)).append("\" target=\"_top\" rel=\"noopener\">Buy now</a>")
                 .append("</div></body></html>");
         // The one page another site may frame: its own policy, no scripts.

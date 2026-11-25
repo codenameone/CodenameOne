@@ -182,6 +182,17 @@ public class StoreOrder {
     @Column(nullable = false, type = "VARCHAR(16)")
     private String fxSource = "";
 
+    /// The platform's reporting currency when the order was placed
+    /// (`bazaar.fx.reporting.currency`), which [#getReportingRateMicros]
+    /// converts into; empty for an order from before rates were recorded.
+    @Column(nullable = false, type = "VARCHAR(3)")
+    private String reportingCurrency = "";
+
+    /// Units of [#getReportingCurrency] per unit of the store's currency, in
+    /// millionths, at the time of sale; 0 when none was recorded.
+    @Column(nullable = false)
+    private long reportingRateMicros;
+
     /// Out of the working order list, whatever its status: archived by hand,
     /// in bulk, or when it closed and the store archives closed orders.
     @Column(nullable = false)
@@ -579,6 +590,22 @@ public class StoreOrder {
 
     public void setFxSource(String fxSource) {
         this.fxSource = fxSource;
+    }
+
+    public String getReportingCurrency() {
+        return reportingCurrency;
+    }
+
+    public void setReportingCurrency(String reportingCurrency) {
+        this.reportingCurrency = reportingCurrency;
+    }
+
+    public long getReportingRateMicros() {
+        return reportingRateMicros;
+    }
+
+    public void setReportingRateMicros(long reportingRateMicros) {
+        this.reportingRateMicros = reportingRateMicros;
     }
 
     /// The language the order was placed in (a `StoreText` code), or empty when not known.

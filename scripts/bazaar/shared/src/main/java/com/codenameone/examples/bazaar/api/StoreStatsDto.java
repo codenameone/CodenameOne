@@ -33,5 +33,7 @@ public record StoreStatsDto(
         int orders,
         long gmvCents,
         String currency,
-        long createdAt) {
+        long createdAt,
+        long reportingGmvCents,
+        String reportingCurrency) {
 }

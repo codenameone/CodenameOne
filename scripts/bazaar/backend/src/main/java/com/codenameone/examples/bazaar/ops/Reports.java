@@ -721,14 +721,21 @@ public class Reports {
     /// plain decimals. Labels are fixed text, but every cell goes through the
     /// same quoting and formula guard as the other exports.
     public static String profitLossCsv(ProfitLossDto p) {
+        return profitLossCsv(p, "");
+    }
+
+    /// [#profitLossCsv(ProfitLossDto)] with the amounts in `currency`'s own
+    /// decimals (none for yen, three for dinars); an empty code is two.
+    public static String profitLossCsv(ProfitLossDto p, String currency) {
+        String c = currency == null ? "" : currency;
         String[] labels = {"from", "to", "orders", "gross_sales", "discounts", "refunds",
             "net_sales", "cost_of_goods", "gross_margin", "gross_margin_percent", "shipping",
             "tax_collected", "uncosted_units"};
         String[] values = {p.from(), p.to(), String.valueOf(p.orders()),
-            Money.plain(p.grossSalesCents()), Money.plain(p.discountsCents()),
-            Money.plain(p.refundsCents()), Money.plain(p.netSalesCents()),
-            Money.plain(p.cogsCents()), Money.plain(p.grossMarginCents()),
-            Money.plain(p.marginBp()), Money.plain(p.shippingCents()), Money.plain(p.taxCents()),
+            Money.plain(p.grossSalesCents(), c), Money.plain(p.discountsCents(), c),
+            Money.plain(p.refundsCents(), c), Money.plain(p.netSalesCents(), c),
+            Money.plain(p.cogsCents(), c), Money.plain(p.grossMarginCents(), c),
+            com.codenameone.examples.bazaar.ops.Amounts.plain(p.marginBp(), 2), Money.plain(p.shippingCents(), c), Money.plain(p.taxCents(), c),
             String.valueOf(p.uncostedUnits())};
         StringBuilder out = new StringBuilder("line,amount\r\n");
         for (int iter = 0; iter < labels.length; iter++) {

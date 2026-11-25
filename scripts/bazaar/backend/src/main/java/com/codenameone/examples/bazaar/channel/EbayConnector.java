@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bazaar.channel;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
+
 import com.codename1.backend.Base64;
 import com.codename1.backend.Json;
 import java.io.IOException;
@@ -145,7 +147,7 @@ public class EbayConnector implements MarketplaceConnector {
                 offerId = text(((Map) offers.get(0)).get("offerId"));
             }
             Map price = new HashMap();
-            price.put("value", Cents.format(push.priceCents));
+            price.put("value", Cents.format(push.priceCents, push.currency));
             price.put("currency", push.currency);
             Map offer = new HashMap();
             offer.put("offerId", offerId);
@@ -220,9 +222,9 @@ public class EbayConnector implements MarketplaceConnector {
         Map pricing = map(m.get("pricingSummary"));
         Map total = map(pricing.get("total"));
         o.currency = text(total.get("currency"));
-        o.totalCents = Cents.parse(total.get("value"));
-        o.shippingCents = Cents.parse(map(pricing.get("deliveryCost")).get("value"));
-        o.taxCents = Cents.parse(map(pricing.get("tax")).get("value"));
+        o.totalCents = Cents.parse(total.get("value"), o.currency);
+        o.shippingCents = Cents.parse(map(pricing.get("deliveryCost")).get("value"), o.currency);
+        o.taxCents = Cents.parse(map(pricing.get("tax")).get("value"), o.currency);
         Map buyer = map(m.get("buyer"));
         o.buyerEmail = text(map(buyer.get("buyerRegistrationAddress")).get("email"));
         List starts = list(m.get("fulfillmentStartInstructions"));
@@ -244,7 +246,7 @@ public class EbayConnector implements MarketplaceConnector {
         for (int iter = 0; iter < items.size(); iter++) {
             Map li = map(items.get(iter));
             int qty = (int) Math.max(0, Math.min(10000, number(li.get("quantity"))));
-            long cost = Cents.parse(map(li.get("lineItemCost")).get("value"));
+            long cost = Cents.parse(map(li.get("lineItemCost")).get("value"), o.currency);
             // lineItemCost is the line's total; the unit price divides it
             // (guarded: a zero quantity line is kept and refused later).
             long unit = qty > 0 ? cost / qty : cost;
@@ -305,8 +307,8 @@ public class EbayConnector implements MarketplaceConnector {
         if (o instanceof Number) {
             return ((Number) o).longValue();
         }
-        long c = Cents.parse(o);
-        return c / 100;
+        // A whole number written as text: no decimals to keep.
+        return Amounts.parse(o == null ? "" : String.valueOf(o), 0);
     }
 
     static Map map(Object o) {

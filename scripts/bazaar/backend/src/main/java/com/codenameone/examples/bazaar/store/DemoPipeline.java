@@ -99,10 +99,14 @@ public class DemoPipeline {
     private int ticks;
     private int seq;
 
+    private final com.codenameone.examples.bazaar.market.ReportingRates reporting;
+
     public DemoPipeline(Config config, StoreRepository stores, LocationRepository locations,
             VariantRepository variants, StoreOrderRepository orders, OrderLineRepository lines,
             FulfillmentRepository fulfillments, CartRepository carts,
-            CartLineRepository cartLines, Orders orderService, Fulfillments fulfil) {
+            CartLineRepository cartLines, Orders orderService, Fulfillments fulfil,
+            com.codenameone.examples.bazaar.market.ReportingRates reporting) {
+        this.reporting = reporting;
         this.config = config;
         this.stores = stores;
         this.locations = locations;
@@ -358,10 +362,14 @@ public class DemoPipeline {
             made.add(line);
         }
         o.setSubtotalCents(subtotal);
-        o.setShippingCents(subtotal > 7500 ? 0 : 595);
+        // Free over $75, else $5.95, in the store's own currency.
+        o.setShippingCents(subtotal > com.codenameone.examples.bazaar.pricing.DemoMoney.local(7500,
+                o.getCurrency()) ? 0 : com.codenameone.examples.bazaar.pricing.DemoMoney.local(595,
+                o.getCurrency()));
         o.setTotalCents(subtotal + o.getShippingCents());
         o.setCreatedAt(when);
         o.setUpdatedAt(when);
+        reporting.stamp(o);
         orders.insert(o);
         lines.saveAll(made);
         orderService.publish(o);

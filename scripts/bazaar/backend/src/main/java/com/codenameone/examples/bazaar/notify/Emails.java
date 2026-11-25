@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.notify;
 
+import com.codenameone.examples.bazaar.ops.Amounts;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -921,11 +922,9 @@ public class Emails {
         return PngCodec.encode(img);
     }
 
+    /// Minor units of `currency` with that currency's own decimals.
     static String money(long cents, String currency) {
-        long abs = cents < 0 ? -cents : cents;
-        String frac = Long.toString(abs % 100);
-        String amount = (cents < 0 ? "-" : "") + (abs / 100) + "." + (frac.length() < 2 ? "0" : "")
-                + frac;
+        String amount = Amounts.plain(cents, currency);
         return currency == null || currency.length() == 0 || "USD".equals(currency) ? "$" + amount
                 : amount + " " + currency;
     }

@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.marketing;
 
+import com.codenameone.examples.bazaar.pricing.DemoMoney;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
@@ -78,10 +79,14 @@ public class DemoMarketing {
     private final SaleEvents sales;
     private final Journeys journeys;
 
+    private final com.codenameone.examples.bazaar.repository.StoreRepository stores;
+
     public DemoMarketing(AudienceRepository audienceRows, CampaignRepository campaignRows,
             CampaignSendRepository sends, CustomerRepository customers, StoreOrderRepository orders,
             VariantRepository variants, Audiences audiences, Campaigns campaigns, SignupForms forms,
-            Loyalty loyalty, Clubs clubs, SaleEvents sales, Journeys journeys) {
+            Loyalty loyalty, Clubs clubs, SaleEvents sales, Journeys journeys,
+            com.codenameone.examples.bazaar.repository.StoreRepository stores) {
+        this.stores = stores;
         this.audienceRows = audienceRows;
         this.campaignRows = campaignRows;
         this.sends = sends;
@@ -102,11 +107,18 @@ public class DemoMarketing {
     /// campaigns: Fennel & Fig, whose order-placed card otherwise had no
     /// programme to estimate its points from and showed "+0 pts".
     public void programme(String storeId) throws IOException {
+        // Written in US cents; a store in another currency gets the same
+        // sizes in its own minor units (a point per dollar, or per 150 yen).
+        com.codenameone.examples.bazaar.domain.Store store = stores.findById(storeId);
+        String cur = store == null ? "USD" : store.getCurrency();
         List<LoyaltyTierDto> tiers = new ArrayList<LoyaltyTierDto>();
         tiers.add(new LoyaltyTierDto(null, "Bronze", 0, 0, false, 0, "#a0522d", 0));
-        tiers.add(new LoyaltyTierDto(null, "Silver", 25000, 500, false, 12, "#90a4ae", 1));
-        tiers.add(new LoyaltyTierDto(null, "Gold", 100000, 1000, true, 48, "#f9a825", 2));
-        loyalty.save(storeId, new LoyaltyProgramDto(true, 1, 100, LoyaltyMath.DOWN, 100, 500, 500, 365,
+        tiers.add(new LoyaltyTierDto(null, "Silver", DemoMoney.local(25000, cur), 500, false, 12,
+                "#90a4ae", 1));
+        tiers.add(new LoyaltyTierDto(null, "Gold", DemoMoney.local(100000, cur), 1000, true, 48,
+                "#f9a825", 2));
+        loyalty.save(storeId, new LoyaltyProgramDto(true, 1, DemoMoney.local(100, cur),
+                LoyaltyMath.DOWN, 100, DemoMoney.local(500, cur), 500, 365,
                 true, "SPEND", 500, 250, tiers));
     }
 

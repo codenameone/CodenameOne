@@ -143,7 +143,7 @@ public class StorefrontFeeds {
                 tag(x, "g:image_link", r.image);
             }
             tag(x, "g:availability", r.availability);
-            tag(x, "g:price", Money.plain(r.priceCents) + " " + r.currency);
+            tag(x, "g:price", Money.plain(r.priceCents, r.currency) + " " + r.currency);
             tag(x, "g:condition", "new");
             if (r.brand.length() > 0) {
                 tag(x, "g:brand", r.brand);
@@ -188,7 +188,7 @@ public class StorefrontFeeds {
             cell(c, r.link, false);
             cell(c, r.image, false);
             cell(c, r.availability, false);
-            cell(c, Money.plain(r.priceCents) + " " + r.currency, false);
+            cell(c, Money.plain(r.priceCents, r.currency) + " " + r.currency, false);
             cell(c, "new", false);
             cell(c, r.brand, false);
             cell(c, r.gtin, false);

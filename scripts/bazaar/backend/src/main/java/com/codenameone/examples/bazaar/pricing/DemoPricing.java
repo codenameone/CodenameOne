@@ -46,6 +46,10 @@ import java.util.List;
 /// free). Pickup and local delivery use the store's first location and are
 /// left out when it has none. Seeding a store twice does nothing the second
 /// time.
+///
+/// The amounts are written in US cents and seeded in the store's own
+/// currency ([DemoMoney]): a yen store's "Free over" threshold is the same
+/// size in yen, and the titles name it in yen.
 @Component
 public class DemoPricing {
     private final ShippingZoneRepository zones;
@@ -53,9 +57,14 @@ public class DemoPricing {
     private final TaxRateRepository taxes;
     private final DiscountRepository discounts;
     private final LocationRepository locations;
+    private final com.codenameone.examples.bazaar.repository.StoreRepository stores;
+    /// The currency of the store [#seed] is seeding; seeding is one store at a time.
+    private String currency = "USD";
 
     public DemoPricing(ShippingZoneRepository zones, ShippingRateRepository rates,
-            TaxRateRepository taxes, DiscountRepository discounts, LocationRepository locations) {
+            TaxRateRepository taxes, DiscountRepository discounts, LocationRepository locations,
+            com.codenameone.examples.bazaar.repository.StoreRepository stores) {
+        this.stores = stores;
         this.zones = zones;
         this.rates = rates;
         this.taxes = taxes;
@@ -80,13 +89,15 @@ public class DemoPricing {
         }
         List<Location> at = locations.findByStoreIdOrderByPositionAsc(storeId);
         Location home = at.isEmpty() ? null : at.get(0);
+        com.codenameone.examples.bazaar.domain.Store store = stores.findById(storeId);
+        currency = store == null ? "USD" : store.getCurrency();
 
         String us = zone(storeId, "Domestic US", "US", 0);
         rate(storeId, us, "Standard", ShippingCalculator.WEIGHT, 599, 0, 2000, "USPS", 3, 5, null, 0, 0);
         rate(storeId, us, "Standard (heavy)", ShippingCalculator.WEIGHT, 1299, 2000, 0, "USPS", 3, 6,
                 null, 0, 1);
         rate(storeId, us, "Express", ShippingCalculator.FLAT, 1999, 0, 0, "UPS", 1, 2, null, 0, 2);
-        rate(storeId, us, "Free over $75", ShippingCalculator.FREE_OVER, 0, 7500, 0, "USPS", 4, 7,
+        rate(storeId, us, "Free over " + whole(7500), ShippingCalculator.FREE_OVER, 0, 7500, 0, "USPS", 4, 7,
                 null, 0, 3);
         if (home != null) {
             rate(storeId, us, "Same-day local delivery", ShippingCalculator.LOCAL, 499, 0, 0, "", 0, 0,
@@ -119,7 +130,7 @@ public class DemoPricing {
 
         discount(storeId, "WELCOME10", "10% off your first order", DiscountEngine.PERCENT, 1000, 0,
                 0, 0, true, false);
-        discount(storeId, "FREESHIP", "Free shipping over $75", DiscountEngine.FREE_SHIPPING, 0,
+        discount(storeId, "FREESHIP", "Free shipping over " + whole(7500), DiscountEngine.FREE_SHIPPING, 0,
                 7500, 0, 0, false, true);
         discount(storeId, "BUNDLE", "Buy 2, get 1 free", DiscountEngine.BUY_X_GET_Y, 0, 0, 2, 1,
                 false, false);
@@ -146,9 +157,11 @@ public class DemoPricing {
         r.setStoreId(storeId);
         r.setName(name);
         r.setKind(kind);
-        r.setPriceCents(price);
-        r.setMinValue(min);
-        r.setMaxValue(max);
+        boolean money = ShippingCalculator.PRICE.equals(kind)
+                || ShippingCalculator.FREE_OVER.equals(kind);
+        r.setPriceCents(DemoMoney.local(price, currency));
+        r.setMinValue(money ? DemoMoney.local(min, currency) : min);
+        r.setMaxValue(money ? DemoMoney.local(max, currency) : max);
         r.setCarrier(carrier);
         r.setService(name);
         r.setEtaDaysMin(etaMin);
@@ -157,6 +170,24 @@ public class DemoPricing {
         r.setRadiusMeters(radius);
         r.setPosition(position);
         rates.insert(r);
+    }
+
+    /// US cents as a whole amount in the store's currency: `$75`, or the
+    /// yen sign and `11250`.
+    private String whole(long usdCents) {
+        String s = com.codenameone.examples.bazaar.ops.Amounts.format(
+                DemoMoney.local(usdCents, currency), currency);
+        int dot = s.lastIndexOf('.');
+        if (dot > 0) {
+            boolean zeros = true;
+            for (int i = dot + 1; i < s.length(); i++) {
+                zeros &= s.charAt(i) == '0';
+            }
+            if (zeros) {
+                return s.substring(0, dot);
+            }
+        }
+        return s;
     }
 
     private void tax(String storeId, String country, String region, String name, int bp,
@@ -181,7 +212,7 @@ public class DemoPricing {
         d.setTitle(title);
         d.setKind(kind);
         d.setAmount(amount);
-        d.setMinSubtotalCents(min);
+        d.setMinSubtotalCents(DemoMoney.local(min, currency));
         d.setBuyQty(buy);
         d.setGetQty(get);
         d.setAppliesTo(DiscountEngine.ALL);

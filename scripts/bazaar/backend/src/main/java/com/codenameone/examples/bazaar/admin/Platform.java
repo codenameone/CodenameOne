@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.admin;
 
+import com.codenameone.examples.bazaar.market.ReportingRates;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
@@ -47,9 +48,10 @@ import java.util.Map;
 /// directory and its shop; its staff still sign in and see it.
 ///
 /// GMV is the total of the counted orders (not cancelled, not an
-/// unconverted draft) less what was refunded on them, in each store's own
-/// currency, so the platform total adds amounts in mixed currencies -- fine
-/// for a demo where every store sells in one.
+/// unconverted draft) less what was refunded on them. A store's own figure is
+/// in its own currency; the platform total, and each store's share of it, is
+/// in the reporting currency ([ReportingRates]), every order converted at the
+/// rate recorded on it when it was sold.
 @Component
 public class Platform {
     public static final String ACTIVE = "ACTIVE";
@@ -58,9 +60,11 @@ public class Platform {
     private final StoreRepository stores;
     private final StoreOrderRepository orders;
     private final AuditEventRepository audits;
+    private final ReportingRates reporting;
 
     public Platform(StoreRepository stores, StoreOrderRepository orders,
-            AuditEventRepository audits) {
+            AuditEventRepository audits, ReportingRates reporting) {
+        this.reporting = reporting;
         this.stores = stores;
         this.orders = orders;
         this.audits = audits;
@@ -82,14 +86,16 @@ public class Platform {
             }
             long[] s = per.get(o.getStoreId());
             if (s == null) {
-                s = new long[2];
+                s = new long[3];
                 per.put(o.getStoreId(), s);
             }
             long value = o.getTotalCents() - o.getRefundedCents();
+            long converted = reporting.toReporting(o, value);
             s[0]++;
             s[1] += value;
+            s[2] += converted;
             count++;
-            gmv += value;
+            gmv += converted;
             if (o.getCreatedAt().toEpochMilli() >= today) {
                 ordersToday++;
             }
@@ -106,7 +112,8 @@ public class Platform {
             }
             table.add(dto(st, per.get(st.getId())));
         }
-        return new PlatformStatsDto(all.size(), active, suspended, count, ordersToday, gmv, table);
+        return new PlatformStatsDto(all.size(), active, suspended, count, ordersToday, gmv, table,
+                reporting.currency());
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -134,7 +141,7 @@ public class Platform {
         e.setDetail(Codes.cut(wanted.reason() == null ? "" : wanted.reason(), 500));
         e.setCreatedAt(Instant.now());
         audits.insert(e);
-        long[] s = new long[2];
+        long[] s = new long[3];
         List<StoreOrder> mine = orders.findByStoreIdAndCreatedAtGreaterThanEqual(storeId,
                 Instant.EPOCH);
         for (int iter = 0; iter < mine.size(); iter++) {
@@ -142,6 +149,7 @@ public class Platform {
             if (!"CANCELLED".equals(o.getStatus()) && !Orders.isUnconvertedDraft(o)) {
                 s[0]++;
                 s[1] += o.getTotalCents() - o.getRefundedCents();
+                s[2] += reporting.toReporting(o, o.getTotalCents() - o.getRefundedCents());
             }
         }
         return dto(st, s);
@@ -155,7 +163,7 @@ public class Platform {
         List<StoreStatsDto> out = new ArrayList<StoreStatsDto>();
         for (int iter = 0; iter < owned.size(); iter++) {
             Store st = owned.get(iter);
-            long[] s = new long[2];
+            long[] s = new long[3];
             List<StoreOrder> rows = orders.findByStoreIdAndCreatedAtGreaterThanEqual(st.getId(),
                     Instant.EPOCH);
             for (int o = 0; o < rows.size(); o++) {
@@ -163,6 +171,8 @@ public class Platform {
                 if (!"CANCELLED".equals(order.getStatus()) && !Orders.isUnconvertedDraft(order)) {
                     s[0]++;
                     s[1] += order.getTotalCents() - order.getRefundedCents();
+                    s[2] += reporting.toReporting(order,
+                            order.getTotalCents() - order.getRefundedCents());
                 }
             }
             out.add(dto(st, s));
@@ -170,9 +180,10 @@ public class Platform {
         return out;
     }
 
-    private static StoreStatsDto dto(Store st, long[] s) {
+    private StoreStatsDto dto(Store st, long[] s) {
         return new StoreStatsDto(st.getId(), st.getHandle(), st.getName(), st.getStatus(),
                 st.getOwnerUsername(), s == null ? 0 : (int) s[0], s == null ? 0 : s[1],
-                st.getCurrency(), st.getCreatedAt().toEpochMilli());
+                st.getCurrency(), st.getCreatedAt().toEpochMilli(), s == null ? 0 : s[2],
+                reporting.currency());
     }
 }
