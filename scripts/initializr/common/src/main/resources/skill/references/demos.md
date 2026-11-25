@@ -68,8 +68,8 @@ no `Prefs`, `Telemetry` or l10n bundles. Bastion has no live channel or
 - **Live updates through one channel.** `live/LiveChannel.java` owns the
   WebSocket and fans events out on the EDT; screens subscribe rather than poll.
 - **UI helpers instead of repeated code.** `ui/Ui.java`, `ui/Layouts.java`,
-  `ui/Nav.java`, `ui/Look.java`, `ui/Skeleton.java` (loading placeholders),
-  `ui/BottomSheet.java`. Look for an existing helper before adding a component.
+  `ui/Nav.java`, `ui/Look.java`, `ui/BottomSheet.java`; loading
+  placeholders are the core `com.codename1.components.Skeleton`. Look for an existing helper before adding a component.
 - **Theme driven by variables.** `common/src/main/css/theme.css` opens with a
   block of variables (colors, corner radius) everything else is drawn from; dark
   mode and color schemes swap those, not individual rules.

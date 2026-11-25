@@ -57,7 +57,12 @@ form.add(BorderLayout.CENTER, col);
 | `Tabs` | Tabbed pane | Like Swing JTabbedPane |
 | `Accordion` | Collapsible sections | |
 | `InfiniteScrollAdapter` | Lazy-loaded pagination | Plug into a Container |
-| `InfiniteProgress` | Activity spinner | |
+| `InfiniteProgress` | Activity spinner | For content that is loading in place, prefer `Skeleton`. |
+| `Skeleton` | Skeleton screen / shimmer placeholder while content loads | `Skeleton.rows(5)`, `text(n)`, `circle(mm)`, `rect(w, h)`, `card()`; `Skeleton.show(cmp)` / `hide(cmp)` masks an existing component. See *Loading, empty states, carousels and tours* below. |
+| `EmptyState` | "Nothing here" / error-and-retry view | Icon, title, text, optional action button. |
+| `Carousel` | Image slider / view pager / onboarding pages with dots and auto play | Swipeable `Tabs` + `PageIndicator`; do **not** hand-build tabs plus a radio button row. |
+| `PageIndicator` | Page dots for a pager | `bind(tabs)` keeps it in step with `Tabs`. |
+| `CoachMarks` | Feature tour / onboarding spotlight over the form | `new CoachMarks(form).add(cmp, title, text).showOnce("key")`. Replaces the deprecated `GlassTutorial`. |
 | `Dialog` | Modal popup | `Dialog.show(...)` blocks current EDT pump |
 | `Toolbar` | Top bar | Already on every Form |
 | `BrowserComponent` | Embedded WebView | Use sparingly; ParparVM/iOS WebView has caveats. See *BrowserComponent appearance* below. |
@@ -81,7 +86,7 @@ A few components live in package paths that don't match where you'd guess from t
 | Component | Package |
 | --- | --- |
 | `Label`, `Button`, `TextField`, `TextArea`, `Form`, `Container`, `TextComponent`, `Dialog`, `Tabs`, `CheckBox`, `RadioButton`, `Slider`, `List` | `com.codename1.ui` |
-| `SpanLabel`, `SpanButton`, `MultiButton`, `MultiList`, `Switch`, `ScaleImageButton`, `ScaleImageLabel`, `ToastBar`, `InfiniteProgress`, `ImageViewer`, `FloatingActionButton`, `StickyHeaderContainer`, `Accordion` | `com.codename1.components` |
+| `SpanLabel`, `SpanButton`, `MultiButton`, `MultiList`, `Switch`, `ScaleImageButton`, `ScaleImageLabel`, `ToastBar`, `InfiniteProgress`, `ImageViewer`, `FloatingActionButton`, `StickyHeaderContainer`, `Accordion`, `Skeleton`, `EmptyState`, `Carousel`, `PageIndicator`, `CoachMarks` | `com.codename1.components` |
 | `Picker` | `com.codename1.ui.spinner` |
 | `InfiniteContainer` | `com.codename1.ui` (despite being a "component") |
 
@@ -369,6 +374,50 @@ URLImage urlImg = URLImage.createToStorage(
 The verbose `new Label(FontImage.createMaterial(FontImage.MATERIAL_FAVORITE, "Label", 6))` form works but you almost never need it — the convenience APIs above take a `char` directly and use the right UIID and sizing for the component.
 
 The full Material icon catalog is exposed as `char` constants on `FontImage` — autocomplete on `FontImage.MATERIAL_` to discover them.
+
+## Loading, empty states, carousels and tours
+
+One component per job; don't paint your own placeholder bars, page dots or tour overlay.
+
+| When you need to | Use |
+| --- | --- |
+| Show that content is on its way, in its place (skeleton screen, shimmer) | `Skeleton` |
+| Block the screen during a short operation | `InfiniteProgress.showInfiniteBlocking()` |
+| Say a list or screen is empty, or failed to load | `EmptyState` |
+| Report a transient status ("Saved", "Offline") | `ToastBar` |
+| Swipe through banners, photos or intro pages | `Carousel` (or `Tabs` + `PageIndicator`) |
+| Point out features on a screen, once | `CoachMarks` |
+
+```java
+final Container list = new Container(BoxLayout.y());
+list.add(Skeleton.rows(5));                       // outline while loading
+form.add(BorderLayout.CENTER, list);
+fetchOrders(orders -> {
+    list.removeAll();
+    if (orders.isEmpty()) {
+        list.add(new EmptyState(FontImage.MATERIAL_INBOX, "No orders yet",
+                "Orders you place show up here."));
+    }
+    for (Order o : orders) {
+        list.add(new MultiButton(o.getTitle()));
+    }
+    list.animateLayout(200);
+});
+
+Carousel carousel = new Carousel();
+carousel.addPage(new ScaleImageLabel(banner1));
+carousel.addPage(new ScaleImageLabel(banner2));
+carousel.setAutoPlay(4000);                       // pauses on touch, wraps
+
+new CoachMarks(form)
+        .add(searchButton, "Search", "Find any order by number or name.")
+        .add(fab, "New order", "Start an order from here.")
+        .showOnce("orders-tour");                 // first launch only
+```
+
+- `Skeleton` draws in the `Skeleton` UIID's foreground colour; unstyled, it uses the theme's text colour faintly, so it works in dark mode. Call `shimmer(false)` in screenshot tests so the frames are deterministic.
+- `Skeleton.show(cmp, Skeleton.text(3))` swaps an existing component out until `Skeleton.hide(cmp, transition)`.
+- `CoachMarks` captures touches while it is up, so the form underneath can't be tapped by accident. `CoachMarks.resetShowOnce(key)` brings a tour back for a "show tips again" setting.
 
 ## Lists and infinite scrolling
 

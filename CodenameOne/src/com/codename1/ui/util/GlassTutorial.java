@@ -50,7 +50,8 @@ import java.util.Vector;
 ///
 /// #### Deprecated
 ///
-/// interaction dialog is a superior way for displaying these types of tutorials
+/// use [com.codename1.components.CoachMarks], which dims the screen, lights one
+/// component at a time and walks through the steps with Next and Skip
 public class GlassTutorial implements Painter {
     private static final String DEST = "$$GLSDESTHINT$$";
     private static final String POS = "$$GLSDESTPOS$$";

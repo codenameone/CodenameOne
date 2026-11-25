@@ -68,6 +68,11 @@ import com.codename1.ui.animations.Transition;
 /// Dimension pre = dlg.getContentPane().getPreferredSize();
 /// dlg.show(0, 0, Display.getInstance().getDisplayWidth() - (pre.getWidth() + pre.getWidth() / 6), 0);
 /// ```
+///
+/// #### See also
+///
+/// - [CoachMarks]: a feature tour or spotlight that dims the screen around one
+///   component at a time, for first-launch onboarding.
 public class InteractionDialog extends Container implements AbstractDialog {
     private static final Runnable BLOCKING_SLEEP = new BlockingSleepRunnable();
 
