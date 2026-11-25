@@ -369,6 +369,14 @@ public class RangeSlider extends Component {
     }
 
     @Override
+    protected void deinitialize() {
+        // A drag that never saw its release (the form changed) must not stay open.
+        dragging = -1;
+        adjusting = false;
+        super.deinitialize();
+    }
+
+    @Override
     protected boolean isStickyDrag() {
         return dragging >= 0;
     }

@@ -118,14 +118,12 @@ public class InputAndProgressSnippets {
         // tag::audio-waveform[]
         final AudioWaveform wave = new AudioWaveform(AudioWaveform.levelsFromPcm(pcm, 48));
         wave.setSeekable(true);
-        wave.addActionListener(e -> {
-            if (!wave.isSeeking()) {
-                Log.p("Seek to " + wave.getProgress());
-            }
-        });
+        wave.addActionListener(e -> Log.p("Seek to " + wave.getProgress()));
         form.add(wave);
-        // while playing
-        wave.setProgress(0.25f);
+        // while playing, unless the user is dragging
+        if (!wave.isSeeking()) {
+            wave.setProgress(0.25f);
+        }
         // end::audio-waveform[]
     }
 

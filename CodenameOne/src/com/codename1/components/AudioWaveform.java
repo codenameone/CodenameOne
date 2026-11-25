@@ -38,8 +38,10 @@ import com.codename1.ui.util.EventDispatcher;
 /// AudioWaveform wave = new AudioWaveform(AudioWaveform.levelsFromPcm(samples, 48));
 /// wave.addActionListener(e -> player.setTime(
 ///         (int) (wave.getProgress() * player.getDuration())));
-/// // as playback advances
-/// wave.setProgress(player.getTime() / (float) player.getDuration());
+/// // as playback advances, unless the user's finger is on it
+/// if (!wave.isSeeking()) {
+///     wave.setProgress(player.getTime() / (float) player.getDuration());
+/// }
 /// ```
 ///
 /// Levels are fractions from 0 to 1, one per bar, and are drawn evenly across
@@ -307,6 +309,13 @@ public class AudioWaveform extends Component {
             seeking = false;
             listeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
         }
+    }
+
+    @Override
+    protected void deinitialize() {
+        // A drag that never saw its release (the form changed) must not stay open.
+        seeking = false;
+        super.deinitialize();
     }
 
     @Override

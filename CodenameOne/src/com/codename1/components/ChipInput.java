@@ -53,6 +53,10 @@ import java.util.List;
 /// Each chip has a close button that removes it. Action listeners fire after
 /// every addition and removal.
 ///
+/// The ChipInput is a `BorderLayout` container whose center holds the chips
+/// and the field, so a component added beside them (a "To:" label, say) needs
+/// a constraint: `add(BorderLayout.WEST, label)`.
+///
 /// UIIDs: `ChipInput` for the container and `ChipInputField` for the text
 /// field, falling back to `TextField`; the chips use the `Chip` UIIDs.
 public class ChipInput extends Container {

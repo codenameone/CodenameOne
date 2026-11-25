@@ -170,20 +170,46 @@ public class MasonryLayout extends Layout {
                 place(parent, 0, 0, width, false) + s.getVerticalPadding());
     }
 
+    private static void invalidate(Component c) {
+        c.setShouldCalcPreferredSize(true);
+        if (c instanceof Container) {
+            Container k = (Container) c;
+            for (int i = 0; i < k.getComponentCount(); i++) {
+                invalidate(k.getComponentAt(i));
+            }
+        }
+    }
+
     /// The height of a tile at a given width. The component is given that width
     /// first, so text wraps to it; an image label that scales its image is
     /// scaled to it keeping its aspect ratio.
     private static int heightAt(Component c, int w) {
         if (c.getWidth() != w) {
             c.setWidth(w);
+            if (c instanceof Container) {
+                // A card's text sits in its children; lay them out at the new
+                // width first, then drop the sizes they cached at the old one,
+                // so a SpanLabel inside measures at its own width.
+                ((Container) c).layoutContainer();
+                invalidate(c);
+            }
             // Only on a change, so measuring converges instead of relaying out forever.
             c.setShouldCalcPreferredSize(true);
         }
         int h = c.getPreferredH();
         int pw = c.getPreferredW();
+        // An image label reports its image's full size and scales it to whatever
+        // it is given, so it is sized to the column keeping the aspect ratio of
+        // its content box. Named here because no API says a component scales;
+        // the dependency on components is one way and costs nothing to apps
+        // that never use these classes.
         if (pw > 0 && w > 0 && (c instanceof com.codename1.components.ScaleImageLabel
                 || c instanceof com.codename1.components.ScaleImageButton)) {
-            h = (int) ((long) h * w / pw);
+            Style st = c.getStyle();
+            int hp = st.getHorizontalPadding();
+            int vp = st.getVerticalPadding();
+            int contentW = Math.max(1, pw - hp);
+            h = vp + (int) ((long) Math.max(0, h - vp) * Math.max(0, w - hp) / contentW);
         }
         return h;
     }

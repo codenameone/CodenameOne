@@ -3458,7 +3458,7 @@ The units don't have to be percentages they can be mm (millimeters) or px (pixel
 [[range-slider-section]]
 === RangeSlider
 
-https://www.codenameone.com/javadoc/com/codename1/components/RangeSlider.html[RangeSlider] is a slider with two thumbs that picks a range, such as a price band or an age range. Drag either thumb, or tap the track to move the nearer one. The thumbs can't cross: dragging one past the other carries it along.
+https://www.codenameone.com/javadoc/com/codename1/components/RangeSlider.html[RangeSlider] is a slider with two thumbs that picks a range, such as a price band or an age range. Drag either thumb, or tap the track to move the nearer one. The thumbs can't cross: a dragged thumb stops at the other one.
 
 [source,java]
 ----
@@ -3524,7 +3524,7 @@ The UIIDs are `CircularProgress` for the text, `CircularProgressFill` for the ar
 [[audio-waveform-section]]
 === AudioWaveform
 
-https://www.codenameone.com/javadoc/com/codename1/components/AudioWaveform.html[AudioWaveform] draws a recording as a row of bars, with the played part in the accent color. It's the voice message bubble of a chat app. The user can tap or drag across it to seek.
+https://www.codenameone.com/javadoc/com/codename1/components/AudioWaveform.html[AudioWaveform] draws a recording as a row of bars, with the played part in the accent color. It's the voice message bubble of a chat app. The user can tap or drag across it to seek; listeners fire once, when the finger lifts, and `isSeeking()` is true while the finger is down, so skip playback updates then.
 
 [source,java]
 ----

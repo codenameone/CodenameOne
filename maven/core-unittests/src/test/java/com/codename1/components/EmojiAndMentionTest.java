@@ -100,6 +100,6 @@ class EmojiAndMentionTest extends UITestBase {
         m.setText("hi @Anna");
         assertTrue(m.getMentions().isEmpty());
         m.setText("hi @Ann.");
-        assertTrue(m.getMentions().isEmpty(), "a name no longer in the text is forgotten");
+        assertEquals(Arrays.asList("Ann"), m.getMentions(), "a name typed back is found again");
     }
 }

@@ -180,17 +180,12 @@ public class MentionField extends Container {
     public List<String> getMentions() {
         List<String> out = new ArrayList<String>();
         String text = field.getText() == null ? "" : field.getText();
-        List<String> stale = new ArrayList<String>();
+        // Filtered into the copy only: a name deleted and typed back is found again.
         for (String m : mentions) {
-            if (!out.contains(m)) {
-                if (containsMention(text, trigger + m)) {
-                    out.add(m);
-                } else {
-                    stale.add(m);
-                }
+            if (!out.contains(m) && containsMention(text, trigger + m)) {
+                out.add(m);
             }
         }
-        mentions.removeAll(stale);
         return out;
     }
 

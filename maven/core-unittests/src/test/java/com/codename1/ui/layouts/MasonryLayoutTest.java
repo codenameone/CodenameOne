@@ -123,4 +123,30 @@ class MasonryLayoutTest extends UITestBase {
         c.setWidth(5000);
         assertEquals(20, m.getPreferredSize(c).getWidth());
     }
+
+    @FormTest
+    void textInsideACardWrapsToTheColumn() {
+        MasonryLayout m = new MasonryLayout(2);
+        m.setGap(0);
+        Container grid = new Container(m);
+        grid.getAllStyles().setPadding(0, 0, 0, 0);
+        final int[] seen = {-1};
+        Label text = new Label() {
+            @Override
+            protected Dimension calcPreferredSize() {
+                seen[0] = getWidth();
+                return new Dimension(1000, getWidth() > 0 ? 10000 / getWidth() : 10);
+            }
+        };
+        text.getAllStyles().setMargin(0, 0, 0, 0);
+        Container card = new Container(BoxLayout.y());
+        card.getAllStyles().setPadding(0, 0, 0, 0);
+        card.getAllStyles().setMargin(0, 0, 0, 0);
+        card.add(text);
+        grid.add(card).add(tile(10));
+        grid.setWidth(200);
+        grid.layoutContainer();
+        assertEquals(100, seen[0]);
+        assertEquals(100, card.getHeight());
+    }
 }
