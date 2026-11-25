@@ -437,7 +437,7 @@
     },
     {
       "test": "VideoIODecodedFramesScreenshotTest",
-      "reason": "The decoded-frame grid has to encode a clip before it can decode one back. The Apple television and watch simulators expose no usable video encoder to a headless job, so there is no clip to decode and no grid to compare.",
+      "reason": "The decoded-frame grid has to encode a clip before it can decode one back. The Apple television and watch simulators expose no usable video encoder to a headless job, so there is no clip to decode and no grid to compare. On iOS with the Metal renderer the test also checks that the digit it drew into each source frame survives Image.getRGB(); when a getRGB-after-draw synchronisation gap returns the frame without its ink, it skips rather than encode blank frames against a baseline that can never match.",
       "platform_support": "Video playback and frame decoding are supported on those ports; the skip covers creating a new encoded clip inside that CI environment, the same limitation VideoIORoundTripTest records.",
       "verification": "Encoder-backed targets encode the counting frames, decode them back and compare the resulting grid against a stored golden with a per-port tolerance.",
       "reason_codes": [
@@ -446,6 +446,12 @@
           "ports": [
             "tvos",
             "watchos"
+          ]
+        },
+        {
+          "prefix": "frame-render-readback-unavailable-on-",
+          "ports": [
+            "ios-metal"
           ]
         }
       ]
@@ -630,6 +636,135 @@
           "prefix": "document-on-watch",
           "ports": [
             "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "DatabaseCursorLegacyTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseCursorTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseEncryptionTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one. Encryption is requested only where the port supports encrypted databases; elsewhere the suite asserts that the request is refused rather than silently returning a plaintext database, then reports the rest as a skip.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        },
+        {
+          "prefix": "encryption-unsupported-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseLifecycleTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseMigrationTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseStatementLegacyTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseStatementTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "DatabaseTransactionTest",
+      "reason": "The shared database conformance suite (tests/conformance DatabaseConformanceSuite) first probes for a database it can open, and reports a skip naming the platform instead of a failure when the port has no SQL database implementation or the probe cannot open one.",
+      "platform_support": "A skip here means the port has no usable embedded database on that runner; it says nothing about the rest of the port. Every port that ships a database runs the whole suite.",
+      "verification": "Each check in the suite runs on every port that opens a database, and its skip carries the platform name so the page shows exactly where the suite could not run.",
+      "reason_codes": [
+        {
+          "prefix": "no-database-implementation-on-"
+        },
+        {
+          "prefix": "database-unavailable-on-"
+        }
+      ]
+    },
+    {
+      "test": "AccessibilityTest",
+      "reason": "Every semantic assertion runs first on all ports. The final check is whether the port publishes the accessibility tree to the platform's assistive stack; the AppKit macOS port does not do that yet, answers false from isAccessibilityTreeSupported, and the test reports a skip naming the platform rather than claiming support.",
+      "platform_support": "The accessibility semantics Codename One builds are correct on macOS; only the hand-off to VoiceOver is not implemented in the AppKit port.",
+      "verification": "The semantic assertions run on every port, and the platform hand-off is asserted on every port that reports it as supported.",
+      "reason_codes": [
+        {
+          "prefix": "no-native-accessibility-tree-on-",
+          "ports": [
+            "macos"
           ]
         }
       ]

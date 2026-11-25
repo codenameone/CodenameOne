@@ -1157,6 +1157,27 @@ class PortStatusTest(unittest.TestCase):
         self.assertIn("DocumentLayoutScreenshotTest.java:", problems[0])
         self.assertIn("document-on-watch", problems[0])
 
+    def test_source_scan_reads_split_and_computed_markers(self):
+        # Each shape the first scan missed, by removing the erratum it needs:
+        # a reason on the next literal (CameraApiTest), a computed test name
+        # (VideoIODecodedFrames), a helper base class (BackendAuthTestBase) and
+        # a shared reporter whose reason is wholly computed (Database*).
+        cases = {
+            "AccessibilityTest": "AccessibilityTest.java:",
+            "VideoIODecodedFramesScreenshotTest": "VideoIODecodedFramesScreenshotTest.java:",
+            "BackendAuthTest": "BackendAuthTestBase.java:",
+            "DatabaseCursorTest": "DatabaseConformanceTest.java:",
+        }
+        for test, where in cases.items():
+            with self.subTest(test=test):
+                problems = port_status.source_skip_problems(
+                    self.manifest, self.supplement_without(test)
+                )
+                self.assertTrue(
+                    any(where in item and " " + test + " " in item for item in problems),
+                    problems,
+                )
+
     def test_source_skip_reason_matching(self):
         items = [{"reason_codes": [{"prefix": "needs-permission-on-", "ports": ["android"]}]}]
         documented = port_status.source_skip_documented
