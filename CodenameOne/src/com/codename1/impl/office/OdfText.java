@@ -409,6 +409,10 @@ public final class OdfText {
                 b.append("&gt;");
             } else if (c == '"') {
                 b.append("&quot;");
+            } else if (c < 0x20 && c != '\t' && c != '\n' && c != '\r'
+                    || c == 0xfffe || c == 0xffff) {
+                // not allowed in XML 1.0 at all, not even escaped: dropped, as XmlOut does
+                continue;
             } else {
                 b.append(c);
             }

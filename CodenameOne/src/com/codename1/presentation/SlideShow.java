@@ -496,7 +496,11 @@ public class SlideShow extends Container {
             f.registerAnimated(this);
             registered = true;
         }
-        startedAt = AnimationTime.now();
+        if (startedAt == 0) {
+            // only the first time: re-adding the show (a rotation, a form switch) keeps the
+            // presenter's clock running
+            startedAt = AnimationTime.now();
+        }
     }
 
     @Override

@@ -116,12 +116,17 @@ final class KeynoteReader {
         if (!iwa) {
             throw new IOException("Not a Keynote package: no Index/*.iwa archives");
         }
+        // one budget for every archive: Snappy expands about twenty times, so a cap per
+        // archive would let a package of many archives unpack to gigabytes
+        int budget = Snappy.DEFAULT_LIMIT;
         Iterator<Map.Entry<String, byte[]>> entries = parts.entrySet().iterator();
         while (entries.hasNext()) {
             Map.Entry<String, byte[]> e = entries.next();
             String n = e.getKey();
             if (n.startsWith("Index/") && n.endsWith(".iwa")) {
-                readArchive(Snappy.decompressIwa(e.getValue(), Snappy.DEFAULT_LIMIT));
+                byte[] raw = Snappy.decompressIwa(e.getValue(), budget);
+                budget -= raw.length;
+                readArchive(raw);
             }
         }
         readMetadata();
@@ -878,9 +883,19 @@ final class KeynoteReader {
     }
 
     private static int styleIndex(List<int[]> runs, int pos) {
+        // the last run starting at or before pos; runs are in ascending order, so a binary
+        // search keeps a storage of many runs linear overall
+        int lo = 0;
+        int hi = runs.size() - 1;
         int k = -1;
-        for (int i = 0; i < runs.size() && runs.get(i)[0] <= pos; i++) {
-            k = i;
+        while (lo <= hi) {
+            int mid = (lo + hi) >>> 1;
+            if (runs.get(mid)[0] <= pos) {
+                k = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
         }
         return k;
     }

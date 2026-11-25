@@ -491,6 +491,9 @@ public class SlideRenderer {
             this.ox = ox;
             this.oy = oy;
             this.scale = scale;
+            // paint under whatever alpha the caller set: a fading transition draws the new
+            // slide this way, and an element's own alpha multiplies into it
+            this.alpha = g.getAlpha() / 255f;
         }
 
         private int px(float x) {

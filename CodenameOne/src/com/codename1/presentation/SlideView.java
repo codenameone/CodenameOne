@@ -163,6 +163,10 @@ public class SlideView extends Container {
 
     @Override
     protected void deinitialize() {
+        // a drag or a text edit cut short by leaving the form must not leave an undo group
+        // open, or every later edit would join it
+        endTextEdit();
+        canvas.endDrag();
         model.removePresentationListener(modelListener);
         super.deinitialize();
     }
@@ -681,6 +685,8 @@ public class SlideView extends Container {
 
         @Override
         public void pointerPressed(int x, int y) {
+            // a press with a drag still open means its release was lost
+            endDrag();
             float[] pt = toSlide(x, y);
             SlideElement sel = selected();
             int h = sel == null ? NONE : handleAt(sel, pt[0], pt[1]);
@@ -739,13 +745,18 @@ public class SlideView extends Container {
 
         @Override
         public void pointerReleased(int x, int y) {
+            endDrag();
+            super.pointerReleased(x, y);
+        }
+
+        /// Ends a drag, closing its undo group; also when its release never arrived.
+        void endDrag() {
             if (grouped) {
                 model.endGroup();
                 grouped = false;
             }
             mode = NONE;
             pressed = null;
-            super.pointerReleased(x, y);
         }
 
         @Override

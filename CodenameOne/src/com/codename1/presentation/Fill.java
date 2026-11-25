@@ -151,6 +151,7 @@ public final class Fill {
     @Override
     public int hashCode() {
         return ((kind * 31 + color) * 31 + color2) * 31 + Float.floatToIntBits(angle)
+                + 31 * Float.floatToIntBits(alpha)
                 + (picture == null ? 0 : picture.hashCode());
     }
 

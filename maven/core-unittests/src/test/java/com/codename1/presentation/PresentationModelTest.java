@@ -66,6 +66,18 @@ class PresentationModelTest extends UITestBase {
     }
 
     @Test
+    void anEditAfterUndoInsideAGroupIsItsOwnStep() {
+        PresentationModel m = new PresentationModel(Decks.everything());
+        m.beginGroup();
+        m.setBounds(0, "e2", 1, 1, 50, 50);
+        assertTrue(m.undo());
+        m.setBounds(0, "e2", 2, 2, 50, 50);
+        m.endGroup();
+        assertTrue(m.undo(), "the edit made after the undo can be undone");
+        assertEquals(100, m.getSlide(0).find("e2").x, 0);
+    }
+
+    @Test
     void slidesAddMoveDuplicateRemove() {
         PresentationModel m = new PresentationModel(Decks.everything());
         String id = m.addSlide(-1);

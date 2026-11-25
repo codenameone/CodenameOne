@@ -169,6 +169,9 @@ public final class PresentationModel {
         if (undo.isEmpty()) {
             return false;
         }
+        // an edit after this starts a step of its own even inside an open group, so what
+        // was undone cannot be swallowed into the group's old step
+        groupRecorded = false;
         push(redo, presentation);
         replace(undo.remove(undo.size() - 1));
         return true;
@@ -183,6 +186,7 @@ public final class PresentationModel {
         if (redo.isEmpty()) {
             return false;
         }
+        groupRecorded = false;
         push(undo, presentation);
         replace(redo.remove(redo.size() - 1));
         return true;

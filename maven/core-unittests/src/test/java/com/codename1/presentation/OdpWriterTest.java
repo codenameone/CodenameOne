@@ -162,4 +162,11 @@ class OdpWriterTest extends UITestBase {
         assertTrue(chartXml.contains("Revenue"));
         assertTrue(chartXml.contains("office:value=\"22\""));
     }
+
+    @Test
+    void controlCharactersNeverReachTheXml() {
+        StringBuilder b = new StringBuilder();
+        com.codename1.impl.office.OdfText.escape(b, "a\u0001b\u000cc\td&e");
+        org.junit.jupiter.api.Assertions.assertEquals("abc\td&amp;e", b.toString());
+    }
 }
