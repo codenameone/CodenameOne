@@ -115,6 +115,32 @@ public final class ReceiptForm {
 
     /// A payment's state, in words.
     public static String status(String status) {
+        // The server's own payment states, as the admin's "By status" counts
+        // them; every one of them used to read "Payment pending".
+        if ("PAID".equals(status)) {
+            return "Paid";
+        }
+        if ("AUTHORIZED".equals(status)) {
+            return "Authorized";
+        }
+        if ("PARTIALLY_REFUNDED".equals(status)) {
+            return "Partially refunded";
+        }
+        if ("REFUNDED".equals(status)) {
+            return "Refunded";
+        }
+        if ("VOIDED".equals(status)) {
+            return "Voided";
+        }
+        if ("REFUND_PENDING".equals(status)) {
+            return "Refund pending";
+        }
+        if ("REFUND_FAILED".equals(status)) {
+            return "Refund failed";
+        }
+        if ("FAILED".equals(status)) {
+            return "Payment failed";
+        }
         return "paid".equals(status) ? "Paid" : "cash".equals(status) ? "Paid in cash"
                 : "refunded".equals(status) ? "Refunded"
                 : "refund_pending".equals(status) ? "Refund pending"
@@ -123,8 +149,10 @@ public final class ReceiptForm {
     }
 
     public static String badge(String status) {
-        return "paid".equals(status) || "cash".equals(status) ? "SvBadgeGood"
-                : "failed".equals(status) || "refund_failed".equals(status) ? "SvBadgeBad"
+        return "paid".equals(status) || "cash".equals(status) || "PAID".equals(status)
+                ? "SvBadgeGood"
+                : "failed".equals(status) || "refund_failed".equals(status)
+                || "FAILED".equals(status) || "REFUND_FAILED".equals(status) ? "SvBadgeBad"
                 : "SvBadgeWarn";
     }
 }

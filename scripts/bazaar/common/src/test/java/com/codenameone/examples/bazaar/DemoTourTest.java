@@ -1704,6 +1704,7 @@ private void screens() throws Exception {
             hideSimulatorMenus();
             waitFor(1000);
             fitFormToScreen();
+            startChromeWatch();
         }
         recorder = JavaSEPort.instance.getSimulatorRecorder();
         RecordingOptions o = new RecordingOptions();
@@ -1723,6 +1724,47 @@ private void screens() throws Exception {
         recordStart = System.currentTimeMillis();
     }
 
+    /// Keeps every later frame of a desktop tour free of simulator chrome.
+    ///
+    /// The app gives each form a desktop menu bar of its own ([DesktopMenus]),
+    /// and the port builds a new `JMenuBar` whenever a form shows: the
+    /// register's sell screen came up with File ... Sale ... Simulate showing
+    /// again and, with the bar back, the canvas 25 px shorter than the form
+    /// laid out under it -- "Sign out" and the Charge button cut off. Hiding
+    /// once before recording cannot see a bar made later, so a daemon thread
+    /// repeats the hide and the fit for as long as the test runs.
+    private void startChromeWatch() {
+        if (chromeWatch != null) {
+            return;
+        }
+        chromeWatch = new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(150);
+                    hideSimulatorMenus();
+                    Display.getInstance().callSeriallyAndWait(() -> {
+                        Display d = Display.getInstance();
+                        com.codename1.ui.Form f = d.getCurrent();
+                        int w = d.getDisplayWidth();
+                        int h = d.getDisplayHeight();
+                        if (f != null && w > 0 && h > 0
+                                && (f.getWidth() != w || f.getHeight() != h)) {
+                            d.sizeChanged(w, h);
+                        }
+                    });
+                } catch (InterruptedException err) {
+                    return;
+                } catch (Throwable err) {
+                    log("chrome watch: " + err);
+                }
+            }
+        }, "demo-chrome-watch");
+        chromeWatch.setDaemon(true);
+        chromeWatch.start();
+    }
+
+    private static Thread chromeWatch;
+
     /// Hides the simulator's own Swing menu bar (File, Edit, Simulate ...):
     /// the recorder paints it over the top of a desktop frame, and it is
     /// the simulator's, not the app's.
@@ -1731,7 +1773,8 @@ private void screens() throws Exception {
             javax.swing.SwingUtilities.invokeAndWait(() -> {
                 java.awt.Window w = javax.swing.SwingUtilities.getWindowAncestor(
                         JavaSEPort.instance.getCanvas());
-                if (w instanceof javax.swing.JFrame && ((javax.swing.JFrame) w).getJMenuBar() != null) {
+                if (w instanceof javax.swing.JFrame && ((javax.swing.JFrame) w).getJMenuBar() != null
+                        && ((javax.swing.JFrame) w).getJMenuBar().isVisible()) {
                     ((javax.swing.JFrame) w).getJMenuBar().setVisible(false);
                     w.validate();
                 }

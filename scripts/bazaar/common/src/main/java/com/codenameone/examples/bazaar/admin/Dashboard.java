@@ -171,7 +171,7 @@ final class Dashboard extends LiveChannel.Adapter {
 
     private void fill(AdminStatsDto stats) {
         numbers.clear();
-        numbers.stat(String.valueOf(stats.users()), "Accounts", "users");
+        numbers.stat(String.valueOf(stats.users()), "Registered accounts", "users");
         numbers.stat(String.valueOf(stats.usersToday()), "New today", "usersToday");
         numbers.stat(String.valueOf(stats.paymentsToday()), "Payments today", "paymentsToday");
         numbers.stat(Ui.money(stats.revenueCents(), stats.currency()), "Revenue", "revenue");

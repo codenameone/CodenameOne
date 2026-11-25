@@ -30,6 +30,7 @@ import com.codenameone.examples.bazaar.domain.InventoryLevel;
 import com.codenameone.examples.bazaar.domain.InventoryMove;
 import com.codenameone.examples.bazaar.domain.Location;
 import com.codenameone.examples.bazaar.domain.Photo;
+import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.domain.Product;
 import com.codenameone.examples.bazaar.domain.ProductOption;
 import com.codenameone.examples.bazaar.domain.ProductPhoto;
@@ -278,7 +279,9 @@ public class DemoStores {
             com.codenameone.examples.bazaar.marketing.DemoMarketing marketing,
             PhotoRepository photos, ProductPhotoRepository gallery, ReviewRepository reviews,
             DemoFunnel funnel,
-            com.codenameone.examples.bazaar.repository.RefundRepository refunds) {
+            com.codenameone.examples.bazaar.repository.RefundRepository refunds,
+            com.codenameone.examples.bazaar.repository.PaymentRepository payments) {
+        this.payments = payments;
         this.funnel = funnel;
         this.refunds = refunds;
         this.reviews = reviews;
@@ -409,11 +412,18 @@ public class DemoStores {
         List<StoreOrder> made = new ArrayList<StoreOrder>();
         List<OrderLine> madeLines = new ArrayList<OrderLine>();
         List<Object[]> behind = new ArrayList<Object[]>();
+        List<com.codenameone.examples.bazaar.domain.Payment> madePayments =
+                new ArrayList<com.codenameone.examples.bazaar.domain.Payment>();
         List<com.codenameone.examples.bazaar.domain.Refund> madeRefunds =
                 new ArrayList<com.codenameone.examples.bazaar.domain.Refund>();
         for (int ago = HISTORY_DAYS - 1; ago >= 0; ago--) {
             long epochDay = today - ago;
             int count = ordersOn(big, epochDay, ago);
+            if (FENNEL_FIG.equals(store.getHandle())) {
+                // A shade quieter than Little Clay, and not its twin: the same
+                // curve gave both small stores the same order count.
+                count = Math.max(1, count * 4 / 5 + mix((int) epochDay, 15) % 2);
+            }
             for (int k = 0; k < count; k++) {
                 // Spread over the thirteen hours before this time of day,
                 // counted from now rather than from midnight: a seed made at
@@ -527,6 +537,7 @@ public class DemoStores {
                     o.setRefundedCents(back);
                     o.setFinancial(whole ? Orders.REFUNDED : Orders.PARTIALLY_REFUNDED);
                 }
+                madePayments.add(payment(o, pos, waiting, serial));
                 made.add(o);
                 madeLines.addAll(lines);
                 if (!pos && ago < FUNNEL_DAYS) {
@@ -541,6 +552,9 @@ public class DemoStores {
         for (int iter = 0; iter < madeRefunds.size(); iter++) {
             refunds.insert(madeRefunds.get(iter));
         }
+        for (int iter = 0; iter < madePayments.size(); iter++) {
+            payments.insert(madePayments.get(iter));
+        }
         for (int iter = 0; iter < behind.size(); iter++) {
             Object[] f = behind.get(iter);
             StoreOrder o = (StoreOrder) f[0];
@@ -554,6 +568,45 @@ public class DemoStores {
             funnel.behind(o, ls, browse, ((Integer) f[2]).intValue());
         }
     }
+
+    /// The payment behind a seeded order. The admin's overview and charts
+    /// count payments, not orders, and a history of orders with none read as
+    /// a marketplace that had never taken a cent. An order still waiting to
+    /// ship holds an authorization, as a live one does until it is captured.
+    private static com.codenameone.examples.bazaar.domain.Payment payment(StoreOrder o,
+            boolean pos, boolean waiting, int serial) {
+        com.codenameone.examples.bazaar.domain.Payment p =
+                new com.codenameone.examples.bazaar.domain.Payment();
+        p.setOrderId(o.getId());
+        p.setUsername(o.getEmail());
+        String[] card = DEMO_CARDS[mix(serial, 14) % DEMO_CARDS.length];
+        p.setMethodId(pos ? "reader" : "card");
+        p.setMethodLabel(pos ? "Card reader" : card[0]);
+        p.setAmountCents(o.getTotalCents());
+        p.setCurrency(o.getCurrency());
+        p.setProviderRef("demo_" + o.getId());
+        p.setCreatedAt(o.getCreatedAt());
+        long refunded = o.getRefundedCents();
+        String status = waiting ? Payments.AUTHORIZED
+                : refunded <= 0L ? Payments.PAID
+                : refunded >= o.getTotalCents() ? Payments.REFUNDED
+                : Payments.PARTIALLY_REFUNDED;
+        p.setStatus(status);
+        if (!waiting) {
+            p.setPaidAt(o.getCreatedAt());
+        }
+        if (refunded > 0L) {
+            p.setRefundedCents(refunded);
+            p.setRefundRef("demo_r_" + o.getId());
+            p.setRefundedAt(o.getCreatedAt().plusMillis(2L * 24 * 60 * 60 * 1000));
+        }
+        return p;
+    }
+
+    private static final String[][] DEMO_CARDS = {
+        {"Visa ending 4242"}, {"Mastercard ending 4444"}, {"Visa ending 1881"},
+        {"Amex ending 0005"},
+    };
 
     /// `text` with ASCII capitals folded; names here are ASCII and the
     /// locale must not fold them.
@@ -793,6 +846,8 @@ public class DemoStores {
     }
 
     /// Seeds [#FENNEL_FIG] once, owned by `owner`.
+    private final com.codenameone.examples.bazaar.repository.PaymentRepository payments;
+
     public void fennelFig(String owner) throws IOException {
         if (exists(FENNEL_FIG)) {
             return;
@@ -813,6 +868,11 @@ public class DemoStores {
         // A loyalty programme, as the other two stores have: the walkthrough's
         // order here shows the points it will earn.
         marketing.programme(store.getId());
+        // Its own few months of sales, as the other stores have: without them
+        // the admin's store list showed a live shop with no orders at all.
+        if (sales.findFirstByStoreIdOrderByNumberDesc(store.getId()) == null) {
+            history(store, new ArrayList<Register>(), owner, owner);
+        }
     }
 
     private Store store(String handle, String name, String tagline, String description,

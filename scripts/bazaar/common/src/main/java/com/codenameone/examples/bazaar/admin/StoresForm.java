@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.admin;
 
+import com.codename1.appkit.Chart;
 import com.codename1.appkit.Net;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
@@ -133,8 +134,45 @@ public final class StoresForm {
                 open(panes, stores.get(row), reload);
             }
         });
-        holder.add(BorderLayout.CENTER, grid);
+        Container page = new Container(BoxLayout.y());
+        page.setScrollableY(true);
+        page.add(summary(stats));
+        page.add(grid);
+        page.add(shares(stores, stats.gmvCents()));
+        holder.add(BorderLayout.CENTER, page);
         panes.refresh();
+    }
+
+    /// The marketplace in four numbers above the table: a table of three
+    /// stores alone left most of a desktop window blank.
+    private static Container summary(PlatformStatsDto stats) {
+        com.codenameone.examples.bazaar.ui.StatRow row = Ui.stats(4);
+        row.setName("stores-summary");
+        String currency = stats.perStore() != null && !stats.perStore().isEmpty()
+                ? stats.perStore().get(0).currency() : "USD";
+        row.stat(String.valueOf(stats.stores()), "Stores", "storesCount");
+        row.stat(Ui.money(stats.gmvCents(), currency), "Gross sales", "storesGmv");
+        row.stat(String.valueOf(stats.orders()), "Orders", "storesOrders");
+        row.stat(String.valueOf(stats.ordersToday()), "Orders today", "storesOrdersToday");
+        return row;
+    }
+
+    /// Each store's share of the platform's gross sales, as a bar: what the
+    /// table's column says in numbers, at a glance.
+    private static Container shares(List<StoreStatsDto> stores, long total) {
+        Container tile = new Container(BoxLayout.y());
+        tile.setUIID("SvTile");
+        tile.setName("stores-shares");
+        tile.add(Ui.label("Share of gross sales", "SvStatLabel"));
+        for (int iter = 0; stores != null && iter < stores.size(); iter++) {
+            StoreStatsDto s = stores.get(iter);
+            // Tested before dividing: a platform with no sales has no shares.
+            long percent = total <= 0L ? 0L : s.gmvCents() * 100L / total;
+            Container fact = Ui.fact(s.name(), percent + "%");
+            tile.add(fact);
+            tile.add(new Chart.Meter("Sv", total <= 0L ? 0 : s.gmvCents() / (double) total));
+        }
+        return tile;
     }
 
     /// Gross sales in the currency of the stores on the platform.
