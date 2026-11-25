@@ -140,7 +140,11 @@ public final class PsdReader {
     ///
     /// - `data`: the file
     public static ArtDocument read(byte[] data) throws IOException {
-        return new PsdReader().parse(data);
+        try {
+            return new PsdReader().parse(data);
+        } catch (RuntimeException e) {
+            throw ArtFormats.damaged(e);
+        }
     }
 
     private void note(String where, String msg) {
@@ -316,6 +320,9 @@ public final class PsdReader {
         d.need(extra);
         int end = d.pos + (int) extra;
         long maskLen = d.u32();
+        if (maskLen > end - d.pos) {
+            throw new IOException("Layer mask data runs past its record");
+        }
         int maskEnd = d.pos + (int) maskLen;
         if (maskLen >= 18) {
             l.maskTop = d.s32();
@@ -328,6 +335,9 @@ public final class PsdReader {
         }
         d.pos = maskEnd;
         long br = d.u32();
+        if (br > end - d.pos) {
+            throw new IOException("Blending ranges run past their record");
+        }
         d.skip(br);
         l.name = d.pascal(4);
         while (d.pos + 12 <= end) {
@@ -1236,7 +1246,9 @@ public final class PsdReader {
         } else if (comp == 2 || comp == 3) {
             byte[] z = new byte[p.end - p.pos];
             System.arraycopy(p.b, p.pos, z, 0, z.length);
-            byte[] inf = PngDecoder.inflate(z);
+            // Only rawLen bytes are kept, so inflating stops there: a small deflate bomb per
+            // channel must not cost the decoder's general limit each time.
+            byte[] inf = PngDecoder.inflate(z, (int) rawLen);
             raw = new byte[(int) rawLen];
             System.arraycopy(inf, 0, raw, 0, Math.min(inf.length, raw.length));
             if (comp == 3) {

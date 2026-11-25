@@ -62,6 +62,21 @@ public final class ArtFormats {
     ///
     /// - `data`: the file
     public static ArtDocument read(byte[] data) throws IOException {
+        try {
+            return dispatch(data);
+        } catch (RuntimeException e) {
+            throw damaged(e);
+        }
+    }
+
+    /// A damaged file must fail as an IOException, whatever a reader trips over.
+    static IOException damaged(RuntimeException e) {
+        IOException x = new IOException("Damaged or unsupported file: " + e);
+        x.initCause(e);
+        return x;
+    }
+
+    private static ArtDocument dispatch(byte[] data) throws IOException {
         if (data.length >= 4 && data[0] == '8' && data[1] == 'B' && data[2] == 'P' && data[3] == 'S') {
             return PsdReader.read(data);
         }

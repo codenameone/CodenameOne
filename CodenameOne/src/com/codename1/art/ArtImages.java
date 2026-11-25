@@ -55,6 +55,14 @@ public final class ArtImages {
         }
         try {
             if (PngDecoder.isPng(data)) {
+                // Check the header's size before decoding allocates it.
+                if (data.length >= 24) {
+                    long w = int32(data, 16) & 0xffffffffL;
+                    long h = int32(data, 20) & 0xffffffffL;
+                    if (w > MAX_DIMENSION || h > MAX_DIMENSION || w * h > Raster.MAX_PIXELS) {
+                        return null;
+                    }
+                }
                 PngDecoder d = PngDecoder.decode(data);
                 if (d.width > MAX_DIMENSION || d.height > MAX_DIMENSION) {
                     return null;
@@ -148,5 +156,9 @@ public final class ArtImages {
         byte[] c = new byte[4];
         put32(c, 0, (int) crc.getValue());
         out.write(c);
+    }
+
+    private static int int32(byte[] d, int p) {
+        return ((d[p] & 0xff) << 24) | ((d[p + 1] & 0xff) << 16) | ((d[p + 2] & 0xff) << 8) | (d[p + 3] & 0xff);
     }
 }

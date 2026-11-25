@@ -64,7 +64,11 @@ public final class SketchReader {
     ///
     /// - `in`: the file; read to its end, not closed
     public static ArtDocument read(InputStream in) throws IOException {
-        return new SketchReader().parse(ArtZip.read(in, "Sketch file"));
+        try {
+            return new SketchReader().parse(ArtZip.read(in, "Sketch file"));
+        } catch (RuntimeException e) {
+            throw ArtFormats.damaged(e);
+        }
     }
 
     private void note(String where, String msg) {

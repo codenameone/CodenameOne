@@ -84,8 +84,11 @@ public final class FigmaReader {
     /// - `json`: the API response
     /// - `images`: image fill bytes keyed by `imageRef`, or null
     public static ArtDocument read(byte[] json, Map<String, byte[]> images) throws IOException {
-        Map<String, Object> m = JSONParser.parseJSON(json);
-        return new FigmaReader(images).parse(m);
+        try {
+            return new FigmaReader(images).parse(JSONParser.parseJSON(json));
+        } catch (RuntimeException e) {
+            throw ArtFormats.damaged(e);
+        }
     }
 
     /// The `imageRef` of every image fill in a file's JSON, so the caller can fetch them.

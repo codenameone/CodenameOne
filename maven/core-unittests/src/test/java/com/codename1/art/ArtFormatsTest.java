@@ -513,4 +513,42 @@ class ArtFormatsTest {
         assertEquals((c >> 16) & 0xff, (c >> 8) & 0xff);
         assertEquals((c >> 8) & 0xff, c & 0xff);
     }
+
+    @Test
+    void svgUseExpansionIsBounded() throws IOException {
+        // Ten references per level, 31 levels: 10^31 copies if nothing counted them.
+        StringBuilder sb = new StringBuilder("<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><defs>");
+        sb.append("<rect id='a31' width='1' height='1'/>");
+        for (int l = 30; l >= 0; l--) {
+            sb.append("<g id='a").append(l).append("'>");
+            for (int k = 0; k < 10; k++) {
+                sb.append("<use href='#a").append(l + 1).append("'/>");
+            }
+            sb.append("</g>");
+        }
+        sb.append("</defs><use href='#a0'/></svg>");
+        long start = System.currentTimeMillis();
+        ArtDocument d = SvgReader.read(utf8(sb.toString()));
+        assertTrue(System.currentTimeMillis() - start < 20000);
+        assertFalse(d.getNotes().isEmpty());
+    }
+
+    @Test
+    void hostilePsdAndImagesFailCleanly() throws IOException {
+        byte[] psd = PsdWriter.toBytes(twoLayers());
+        // Every corruption of every byte of a real file must answer an IOException or a document.
+        for (int i = 26; i < Math.min(psd.length, 600); i++) {
+            byte[] bad = psd.clone();
+            bad[i] = (byte) 0x80;
+            try {
+                ArtFormats.read(bad);
+            } catch (IOException expected) {
+                // fine
+            }
+        }
+        // A PNG whose header claims 30000x30000 is refused before it is decoded.
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0, 0, 13, 'I', 'H', 'D', 'R',
+            0, 0, 0x75, 0x30, 0, 0, 0x75, 0x30, 8, 6, 0, 0, 0};
+        assertEquals(null, ArtImages.decode(png));
+    }
 }

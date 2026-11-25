@@ -96,6 +96,14 @@ public final class NativeFormat {
     ///
     /// - `in`: the file; read to its end, not closed
     public static ArtDocument read(InputStream in) throws IOException {
+        try {
+            return readParts(in);
+        } catch (RuntimeException e) {
+            throw ArtFormats.damaged(e);
+        }
+    }
+
+    private static ArtDocument readParts(InputStream in) throws IOException {
         NativeFormat f = new NativeFormat();
         f.parts = ArtZip.read(in, "cn1gfx file");
         byte[] json = f.parts.get(ENTRY);

@@ -83,6 +83,10 @@ public final class SvgReader {
     private final Set<String> noted = new HashSet<String>();
     private ResourceResolver resolver;
     private int useDepth;
+    /// How many `use` references have been expanded. Depth alone does not bound the work:
+    /// ten references per level, 32 levels deep, is 10^32 copies from a few hundred elements.
+    private int useExpansions;
+    private static final int MAX_USE_EXPANSIONS = 20000;
     private double viewportW = 100;
     private double viewportH = 100;
 
@@ -102,7 +106,11 @@ public final class SvgReader {
     ///
     /// - `in`: the document; not closed
     public static ArtDocument read(InputStream in) throws IOException {
-        return new SvgReader().parse(in);
+        try {
+            return new SvgReader().parse(in);
+        } catch (RuntimeException e) {
+            throw ArtFormats.damaged(e);
+        }
     }
 
     /// Reads an SVG document from bytes.
@@ -111,7 +119,11 @@ public final class SvgReader {
     ///
     /// - `data`: the document
     public static ArtDocument read(byte[] data) throws IOException {
-        return new SvgReader().parse(new ByteArrayInputStream(data));
+        try {
+            return new SvgReader().parse(new ByteArrayInputStream(data));
+        } catch (RuntimeException e) {
+            throw ArtFormats.damaged(e);
+        }
     }
 
     /// Reads an SVG document with this reader's settings.
@@ -648,6 +660,12 @@ public final class SvgReader {
         }
         SvgElement t = ids.get(href.substring(1));
         if (t == null || useDepth > 32) {
+            return null;
+        }
+        if (++useExpansions > MAX_USE_EXPANSIONS) {
+            if (useExpansions == MAX_USE_EXPANSIONS + 1) {
+                note("use", "more than " + MAX_USE_EXPANSIONS + " references expanded; the rest were dropped");
+            }
             return null;
         }
         for (SvgElement a = e; a != null; a = a.parent) {
