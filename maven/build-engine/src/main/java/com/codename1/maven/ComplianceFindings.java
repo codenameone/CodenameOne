@@ -48,22 +48,30 @@ public final class ComplianceFindings {
     /// What kind of API a finding is about.
     public enum Category {
         /// Swing, AWT or JavaFX API a compatibility layer does not have.
-        TOOLKIT("Swing, AWT and JavaFX API the compatibility layers lack"),
+        TOOLKIT("Swing, AWT and JavaFX API the compatibility layers lack", "CN1-API-TOOLKIT"),
         /// API of a UI library a compatibility layer stands in for.
-        UI_LIBRARY("UI library API the compatibility layers lack"),
+        UI_LIBRARY("UI library API the compatibility layers lack", "CN1-API-UI-LIBRARY"),
         /// JDK API a device does not have.
-        JDK("JDK API a device lacks"),
+        JDK("JDK API a device lacks", "CN1-API-JDK"),
         /// A Java language feature compiled to something a device cannot run.
-        LANGUAGE("Language features a device cannot run"),
+        LANGUAGE("Language features a device cannot run", "CN1-LANGUAGE"),
         /// A class of some other library that is not in the application.
-        LIBRARY("Other libraries"),
+        LIBRARY("Other libraries", "CN1-LIBRARY-MISSING"),
         /// What fits none of these.
-        OTHER("Other findings");
+        OTHER("Other findings", "CN1-API-OTHER");
 
         private final String heading;
+        private final String id;
 
-        Category(String heading) {
+        Category(String heading, String id) {
             this.heading = heading;
+            this.id = id;
+        }
+
+        /// The category's stable ID, which a build log prints beside the heading so a
+        /// developer or an agent can key on it; the wording of a heading may change.
+        public String id() {
+            return id;
         }
 
         /// The category as a report heads it.
@@ -512,7 +520,7 @@ public final class ComplianceFindings {
                 if (apis.isEmpty()) {
                     continue;
                 }
-                out.append("\n    ").append(c.heading()).append(": ").append(plural(apis.size(), "API", "APIs"))
+                out.append("\n    ").append(c.heading()).append(" [").append(c.id()).append("]: ").append(plural(apis.size(), "API", "APIs"))
                         .append(", ").append(plural(s.callSites(c), "call site", "call sites")).append(" -- ");
                 if (c == Category.JDK || c == Category.LIBRARY) {
                     out.append(top(s.families(c), 5));
@@ -570,7 +578,7 @@ public final class ComplianceFindings {
                 if (apis.isEmpty()) {
                     continue;
                 }
-                out.append('\n').append(c.heading()).append(" (").append(plural(apis.size(), "API", "APIs"))
+                out.append('\n').append(c.heading()).append(" [").append(c.id()).append("] (").append(plural(apis.size(), "API", "APIs"))
                         .append(", ").append(plural(s.callSites(c), "call site", "call sites")).append(")\n");
                 if (c == Category.JDK || c == Category.LIBRARY) {
                     out.append("  by family: ").append(top(s.families(c), 12)).append('\n');

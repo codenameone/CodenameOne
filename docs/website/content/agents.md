@@ -54,7 +54,12 @@ Show me screenshots before you submit it to TestFlight and Google Play testing.
    then build screen by screen. Run the app with `./mvnw cn1:agent`
    (`mvnw.cmd cn1:agent` on Windows) in the background and look at each screen
    with `java .agent-skills/codename-one/tools/Sim.java`
-   (`screenshot`, `tap`, `type`, `record-start`).
+   (`screenshot`, `tap`, `type`, `record-start`). Freeze animation time once
+   (`freeze`) and `settle` after each tap, so screenshots never catch half an
+   animation. Check every finished screen with `verify`: light and dark,
+   portrait and landscape, the largest text size, and unlabeled controls,
+   cut-off text and low contrast. `./mvnw cn1:verify` does the same for the
+   first screen and fails the build on an error.
 5. **Make the icon** with `.agent-skills/codename-one/tools/MakeIcon.java`
    (one bold Material glyph or initials on the brand colour, 1024px, opaque).
 6. **Show the user** the screenshots, a video of the main flow, and the icon.

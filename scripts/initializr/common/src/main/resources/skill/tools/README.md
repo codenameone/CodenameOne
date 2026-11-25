@@ -14,6 +14,20 @@ Paths in the examples are a Maven project's; in a Gradle project the app is at t
 
 ## Available tools
 
+### `BuildLog.java`
+
+Names the cause of a failed build from its log, and the fix. Give it a downloaded cloud build log, or pipe a local build into it:
+
+```bash
+java tools/BuildLog.java build.log
+./mvnw package -Dcodename1.platform=ios 2>&1 | java tools/BuildLog.java -
+# [CN1-SIGN-PROFILE] The provisioning profile does not fit the build: ...
+#   line 812: error: Provisioning profile "Dev" doesn't include signing certificate ...
+#   fix: Regenerate the profile for this bundle ID ...
+```
+
+Exits 0 when it named a cause, 1 when nothing it knows matched. The IDs are in `references/mcp-agent-control.md`.
+
 ### `IsApiSupported.java`
 
 Checks whether a fully-qualified class name (or class#method) is part of the Codename One supported Java API subset.

@@ -67,6 +67,8 @@ public final class BuildHints {
 
     private static final List<Hint> ENTRIES;
     private static final Map<String, Hint> BY_NAME;
+    /** Whether the annotated hints' data file was on the class path; without it the catalog is partial. */
+    private static final boolean ANNOTATED_LOADED;
 
     static {
         List<Hint> h = new ArrayList<Hint>();
@@ -82,7 +84,9 @@ public final class BuildHints {
         // bytecode -- the Settings editor above all -- and not a second
         // statement of them. Anything that CAN read bytecode reads the
         // annotations directly and never comes here.
-        h.addAll(BuildHintsJson.load());
+        List<Hint> annotated = BuildHintsJson.load();
+        ANNOTATED_LOADED = !annotated.isEmpty();
+        h.addAll(annotated);
 
         Map<String, Hint> byName = new LinkedHashMap<String, Hint>();
         for (Hint entry : h) {
@@ -113,6 +117,102 @@ public final class BuildHints {
             return null;
         }
         return BY_NAME.get(strip(name));
+    }
+
+    /** The stable ID an unknown-hint warning carries, for agents and tools to key on. */
+    public static final String UNKNOWN_HINT_ID = "CN1-HINT-UNKNOWN";
+
+    /**
+     * Whether a builder reads this hint: a declared name, or a name one of the
+     * dynamic families ({@code android.permission.*}, {@code var.*}...) covers.
+     */
+    public static boolean isKnown(String name) {
+        String bare = strip(name);
+        if (bare == null || BY_NAME.containsKey(bare)) {
+            return bare != null;
+        }
+        for (Hint h : ENTRIES) {
+            if (h.isDynamic() && h.pattern() != null && globMatches(h.pattern(), bare)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The warning for a hint no builder reads, naming the closest declared hint
+     * when one is near enough to be a misspelling; null for a known hint. An
+     * undeclared hint is accepted and silently does nothing, so a typo ships as
+     * "no setting at all" unless something says so.
+     */
+    public static String unknownHintAdvice(String name) {
+        // Without the annotated hints the catalog is missing every hint declared by an
+        // annotation, and warning would name real hints as unknown. A class path that
+        // lacks cn1-build-hints.json (the Gradle plugin's, for one) gets no advice.
+        return ANNOTATED_LOADED ? advice(name) : null;
+    }
+
+    /** The advice for a name, judged against whatever the catalog holds. */
+    static String advice(String name) {
+        if (isKnown(name)) {
+            return null;
+        }
+        String bare = strip(name);
+        String best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (Hint h : ENTRIES) {
+            if (h.isDynamic()) {
+                continue;
+            }
+            int d = distance(bare.toLowerCase(java.util.Locale.ROOT), h.name().toLowerCase(java.util.Locale.ROOT));
+            if (d < bestDistance) {
+                bestDistance = d;
+                best = h.name();
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        out.append('[').append(UNKNOWN_HINT_ID).append("] ").append(ARG_PREFIX).append(bare)
+                .append(" is not a build hint any builder reads, so it has no effect.");
+        if (best != null && bestDistance <= Math.max(2, bare.length() / 4)) {
+            out.append(" Did you mean ").append(ARG_PREFIX).append(best).append('?');
+        } else {
+            out.append(" Check the name against the build hints table in the developer guide.");
+        }
+        return out.toString();
+    }
+
+    /** A family pattern where each {@code *} stands for one or more characters. */
+    static boolean globMatches(String glob, String name) {
+        StringBuilder re = new StringBuilder();
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            if (c == '*') {
+                re.append(".+");
+            } else {
+                re.append(java.util.regex.Pattern.quote(String.valueOf(c)));
+            }
+        }
+        return name.matches(re.toString());
+    }
+
+    /** Levenshtein distance; the names are short, so the quadratic table is fine. */
+    static int distance(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) {
+            prev[j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] t = prev;
+            prev = cur;
+            cur = t;
+        }
+        return prev[b.length()];
     }
 
     /** Removes the {@link #ARG_PREFIX} if present. */

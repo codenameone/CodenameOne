@@ -115,6 +115,37 @@ class ToolbarTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void theSideMenuButtonHasAnAccessibleLabel() {
+        Toolbar.setOnTopSideMenu(true);
+        Form form = Display.getInstance().getCurrent();
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        toolbar.addCommandToSideMenu("Execute", null, evt -> { });
+        form.show();
+        form.revalidate();
+        flushSerialCalls();
+        java.util.List<Button> iconOnly = new java.util.ArrayList<Button>();
+        collectIconOnlyButtons(toolbar, iconOnly);
+        assertFalse(iconOnly.isEmpty(), "the hamburger button should be in the toolbar");
+        for (Button b : iconOnly) {
+            assertEquals("Menu", b.getAccessibilityText(), "an icon-only toolbar button needs a label");
+        }
+    }
+
+    private static void collectIconOnlyButtons(Container parent, java.util.List<Button> out) {
+        for (int i = 0; i < parent.getComponentCount(); i++) {
+            Component c = parent.getComponentAt(i);
+            if (c instanceof Button && c.isVisible() && (((Button) c).getText() == null
+                    || ((Button) c).getText().length() == 0)) {
+                out.add((Button) c);
+            }
+            if (c instanceof Container) {
+                collectIconOnlyButtons((Container) c, out);
+            }
+        }
+    }
+
     private void awaitAnimations(Form form) {
         CountDownLatch latch = new CountDownLatch(1);
         form.getAnimationManager().flushAnimation(latch::countDown);

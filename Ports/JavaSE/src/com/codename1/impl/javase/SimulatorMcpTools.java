@@ -59,7 +59,29 @@ final class SimulatorMcpTools {
 
     static void register(JavaSEPort port, MCPServer server) {
         new SimulatorMcpTools(port).addAll(server);
+        registerVerify(port, server);
+        SimulatorVerifier.startIfRequested(port, server);
         SimulatorStyleTools.register(server);
+    }
+
+    private static void registerVerify(final JavaSEPort port, final MCPServer server) {
+        server.addTool(new Tool("sim_verify",
+                "Checks the current screen in light and dark mode, portrait and landscape, and at the largest "
+                        + "text size (when the app opts into larger text): unlabeled or zero-size controls, "
+                        + "truncated or overflowing text, and text contrast below 3:1. Writes report.json, "
+                        + "report.html and a screenshot per condition into dir, puts every setting back, and "
+                        + "returns the report. Leaves the clock as it found it.",
+                "{\"type\":\"object\",\"properties\":{\"dir\":{\"type\":\"string\","
+                        + "\"description\":\"directory for the report\"}},\"required\":[\"dir\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        String dir = str(parse(argumentsJson), "dir");
+                        if (dir == null || dir.length() == 0) {
+                            throw new IllegalArgumentException("dir is required");
+                        }
+                        return JSONParser.toJson(new SimulatorVerifier(port, server).verify(new java.io.File(dir)));
+                    }
+                }));
     }
 
     private void addAll(MCPServer server) {
@@ -602,6 +624,37 @@ final class SimulatorMcpTools {
                     }
                 }));
 
+        server.addTool(new Tool("sim_record_film",
+                "Films an animation deterministically as one contact-sheet PNG: steps the frozen clock "
+                        + "(ui_clock_freeze first) by everyMs over overMs and captures the screen at each step, "
+                        + "transition frames included. Call it right after the tap that starts the animation.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"path\":{\"type\":\"string\",\"description\":\"PNG file to write\"},"
+                        + "\"overMs\":{\"type\":\"integer\",\"description\":\"animation time to film, default 600\"},"
+                        + "\"everyMs\":{\"type\":\"integer\",\"description\":\"time between frames, default 50, at least 16\"},"
+                        + "\"scale\":{\"type\":\"number\",\"description\":\"frame scale, default 0.5\"}"
+                        + "},\"required\":[\"path\"]}",
+                new ToolHandler() {
+                    public String invoke(String argumentsJson) throws Exception {
+                        Map<String, Object> a = parse(argumentsJson);
+                        String path = str(a, "path");
+                        if (path == null || path.length() == 0) {
+                            throw new IllegalArgumentException("path is required");
+                        }
+                        long overMs = clamp(num(a, "overMs", 600), 0, MAX_GESTURE_MS);
+                        long everyMs = clamp(num(a, "everyMs", 50), 16, MAX_GESTURE_MS);
+                        Object sc = a.get("scale");
+                        double scale = sc instanceof Number ? ((Number) sc).doubleValue() : 0.5;
+                        java.io.File out = new java.io.File(path);
+                        int frames = filmFrames(out, overMs, everyMs, Math.max(0.1, Math.min(1.0, scale)));
+                        Map<String, Object> result = new LinkedHashMap<String, Object>();
+                        result.put("path", out.getAbsolutePath());
+                        result.put("frames", Integer.valueOf(frames));
+                        result.put("everyMs", Long.valueOf(everyMs));
+                        return JSONParser.toJson(result);
+                    }
+                }));
+
         server.addTool(new Tool("sim_wait",
                 "Waits, so a scripted recording can pace itself (an animation finishing, a pause "
                         + "for the viewer). At most 30000 ms.",
@@ -767,10 +820,14 @@ final class SimulatorMcpTools {
         }
     }
 
-    private static void onEdt(final Runnable r) {
+    static void onEdt(final Runnable r) {
         Display d = Display.getInstance();
         if (d.isEdt()) {
             r.run();
+            return;
+        }
+        if (com.codename1.ui.animations.AnimationTime.isOverridden()) {
+            onEdtWhileFrozen(d, r);
             return;
         }
         final RuntimeException[] err = new RuntimeException[1];
@@ -787,6 +844,57 @@ final class SimulatorMcpTools {
             throw err[0];
         }
     }
+
+    /// A form transition holds back every serial call, and on a frozen clock it never
+    /// ends, so an unbounded wait would hang the tool for good. Bounded instead: a call
+    /// the EDT has not started within the limit is withdrawn (it never runs late) and the
+    /// agent is told to settle. Mirrors `McpUiTools.runOnEdtWhileFrozen`.
+    private static void onEdtWhileFrozen(Display d, final Runnable r) {
+        final java.util.concurrent.atomic.AtomicInteger state = new java.util.concurrent.atomic.AtomicInteger(0);
+        final RuntimeException[] err = new RuntimeException[1];
+        final Object gate = new Object();
+        d.callSerially(new Runnable() {
+            public void run() {
+                if (!state.compareAndSet(0, 1)) {
+                    return;
+                }
+                try {
+                    r.run();
+                } catch (RuntimeException e) {
+                    err[0] = e;
+                } finally {
+                    synchronized (gate) {
+                        state.set(3);
+                        gate.notifyAll();
+                    }
+                }
+            }
+        });
+        long deadline = System.currentTimeMillis() + FROZEN_EDT_WAIT_MS;
+        synchronized (gate) {
+            while (state.get() != 3) {
+                long left = deadline - System.currentTimeMillis();
+                if (left <= 0 && state.compareAndSet(0, 2)) {
+                    throw new IllegalStateException("A form transition is running and the clock is frozen, "
+                            + "so the simulator cannot act until it finishes. Call ui_clock_settle "
+                            + "(or ui_clock_advance), then try again.");
+                }
+                try {
+                    gate.wait(left > 0 ? left : 50);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    if (state.compareAndSet(0, 2)) {
+                        throw new IllegalStateException("Interrupted", ex);
+                    }
+                }
+            }
+        }
+        if (err[0] != null) {
+            throw err[0];
+        }
+    }
+
+    private static final long FROZEN_EDT_WAIT_MS = 1500;
 
     /// The fold script of the running recording, cancelled when it stops.
     private FoldScript foldScript;
@@ -806,6 +914,116 @@ final class SimulatorMcpTools {
                     port.rotateSimulator(portrait);
                 }
             });
+        }
+    }
+
+    /// Steps the frozen animation clock and captures the presented simulator frame at
+    /// each step into a grid. The presented frame, not a repaint of the current form,
+    /// so a form transition is filmed as it is shown. Runs on the server's thread.
+    private int filmFrames(java.io.File out, long overMs, long everyMs, double scale) throws IOException {
+        if (!com.codename1.ui.animations.AnimationTime.isOverridden()) {
+            throw new IllegalStateException("The clock is not frozen; call ui_clock_freeze first");
+        }
+        // A sheet of more frames than this is unreadable anyway; the step widens to fit.
+        if (overMs / everyMs + 1 > MAX_FILM_FRAMES) {
+            everyMs = (overMs + MAX_FILM_FRAMES - 2) / (MAX_FILM_FRAMES - 1);
+        }
+        long start = com.codename1.ui.animations.AnimationTime.now();
+        java.util.List<java.awt.image.BufferedImage> shots = new java.util.ArrayList<java.awt.image.BufferedImage>();
+        for (long t = 0; t <= overMs; t += everyMs) {
+            long target = start + t;
+            while (com.codename1.ui.animations.AnimationTime.now() < target) {
+                com.codename1.ui.animations.AnimationTime.setTime(
+                        Math.min(target, com.codename1.ui.animations.AnimationTime.now() + 16));
+                paintOneFrame();
+            }
+            paintOneFrame();
+            java.awt.image.BufferedImage shot = port.captureSimulatorFrame(RecordingOptions.Frame.SCREEN);
+            if (shot != null) {
+                // Scaled as it is taken, so only the small copy of each frame is held.
+                shots.add(scaled(shot, scale));
+            }
+        }
+        if (shots.isEmpty()) {
+            throw new IllegalStateException("No screen to capture");
+        }
+        int fw = shots.get(0).getWidth();
+        int fh = shots.get(0).getHeight();
+        int cols = (int) Math.ceil(Math.sqrt(shots.size()));
+        int rows = (shots.size() + cols - 1) / cols;
+        int gap = 4;
+        java.awt.image.BufferedImage sheet = new java.awt.image.BufferedImage(cols * (fw + gap) + gap,
+                rows * (fh + gap) + gap, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = sheet.createGraphics();
+        try {
+            g.setColor(java.awt.Color.DARK_GRAY);
+            g.fillRect(0, 0, sheet.getWidth(), sheet.getHeight());
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            for (int i = 0; i < shots.size(); i++) {
+                g.drawImage(shots.get(i), gap + (i % cols) * (fw + gap), gap + (i / cols) * (fh + gap), fw, fh, null);
+            }
+        } finally {
+            g.dispose();
+        }
+        java.io.File parent = out.getAbsoluteFile().getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("Cannot create " + parent);
+        }
+        if (!javax.imageio.ImageIO.write(sheet, "png", out)) {
+            throw new IOException("No PNG writer");
+        }
+        return shots.size();
+    }
+
+    private static final int MAX_FILM_FRAMES = 64;
+
+    private static java.awt.image.BufferedImage scaled(java.awt.image.BufferedImage src, double scale) {
+        int w = Math.max(1, (int) Math.round(src.getWidth() * scale));
+        int h = Math.max(1, (int) Math.round(src.getHeight() * scale));
+        java.awt.image.BufferedImage out = new java.awt.image.BufferedImage(w, h,
+                java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = out.createGraphics();
+        try {
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(src, 0, 0, w, h, null);
+        } finally {
+            g.dispose();
+        }
+        return out;
+    }
+
+    /// Two EDT round trips, so one whole loop (paint included) runs between them. A form
+    /// transition is painted by a loop that runs no serial calls, so a call not picked up
+    /// within 25 ms is waiting behind one, and that loop has repainted meanwhile.
+    private static void paintOneFrame() {
+        for (int i = 0; i < 2; i++) {
+            final boolean[] ran = new boolean[1];
+            final Object gate = new Object();
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    synchronized (gate) {
+                        ran[0] = true;
+                        gate.notifyAll();
+                    }
+                }
+            });
+            synchronized (gate) {
+                long deadline = System.currentTimeMillis() + 25;
+                while (!ran[0]) {
+                    long left = deadline - System.currentTimeMillis();
+                    if (left <= 0) {
+                        return;
+                    }
+                    try {
+                        gate.wait(left);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
         }
     }
 
