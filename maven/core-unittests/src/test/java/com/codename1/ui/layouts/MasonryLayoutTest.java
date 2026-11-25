@@ -148,5 +148,10 @@ class MasonryLayoutTest extends UITestBase {
         grid.layoutContainer();
         assertEquals(100, seen[0]);
         assertEquals(100, card.getHeight());
+        // A width change after the first layout, as on rotation.
+        grid.setWidth(400);
+        grid.layoutContainer();
+        assertEquals(200, seen[0]);
+        assertEquals(50, card.getHeight());
     }
 }

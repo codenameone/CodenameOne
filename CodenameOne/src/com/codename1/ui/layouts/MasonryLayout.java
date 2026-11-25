@@ -190,6 +190,10 @@ public class MasonryLayout extends Layout {
                 // A card's text sits in its children; lay them out at the new
                 // width first, then drop the sizes they cached at the old one,
                 // so a SpanLabel inside measures at its own width.
+                // layoutContainer() is a no-op unless the tile is marked for
+                // layout, which a width change alone does not do; invalidating
+                // its children marks it (Component.setShouldCalcPreferredSize).
+                invalidate(c);
                 ((Container) c).layoutContainer();
                 invalidate(c);
             }
