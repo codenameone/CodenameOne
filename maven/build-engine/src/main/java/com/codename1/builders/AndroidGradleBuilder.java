@@ -7165,7 +7165,7 @@ public class AndroidGradleBuilder extends Executor {
             }
 
             rootCheckCall = "        com.scottyab.rootbeer.RootBeer rootBeer = new com.scottyab.rootbeer.RootBeer(this);\n"
-                    + "        if (rootBeer.isRooted()) {\n"
+                    + "        if (rootBeer.isRooted() || com.codename1.impl.android.DebugEnvironmentDetector.isRootHidingDetected(this)) {\n"
                     + "            android.util.Log.e(\"Codename One\", \"Device is rooted. Exiting app.\");\n"
                     + "            System.exit(0);\n"
                     + "        }\n";
@@ -7175,6 +7175,16 @@ public class AndroidGradleBuilder extends Executor {
         if (fridaDetection) {
             fridaDetectionCall = "        com.codename1.impl.android.FridaDetectionUtil.runFridaDetection(this);\n";
         }
+
+        // android.debugGuard: launch gate for an attached debugger, Developer Options and USB
+        // debugging. android.debugGuard.checks narrows it (csv of debugger,developerOptions,
+        // usbDebugging; empty = all) and android.debugGuard.mode (exit|warn, default exit)
+        // decides whether to terminate or just log. The checks live in the port's
+        // DebugEnvironmentDetector so DeviceIntegrity.getCompromiseReasons() reports the same.
+        String debugGuardCall = debugGuardCall(
+                request.getArg("android.debugGuard", "false"),
+                request.getArg("android.debugGuard.checks", ""),
+                request.getArg("android.debugGuard.mode", "exit"));
 
         // android.playIntegrity bundles the Google Play Integrity SDK so the
         // DeviceIntegrity.requestIntegrityToken() runtime API works. When
@@ -7328,6 +7338,7 @@ public class AndroidGradleBuilder extends Executor {
                     + fridaDetectionCall
                     + rootCheckCall
                     + accessibilityGuardCall
+                    + debugGuardCall
                     + playIntegrityCall
                     + facebookHashCode
                     + facebookSupport
@@ -13030,4 +13041,16 @@ public class AndroidGradleBuilder extends Executor {
         return parsed == null ? 0 : parsed;
     }
 
+
+    /// The `onCreate` statement for `android.debugGuard`, or "" when the hint is off. Any mode
+    /// other than `warn` exits, matching `android.accessibilityGuard`.
+    static String debugGuardCall(String enabled, String checks, String mode) {
+        if (!"true".equals(enabled)) {
+            return "";
+        }
+        boolean exit = !"warn".equals(mode);
+        String c = checks == null ? "" : checks;
+        return "        com.codename1.impl.android.DebugEnvironmentDetector.runDebugGuard(this, \""
+                + c.replace("\\", "\\\\").replace("\"", "\\\"") + "\", " + exit + ");\n";
+    }
 }

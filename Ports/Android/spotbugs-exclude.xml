@@ -246,6 +246,16 @@
         <Bug pattern="DM_EXIT" />
     </Match>
 
+    <!--
+    The android.debugGuard launch gate terminates the process when its mode is exit;
+    that is the gate's purpose, the same as the Frida gate above.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.android.DebugEnvironmentDetector" />
+        <Method name="runDebugGuard" />
+        <Bug pattern="DM_EXIT" />
+    </Match>
+
     <!-- CodenameOneThread.DEFAULT_STACK_SIZE is a tunable reassigned in tests. -->
     <Match>
         <Class name="com.codename1.impl.CodenameOneThread" />

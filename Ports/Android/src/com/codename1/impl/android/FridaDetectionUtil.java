@@ -134,8 +134,10 @@ public class FridaDetectionUtil {
 
     // Run the detection checks and log the result
     public static void runFridaDetection(Context context) {
-        if (isFridaDetected()) {
-            Log.e(TAG, "Frida detected! Exiting app.");
+        // The gate covers instrumentation in general, so the Xposed/LSPosed method-hooking
+        // frameworks trip it as well as Frida.
+        if (isFridaDetected() || DebugEnvironmentDetector.isHookFrameworkDetected()) {
+            Log.e(TAG, "Instrumentation detected! Exiting app.");
             System.exit(0);
         } else {
             Log.i(TAG, "No Frida detection evidence found.");

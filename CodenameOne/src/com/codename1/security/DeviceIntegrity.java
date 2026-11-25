@@ -60,6 +60,9 @@ import com.codename1.util.AsyncResource;
 /// - `android.rootCheck` / `android.fridaDetection` / `ios.detectJailbreak` -- existing hard launch
 ///   gates that exit on a compromised device. [#isDeviceCompromised()] reports the same signals
 ///   without exiting.
+/// - `android.debugGuard=true` (optionally `android.debugGuard.checks=<csv of debugger,
+///   developerOptions,usbDebugging>` and `android.debugGuard.mode=exit|warn`) -- checks for an
+///   attached debugger, Developer Options and USB debugging at launch and exits (or logs).
 /// - `android.accessibilityGuard=true` (optionally `android.accessibilityGuard.allow=<csv packages>`
 ///   and `android.accessibilityGuard.mode=exit|warn`) -- checks the enabled accessibility services at
 ///   launch and exits (or logs) when an untrusted one is active.
@@ -177,7 +180,12 @@ public final class DeviceIntegrity {
 
     /// Returns the reason codes behind [#isDeviceCompromised()]: `"root"`, `"jailbreak"`, `"frida"`
     /// (any hooking or instrumentation framework, including one caught hooking the detection
-    /// itself), `"emulator"` and `"debugger"`. Empty when the device appears clean.
+    /// itself, and on Android the Xposed family of method-hooking frameworks), `"emulator"` and
+    /// `"debugger"`. Empty when the device appears clean.
+    ///
+    /// Android also reports `"developerOptions"` and `"usbDebugging"`. Those describe how the
+    /// device is configured, not tampering, so [#isDeviceCompromised()] ignores them; read them
+    /// here to apply your own policy, such as a warning or step-up authentication.
     ///
     /// Nothing is cached, so calling this again before a sensitive operation reports an
     /// instrumentation framework that attached after launch.
