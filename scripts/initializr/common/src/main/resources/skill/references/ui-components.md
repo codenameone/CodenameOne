@@ -26,6 +26,7 @@ Picking the right layout makes 90% of the work straightforward. Treat layouts li
 | `FlowLayout` | Children flow horizontally, wrap when out of width. | `new Container(new FlowLayout(Component.CENTER));` |
 | `GridLayout` | N rows × M columns, all cells the same size. | `new Container(new GridLayout(2, 3));` |
 | `TableLayout` | Spreadsheet-like: per-cell width/height/span. Use when GridLayout is too rigid. | `TableLayout tl = new TableLayout(rows, cols);` |
+| `MasonryLayout` | Masonry / staggered grid: equal width columns, each tile under the shortest column. | `new Container(new MasonryLayout(2));` |
 | `LayeredLayout` | Stack components on top of each other with percent-based insets. The "responsive" layout. | See `mobile-adaptability.md`. |
 | `GridBagLayout` | Swing-style absolute control. Avoid unless porting. | — |
 
@@ -64,6 +65,15 @@ form.add(BorderLayout.CENTER, col);
 | `EmptyState` | "Nothing here" / error-and-retry view | Icon, title, text, optional action button. |
 | `Carousel` | Image slider / view pager / onboarding pages with dots and auto play | Swipeable `Tabs` + `PageIndicator`; do **not** hand-build tabs plus a radio button row. |
 | `PageIndicator` | Page dots for a pager | `bind(tabs)` keeps it in step with `Tabs`. |
+| `RangeSlider` | Two thumb range (price, age) | `new RangeSlider(min, max, lower, upper)`, `setStep`. |
+| `Chip` / `ChipInput` | Filter/choice chips; tag or recipient input | `setSelectable`, `setRemovable`; `ChipInput.getValues()`. |
+| `ColorPicker` | Color picker | `ColorPicker.showDialog(title, rgb)` for a dialog. |
+| `CircularProgress` | Ring / percent progress | Determinate; `InfiniteProgress` for a spinner. |
+| `AudioWaveform` | Voice message waveform with seek | `levelsFromPcm(samples, bars)`. |
+| `ExpandableText` | "Read more" text | `new ExpandableText(text, maxLines)`. |
+| `ActivityTimeline` | Order tracking / step timeline | `addStep(title, text, time, DONE/CURRENT/PENDING)`. |
+| `EmojiPicker` | Emoji keyboard | `bindTo(textField)`. |
+| `MentionField` | @mention text field | `setCandidates`, override `suggest(query)`. |
 | `CoachMarks` | Feature tour / onboarding spotlight over the form | `new CoachMarks(form).add(cmp, title, text).showOnce("key")`. Replaces the deprecated `GlassTutorial`. |
 | `Dialog` | Modal popup | `Dialog.show(...)` blocks current EDT pump |
 | `Toolbar` | Top bar | Already on every Form |
@@ -91,7 +101,7 @@ A few components live in package paths that don't match where you'd guess from t
 | Component | Package |
 | --- | --- |
 | `Label`, `Button`, `TextField`, `TextArea`, `Form`, `Container`, `TextComponent`, `Dialog`, `Tabs`, `CheckBox`, `RadioButton`, `Slider`, `List` | `com.codename1.ui` |
-| `SpanLabel`, `SpanButton`, `MultiButton`, `MultiList`, `Switch`, `ScaleImageButton`, `ScaleImageLabel`, `ToastBar`, `InfiniteProgress`, `ImageViewer`, `FloatingActionButton`, `StickyHeaderContainer`, `Accordion`, `Skeleton`, `EmptyState`, `Carousel`, `PageIndicator`, `CoachMarks` | `com.codename1.components` |
+| `SpanLabel`, `SpanButton`, `MultiButton`, `MultiList`, `Switch`, `ScaleImageButton`, `ScaleImageLabel`, `ToastBar`, `InfiniteProgress`, `ImageViewer`, `FloatingActionButton`, `StickyHeaderContainer`, `Accordion`, `Skeleton`, `EmptyState`, `Carousel`, `PageIndicator`, `CoachMarks`, `RangeSlider`, `Chip`, `ChipInput`, `ColorPicker`, `CircularProgress`, `AudioWaveform`, `ExpandableText`, `ActivityTimeline`, `EmojiPicker`, `MentionField` | `com.codename1.components` |
 | `Picker` | `com.codename1.ui.spinner` |
 | `InfiniteContainer` | `com.codename1.ui` (despite being a "component") |
 

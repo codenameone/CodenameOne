@@ -80,6 +80,18 @@ example. Read it before writing code against the class.
 | Embedded web view | `BrowserComponent` | `com.codename1.ui` |
 | Page / hero transitions | `MorphTransition`, `CommonTransitions`, `FlipTransition`, `BubbleTransition` | `com.codename1.ui.animations` |
 | Particles for games | `ParticleEmitter` | `com.codename1.gaming` |
+| Range slider, two thumbs (`syncfusion_flutter_sliders` RangeSlider, `@ptomasroos/react-native-multi-slider`) | `RangeSlider(min, max, lower, upper)`, `setStep`, `isAdjusting()` | `com.codename1.components` |
+| Chips / filter chips / choice chips (`Chip`, `react-native-paper` Chip) | `Chip(text)`, `setSelectable(true)`, `setRemovable(true)` + `addRemoveListener` | `com.codename1.components` |
+| Tag input / chips input (`flutter_chips_input`, `react-native-tags`) | `ChipInput` (`addValue`, `getValues`, `setSeparators`) | `com.codename1.components` |
+| Color picker (`flutter_colorpicker`, `reanimated-color-picker`) | `ColorPicker(rgb)`, `setPresets(...)`, `ColorPicker.showDialog(title, rgb)` | `com.codename1.components` |
+| Circular / ring percent progress (`percent_indicator`, `react-native-circular-progress`) | `CircularProgress(percent)`, `setText`, `setRingSize`. Indeterminate spinner: `InfiniteProgress` | `com.codename1.components` |
+| Audio waveform / voice message bar (`audio_waveforms`, `react-native-audio-waveform`) | `AudioWaveform(levels)`, `AudioWaveform.levelsFromPcm(samples, bars)`, `setProgress`, `setSeekable` | `com.codename1.components` |
+| "Read more" text (`readmore`, `react-native-read-more-text`) | `ExpandableText(text, maxLines)` | `com.codename1.components` |
+| Timeline / order tracking / stepper timeline (`timelines`, `react-native-timeline-flatlist`) | `ActivityTimeline().addStep(title, text, time, ActivityTimeline.DONE)` | `com.codename1.components` |
+| Emoji picker / emoji keyboard (`emoji_picker_flutter`, `rn-emoji-keyboard`) | `EmojiPicker`, `bindTo(textField)` | `com.codename1.components` |
+| @mention input (`flutter_mentions`, `react-native-controlled-mentions`) | `MentionField` (`setCandidates`, override `suggest(query)` for a server, `getMentions()`, `setTrigger('#')`) | `com.codename1.components` |
+| Masonry / staggered grid (`flutter_staggered_grid_view`, `@react-native-seoul/masonry-list`) | `new Container(new MasonryLayout(2))`; `setMinimumColumnWidth(mm)` for adaptive columns. `TableLayout`/`GridLayout` align rows, so they are not the same | `com.codename1.ui.layouts` |
+| Segmented control (`CupertinoSegmentedControl`, `@react-native-segmented-control`) | A horizontal `ComponentGroup` of `ToggleButton`s in one `ButtonGroup` (`group.setHorizontal(true)`) | `com.codename1.ui` |
 
 ## Star rating with `Slider`
 
@@ -131,18 +143,3 @@ md.setMarkdown("# Title\n\nSome **bold** text and a [link](https://example.com).
 md.setEditable(false);
 form.add(BorderLayout.CENTER, md);
 ```
-
-## Not built in yet
-
-Checked against the sources. Build these from the existing pieces, and say so to
-the user rather than inventing an API:
-
-- Masonry / staggered grid (variable height tiles packed into the shortest
-  column). `TableLayout` aligns rows, so it is not the same; a row of
-  `BoxLayout.y()` columns filled by height is the usual workaround.
-- Two thumb range slider.
-- Color picker.
-- Ring / circular percent progress indicator.
-- Chips / tag input field.
-- Emoji picker, @mention input, "read more" expandable text, activity timeline,
-  segmented control, audio waveform view.

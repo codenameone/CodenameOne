@@ -616,6 +616,10 @@
         "CenteredInteractionDialogTitleScreenshotTest",
         "CoachMarksScreenshotTest",
         "LoadingPlaceholdersScreenshotTest",
+        "PickersAndInputsScreenshotTest",
+        "ProgressAndMediaScreenshotTest",
+        "MasonryGridScreenshotTest",
+        "EmojiAndMentionScreenshotTest",
         "DialogThemeScreenshotTest",
         "FloatingActionButtonThemeScreenshotTest",
         "SpanLabelThemeScreenshotTest"
@@ -1832,6 +1836,22 @@
     {
       "pattern": "LoadingPlaceholders*",
       "test": "LoadingPlaceholdersScreenshotTest"
+    },
+    {
+      "pattern": "PickersAndInputs*",
+      "test": "PickersAndInputsScreenshotTest"
+    },
+    {
+      "pattern": "ProgressAndMedia*",
+      "test": "ProgressAndMediaScreenshotTest"
+    },
+    {
+      "pattern": "MasonryGrid*",
+      "test": "MasonryGridScreenshotTest"
+    },
+    {
+      "pattern": "EmojiAndMention*",
+      "test": "EmojiAndMentionScreenshotTest"
     },
     {
       "pattern": "AppReviewDialog",
