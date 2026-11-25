@@ -1847,6 +1847,14 @@ public class AndroidGradleBuilder extends Executor {
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         rootCheck = request.getArg("android.rootCheck", "false").equals("true");
+        if (request.getArg("android.debugGuard", "false").equals("true")) {
+            // Validated before anything is generated, so a typo is a one-line build error.
+            try {
+                debugGuardChecks(request.getArg("android.debugGuard.checks", ""));
+            } catch (IllegalArgumentException bad) {
+                throw new BuildException(bad.getMessage());
+            }
+        }
         fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
         playIntegrity = request.getArg("android.playIntegrity", "false").equals("true");
         accessibilityGuard = request.getArg("android.accessibilityGuard", "false").equals("true");
@@ -7185,8 +7193,8 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         // android.debugGuard: launch gate for an attached debugger, Developer Options and USB
-        // debugging. android.debugGuard.checks narrows it (csv of debugger,developerOptions,
-        // usbDebugging; empty = all) and android.debugGuard.mode (exit|warn, default exit)
+        // debugging. android.debugGuard.checks picks them (csv of debugger,developerOptions,
+        // usbDebugging; empty = debugger alone) and android.debugGuard.mode (exit|warn, default exit)
         // decides whether to terminate or just log. The checks live in the port's
         // DebugEnvironmentDetector so DeviceIntegrity.getCompromiseReasons() reports the same.
         String debugGuardCall = debugGuardCall(

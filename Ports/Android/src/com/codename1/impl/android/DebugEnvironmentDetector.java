@@ -41,8 +41,10 @@ import java.io.InputStreamReader;
 /// What these checks do NOT see, so nobody reads more into them: Zygisk-based LSPosed maps its
 /// bridge from anonymous memory under obfuscated names, and Magisk's DenyList or Shamiko removes
 /// the root mounts from the app's namespace. Catching those is attestation's job -- a
-/// strong-integrity Play Integrity verdict verified on the server. Every check here is a
-/// best-effort local signal and can be defeated by an attacker who controls the device. The control that holds is server-verified attestation (Play Integrity,
+/// strong-integrity Play Integrity verdict verified on the server.
+///
+/// Every check here is a best-effort local signal and can be defeated by an attacker who
+/// controls the device. The control that holds is server-verified attestation (Play Integrity,
 /// App Shield); these exist so a compromised environment is visible to the app and so the
 /// launch gates have something to act on. No method throws: a check that cannot run answers
 /// "not detected".
@@ -117,6 +119,13 @@ public final class DebugEnvironmentDetector {
             "/sbin/.magisk/"
     };
 
+    /// Mount points root tools mount ON (Magisk's tmpfs at `/debug_ramdisk`). The directory
+    /// exists on stock builds, but nothing is mounted on it outside a debug ramdisk boot.
+    private static final String[] ROOT_MOUNT_POINTS = {
+            "/debug_ramdisk",
+            "/sbin/.magisk"
+    };
+
     private DebugEnvironmentDetector() {
     }
 
@@ -130,7 +139,34 @@ public final class DebugEnvironmentDetector {
         } catch (Throwable t) {
             // fall through to the native check
         }
-        return getTracerPid() > 0;
+        int tracer = getTracerPid();
+        return tracer > 0 && !isOwnTracer(tracer);
+    }
+
+    /// True when the tracer runs as this app's own uid: the anti-debug child a commercial RASP
+    /// or packer forks to ptrace its parent (which also keeps a real debugger out). A debugger
+    /// attached from outside runs as shell (adb) or root; one running as the app's uid needs
+    /// `run-as`, which only works on a debuggable build, where the guard only logs anyway.
+    /// Counting the RASP's own child would kill every launch of an app that ships one.
+    private static boolean isOwnTracer(int pid) {
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(
+                    new FileInputStream(new File("/proc/" + pid + "/status")), "UTF-8"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("Uid:")) {
+                    String[] ids = line.substring("Uid:".length()).trim().split("\\s+");
+                    return ids.length > 0 && Integer.parseInt(ids[0]) == android.os.Process.myUid();
+                }
+            }
+        } catch (Throwable t) {
+            // another uid's /proc entry is often unreadable: treat the tracer as foreign
+            return false;
+        } finally {
+            close(reader);
+        }
+        return false;
     }
 
     /// The `TracerPid` from `/proc/self/status`: the pid of the process ptrace-attached to
@@ -358,6 +394,11 @@ public final class DebugEnvironmentDetector {
                 }
                 for (int i = 0; i < ROOT_MOUNT_SOURCES.length; i++) {
                     if (fields[0].equals(ROOT_MOUNT_SOURCES[i])) {
+                        return line;
+                    }
+                }
+                for (int i = 0; i < ROOT_MOUNT_POINTS.length; i++) {
+                    if (fields[1].equals(ROOT_MOUNT_POINTS[i])) {
                         return line;
                     }
                 }
