@@ -493,10 +493,9 @@ The development profile seeds two examples in every store: tagging
 orders over a set amount as VIP, and notifying staff and drafting a purchase
 order when stock runs low.
 
-[[bazaar-storefront]]
-
 image::img/bazaar-merchant-automations-tablet.png["Automations in the app",scaledwidth=80%]
 
+[[bazaar-storefront]]
 === A storefront search engines can read
 
 `web/StoreSite` adds the storefront's search and launch surfaces: `/s/<handle>/suggest`
@@ -532,10 +531,9 @@ Pages that are the same for every visitor are sent with
 `Cache-Control: public, max-age=60, stale-while-revalidate=600`, so a cache in
 front of the server can absorb a crawl. Checkout runs on the same pages; see <<bazaar-web>>.
 
-[[bazaar-web]]
-
 image::img/bazaar-web-product.png["A server-rendered product page",scaledwidth=80%]
 
+[[bazaar-web]]
 === The web application
 
 The server renders two things for a browser: the storefront with its checkout
