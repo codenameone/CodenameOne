@@ -810,6 +810,9 @@ public class DemoStores {
         hero(store, "butter-dish.jpg");
         // Shipping and tax, or nothing at checkout can be bought.
         pricing.seed(store.getId());
+        // A loyalty programme, as the other two stores have: the walkthrough's
+        // order here shows the points it will earn.
+        marketing.programme(store.getId());
     }
 
     private Store store(String handle, String name, String tagline, String description,

@@ -157,11 +157,11 @@ public class DemoTourTest extends E2e {
             pause(1200);
         }
         go(Sections.CART);
-        caption("One cart, grouped by store, with a running total", 3000);
-        pause(3200);
+        caption("One cart, grouped by store, with a running total", 2600);
+        pause(2200);
         mark("quantity");
         tapFirst("line-more-");
-        pause(1800);
+        pause(1400);
         shotAs("shop-cart");
         logCart("before sign-in");
         go(Sections.ACCOUNT);
@@ -186,11 +186,11 @@ public class DemoTourTest extends E2e {
         go(Sections.ACCOUNT);
         pause(3200);
         shotAs("shop-account");
-        scrollDown(3);
-        pause(1200);
+        scrollDown(2);
+        pause(800);
         shotAs("shop-account-more");
         go(Sections.CART);
-        pause(1500);
+        pause(900);
         logCart("before checkout");
         if (tap("checkout")) {
             caption("Checkout: address, shipping, payment, review", 3000);
@@ -199,28 +199,30 @@ public class DemoTourTest extends E2e {
             fill("ship-city", "San Francisco");
             fill("ship-region", "CA");
             fill("ship-postal", "94105");
-            pause(800);
+            pause(600);
             shotAs("shop-checkout");
             tap("address-continue");
-            pause(2500);
-            // The steps stack on one page: scroll to the rates the address opened.
-            scrollDown(4);
-            pause(1200);
-            caption("Live shipping rates for the address", 2800);
+            pause(1600);
+            // The steps stack on one page; tapping a rate scrolls it into view.
+            // Dragging the form here moved nothing and held it for seconds.
+            caption("Live shipping rates for the address", 2400);
             tapFirst("rate-");
-            pause(2500);
+            pause(1600);
             shotAs("shop-checkout-shipping");
-            caption("Pay with a saved card, a wallet or another way", 3000);
+            // Paced so no step of the form holds still for long: the
+            // payment scroll used to find nothing to move from where it was
+            // pressed, and the rates stood for ten seconds.
+            caption("Pay with a saved card, a wallet or another way", 2600);
             tapFirst("method-");
-            pause(1200);
-            scrollDown(4);
+            pause(900);
+            reveal("place-order");
             pause(1200);
             shotAs("shop-checkout-payment");
             mark("place-order");
             if (tap("place-order")) {
-                pause(4000);
-                caption("Order placed, with a link to follow it", 3000);
-                pause(3200);
+                pause(2600);
+                caption("Order placed, with a link to follow it", 2600);
+                pause(2600);
                 shotAs("shop-order-placed");
                 if (!tap("view-order")) {
                     safeBack();
@@ -239,7 +241,7 @@ public class DemoTourTest extends E2e {
         pause(1200);
         go(Sections.ACCOUNT);
         mark("badge-unlock");
-        pause(3200);
+        pause(2600);
         shotAs("shop-account-unlocked");
         go(Sections.ORDERS);
         caption("Every order, with its tracking timeline", 2800);
@@ -333,7 +335,10 @@ public class DemoTourTest extends E2e {
         caption("The store assistant answers from the store's own data", 3000);
         pause(2000);
         tapFirst("assistant-ask-");
-        pause(6000);
+        pause(3000);
+        // A second question, answered as a list.
+        tap("assistant-ask-2");
+        pause(3200);
         shotAs("merchant-assistant");
 
         go(Sections.PRODUCTS);
@@ -394,8 +399,8 @@ public class DemoTourTest extends E2e {
         signIn(CASHIER, "home-pos");
         pause(2500);
         record("bazaar-pos-" + device());
-        caption("The register, for a cashier at the counter", 3000);
-        pause(3200);
+        caption("The register, for a cashier at the counter", 2600);
+        pause(2600);
         shotAs("pos-home");
         tapFirst("pos-store-");
         pause(1500);
@@ -407,13 +412,13 @@ public class DemoTourTest extends E2e {
                 tap("pos-pin-" + k);
                 pause(250);
             }
-            pause(2000);
+            pause(1200);
         }
         if (findByName("pos-open-shift") != null) {
             caption("Open the shift by counting the float into the drawer", 3000);
             for (String k : new String[] {"1", "5", "0", "00"}) {
                 tap("pos-float-" + k);
-                pause(200);
+                pause(320);
             }
             pause(800);
             shotAs("pos-shift");
@@ -456,13 +461,17 @@ public class DemoTourTest extends E2e {
             if (!tapFirst("pos-cash-")) {
                 tap("pos-cash-other");
             }
-            pause(3500);
-            caption("The receipt: printed, emailed or shown as a code", 3000);
-            pause(3200);
+            pause(1800);
+            caption("The receipt: printed, emailed or shown as a code", 2600);
+            pause(2600);
             shotAs("pos-receipt");
+            // On to the next sale rather than holding the receipt for the
+            // closing caption: it stood for twelve seconds.
+            tapFirst("pos-new-sale");
+            pause(600);
         }
-        caption("Sales made offline sync when the network is back", 3000);
-        pause(3200);
+        caption("Sales made offline sync when the network is back", 2600);
+        pause(2600);
     }
 
     // ------------------------------------------------------------ visual
@@ -1267,8 +1276,8 @@ private void screens() throws Exception {
         pause(2500);
         record("bazaar-admin-" + device());
         go(Sections.OVERVIEW);
-        caption("The platform console: every store on the marketplace at a glance", 3400);
-        pause(3600);
+        caption("The platform console: every store on the marketplace at a glance", 2800);
+        pause(2800);
         shotAs("admin-" + Sections.OVERVIEW);
         scrollDown(1);
         pause(1800);
@@ -1277,7 +1286,7 @@ private void screens() throws Exception {
         caption("Stores: review, verify and suspend merchants", 3000);
         pause(3200);
         shotAs("admin-" + Sections.STORES);
-        if (tapText("Northwind Outfitters") || tap("store-0")) {
+        if (tapGridRow("stores-grid", 0) || tapText("Northwind Outfitters") || tap("store-0")) {
             caption("A store's standing, volume and history", 3000);
             pause(3400);
             scrollDown(1);
@@ -1285,8 +1294,8 @@ private void screens() throws Exception {
         }
 
         go(Sections.USERS);
-        caption("Users: search accounts, see their standing and activity", 3000);
-        pause(3200);
+        caption("Users: search accounts, see their standing and activity", 2600);
+        pause(2400);
         shotAs("admin-" + Sections.USERS);
         scrollDown(1);
         pause(1600);
@@ -1460,6 +1469,27 @@ private void screens() throws Exception {
         final Component[] found = new Component[1];
         onEdt(() -> found[0] = withText(Display.getInstance().getCurrent(), text));
         return found[0] != null && tapComponent(found[0]);
+    }
+
+    /// Taps row `row` of the data grid called `name`, below its header.
+    private boolean tapGridRow(final String name, final int row) {
+        final int[] at = new int[2];
+        onEdt(() -> {
+            Component c = findByName(name);
+            if (c instanceof com.codename1.ui.table.DataGrid && c.isVisible()) {
+                int rh = ((com.codename1.ui.table.DataGrid) c).getRowHeight();
+                at[0] = c.getAbsoluteX() + c.getWidth() / 3;
+                // The header is shorter than a row: a row and a half down is
+                // inside the first row.
+                at[1] = c.getAbsoluteY() + rh * (row + 1) + rh / 2;
+            }
+        });
+        if (at[1] == 0) {
+            return false;
+        }
+        touchAt(at[0], at[1]);
+        waitFor(700);
+        return true;
     }
 
     private static Component withText(Component c, String text) {
@@ -1670,7 +1700,10 @@ private void screens() throws Exception {
             // The size the design captures are taken at (visual/capture.sh),
             // in 16:10: at 1680 the app's type was small inside the frame.
             onEdt(() -> Display.getInstance().setWindowSize(1440, 900));
-            waitFor(2500);
+            waitFor(1500);
+            hideSimulatorMenus();
+            waitFor(1000);
+            fitFormToScreen();
         }
         recorder = JavaSEPort.instance.getSimulatorRecorder();
         RecordingOptions o = new RecordingOptions();
@@ -1688,6 +1721,52 @@ private void screens() throws Exception {
         o.setMaxSeconds(420);
         recorder.start(o);
         recordStart = System.currentTimeMillis();
+    }
+
+    /// Hides the simulator's own Swing menu bar (File, Edit, Simulate ...):
+    /// the recorder paints it over the top of a desktop frame, and it is
+    /// the simulator's, not the app's.
+    private void hideSimulatorMenus() {
+        try {
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                java.awt.Window w = javax.swing.SwingUtilities.getWindowAncestor(
+                        JavaSEPort.instance.getCanvas());
+                if (w instanceof javax.swing.JFrame && ((javax.swing.JFrame) w).getJMenuBar() != null) {
+                    ((javax.swing.JFrame) w).getJMenuBar().setVisible(false);
+                    w.validate();
+                }
+            });
+        } catch (Exception err) {
+            log("menu bar left showing: " + err);
+        }
+    }
+
+    /// Lays the form out at the size of the screen the recorder captures.
+    ///
+    /// Measured under Xvfb: after the resize the window's content pane was
+    /// 1440x879 and the form was laid out at that, while the canvas -- what
+    /// [Display] reports and the recorder captures -- was 1440x854, the menu
+    /// bar's 21 px and a few more taken from it. The bottom 25 px of every
+    /// screen fell outside the video: the sidebar's "Sign out" cut in half,
+    /// the assistant's message box and Send button cut off. Telling the
+    /// display its real size lays the form out to exactly the captured frame.
+    private void fitFormToScreen() {
+        onEdt(() -> {
+            Display d = Display.getInstance();
+            com.codename1.ui.Form f = d.getCurrent();
+            int w = d.getDisplayWidth();
+            int h = d.getDisplayHeight();
+            log("[fit] screen " + w + "x" + h + " form "
+                    + (f == null ? "-" : f.getWidth() + "x" + f.getHeight()));
+            if (f != null && (f.getWidth() != w || f.getHeight() != h)) {
+                d.sizeChanged(w, h);
+            }
+        });
+        waitFor(800);
+        onEdt(() -> {
+            com.codename1.ui.Form f = Display.getInstance().getCurrent();
+            log("[fit] form now " + (f == null ? "-" : f.getWidth() + "x" + f.getHeight()));
+        });
     }
 
     private void caption(String text, long ms) {

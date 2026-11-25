@@ -21,7 +21,13 @@ package com.codenameone.examples.bazaar.merchant;
 
 import com.codename1.ai.ChatMessage;
 import com.codename1.ai.LlmClient;
+import com.codename1.ai.Role;
+import com.codename1.components.ChatBubble;
 import com.codename1.components.ChatView;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.Form;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -34,7 +40,6 @@ import com.codenameone.examples.bazaar.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Lang;
-import com.codenameone.examples.bazaar.ui.Ui;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,14 +106,19 @@ final class AssistantPane extends MerchantPane {
     private void paint() {
         Container page = new Container(new BorderLayout());
         page.setName("assistant-page");
-        chat = new ChatView();
+        chat = new AssistantChat();
         chat.setName("assistant-chat");
         chat.setOnSend(e -> send(chat.getInput().getText()));
         Container chips = new Container(new FlowLayout());
         chips.setName("assistant-suggestions");
+        chips.setUIID("AsChips");
         for (int iter = 0; iter < SUGGESTIONS.length; iter++) {
             final String q = SUGGESTIONS[iter];
-            chips.add(Ui.secondary(Lang.tr(q), "assistant-ask-" + iter, e -> send(Lang.tr(q))));
+            // The rounded, spaced chip the customer and review filters use.
+            Button chip = new Button(Lang.tr(q), "MeChip");
+            chip.setName("assistant-ask-" + iter);
+            chip.addActionListener(e -> send(Lang.tr(q)));
+            chips.add(chip);
         }
         page.add(BorderLayout.NORTH, chips);
         page.add(BorderLayout.CENTER, chat);
@@ -145,7 +155,7 @@ final class AssistantPane extends MerchantPane {
                 asking = false;
                 chat.setTypingIndicatorVisible(false);
                 String shown = answer.length() == 0
-                        ? Lang.tr("I could not answer that. Try asking another way.") : answer;
+                        ? Lang.tr("I could not answer that. Try asking another way.") : AssistantTools.listed(answer);
                 history.add(ChatMessage.user(question));
                 history.add(ChatMessage.assistant(shown));
                 chat.addMessage(ChatMessage.assistant(shown));
@@ -164,6 +174,36 @@ final class AssistantPane extends MerchantPane {
                 relayout();
             }
         });
+    }
+
+    /// The conversation, with the assistant's answers beside a small
+    /// avatar and wrapped at a readable width rather than across the pane.
+    private static final class AssistantChat extends ChatView {
+        @Override
+        protected ChatBubble createBubble(ChatMessage message) {
+            ChatBubble b = super.createBubble(message);
+            if (message.getRole() != Role.ASSISTANT) {
+                return b;
+            }
+            b.setUIID("AsBubbleRow");
+            for (int iter = 0; iter < b.getComponentCount(); iter++) {
+                Component c = b.getComponentAt(iter);
+                if (c instanceof TextArea) {
+                    TextArea body = (TextArea) c;
+                    body.setUIID("AsBubbleText");
+                    // The bubble cleared the text's background; it carries it now.
+                    body.getAllStyles().setBgTransparency(255);
+                    body.setColumns(46);
+                }
+            }
+            Label avatar = new Label("", "AsAvatar");
+            FontImage.setMaterialIcon(avatar, FontImage.MATERIAL_AUTO_AWESOME, 3.2f);
+            Container side = new Container(new BorderLayout());
+            side.setUIID("Container");
+            side.add(BorderLayout.NORTH, avatar);
+            b.add(BorderLayout.WEST, side);
+            return b;
+        }
     }
 
     /// Lays the whole screen out again once an answer is in: the bubble is

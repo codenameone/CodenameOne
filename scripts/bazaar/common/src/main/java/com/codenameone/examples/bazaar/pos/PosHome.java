@@ -166,7 +166,7 @@ final class PosHome {
                             "pos-register-" + iter, "PosChoice", e -> {
                                 PosState.useRegister(store.id(), store.name(), store.handle(),
                                         store.currency(), r.id(), r.name(), r.locationId());
-                                PosState.refreshCatalog(null);
+                                PosState.refreshCatalog(PosHome::prewarm);
                                 next();
                             });
                     b.setShouldLocalize(false);
@@ -317,5 +317,18 @@ final class PosHome {
         south.add(BorderLayout.CENTER, open);
         page.add(BorderLayout.SOUTH, south);
         return page;
+    }
+
+    /// Readies every product photo of the catalog while the cashier enters
+    /// the PIN and counts the float, so the product grid opens on photos.
+    /// Drawn placeholder tiles showed for a second before them otherwise.
+    private static void prewarm() {
+        com.codenameone.examples.bazaar.api.PosCatalogDto c = PosState.catalog();
+        if (c == null || c.items() == null) {
+            return;
+        }
+        for (int iter = 0; iter < c.items().size(); iter++) {
+            com.codenameone.examples.bazaar.ui.ProductArt.prefetch(c.items().get(iter).photoId());
+        }
     }
 }

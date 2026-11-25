@@ -33,15 +33,21 @@ import java.util.List;
 
 /// [Panes] inside a section of the shell.
 ///
-/// The list fills the section. On a wide screen what is picked from it is
-/// shown beside it, with a bar to go back through what was opened on top; on
-/// a phone each of those is a screen of its own over the home screen.
+/// The list fills the section. On a tablet what is picked from it is shown
+/// beside it, with a bar to go back through what was opened on top. On a
+/// desktop the list keeps the whole width, as the merchant's order table does,
+/// and what is picked opens in its place with a back arrow to the list: beside
+/// a narrow list, the empty "Select a store" pane took half the window. On a
+/// phone each of those is a screen of its own over the home screen.
 final class EmbeddedPanes extends Panes {
     private static final float MASTER_MM = 100f;
 
     private final Container host = new Container(new BorderLayout());
     private final Container detail = new Container(new BorderLayout());
     private final boolean wide = Layouts.split();
+    /// Wide enough that the list keeps the whole section (see the class doc).
+    private final boolean stacked = Layouts.wide();
+    private Component listContent;
     private final List<Object[]> open = new ArrayList<Object[]>();
     private final List<Form> screens = new ArrayList<Form>();
     private Runnable shown;
@@ -70,7 +76,11 @@ final class EmbeddedPanes extends Panes {
         open.clear();
         picked = null;
         host.removeAll();
-        if (wide) {
+        if (stacked) {
+            content.setName(name);
+            listContent = content;
+            host.add(BorderLayout.CENTER, content);
+        } else if (wide) {
             Container master = new Container(new BorderLayout()) {
                 @Override
                 protected Dimension calcPreferredSize() {
@@ -130,6 +140,10 @@ final class EmbeddedPanes extends Panes {
                 open.remove(open.size() - 1);
             }
             showDetail();
+            if (stacked && open.isEmpty() && shown != null) {
+                // Back on the list: fetched again, with nothing left picked.
+                shown.run();
+            }
             return;
         }
         if (!screens.isEmpty()) {
@@ -171,7 +185,7 @@ final class EmbeddedPanes extends Panes {
 
     @Override
     void picked(Component row) {
-        if (!wide) {
+        if (!wide || stacked) {
             return;
         }
         if (picked != null) {
@@ -181,7 +195,16 @@ final class EmbeddedPanes extends Panes {
         row.setUIID("SvRowPicked");
     }
 
+    @Override
+    boolean fullWidth() {
+        return stacked;
+    }
+
     private void showDetail() {
+        if (stacked) {
+            showStacked();
+            return;
+        }
         detail.removeAll();
         if (open.isEmpty()) {
             Container none = Ui.empty(noneIcon, noneTitle, noneText);
@@ -204,6 +227,33 @@ final class EmbeddedPanes extends Panes {
             holder.add(BorderLayout.CENTER, content);
             detail.add(BorderLayout.NORTH, bar);
             detail.add(BorderLayout.CENTER, holder);
+        }
+        refresh();
+    }
+
+    /// The list, or what is open over it with a back arrow that leads back
+    /// through what was opened and then to the list.
+    private void showStacked() {
+        host.removeAll();
+        if (open.isEmpty()) {
+            if (listContent != null) {
+                listContent.remove();
+                host.add(BorderLayout.CENTER, listContent);
+            }
+        } else {
+            Object[] top = open.get(open.size() - 1);
+            Ui.viewed((String) top[1]);
+            Container bar = new Container(new BorderLayout());
+            bar.setUIID("SvPaneBar");
+            bar.add(BorderLayout.WEST, Ui.flat(FontImage.MATERIAL_ARROW_BACK, "pane-back", e -> back()));
+            bar.add(BorderLayout.CENTER, Ui.label((String) top[0], "SvPaneTitle"));
+            Container holder = new Container(new BorderLayout());
+            holder.setName((String) top[1]);
+            Component content = (Component) top[2];
+            content.remove();
+            holder.add(BorderLayout.CENTER, content);
+            host.add(BorderLayout.NORTH, bar);
+            host.add(BorderLayout.CENTER, holder);
         }
         refresh();
     }

@@ -113,6 +113,14 @@ public class DemoAccounts {
         }
         // The stores the owner and the cashier work at, with their catalogs.
         demoStores.seed(MERCHANT, CASHIER);
+        // The third store, for any walkthrough server: the shopper demo used
+        // to be the only one to seed it, so the admin and merchant tours
+        // showed two stores where the shopper's showed three. The backend
+        // tests set neither flag and keep their two-store counts.
+        if (config.getBoolean("bazaar.demo.pipeline", false)
+                || config.getBoolean("bazaar.demo.shopper", false)) {
+            demoStores.fennelFig(MERCHANT);
+        }
     }
 
     /// Marks an account as one the admins flagged some days ago, with the

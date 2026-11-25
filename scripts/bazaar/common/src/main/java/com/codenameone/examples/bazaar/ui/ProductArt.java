@@ -190,6 +190,34 @@ public final class ProductArt {
         waiting = new ArrayList<Label>();
         waiting.add(label);
         WAITING.put(photoId, waiting);
+        fetch(photoId, width, height);
+    }
+
+    /// Makes the photo `photoId` ready before anything shows it: read from
+    /// the device's cache, or downloaded into it. The register calls this for
+    /// its whole catalog while the cashier signs in, so the product grid opens
+    /// with its photos instead of a second of drawn tiles.
+    public static void prefetch(String photoId) {
+        if (photoId == null || photoId.length() == 0 || SOURCES.get(photoId) != null
+                || WAITING.get(photoId) != null) {
+            return;
+        }
+        byte[] kept = PhotoCache.shared().get(photoId);
+        if (kept != null) {
+            EncodedImage decoded = EncodedImage.create(kept);
+            if (decoded != null && decoded.getWidth() > 0) {
+                keep(photoId, decoded);
+                return;
+            }
+        }
+        WAITING.put(photoId, new ArrayList<Label>());
+        fetch(photoId, 1, 1);
+    }
+
+    /// Downloads `photoId`, keeps it, and gives it to every label waiting
+    /// for it, each at the size it asked for (`width` by `height` when it
+    /// did not say).
+    private static void fetch(final String photoId, final int width, final int height) {
         Api.catalog().photo(photoId, Net.to(photo -> {
             List<Label> told = WAITING.remove(photoId);
             if (photo == null || photo.data() == null) {

@@ -70,6 +70,12 @@ abstract class Panes {
     /// The screen all of this is on, for something that needs one to return to.
     abstract Form form();
 
+    /// Whether the list keeps the whole width, with nothing beside it: a part
+    /// lays its list out as a table then.
+    boolean fullWidth() {
+        return false;
+    }
+
     /// Marks `row` as the one that is open, where the list stays in view.
     void picked(Component row) {
     }

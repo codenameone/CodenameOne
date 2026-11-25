@@ -150,20 +150,23 @@ class SalesInsightLogicTest {
         AssistantTools t = tools();
         assertEquals(5, t.tools().size());
         String sales = t.run(AssistantTools.SALES);
-        assertTrue(sales.contains("Net sales were 1250.00 USD from 10 orders"), sales);
+        assertTrue(sales.contains("Net sales were $1,250.00 from 10 orders, an average of $125.00."), sales);
         assertTrue(sales.contains("Up 25%"), sales);
         String ch = t.run(AssistantTools.CHANNELS);
-        assertTrue(ch.contains("Online store sold the most: 800.00 USD from 6 orders, 64% of "
-                + "sales."), ch);
+        assertTrue(ch.contains("Online store sold the most: $800.00 from 6 orders, 64% of "
+                + "sales.\\n- App: $450.00"), ch);
         String f = t.run(AssistantTools.FUNNEL);
-        assertTrue(f.contains("200 product views, then 50 carts"), f);
+        assertTrue(f.contains("The funnel for the period:\\n- 200 product views\\n- 50 carts"), f);
         assertTrue(f.contains("5.00% of the first step reached the last"), f);
-        assertTrue(f.contains("the biggest drop is from product views to carts"), f);
+        assertTrue(f.contains("The biggest drop is from product views to carts."), f);
         String p = t.run(AssistantTools.PIPELINE);
-        assertTrue(p.contains("Open now: 1 paid, 2 checkout started"), p);
-        assertTrue(p.contains("worth 125.00 USD, intent 82: viewed products 6 times"), p);
-        assertTrue(t.run(AssistantTools.TOP).contains("Linen Shirt (7 sold, 700.00 USD)"));
+        assertTrue(p.contains("Open now:\\n- 1 paid\\n- 2 checkout started"), p);
+        assertTrue(p.contains("worth $125.00, intent 82: viewed products 6 times"), p);
+        assertTrue(t.run(AssistantTools.TOP).contains("Best sellers:\\n- Linen Shirt (7 sold, $700.00)"));
+        assertFalse(t.run(AssistantTools.SALES).contains(" USD"));
         assertTrue(t.run("nope").contains("unknown tool"));
+        assertEquals("Open now:\n\u2022 1 paid\n\u2022 2 carts, a-b", AssistantTools.listed(
+                "Open now:\n- 1 paid\n* 2 carts, a-b"));
         assertEquals("Down 50%", AssistantTools.change(50, 100));
         assertEquals("Level", AssistantTools.change(5, 5));
         assertTrue(new AssistantTools(null, null, null, "USD").run(AssistantTools.SALES)

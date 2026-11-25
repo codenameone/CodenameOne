@@ -98,18 +98,25 @@ public class DemoMarketing {
     }
 
     @Transactional(rollbackFor = IOException.class)
-    public void seed(String storeId) throws IOException {
-        if (!audienceRows.findByStoreIdOrderByNameAsc(storeId).isEmpty()) {
-            return;
-        }
-        customersFromOrders(storeId);
-        Instant now = Instant.now();
+    /// The three-tier loyalty programme alone, for a store that gets no
+    /// campaigns: Fennel & Fig, whose order-placed card otherwise had no
+    /// programme to estimate its points from and showed "+0 pts".
+    public void programme(String storeId) throws IOException {
         List<LoyaltyTierDto> tiers = new ArrayList<LoyaltyTierDto>();
         tiers.add(new LoyaltyTierDto(null, "Bronze", 0, 0, false, 0, "#a0522d", 0));
         tiers.add(new LoyaltyTierDto(null, "Silver", 25000, 500, false, 12, "#90a4ae", 1));
         tiers.add(new LoyaltyTierDto(null, "Gold", 100000, 1000, true, 48, "#f9a825", 2));
         loyalty.save(storeId, new LoyaltyProgramDto(true, 1, 100, LoyaltyMath.DOWN, 100, 500, 500, 365,
                 true, "SPEND", 500, 250, tiers));
+    }
+
+    public void seed(String storeId) throws IOException {
+        if (!audienceRows.findByStoreIdOrderByNameAsc(storeId).isEmpty()) {
+            return;
+        }
+        customersFromOrders(storeId);
+        Instant now = Instant.now();
+        programme(storeId);
 
         // Sorted, so the same pieces go on sale and behind the club every run.
         List<Variant> vs = new ArrayList<Variant>(variants.findByStoreId(storeId));

@@ -32,6 +32,7 @@ import com.codenameone.examples.bazaar.api.PipelineCardDto;
 import com.codenameone.examples.bazaar.api.PipelineColumnDto;
 import com.codenameone.examples.bazaar.api.TopItemDto;
 import com.codenameone.examples.bazaar.ops.SalesPipeline;
+import com.codenameone.examples.bazaar.shop.Money;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +52,9 @@ final class AssistantTools {
     static final String TOP = "top_products";
     static final String FUNNEL = "conversion_funnel";
     static final String PIPELINE = "pipeline_overview";
+
+    /// Starts an item of a list in a summary; the pane draws it as a bullet.
+    static final String BULLET = "\n- ";
 
     private static final String NO_ARGS = "{\"type\":\"object\",\"properties\":{}}";
 
@@ -116,9 +120,24 @@ final class AssistantTools {
         return run(call.getName());
     }
 
+    /// Money the way the rest of the app shows it: `$43,295.50`, or the
+    /// amount and the store's currency code for any other currency.
     String money(long cents) {
-        return Pipelines.PLAIN.money(cents, currency).trim();
+        return Money.format(cents, currency, "USD");
     }
+
+    /// The same words as [Pipelines#PLAIN], with money formatted as above.
+    private final Pipelines.Words words = new Pipelines.Words() {
+        @Override
+        public String tr(String key, String... args) {
+            return Pipelines.PLAIN.tr(key, args);
+        }
+
+        @Override
+        public String money(long cents, String code) {
+            return Money.format(cents, code == null || code.length() == 0 ? currency : code, "USD");
+        }
+    };
 
     private void sales(Map<String, Object> out) {
         if (data == null || data.current() == null) {
@@ -195,8 +214,7 @@ final class AssistantTools {
         for (int iter = 0; iter < list.size(); iter++) {
             BreakdownDto b = list.get(iter);
             if (b != best && b.orders() > 0) {
-                s.append(' ').append(b.label()).append(": ").append(money(b.salesCents()))
-                        .append('.');
+                s.append(BULLET).append(b.label()).append(": ").append(money(b.salesCents()));
             }
         }
         out.put("summary", s.toString());
@@ -209,7 +227,7 @@ final class AssistantTools {
             return;
         }
         List<Object> rows = new ArrayList<Object>();
-        StringBuilder s = new StringBuilder("Best sellers: ");
+        StringBuilder s = new StringBuilder("Best sellers:");
         for (int iter = 0; iter < list.size() && iter < 5; iter++) {
             TopItemDto t = list.get(iter);
             Map<String, Object> row = new LinkedHashMap<String, Object>();
@@ -217,14 +235,11 @@ final class AssistantTools {
             row.put("units", t.quantity());
             row.put("salesCents", t.salesCents());
             rows.add(row);
-            if (iter > 0) {
-                s.append("; ");
-            }
-            s.append(t.title()).append(" (").append(t.quantity()).append(" sold, ")
+            s.append(BULLET).append(t.title()).append(" (").append(t.quantity()).append(" sold, ")
                     .append(money(t.salesCents())).append(')');
         }
         out.put("products", rows);
-        out.put("summary", s.append('.').toString());
+        out.put("summary", s.toString());
     }
 
     private void funnel(Map<String, Object> out) {
@@ -243,23 +258,25 @@ final class AssistantTools {
             row.put("count", f.count());
             row.put("shareOfFirstBp", shares[iter]);
             rows.add(row);
-            s.append(iter == 0 ? "" : ", then ").append(f.count()).append(' ')
-                    .append(lowerFirst(f.label()));
+            if (iter == 0) {
+                s.append("The funnel for the period:");
+            }
+            s.append(BULLET).append(f.count()).append(' ').append(lowerFirst(f.label()));
         }
         out.put("funnel", rows);
         int last = steps.size() - 1;
         if (last > 0 && steps.get(0).count() > 0) {
-            s.append(". ").append(shares[last] / 100).append('.')
+            s.append('\n').append(shares[last] / 100).append('.')
                     .append(shares[last] % 100 < 10 ? "0" : "").append(shares[last] % 100)
-                    .append("% of the first step reached the last");
+                    .append("% of the first step reached the last.");
             int worst = worstStep(steps);
             if (worst > 0) {
-                s.append("; the biggest drop is from ").append(lowerFirst(
+                s.append(" The biggest drop is from ").append(lowerFirst(
                         steps.get(worst - 1).label())).append(" to ").append(lowerFirst(
-                        steps.get(worst).label()));
+                        steps.get(worst).label())).append('.');
             }
         }
-        out.put("summary", s.append('.').toString());
+        out.put("summary", s.toString());
     }
 
     /// The step losing the largest share of the one before it.
@@ -303,8 +320,7 @@ final class AssistantTools {
             row.put("count", c.total());
             rows.add(row);
             if (c.total() > 0) {
-                s.append(s.length() == 0 ? "" : ", ").append(c.total()).append(' ')
-                        .append(lowerFirst(c.title()));
+                s.append(BULLET).append(c.total()).append(' ').append(lowerFirst(c.title()));
             }
             for (int at = 0; c.cards() != null && at < c.cards().size(); at++) {
                 PipelineCardDto p = c.cards().get(at);
@@ -319,7 +335,7 @@ final class AssistantTools {
             out.put("summary", "There are no open carts or orders right now.");
             return;
         }
-        s.insert(0, "Open now: ").append('.');
+        s.insert(0, "Open now:");
         if (hottest != null && hottest.intent() > 0) {
             Map<String, Object> hot = new LinkedHashMap<String, Object>();
             hot.put("customer", hottest.customer());
@@ -327,8 +343,8 @@ final class AssistantTools {
             hot.put("intent", hottest.intent());
             hot.put("reasons", hottest.reasons());
             out.put("hottestCart", hot);
-            List<String> why = Pipelines.explain(hottest, Pipelines.PLAIN);
-            s.append(" The cart most likely to buy is worth ").append(money(
+            List<String> why = Pipelines.explain(hottest, words);
+            s.append("\nThe cart most likely to buy is worth ").append(money(
                     hottest.valueCents())).append(", intent ").append(hottest.intent());
             if (!why.isEmpty()) {
                 s.append(": ").append(lowerFirst(why.get(0)));
@@ -336,5 +352,24 @@ final class AssistantTools {
             s.append('.');
         }
         out.put("summary", s.toString());
+    }
+
+    /// An answer with its list items drawn as bullets: a line starting with
+    /// `- ` or `* ` (how the tools' summaries and most models write a list)
+    /// starts with a bullet instead.
+    static String listed(String answer) {
+        StringBuilder out = new StringBuilder(answer.length());
+        boolean lineStart = true;
+        int len = answer.length();
+        for (int iter = 0; iter < len; iter++) {
+            char c = answer.charAt(iter);
+            if (lineStart && (c == '-' || c == '*') && iter + 1 < len && answer.charAt(iter + 1) == ' ') {
+                out.append('\u2022');
+            } else {
+                out.append(c);
+            }
+            lineStart = c == '\n';
+        }
+        return out.toString();
     }
 }
