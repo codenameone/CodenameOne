@@ -44,6 +44,11 @@ import java.util.Map;
 /// Both are cached, bounded, by id, size and light or dark.
 public final class ProductArt {
     private static final int MOST = 160;
+
+    /// The most photos a screen prefetches ahead of showing them: about a
+    /// register grid's first screenful, well below [#MOST] so a prefetch
+    /// never evicts another.
+    public static final int PREFETCH_MOST = 24;
     private static final Map<String, Image> CACHE = new HashMap<String, Image>();
     private static final List<String> ORDER = new ArrayList<String>();
     /// Photos being fetched, and the labels waiting for each.
@@ -195,7 +200,7 @@ public final class ProductArt {
 
     /// Makes the photo `photoId` ready before anything shows it: read from
     /// the device's cache, or downloaded into it. The register calls this for
-    /// its whole catalog while the cashier signs in, so the product grid opens
+    /// its grid's first screenful ([#PREFETCH_MOST]) while the cashier signs in, so the product grid opens
     /// with its photos instead of a second of drawn tiles.
     public static void prefetch(String photoId) {
         if (photoId == null || photoId.length() == 0 || SOURCES.get(photoId) != null

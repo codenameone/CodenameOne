@@ -353,33 +353,79 @@ public final class ShopState {
         fire(CART_LISTENERS);
     }
 
-    /// The id of the store whose cart the Cart section shows: the one the
-    /// shopper last added to, else the current store. The cart is kept per
-    /// store, and the current store follows every product opened; showing
-    /// the current one alone, a shopper who filled a cart in one store,
-    /// signed in and looked at a product of another found the Cart section
-    /// empty, with their cart still on the server and nowhere on screen.
-    static String cartStore(String current, String lastFilled) {
-        return lastFilled != null && lastFilled.length() > 0 ? lastFilled : current;
+    /// The id of the store whose cart the Cart section shows. The cart is
+    /// kept per store, and the current store follows every product opened;
+    /// showing the current one alone, a shopper who filled a cart in one
+    /// store, signed in and looked at a product of another found the Cart
+    /// section empty, with their cart still on the server. Showing the
+    /// remembered one always, a shopper who had ordered in one store and was
+    /// browsing another was yanked back to the first one's empty cart.
+    ///
+    /// So: the current store's cart when it has lines; else the remembered
+    /// store's (`remembered`, the one last added to) when its cart has lines
+    /// -- or is still to be fetched, `rememberedLines` below 0 -- else the
+    /// current store. Null when there is neither.
+    static String cartStore(String current, int currentLines, String remembered,
+            int rememberedLines) {
+        boolean hasCurrent = current != null && current.length() > 0;
+        if (hasCurrent && currentLines > 0) {
+            return current;
+        }
+        if (remembered != null && remembered.length() > 0 && !remembered.equals(current)
+                && rememberedLines != 0) {
+            return remembered;
+        }
+        return hasCurrent ? current : null;
     }
 
-    /// Enters the store [#cartStore] names, then fetches its cart.
+    /// The number of lines in `c`; 0 for none.
+    static int lines(CartDto c) {
+        return c == null || c.lines() == null ? 0 : c.lines().size();
+    }
+
+    /// Fetches the cart [#cartStore] picks, entering its store when that is
+    /// the remembered one, and returning to the current store when the
+    /// remembered cart turns out empty or its store gone.
     public static void loadShownCart(final Runnable done) {
-        String wanted = cartStore(store == null ? null : store.id(),
-                Preferences.get(CART_STORE_KEY, ""));
-        if (wanted == null) {
+        final String current = store == null ? null : store.id();
+        final String remembered = Preferences.get(CART_STORE_KEY, "");
+        if (current == null) {
+            shownCart(null, 0, remembered, done);
+            return;
+        }
+        loadCart(() -> shownCart(current, lines(cart), remembered, done));
+    }
+
+    private static void shownCart(final String current, final int currentLines,
+            final String remembered, final Runnable done) {
+        String wanted = cartStore(current, currentLines, remembered, -1);
+        if (wanted == null || wanted.equals(current)) {
             run(done);
             return;
         }
-        enter(wanted, () -> loadCart(done), () -> {
-            // That store is gone: show the current one's cart.
+        final Runnable back = () -> {
+            // Nothing there: forget it and show the current store's cart.
             Preferences.delete(CART_STORE_KEY);
-            if (store != null) {
-                loadCart(done);
-            } else {
+            if (current == null) {
                 run(done);
+            } else {
+                enter(current, () -> loadCart(done), done);
             }
-        });
+        };
+        enter(remembered, () -> loadCart(() -> {
+            if (remembered.equals(cartStore(current, currentLines, remembered, lines(cart)))) {
+                run(done);
+            } else {
+                back.run();
+            }
+        }), back);
+    }
+
+    /// Forgets the store last added to ([#cartStore]): after an order is
+    /// placed, whose cart is now empty, and on sign-out, so the next account
+    /// on the device does not inherit it.
+    public static void forgetCartStore() {
+        Preferences.delete(CART_STORE_KEY);
     }
 
     /// The id of the store last added to; empty for none.
@@ -432,7 +478,13 @@ public final class ShopState {
             add(variantId, quantity, done, failed);
             return;
         }
-        enter(storeId, () -> add(variantId, quantity, done, failed));
+        enter(storeId, () -> add(variantId, quantity, done, failed), () -> {
+            // The store could not be found or the lookup failed: the caller
+            // still hears of it, to re-enable its button and say so.
+            if (failed != null) {
+                failed.failed(0, "That store could not be opened");
+            }
+        });
     }
 
     /// Adds `quantity` of a variant to the cart.

@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.shop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -29,11 +30,29 @@ import org.junit.jupiter.api.Test;
 /// merged Fennel & Fig cart still on the server.
 class StoreEntryTest {
     @Test
-    void theCartShownIsTheOneLastFilledNotTheStoreLastBrowsed() {
-        assertEquals("fennel", ShopState.cartStore("northwind", "fennel"));
-        assertEquals("northwind", ShopState.cartStore("northwind", ""));
-        assertEquals("northwind", ShopState.cartStore("northwind", null));
-        assertEquals("fennel", ShopState.cartStore(null, "fennel"));
+    void anEmptyCurrentCartGivesWayToTheOneLastFilled() {
+        // Remembered cart still to be fetched (-1): go and look.
+        assertEquals("fennel", ShopState.cartStore("northwind", 0, "fennel", -1));
+        // ...and it has lines: show it.
+        assertEquals("fennel", ShopState.cartStore("northwind", 0, "fennel", 2));
+        assertEquals("fennel", ShopState.cartStore(null, 0, "fennel", -1));
+        assertEquals("northwind", ShopState.cartStore("northwind", 0, "", -1));
+        assertEquals("northwind", ShopState.cartStore("northwind", 0, null, -1));
+    }
+
+    @Test
+    void theCurrentStoresCartWinsWhenItHasLines() {
+        assertEquals("northwind", ShopState.cartStore("northwind", 1, "fennel", -1));
+        assertEquals("northwind", ShopState.cartStore("northwind", 3, "fennel", 2));
+    }
+
+    @Test
+    void anEmptyRememberedCartDoesNotPullTheShopperBack() {
+        // Ordered at Fennel & Fig (its cart now empty), browsing Northwind.
+        assertEquals("northwind", ShopState.cartStore("northwind", 0, "fennel", 0));
+        assertNull(ShopState.cartStore(null, 0, "fennel", 0));
+        assertNull(ShopState.cartStore(null, 0, "", -1));
+        assertEquals("fennel", ShopState.cartStore("fennel", 0, "fennel", -1));
     }
 
     @Test

@@ -86,6 +86,7 @@ public class DemoTourTest extends E2e {
             }
             return true;
         } finally {
+            stopChromeWatch();
             if (recorder != null && recorder.isRecording()) {
                 recorder.stop();
             }
@@ -1732,13 +1733,13 @@ private void screens() throws Exception {
     /// again and, with the bar back, the canvas 25 px shorter than the form
     /// laid out under it -- "Sign out" and the Charge button cut off. Hiding
     /// once before recording cannot see a bar made later, so a daemon thread
-    /// repeats the hide and the fit for as long as the test runs.
+    /// repeats the hide and the fit until the tour ends ([#stopChromeWatch]).
     private void startChromeWatch() {
         if (chromeWatch != null) {
             return;
         }
         chromeWatch = new Thread(() -> {
-            while (true) {
+            while (!Thread.currentThread().isInterrupted()) {
                 try {
                     Thread.sleep(150);
                     hideSimulatorMenus();
@@ -1764,6 +1765,15 @@ private void screens() throws Exception {
     }
 
     private static Thread chromeWatch;
+
+    /// Ends [#startChromeWatch]'s thread: the tour is over, on success or not.
+    private static void stopChromeWatch() {
+        Thread t = chromeWatch;
+        chromeWatch = null;
+        if (t != null) {
+            t.interrupt();
+        }
+    }
 
     /// Hides the simulator's own Swing menu bar (File, Edit, Simulate ...):
     /// the recorder paints it over the top of a desktop frame, and it is

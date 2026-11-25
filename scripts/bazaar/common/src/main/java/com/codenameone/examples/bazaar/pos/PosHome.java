@@ -319,15 +319,21 @@ final class PosHome {
         return page;
     }
 
-    /// Readies every product photo of the catalog while the cashier enters
-    /// the PIN and counts the float, so the product grid opens on photos.
-    /// Drawn placeholder tiles showed for a second before them otherwise.
+    /// Readies the photos of the grid's first screenful while the cashier
+    /// enters the PIN and counts the float, so the product grid opens on
+    /// photos. Drawn placeholder tiles showed for a second before them
+    /// otherwise. Only the first screenful ([ProductArt#PREFETCH_MOST]): the
+    /// whole catalog queued one request per item ahead of the PIN sign-in,
+    /// and more than the image cache holds evicted its own prefetches.
+    /// Photos already on the device cost no request (`ProductArt.prefetch`).
     private static void prewarm() {
         com.codenameone.examples.bazaar.api.PosCatalogDto c = PosState.catalog();
         if (c == null || c.items() == null) {
             return;
         }
-        for (int iter = 0; iter < c.items().size(); iter++) {
+        int n = Math.min(c.items().size(),
+                com.codenameone.examples.bazaar.ui.ProductArt.PREFETCH_MOST);
+        for (int iter = 0; iter < n; iter++) {
             com.codenameone.examples.bazaar.ui.ProductArt.prefetch(c.items().get(iter).photoId());
         }
     }

@@ -537,6 +537,13 @@ public class DemoStores {
                     o.setRefundedCents(back);
                     o.setFinancial(whole ? Orders.REFUNDED : Orders.PARTIALLY_REFUNDED);
                 }
+                if (waiting) {
+                    // Its payment is a hold until the first units ship
+                    // (payment() below), so the order says so too: the
+                    // merchant's list, the admin's and the capture on ship
+                    // (Orders.capturePayment) all read this field.
+                    o.setFinancial(Orders.AUTHORIZED);
+                }
                 madePayments.add(payment(o, pos, waiting, serial));
                 made.add(o);
                 madeLines.addAll(lines);
@@ -584,7 +591,8 @@ public class DemoStores {
         p.setMethodLabel(pos ? "Card reader" : card[0]);
         p.setAmountCents(o.getTotalCents());
         p.setCurrency(o.getCurrency());
-        p.setProviderRef("demo_" + o.getId());
+        // Payments.SEEDED keeps it away from a real processor.
+        p.setProviderRef(Payments.SEEDED + o.getId());
         p.setCreatedAt(o.getCreatedAt());
         long refunded = o.getRefundedCents();
         String status = waiting ? Payments.AUTHORIZED
@@ -597,7 +605,7 @@ public class DemoStores {
         }
         if (refunded > 0L) {
             p.setRefundedCents(refunded);
-            p.setRefundRef("demo_r_" + o.getId());
+            p.setRefundRef(Payments.SEEDED + "r_" + o.getId());
             p.setRefundedAt(o.getCreatedAt().plusMillis(2L * 24 * 60 * 60 * 1000));
         }
         return p;

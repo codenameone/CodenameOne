@@ -416,6 +416,7 @@ final class CheckoutForm {
                 text(note), key, 0, null), Net.to(order -> {
                     placing = false;
                     ShopState.rememberAddress(address);
+                    ShopState.forgetCartStore();
                     ShopState.loadCart(null);
                     OrderPlaced.show(order, previous);
                 }, (status, message) -> {

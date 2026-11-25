@@ -275,6 +275,7 @@ public final class Nav {
         homeForm = null;
         homeMode = "";
         signedIn = false;
+        com.codenameone.examples.bazaar.shop.ShopState.forgetCartStore();
         Runnable out = () -> {
             Telemetry.signedOut(reason);
             Session.signOut(Nav::home);

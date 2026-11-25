@@ -707,9 +707,17 @@ public class Payments {
     /// and refund through it.
     public static final String TERMINAL = "TERM-";
 
-    /// Whether a payment's reference is one the processor knows.
-    private static boolean atProcessor(String reference) {
-        return !CASH.equals(reference) && (reference == null || !reference.startsWith(TERMINAL));
+    /// The prefix of a payment the demo data seeded (`DemoStores`). No
+    /// processor ever saw it, so even with a real one configured (Stripe)
+    /// capture, void and refund only move the row, as for [#TERMINAL];
+    /// asking the processor about a made-up reference would fail every time.
+    public static final String SEEDED = "demo_";
+
+    /// Whether a payment's reference is one the processor knows: not cash,
+    /// not a terminal's ([#TERMINAL]) and not seeded demo data ([#SEEDED]).
+    public static boolean atProcessor(String reference) {
+        return !CASH.equals(reference) && (reference == null
+                || !reference.startsWith(TERMINAL) && !reference.startsWith(SEEDED));
     }
 
     /// Records a card payment a register's terminal took for a counter sale,

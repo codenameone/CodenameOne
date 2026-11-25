@@ -110,7 +110,12 @@ final class RewardsView {
         FontImage.setMaterialIcon(star, FontImage.MATERIAL_STARS, 3.4f);
         balance.add(BorderLayout.WEST, star);
         Container spend = new Container(BoxLayout.y());
-        spend.add(Ui.plain(Lang.tr("Points to spend"), "ShopRewardsBalanceLabel"));
+        // The balance is the best store's alone (RewardsDto): every store
+        // runs its own programme and points are never summed, so the label
+        // names the store rather than reading as a total.
+        boolean named = r.storeName() != null && r.storeName().length() > 0;
+        spend.add(Ui.plain(named ? Lang.tr("Points to spend at {0}", r.storeName())
+                : Lang.tr("Points to spend"), "ShopRewardsBalanceLabel"));
         long others = Rewards.otherPoints(r);
         if (others > 0) {
             Label more = Ui.plain(Lang.tr("+{0} pts at other stores", String.valueOf(others)),

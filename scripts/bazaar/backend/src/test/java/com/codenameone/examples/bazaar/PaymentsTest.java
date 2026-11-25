@@ -27,7 +27,9 @@ import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.account.DemoAccounts;
 import com.codenameone.examples.bazaar.api.ReceiptDto;
+import com.codenameone.examples.bazaar.domain.Payment;
 import com.codenameone.examples.bazaar.pay.Payments;
+import com.codenameone.examples.bazaar.repository.PaymentRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,6 +40,7 @@ import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
 import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Paying: the cards an account keeps, and the money of an order -- held at
@@ -54,6 +57,8 @@ class PaymentsTest {
     private Payments payments;
     @Autowired
     private DataSource db;
+    @Autowired
+    private PaymentRepository paymentRows;
 
     private MockRequestBuilder admin(MockRequestBuilder request) {
         return People.asAdmin(request, DemoAccounts.ADMIN);
@@ -300,5 +305,30 @@ class PaymentsTest {
         // Nothing from the address is written into the page.
         assertTrue(cancelled.indexOf("No card was added") > 0, cancelled);
         assertEquals(-1, cancelled.indexOf("<script"));
+    }
+
+    @Test
+    void aSeededHoldIsCapturedAndRefundedWithoutTheProcessor() throws Exception {
+        // DemoStores seeds holds under Payments.SEEDED. With Stripe configured
+        // a call about such a reference fails, so none may reach the provider.
+        String order = Ids.next();
+        String ref = Payments.SEEDED + order;
+        assertFalse(Payments.atProcessor(ref));
+        assertTrue(Payments.atProcessor("pi_123"));
+        Payment row = new Payment();
+        row.setOrderId(order);
+        row.setUsername("seeded@example.com");
+        row.setMethodId("card");
+        row.setMethodLabel("Visa ending 4242");
+        row.setAmountCents(2500L);
+        row.setCurrency("USD");
+        row.setStatus(Payments.AUTHORIZED);
+        row.setProviderRef(ref);
+        row.setCreatedAt(java.time.Instant.now());
+        paymentRows.insert(row);
+        assertEquals(Payments.PAID, payments.capture(order));
+        ReceiptDto receipt = payments.refund(order, 0L, "seeded");
+        assertTrue(receipt != null);
+        assertEquals(Payments.REFUNDED, paymentRows.findById(order).getStatus());
     }
 }

@@ -466,7 +466,10 @@ signed in, `/account` holds:
 
 * orders, with tracking, invoices and a return form once an order is delivered;
 * saved addresses, the wishlist and the reviews they wrote;
-* loyalty points, the member card as a QR code, and clubs they belong to;
+* loyalty points, kept per store: the balance shown is the store where the
+  shopper stands highest, named beside it, with points at other stores listed
+  apart and never added to it; the member card as a QR code, and clubs they
+  belong to;
 * back-in-stock alerts and, per store, whether they receive marketing;
 * subscriptions, which can be paused, resumed, skipped or cancelled;
 * security: an authenticator app for two-step sign-in, recovery codes, and
