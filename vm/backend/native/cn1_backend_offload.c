@@ -484,6 +484,7 @@ struct cn1Uring {
     size_t ringSize;
     size_t sqesSize;
     int inflight;                   /* operations submitted and not yet seen done */
+    int refused;                    /* io_uring_enter was denied: pool from now on */
     unsigned char supported[256];
 };
 
@@ -507,6 +508,39 @@ static void cn1UringAnnounce(int err) {
     } else {
         fprintf(stderr, "local file I/O: thread pool (io_uring unavailable: %s)\n", strerror(err));
     }
+}
+
+static void cn1UringFree(struct cn1Uring* u) {
+    munmap(u->sqes, u->sqesSize);
+    munmap(u->ringBase, u->ringSize);
+    close(u->fd);
+    free(u);
+}
+
+/* Submits one NOP and waits for it. 0, or the errno that refused it. */
+static int cn1UringRoundTrip(struct cn1Uring* u) {
+    unsigned tail = *u->sqTail;
+    unsigned head;
+    struct io_uring_sqe* sqe = &u->sqes[tail & u->sqMask];
+    int entered;
+    memset(sqe, 0, sizeof(*sqe));
+    sqe->opcode = IORING_OP_NOP;
+    u->sqArray[tail & u->sqMask] = tail & u->sqMask;
+    __atomic_store_n(u->sqTail, tail + 1, __ATOMIC_RELEASE);
+    do {
+        entered = (int)syscall(__NR_io_uring_enter, u->fd, 1, 1, IORING_ENTER_GETEVENTS,
+                NULL, 0);
+    } while(entered < 0 && errno == EINTR
+            && __atomic_load_n(u->cqTail, __ATOMIC_ACQUIRE) == *u->cqHead);
+    if(entered < 0 && __atomic_load_n(u->cqTail, __ATOMIC_ACQUIRE) == *u->cqHead) {
+        return errno == 0 ? ENOSYS : errno;
+    }
+    head = *u->cqHead;
+    if(__atomic_load_n(u->cqTail, __ATOMIC_ACQUIRE) == head) {
+        return ENOSYS;
+    }
+    __atomic_store_n(u->cqHead, head + 1, __ATOMIC_RELEASE);
+    return 0;
 }
 
 static struct cn1Uring* cn1UringSetup(int* err) {
@@ -595,7 +629,15 @@ static struct cn1Uring* cn1UringSetup(int* err) {
     u->cqTail = (unsigned*)(ring + params.cq_off.tail);
     u->cqMask = *(unsigned*)(ring + params.cq_off.ring_mask);
     u->cqes = (struct io_uring_cqe*)(ring + params.cq_off.cqes);
-    *err = 0;
+    /* Setup, mmap and the probe can all be allowed while submitting is not: a
+       seccomp profile names each io_uring syscall on its own. One NOP, waited
+       for, proves the whole round trip before this host is told it has a ring
+       -- and before the process says so on stderr. */
+    *err = cn1UringRoundTrip(u);
+    if(*err != 0) {
+        cn1UringFree(u);
+        return 0;
+    }
     return u;
 }
 
@@ -651,7 +693,7 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
         return 0;
     }
     u = cn1UringForHost();
-    if(u == 0 || !u->supported[op->opcode]) {
+    if(u == 0 || u->refused || !u->supported[op->opcode]) {
         return 0;
     }
     signal = cn1OffloadTakeSignal();
@@ -696,7 +738,13 @@ static int cn1UringRun(struct io_uring_sqe* op, long long* result) {
     }
     if(entered < 0 && __atomic_load_n(u->sqHead, __ATOMIC_ACQUIRE) == head) {
         /* The kernel took nothing, so nothing references the job: withdraw it. */
+        int why = errno;
         __atomic_store_n(u->sqTail, tail, __ATOMIC_RELEASE);
+        if(why == EPERM || why == EACCES || why == ENOSYS) {
+            /* Denied after the setup round trip passed (a policy loaded
+               later): answering will not change, so stop asking. */
+            u->refused = 1;
+        }
         __atomic_sub_fetch(&signal->busy, 1, __ATOMIC_RELAXED);
         cn1BackendVtOffloading(-1);
         cn1OffloadReturnSignal(signal);
@@ -789,10 +837,7 @@ static void cn1UringHostExit(void) {
         return;
     }
     cn1UringHost = 0;
-    munmap(u->sqes, u->sqesSize);
-    munmap(u->ringBase, u->ringSize);
-    close(u->fd);
-    free(u);
+    cn1UringFree(u);
 }
 
 #else /* !CN1_HAVE_URING */

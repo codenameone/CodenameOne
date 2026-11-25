@@ -834,9 +834,12 @@ class BackendHttpIntegrationTest {
     @Test
     @DisplayName("a FIFO in the static root is refused, not waited on")
     void aFifoInTheStaticRootIsRefusedNotWaitedOn() throws Exception {
-        // require, not assume: a silent skip would let this guard go vacuous in CI.
         BackendTestSupport.require(busyServer != null && busyPort != 0,
                 "the single-host server is not running");
+        checkFifoRefused(busyPort);
+    }
+
+    private void checkFifoRefused(int port) throws Exception {
         // A FIFO with no writer. A plain open(2) of one blocks until a writer
         // appears, which held a request -- and on the I/O pool a pool thread --
         // for ever; four of them stopped every disk call in the process. The
@@ -848,11 +851,11 @@ class BackendHttpIntegrationTest {
         BackendTestSupport.require(mk.waitFor(10, TimeUnit.SECONDS) && mk.exitValue() == 0,
                 "mkfifo is not available");
         try {
-            String answer = getWithTimeout(busyPort, "/static/stalled.fifo", 8000);
+            String answer = getWithTimeout(port, "/static/stalled.fifo", 8000);
             assertTrue(answer != null && answer.startsWith("HTTP/1.1 404"),
                     "a FIFO in the static root must be refused without waiting for a "
                     + "writer; got: " + answer);
-            String health = getWithTimeout(busyPort, "/healthz", 8000);
+            String health = getWithTimeout(port, "/healthz", 8000);
             assertTrue(health != null && health.startsWith("HTTP/1.1 200"),
                     "/healthz after the FIFO request; got: " + health);
         } finally {
@@ -870,6 +873,10 @@ class BackendHttpIntegrationTest {
     void slowSqliteQueriesDoNotHoldTheHost() throws Exception {
         BackendTestSupport.require(busyServer != null && busyPort != 0,
                 "the single-host server is not running");
+        checkSlowQueriesDoNotHoldHost(busyPort);
+    }
+
+    private void checkSlowQueriesDoNotHoldHost(int port) throws Exception {
         // THREE queries against a pool of two (PetServer sizes it max(2,
         // workers / 4)): two run on the I/O pool, and the third waits for a
         // connection -- which must be a park too, not a wait() on the host.
@@ -877,10 +884,10 @@ class BackendHttpIntegrationTest {
         List<Socket> slow = new ArrayList<>();
         try {
             for (int i = 0; i < 3; i++) {
-                slow.add(sendGet(busyPort, "/slowquery?n=60000000"));
+                slow.add(sendGet(port, "/slowquery?n=60000000"));
             }
             Thread.sleep(500);
-            String health = getWithTimeout(busyPort, "/healthz", 8000);
+            String health = getWithTimeout(port, "/healthz", 8000);
             assertTrue(health != null && health.startsWith("HTTP/1.1 200"),
                     "/healthz must be answered while SQLite queries run; got: " + health);
             for (Socket s : slow) {
@@ -915,16 +922,20 @@ class BackendHttpIntegrationTest {
     void offloadedReadsSurviveCollections() throws Exception {
         BackendTestSupport.require(busyServer != null && busyPort != 0,
                 "the single-host server is not running");
+        checkReadsSurviveCollections(busyPort);
+    }
+
+    private void checkReadsSurviveCollections(int port) throws Exception {
         // A pool thread writes into a byte[] that only the parked virtual
         // thread's frame references. gcchurn collects continuously on the same
         // host meanwhile, so a parked frame that the collector failed to scan
         // shows up as "corrupt at", a short read or a dead server.
         for (int round = 0; round < 3; round++) {
             List<Socket> files = new ArrayList<>();
-            Socket churn = sendGet(busyPort, "/gcchurn?ms=400");
+            Socket churn = sendGet(port, "/gcchurn?ms=400");
             try {
                 for (int i = 0; i < 4; i++) {
-                    files.add(sendGet(busyPort, "/gcfile?kb=512"));
+                    files.add(sendGet(port, "/gcfile?kb=512"));
                 }
                 churn.setSoTimeout(60000);
                 String churned = readAll(churn);
@@ -949,13 +960,126 @@ class BackendHttpIntegrationTest {
     void longSelectReturnsEveryRow() throws Exception {
         BackendTestSupport.require(busyServer != null && busyPort != 0,
                 "the single-host server is not running");
+        checkLongSelect(busyPort);
+    }
+
+    private void checkLongSelect(int port) throws Exception {
         // The first step of a statement goes to the I/O pool and later fast ones
         // run inline (cn1_backend_db.c, stepImpl). Switching between the two
         // paths mid-statement must not lose or repeat a row.
-        String answer = getWithTimeout(busyPort, "/rows?n=25000", 30000);
+        String answer = getWithTimeout(port, "/rows?n=25000", 30000);
         assertTrue(answer != null && answer.startsWith("HTTP/1.1 200"), "/rows: " + answer);
         assertTrue(answer.trim().endsWith("\n25000"),
                 "expected 25000 rows; got: " + answer);
+    }
+
+    @Test
+    @DisplayName("io_uring and its fallbacks: each path is taken where expected and answers alike")
+    void ioUringAndItsFallbacksAnswerAlike() throws Exception {
+        Assumptions.assumeTrue(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT)
+                .contains("linux"), "io_uring exists only on Linux; elsewhere the pool is the only path");
+        BackendTestSupport.require(busyServer != null && busyPort != 0,
+                "the single-host server is not running");
+        // The ring and the pool are two implementations of every offloaded call,
+        // and a green run says nothing about which one ran. So the same checks
+        // run against three copies of the binary, each told apart by the line it
+        // prints on its first offloaded call:
+        //  - as it is: io_uring where the kernel allows it. CI sets
+        //    CN1_REQUIRE_IO_URING=1, so a runner that stopped allowing it fails
+        //    here rather than quietly testing the pool twice;
+        //  - every io_uring syscall refused (what Docker's and podman's default
+        //    seccomp profiles do): the pool;
+        //  - only io_uring_enter refused, so the ring can be created and probed
+        //    but never used: setup has to notice that, and the pool runs.
+        Path launcher = buildSeccompLauncher();
+        Path binary = work.resolve("petserver");
+        Path staticRoot = work.resolve("www");
+        boolean requireRing = "1".equals(System.getenv("CN1_REQUIRE_IO_URING"));
+        String[][] arms = {
+            {"as built", null},
+            {"all io_uring syscalls refused", "all"},
+            {"io_uring_enter refused", "enter"},
+        };
+        for (String[] arm : arms) {
+            List<String> command = new ArrayList<>();
+            if (arm[1] != null) {
+                command.add(launcher.toString());
+                command.add(arm[1]);
+            }
+            command.add(binary.toString());
+            String tag = arm[1] == null ? "ring" : arm[1];
+            Path log = work.resolve("io-" + tag + ".log");
+            int port = freePort();
+            ProcessBuilder run = new ProcessBuilder(command);
+            run.environment().put("CN1_PORT", String.valueOf(port));
+            run.environment().put("CN1_DB_PATH", work.resolve("io-" + tag + ".db").toString());
+            run.environment().put("CN1_STATIC_ROOT", staticRoot.toString());
+            run.environment().put("CN1_HTTP_TIMEOUT_MS", "2000");
+            run.environment().put("CN1_WORKERS", "1");
+            run.redirectErrorStream(true);
+            run.redirectOutput(log.toFile());
+            Process server = run.start();
+            try {
+                assertTrue(waitForPort(port, 30000), arm[0] + ": the server did not start:\n"
+                        + new String(Files.readAllBytes(log), StandardCharsets.UTF_8));
+                checkFifoRefused(port);
+                checkSlowQueriesDoNotHoldHost(port);
+                checkReadsSurviveCollections(port);
+                checkLongSelect(port);
+            } finally {
+                server.destroy();
+                if (!server.waitFor(10, TimeUnit.SECONDS)) {
+                    server.destroyForcibly();
+                }
+            }
+            String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+            String path = null;
+            for (String line : output.split("\n")) {
+                if (line.startsWith("local file I/O: ")) {
+                    path = line.trim();
+                }
+            }
+            assertTrue(path != null, arm[0] + ": the server never said which I/O path it took; "
+                    + "no offloaded call ran, or the announcement is gone:\n" + output);
+            if (arm[1] != null) {
+                assertTrue(path.startsWith("local file I/O: thread pool (io_uring unavailable: "),
+                        arm[0] + ": expected the pool, got: " + path);
+            } else if (requireRing) {
+                assertEquals("local file I/O: io_uring", path, "CN1_REQUIRE_IO_URING is set, so "
+                        + "this machine must run the ring (kernel.io_uring_disabled = "
+                        + ioUringDisabled() + ")");
+            } else {
+                System.out.println("io_uring arm on this machine: " + path);
+            }
+        }
+    }
+
+    private static String ioUringDisabled() {
+        try {
+            return new String(Files.readAllBytes(Paths.get("/proc/sys/kernel/io_uring_disabled")),
+                    StandardCharsets.US_ASCII).trim();
+        } catch (IOException absent) {
+            return "absent";
+        }
+    }
+
+    /** Compiles the seccomp launcher in the test resources into the work directory. */
+    private static Path buildSeccompLauncher() throws Exception {
+        Path source = work.resolve("seccomp-deny-io-uring.c");
+        try (java.io.InputStream in = BackendHttpIntegrationTest.class
+                .getResourceAsStream("/backend/seccomp-deny-io-uring.c")) {
+            BackendTestSupport.require(in != null, "the seccomp launcher source is missing");
+            Files.copy(in, source, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        Path launcher = work.resolve("seccomp-deny-io-uring");
+        Path ccLog = work.resolve("seccomp-cc.log");
+        Process cc = new ProcessBuilder("cc", "-O1", "-o", launcher.toString(), source.toString())
+                .redirectErrorStream(true).redirectOutput(ccLog.toFile()).start();
+        boolean finished = cc.waitFor(60, TimeUnit.SECONDS);
+        String out = new String(Files.readAllBytes(ccLog), StandardCharsets.UTF_8);
+        BackendTestSupport.require(finished && cc.exitValue() == 0
+                && Files.isExecutable(launcher), "could not compile the seccomp launcher:\n" + out);
+        return launcher;
     }
 
     /** Opens a connection and sends a GET on it, leaving the answer unread. */
