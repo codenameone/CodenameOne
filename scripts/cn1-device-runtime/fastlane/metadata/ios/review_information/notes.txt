@@ -5,7 +5,7 @@ from any server.
 
 No computer is needed to review it:
 1. The editor opens on the Hello project. Tap Run (top right).
-2. The program's screen appears with a red Stop button. Tap Stop.
+2. The program's screen appears with a "Slow interpreted mode" label. Long-press it to stop the program.
 3. Change the text in the source and tap Run again.
 4. Tap the title (iPhone) or the sidebar (iPad) for projects, new files,
    and About and help, which shows the version and build.

@@ -96,8 +96,28 @@ public class DevicePushMojo extends AbstractCN1Mojo {
             args.add("--main");
             args.add(mainClass);
         }
+        String version = frameworkVersion();
+        if (version != null) {
+            args.add("--cn1-version");
+            args.add(version);
+        }
         addConnectionArgs(args, lan, device, port);
         runTool(this, args);
+    }
+
+    /// The Codename One version this module compiles against -- the
+    /// `codenameone-core` dependency, else the `cn1.version` property. The
+    /// device warns before it runs a program built for another version.
+    private String frameworkVersion() {
+        for (org.apache.maven.model.Dependency d : project.getDependencies()) {
+            if ("com.codenameone".equals(d.getGroupId())
+                    && "codenameone-core".equals(d.getArtifactId())
+                    && d.getVersion() != null) {
+                return d.getVersion();
+            }
+        }
+        String prop = project.getProperties().getProperty("cn1.version");
+        return prop == null || prop.length() == 0 ? null : prop;
     }
 
     private boolean hasApplicationSources() {

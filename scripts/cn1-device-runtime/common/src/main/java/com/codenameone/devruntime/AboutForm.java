@@ -44,6 +44,8 @@ public final class AboutForm extends Form {
                 com.codename1.ui.Font.SIZE_LARGE));
         add(name);
         add(new Label("Version " + version()));
+        // What a computer must run to push here without a warning.
+        add(new Label("Codename One " + DeviceRuntimeVersion.get()));
 
         section("What it is",
                 "A Java editor and runtime for learning and prototyping Codename One user interfaces. "
@@ -53,7 +55,7 @@ public final class AboutForm extends Form {
         section("Try it",
                 "1. The Hello project opens on first launch.\n"
                 + "2. Tap Run (top right). The program's screen appears.\n"
-                + "3. Tap the red Stop button to return to the editor.\n"
+                + "3. Long-press the \"Slow interpreted mode\" label to return to the editor.\n"
                 + "4. Change the text in the source, tap Run again.\n"
                 + "Compile errors show in the console below the editor; tap one to jump to its line.");
         section("Code completion",

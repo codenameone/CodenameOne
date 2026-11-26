@@ -61,6 +61,8 @@ public final class InterpBundleReader {
         }
         String main = in.readUTF();
         b.mainClass = main.length() == 0 ? null : main;
+        String framework = in.readUTF();
+        b.frameworkVersion = framework.length() == 0 ? null : framework;
 
         int stringCount = in.readInt();
         b.strings = new String[stringCount];

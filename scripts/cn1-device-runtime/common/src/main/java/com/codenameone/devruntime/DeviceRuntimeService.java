@@ -1443,6 +1443,16 @@ public class DeviceRuntimeService {
 
         InterpBundle bundle = InterpBundleReader.read(new ByteArrayInputStream(payload));
 
+        // A program from a computer on another Codename One version is asked
+        // about before anything of the running program is torn down, so Cancel
+        // leaves the device exactly as it was. The editor's own runs are
+        // always this app's version.
+        if (!localRun && !DeviceRuntimeVersion.confirmRun(bundle.getFrameworkVersion())) {
+            throw new IllegalStateException("Codename One " + bundle.getFrameworkVersion()
+                    + " on the computer, " + DeviceRuntimeVersion.get()
+                    + " on the device; the program was not started");
+        }
+
         // Retire whatever is running before publishing anything of the new
         // program's. Stop is on screen throughout an install -- a no-UI program
         // leaves the runtime's own form up -- and stopping tears down exactly

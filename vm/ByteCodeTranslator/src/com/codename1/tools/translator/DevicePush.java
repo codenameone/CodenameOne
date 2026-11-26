@@ -127,7 +127,35 @@ public final class DevicePush {
      */
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /// The Codename One version the program was compiled against, written
+    /// into the bundle so the device can warn when it runs another one. The
+    /// build tools pass the project's version; without it, this tool's own.
+    private static String frameworkVersion;
+
     private DevicePush() {
+    }
+
+    /// This tool's own version, from the Maven metadata packaged in its jar.
+    /// Null when run from a class directory (the repository's own scripts).
+    private static String ownVersion() {
+        java.io.InputStream in = DevicePush.class.getResourceAsStream(
+                "/META-INF/maven/com.codenameone/codenameone-parparvm/pom.properties");
+        if (in == null) {
+            return null;
+        }
+        try {
+            java.util.Properties p = new java.util.Properties();
+            p.load(in);
+            return p.getProperty("version");
+        } catch (java.io.IOException err) {
+            return null;
+        } finally {
+            try {
+                in.close();
+            } catch (java.io.IOException ignored) {
+                // nothing to do
+            }
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -167,6 +195,8 @@ public final class DevicePush {
                 // network path but is now the only authenticated way to reach
                 // the runtime even over adb-reverse loopback.
                 prepackaged = new File(args[++i]);
+            } else if ("--cn1-version".equals(a) && i + 1 < args.length) {
+                frameworkVersion = args[++i];
             } else if ("--stop".equals(a)) {
                 frame = FRAME_STOP;
             } else if ("--help".equals(a)) {
@@ -237,6 +267,8 @@ public final class DevicePush {
                 + " pushing one");
         System.out.println("  --device  connect straight to a device at this address,"
                 + " which the runtime shows on screen");
+        System.out.println("  --cn1-version V  the Codename One version the program was compiled"
+                + " against (default: this tool's)");
         System.out.println("  --lan   the device is on Wi-Fi rather than USB;"
                 + " listens on every interface and pairs first");
     }
@@ -277,6 +309,11 @@ public final class DevicePush {
             System.out.println("entry point " + mainClass.replace('/', '.'));
         }
         w.setMainClass(mainClass.replace('.', '/'));
+        String version = frameworkVersion != null ? frameworkVersion : ownVersion();
+        w.setFrameworkVersion(version);
+        if (version != null) {
+            System.out.println("Codename One " + version);
+        }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         w.write(out);
         return out.toByteArray();

@@ -59,8 +59,9 @@ public class InterpBundleWriter {
     // changes: an older reader would call `Double.parseDouble` on a raw-bit
     // string like "4607182418800017408" and fail on the number, and would
     // also lose the volatile flag the runtime now needs to fence field
-    // accesses. Kept in sync with InterpBundle.VERSION on the reader side.
-    private static final int VERSION = 5;
+    // accesses. 6 added the framework version after the main class. Kept in
+    // sync with InterpBundle.VERSION on the reader side.
+    private static final int VERSION = 6;
 
     private static final int EXTERN_CLASS = 0;
     private static final int EXTERN_METHOD = 1;
@@ -86,6 +87,7 @@ public class InterpBundleWriter {
     /// path an application loads them with, e.g. `/theme.res`.
     private final Map<String, byte[]> resources = new LinkedHashMap<String, byte[]>();
     private String mainClass;
+    private String frameworkVersion;
 
     /** Names of the classes carried in this bundle, i.e. the interpreted set. */
     private final java.util.Set<String> interpretedNames = new java.util.HashSet<String>();
@@ -534,6 +536,13 @@ public class InterpBundleWriter {
         return out.toString();
     }
 
+    /// The Codename One version the program was compiled against, which the
+    /// device compares with its own before it runs the program. Null or empty
+    /// means unknown, and the device then does not warn.
+    public void setFrameworkVersion(String version) {
+        frameworkVersion = version;
+    }
+
     /** The class whose {@code main} the runtime should enter. */
     public void setMainClass(String internalName) {
         mainClass = internalName;
@@ -563,6 +572,7 @@ public class InterpBundleWriter {
         out.writeInt(MAGIC);
         out.writeInt(VERSION);
         out.writeUTF(mainClass == null ? "" : mainClass);
+        out.writeUTF(frameworkVersion == null ? "" : frameworkVersion);
 
         out.writeInt(strings.size());
         for (String s : strings) {

@@ -71,6 +71,7 @@ final class ToolSupport {
             t.setGroup(AppSupport.GROUP);
             t.setDescription(description);
             t.getStop().set(stop);
+            t.getFrameworkVersion().set(PluginInfo.version());
             t.getToolClasspath().from(tool);
             t.getPort().set(project.getProviders().gradleProperty("cn1.push.port"));
             t.getDevice().set(project.getProviders().gradleProperty("cn1.push.device"));

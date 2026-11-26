@@ -71,6 +71,10 @@ public abstract class PushToDeviceTask extends DefaultTask {
     @Internal
     public abstract Property<String> getPort();
 
+    /// The Codename One version the project builds against (the plugin's own).
+    @Internal
+    public abstract Property<String> getFrameworkVersion();
+
     @Internal
     public abstract Property<String> getDevice();
 
@@ -100,6 +104,11 @@ public abstract class PushToDeviceTask extends DefaultTask {
                     args.add("--source");
                     args.add(dir.getAbsolutePath());
                 }
+            }
+            String version = getFrameworkVersion().getOrNull();
+            if (version != null && version.length() > 0) {
+                args.add("--cn1-version");
+                args.add(version);
             }
             String mainClass = getMainClass().getOrNull();
             if (mainClass != null && mainClass.length() > 0) {

@@ -58,7 +58,7 @@ import java.util.List;
 /// Run compiles with the same compiler the Playground uses, packages the
 /// classes into the bundle format a desktop push sends, and installs it
 /// through the same path a push takes -- so a program behaves identically
-/// whichever way it arrived. While it runs, a Stop button floats over its
+/// whichever way it arrived. While it runs, a "Slow interpreted mode" label floats over its
 /// screens ({@link IdeRunOverlay}) and brings the editor back.
 public class IdeForm extends Form {
     static final int ACCENT = 0x6750A4;
@@ -315,6 +315,9 @@ public class IdeForm extends Form {
         Container bottom = new Container(BoxLayout.y());
         bottom.getAllStyles().setBorder(Border.createCompoundBorder(Border.createLineBorder(1, DIVIDER), null, null, null));
         pad(bottom, 1, 1, 1, 1);
+        Button settings = row(FontImage.MATERIAL_SETTINGS, "Settings", false);
+        settings.addActionListener(e -> saveThen(() -> DeviceRuntimeSettingsForm.show(this)));
+        bottom.add(settings);
         bottom.add(about);
         bottom.setSafeArea(true);
         shell.add(BorderLayout.CENTER, sidebar).add(BorderLayout.SOUTH, bottom);
@@ -440,6 +443,12 @@ public class IdeForm extends Form {
             sheet.back();
             saveThen(() -> AboutForm.show(this));
         });
+        Button settings = row(FontImage.MATERIAL_SETTINGS, "Settings", false);
+        settings.addActionListener(e -> {
+            sheet.back();
+            saveThen(() -> DeviceRuntimeSettingsForm.show(this));
+        });
+        c.add(settings);
         c.add(about);
         sheet.show();
     }

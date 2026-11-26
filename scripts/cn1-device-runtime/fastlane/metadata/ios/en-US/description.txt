@@ -3,7 +3,7 @@ Write, run and change Java user interfaces right on your iPhone or iPad.
 Codename One Instant is a Java editor and runtime for learning and
 prototyping Codename One applications. Type Java in the editor, tap Run, and
 the app compiles it on the device in a fraction of a second and shows the
-result. Tap Stop and you are back in the editor to change it.
+result. Long-press the "Slow interpreted mode" label and you are back in the editor to change it.
 
 - A code editor with syntax highlighting, error markers and code completion
 - Compile errors listed under the editor; tap one to jump to its line

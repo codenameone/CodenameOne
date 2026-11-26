@@ -34,7 +34,11 @@ image::img/device-runtime-ide-tablet.png[The editor on a tablet,scaledwidth=60%]
 
 === Sending a program from your computer
 
-The computer icon at the top left of the editor opens the pairing screen. From a Codename One project on your computer, run:
+The computer icon at the top left of the editor opens the pairing screen.
+
+image::img/device-runtime-pair.png[The pairing screen,scaledwidth=30%]
+
+From a Codename One project on your computer, run:
 
 [source,bash]
 ----
@@ -43,11 +47,17 @@ include::../demos/common/src/main/snippets/developer-guide/device-runtime.sh[tag
 
 These are goals of the Codename One Maven plugin, and tasks of its Gradle plugin (`cn1Push`, `cn1PushStop`), so they work the same way on every operating system. The first time, the command prints a six-digit code; type it on the device and press *Pair*. After that, the computer is remembered and later sends start the program at once.
 
-image::img/device-runtime-pushed.png[A program sent from the computer, with its Stop button,scaledwidth=30%]
+image::img/device-runtime-pushed.png[A program sent from the computer, with its interpreted mode label,scaledwidth=30%]
 
-A received program can be stopped three ways: the floating *Stop* button, *Stop the program* on the pairing screen, or `mvn cn1:push-stop` (Gradle: `cn1PushStop`) from the computer. *View and edit source* shows everything that runs, and *Edit* saves the received program as a project in the editor, where you can change it and run it again.
+A running program carries a *Slow interpreted mode* label: it runs in an interpreter, so its speed says nothing about the same code built for the device. A received program can be stopped three ways: a long press on that label, *Stop the program* on the pairing screen, or `mvn cn1:push-stop` (Gradle: `cn1PushStop`) from the computer. *View and edit source* shows everything that runs, and *Edit* saves the received program as a project in the editor, where you can change it and run it again.
+
+*Settings* in the editor menu moves the label to another corner or hides it; with it hidden, stop a program from the pairing screen or the computer.
 
 Only a paired computer can send or stop a program. *Unpair all computers* on the pairing screen revokes every pairing.
+
+=== Versions
+
+The app is built against one Codename One version and shows it on the *About and help* screen. Each push carries the version the project compiles against, and when the two differ the device asks before it starts the program, because a program built for another version can fail in ways it would not on its own. Use the version the app shows for reliable results.
 
 == How it works
 

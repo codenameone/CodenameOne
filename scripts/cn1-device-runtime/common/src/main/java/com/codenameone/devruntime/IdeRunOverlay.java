@@ -25,21 +25,35 @@ package com.codenameone.devruntime;
 import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
-import com.codename1.ui.FontImage;
+import com.codename1.components.ToastBar;
+import com.codename1.io.Preferences;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
-/// A Stop button floated over every form a running program shows, whether
-/// the editor started it or a computer pushed it.
+/// The "Slow interpreted mode" badge floated over every form a running
+/// program shows, whether the editor started it or a computer pushed it.
 ///
-/// A program shows its own forms and the runtime's toolbar goes with them, so
-/// without this there is no way out short of killing the app. It is put into
-/// each form's layered pane as the form is shown, and the button stops the
-/// program, which returns to where it was started from.
+/// It says two things a pushed program cannot: that it runs in an
+/// interpreter, so its speed says nothing about the same code compiled, and
+/// how to leave. A long press stops the program and returns to where it was
+/// started from; a short tap explains that. A long press rather than a tap
+/// because the badge sits over the program's own UI, where a stray touch must
+/// not end it.
+///
+/// Its corner and whether it shows at all are settings
+/// ([DeviceRuntimeSettingsForm]). Hidden, the program is still stopped from
+/// the pairing screen or from the computer.
 public final class IdeRunOverlay {
+    /// Preference keys, shared with the settings screen.
+    static final String PREF_HIDDEN = "instant.overlay.hidden";
+    static final String PREF_CORNER = "instant.overlay.corner";
+
+    /// Corners, in the order the settings screen lists them.
+    static final String[] CORNERS = {"Bottom right", "Bottom left", "Top right", "Top left"};
+
     private static ActionListener listener;
 
     private IdeRunOverlay() {
@@ -106,36 +120,56 @@ public final class IdeRunOverlay {
             return;
         }
         f.putClientProperty("cn1ide.stop", Boolean.TRUE);
+        if (Preferences.get(PREF_HIDDEN, false)) {
+            return;
+        }
+        int corner = Preferences.get(PREF_CORNER, 0);
+        if (corner < 0 || corner >= CORNERS.length) {
+            corner = 0;
+        }
+        boolean left = corner == 1 || corner == 3;
+        boolean top = corner >= 2;
         Container layer = f.getLayeredPane(IdeRunOverlay.class, true);
-        layer.setLayout(new FlowLayout(Component_RIGHT, Component_BOTTOM));
-        Button stop = new Button("Stop");
-        // Its own style, not the button's: an icon drawn from the button style
-        // paints the background colour into its square too.
-        Style iconStyle = new Style();
-        iconStyle.setFgColor(0xffffff);
-        iconStyle.setBgTransparency(0);
-        stop.setIcon(FontImage.createMaterial(FontImage.MATERIAL_STOP, iconStyle, 3.5f));
-        Style s = stop.getAllStyles();
-        s.setBgColor(0xc62828);
+        layer.setLayout(new FlowLayout(left ? Component_LEFT : Component_RIGHT,
+                top ? Component_TOP : Component_BOTTOM));
+        // Clear of the notch and the home indicator in every corner.
+        layer.setSafeArea(true);
+        final boolean[] longPressed = new boolean[1];
+        final Button badge = new Button("Slow interpreted mode");
+        Style s = badge.getAllStyles();
+        s.setBgColor(0x37474f);
         s.setFgColor(0xffffff);
-        s.setBgTransparency(235);
-        // The theme's button border paints its own fill over the background
-        // colour, which is how this came out in the accent colour, not red.
-        s.setBorder(com.codename1.ui.plaf.Border.createRoundBorder(40, 40, 0xc62828, false));
+        s.setBgTransparency(215);
+        s.setBorder(com.codename1.ui.plaf.Border.createRoundBorder(30, 30, 0x37474f, false));
+        s.setFont(com.codename1.ui.Font.createSystemFont(com.codename1.ui.Font.FACE_SYSTEM,
+                com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_SMALL));
         s.setPaddingUnit(Style.UNIT_TYPE_DIPS);
-        s.setPadding(2, 2, 4, 4);
+        s.setPadding(1, 1, 3, 3);
         s.setMarginUnit(Style.UNIT_TYPE_DIPS);
-        s.setMargin(0, 6, 0, 3);
-        stop.addActionListener(new ActionListener() {
+        s.setMargin(top ? 2 : 0, top ? 0 : 4, 3, 3);
+        badge.addLongPressListener(new ActionListener() {
             public void actionPerformed(ActionEvent ev) {
+                longPressed[0] = true;
                 listener = null;
                 DeviceRuntimeService.getInstance().stopProgram();
             }
         });
-        layer.add(stop);
+        badge.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent ev) {
+                if (longPressed[0]) {
+                    // The release that ends a long press is not a tap.
+                    return;
+                }
+                ToastBar.showInfoMessage("This program runs in an interpreter, much slower "
+                        + "than when built. Long-press this label to stop it.");
+            }
+        });
+        layer.add(badge);
         f.revalidate();
     }
 
+    private static final int Component_LEFT = com.codename1.ui.Component.LEFT;
+    private static final int Component_TOP = com.codename1.ui.Component.TOP;
     private static final int Component_RIGHT = com.codename1.ui.Component.RIGHT;
     private static final int Component_BOTTOM = com.codename1.ui.Component.BOTTOM;
 }

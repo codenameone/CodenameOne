@@ -57,7 +57,12 @@ public final class InterpBundle {
     /// `static final X = 42` reading as 0 through GETSTATIC because javac's
     /// inlining does not run for a caller compiled against an earlier
     /// non-final version.
-    public static final int VERSION = 5;
+    ///
+    /// Bumped to 6 when the header started carrying the Codename One version
+    /// the program was compiled against, right after the main class. It sits
+    /// inside the authenticated body, so a device can trust it when it warns
+    /// about a desktop on a different version.
+    public static final int VERSION = 6;
 
     /// Extern kinds -- what a reference into the host app names.
     public static final int EXTERN_CLASS = 0;
@@ -96,6 +101,7 @@ public final class InterpBundle {
     Hashtable resources = new Hashtable();
 
     String mainClass;
+    String frameworkVersion;
 
     InterpBundle() {
     }
@@ -120,6 +126,12 @@ public final class InterpBundle {
     /// bundle is a library rather than a program.
     public String getMainClass() {
         return mainClass;
+    }
+
+    /// The Codename One version the sending desktop compiled against, or null
+    /// when it did not say (the on-device editor, a tool that does not know).
+    public String getFrameworkVersion() {
+        return frameworkVersion;
     }
 
     /// The source text for a file name, or null. Used by the on-device viewer.
