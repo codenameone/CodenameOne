@@ -292,6 +292,11 @@ over an amount, pickup or local delivery. Tax rates are set per country and
 region. The settings hold the store's name, description, logo and banner,
 locations, staff and their roles, and the registers.
 
+*Time zone.* A store counts its days in UTC until it's given a time zone, an
+IANA name such as `Europe/Paris`, saved through the store's API
+(`/api/merchant/stores/{storeId}/time-zone`). Analytics, reports and "today"
+then start and end the day at the store's midnight.
+
 Settings > Two-factor sign-in in the app turns on authenticator codes for the
 account: scan the QR code, enter a code, and keep the recovery codes it shows
 once. When an account has it, signing in asks for the code on its own screen.
@@ -352,6 +357,56 @@ The webhooks page registers addresses to be told about orders, refunds, low stoc
 products and customers. Each webhook has a secret that signs its deliveries, and
 the page lists every delivery with its status and response and can send one again.
 
+[[bazaar-users-apps]]
+==== Apps
+
+Apps are services from other developers that add to a store: back-in-stock
+alerts, reviews, shipping rules and the like. *Apps* in the merchant app lists
+the installed apps and opens the app directory (*Browse apps*), which can be
+searched and filtered by category and shows each app's rating, pricing and
+reviews.
+
+*Installing.* *Install* opens the app's consent page, which lists what the app
+asks to read and change in the store, such as products, orders, or inventory.
+Approving sends the browser back to the app, which finishes installing itself. When an
+installed app later asks for more, the page lists only what's added. Only the
+store's owner installs and removes apps. *Remove*, on an installed app, revokes
+its access at once and deletes what it added to the store's pages. The app is
+told, and 48 hours later it's asked to delete the store's data.
+
+*Charges.* An app that charges asks first. *Charges to approve* lists each
+request with its name and amount, whether it recurs every 30 days, and any free
+trial. *Approve* or *Decline* answers it; until then nothing is charged.
+Removing an app cancels its charges.
+
+*Reviews.* An owner whose store has, or once had, an app installed can rate it
+from 1 to 5 and write a review. A store has one review per app, and writing
+again replaces it.
+
+*What an app adds.* An app may add:
+
+* a block to the product, order or customer pages of the merchant app, filled
+  with the app's own figures, and buttons that ask the app to do something,
+  such as *Notify now*; the app's answer shows as a message;
+* its own page, which opens inside the merchant app already signed in as the
+  merchant;
+* a block on the storefront, below a product's price, below the cart total or on
+  the order confirmation, and pages of its own under `/s/<handle>/apps/`;
+* questions at checkout. A shopper's answers are kept on the order, labelled
+  with the app's name, beside the store's own checkout questions;
+* rules that change checkout: discounts, which shipping rates and payment
+  methods are offered and in what order, or a limit that stops an order. A rule
+  that fails is skipped and checkout goes on without it.
+
+*App slots* are a separate thing: snippets from other services, such as an
+analytics script, a pixel or a widget, which the store's owner places at the
+page head, at the end of every page or at one of the three storefront places.
+Each names a consent category. A necessary snippet always loads, and an
+analytics or marketing snippet loads only once the visitor accepted that
+category in the cookie banner. Checkout loads only necessary snippets.
+
+<<extending-bazaar>> describes the same features for the people who write apps.
+
 === The register
 
 A cashier signs in, chooses the register and enters the PIN (`1234` for the demo
@@ -406,6 +461,12 @@ active ones, with a reason that stays in the store's history. The users screen
 finds accounts, grants and removes roles, and flags or blocks an account. The
 payments screen lists payments and payouts across the stores.
 
+The *App listings* screen is where the platform reviews the app directory. A developer's
+listing, or a change to one, waits there until an administrator approves it.
+*Reject* and *Delist* each need a reason, which the developer sees; delisting
+takes an approved app off the directory. Each listing shows its reviews, and
+*Hide* takes a review out of the listing and its average rating.
+
 image::img/bazaar-admin-overview-desktop.png["The administrator overview on a desktop: accounts, stores, orders and trends",scaledwidth=90%]
 
 image::img/bazaar-admin-stores-desktop.png["Stores on the platform with their orders and status",scaledwidth=90%]
@@ -431,8 +492,13 @@ suggestion opens the product or the collection. On the web admin's online store 
 groups and per-product boosts for search, a storefront password that keeps the
 store behind a pre-launch page until launch (staff always get in), and copies
 an embed code that puts a product's buy button on another site. The same form
-takes a custom domain such as `shop.example.com`: once its DNS points at the
-server, that address serves the store at its root. The header has a globe menu for the
+takes a custom domain such as `shop.example.com`. The domain is served only once
+the store proves it owns it. Saving it gives the store a token, published either
+as a file at `/.well-known/bazaar-verify/<token>` on the domain or as a DNS TXT
+record `bazaar-verify=<token>` on `_bazaar-verify.<domain>`. A check through the
+store's API (`/api/merchant/stores/{storeId}/domain/verify`) then confirms it,
+and from then on that address serves the store at its root. A domain another
+store has proved can't be claimed. The header has a globe menu for the
 language (English, Spanish, French, German and Hebrew, each named in its own
 language) and, when the store sells in more than one market, a market menu
 beside it. A shopper who picks a market sees prices in that market's currency

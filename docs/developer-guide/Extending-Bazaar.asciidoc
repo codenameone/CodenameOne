@@ -1,0 +1,677 @@
+[[extending-bazaar]]
+== Extending Bazaar with apps
+
+This chapter is for developers who write apps for a Bazaar store. An app is a
+separate web service, in any language, that a store's owner installs. It reads
+and writes the store through the HTTP API, hears about events through signed
+webhooks, adds blocks and fields to the merchant app and the storefront, and
+can change checkout through functions. The chapter ends with a walkthrough of
+Restock Alerts, the sample app in `scripts/bazaar/sample-app`.
+
+The Bazaar chapters before this one describe the platform itself:
+<<bazaar-users-guide>> for merchants and <<bazaar-implementors-guide>> for the
+people who run and change it.
+
+[[extending-bazaar-architecture]]
+=== Why apps run outside the server
+
+The Bazaar backend is compiled ahead of time by ParparVM into a native server.
+It has no class loader, so there is no way to load a Java plugin into it, and
+it would not be wise to: a plugin would share the server's memory, threads and
+database connections, and one slow or broken plugin would slow or break every
+store on the platform.
+
+Nothing an app writes runs inside Bazaar, then. Each kind of extension takes one
+of three forms:
+
+* *A separate service.* The app's own server calls the API with a token, and
+  Bazaar calls the app back with signed HTTP requests: webhooks, block data,
+  actions, the storefront proxy and remote functions. Every call Bazaar makes
+  has a short timeout, and an app that doesn't answer in time is left out
+  rather than waited for.
+* *Data.* UI extensions are JSON trees over a fixed vocabulary of blocks. The
+  merchant app draws them with its own components and the storefront prints
+  them as escaped text. There is no script in a block.
+* *A sandboxed language.* A checkout function is a short program in a small
+  language that Bazaar compiles once, verifies and then interprets with a fixed
+  budget of instructions. It has no input or output beyond the cart it reads and
+  the operations it emits.
+
+[[extending-bazaar-register]]
+=== Registering an app
+
+Any signed-in account can register an app. The registration names the app,
+the addresses Bazaar may send a merchant back to (`redirectUris`), the most
+scopes the app may ever ask for (`scopes`), the app's own admin page
+(`appUrl`) and the address its webhooks go to (`webhookUrl`). An app is
+`DRAFT` or `LISTED`; only a listed app can be installed.
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-register,indent=0]
+----
+
+The answer carries the app's `clientId` and its `clientSecret`. The secret is
+shown in this answer only: Bazaar keeps only its SHA-256 hash. `PUT
+/api/developer/apps/{appId}` changes the app later, and `GET
+/api/developer/apps` lists the caller's apps.
+
+[[extending-bazaar-install]]
+=== Installing: OAuth with PKCE
+
+A store's owner installs an app through OAuth's authorization-code flow, with
+PKCE required and `S256` the only challenge method:
+
+. The app sends the owner's browser to the consent page with its
+  `client_id`, the scopes it wants, a registered `redirect_uri`, a `state` and a
+  `code_challenge`.
+. The page lists what the app asks for. When the app is already installed and
+  asks for more, it lists only what's added. The owner approves or declines.
+. On approval the browser returns to the `redirect_uri` with `code` and
+  `state`. The code is good once, for ten minutes, for exactly that request.
+. The app posts the code, its client credentials and the PKCE verifier to the
+  token endpoint and receives an access token.
+
+The consent address:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-consent-url,indent=0]
+----
+
+The token request. The endpoint takes this form, as OAuth does, or the same
+fields as a JSON object. Nobody is signed in to call it; the client secret is
+the credential.
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-token,indent=0]
+----
+
+The answer's `access_token` starts with `bzk_app_`. Asking again for more
+scopes issues a new token and retires the old one. A request that fails the
+checks (an unknown client, an unregistered redirect address, no PKCE) is shown
+as an error on the consent page and never redirected.
+
+When the owner removes the app, its token stops working with the next request,
+its webhooks are turned off, its extensions are deleted, its pending and recurring charges are
+cancelled, and Bazaar sends `app/uninstalled`. Forty-eight hours later it sends
+`shop/redact`, unless the app was installed again in the meantime. Everything
+an app does to a store is written to the store's audit log.
+
+[[extending-bazaar-scopes]]
+=== Scopes
+
+A scope grants one kind of access to one store. A `write_` scope also grants
+the matching `read_` scope. The full list is `StoreApiKeys.SCOPES`, and the same
+scopes apply to the API keys an owner creates by hand.
+
+[cols="1,3",options="header"]
+|===
+| Scope | Grants
+| `read_products`, `write_products` | Products and variants; `productCreate` and `productUpdate`
+| `read_orders` | Orders and their lines
+| `write_orders` | Accepted in a grant; no route of the API asks for it
+| `read_customers`, `write_customers` | Customers; `customerUpdate`
+| `read_inventory`, `write_inventory` | Stock levels; `inventoryAdjust`
+| `read_discounts`, `write_discounts` | Discounts; `discountCreate`
+| `read_fulfillments`, `write_fulfillments` | An order's fulfillments; `fulfillmentCreate`
+| `read_metafields`, `write_metafields` | Metafield values; definitions and values in the app's own namespace
+| `read_analytics` | Accepted in a grant; no route of the API asks for it
+| `write_functions` | Uploading checkout functions
+| `write_extensions` | Uploading UI extensions and the storefront proxy
+|===
+
+The installation's scopes are read on every request, so narrowing a grant takes
+effect at once. A webhook subscription needs the read scope of its topic.
+
+[[extending-bazaar-tokens]]
+=== Tokens, limits and versions
+
+The token is a bearer token on the key API under `/api/v1/stores/{storeId}`.
+It's held to the store it was issued for: a request for any other store's id
+answers 404, and a request outside the token's scopes answers 403.
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-api-call,indent=0]
+----
+
+*Call limit.* Each installation has a leaky bucket of calls: 40 by default,
+draining two a second (`bazaar.apps.bucket`, `bazaar.apps.leak-per-second`).
+Every call adds one. Every answer carries `X-Bazaar-Api-Call-Limit:
+<in the bucket>/<capacity>`, so an app can slow down before it's refused, and a
+call that would overflow the bucket answers 429 with `Retry-After`.
+
+*API version.* A request names the version it was written against in
+`X-Bazaar-Api-Version`. The versions served are `2026-07` and `2026-10`, the
+latest, which is what a request without the header gets. A version the server
+doesn't know answers 400 rather than a guess, and every answer carries the
+header with the version that served it. Pin the version, as the sample app does,
+so a change of the default doesn't change an app's answers.
+
+[[extending-bazaar-rest-graphql]]
+=== REST and GraphQL
+
+The REST routes are under `/api/v1/stores/{storeId}`:
+
+[cols="2,1",options="header"]
+|===
+| Route | Scope
+| `GET products`, `GET products/{productId}` | `read_products`
+| `POST products`, `PUT products/{productId}` | `write_products`
+| `GET orders`, `GET orders/{orderId}` | `read_orders`
+| `GET orders/{orderId}/fulfillments` | `read_fulfillments`
+| `POST orders/{orderId}/fulfillments` | `write_fulfillments`
+| `GET inventory`, `POST inventory/adjustments` | `read_inventory`, `write_inventory`
+| `GET discounts`, `POST discounts` | `read_discounts`, `write_discounts`
+| `GET customers`, `GET customers/{customerId}`, `PUT customers/{customerId}` | `read_customers`, `write_customers`
+| `POST bulk-operations`, `GET bulk-operations/{jobId}` | by kind: `read_orders`, `read_products` or `write_products`
+|===
+
+An update says only what changes: `PUT products/{productId}` with
+`{"vendor":"Rest"}` changes the vendor and leaves the rest.
+
+`POST /api/v1/stores/{storeId}/graphql` takes `{"query": ..., "variables":
+{...}}` over a subset of GraphQL. It reads one query or mutation with
+optional name and variables, nested field selections, aliases and arguments
+(whole numbers, strings, booleans, null, enum words, lists, objects and
+variables). Subscriptions, fragments, directives and fractions are refused with
+a GraphQL error. There is no schema to introspect: the fields are the members
+of the JSON the REST routes answer, so the REST answers are the schema.
+
+[source,graphql]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-graphql-read,indent=0]
+----
+
+The query fields are `products`, `orders`, `customers` and `discounts` (each
+with `first`), `inventoryLevels` (`first`, `locationId`, `productId`) and
+`fulfillments` (`orderId`). The mutations are the writes of the REST routes:
+
+[source,graphql]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-graphql-mutation,indent=0]
+----
+
+[cols="1,1,2",options="header"]
+|===
+| Mutation | Scope | Webhook sent
+| `productCreate`, `productUpdate` | `write_products` | `products/update` on an update
+| `inventoryAdjust` | `write_inventory` | `inventory/low` at the reorder point
+| `discountCreate` | `write_discounts` | none
+| `fulfillmentCreate` | `write_fulfillments` | `orders/fulfilled` when the order is
+| `metafieldsSet` | `write_metafields` | none
+| `customerUpdate` | `write_customers` | none
+|===
+
+Every field of an operation is checked before any of it runs: a field the
+token may not use answers 403 with an `ACCESS_DENIED` error, and nothing is read
+or written. The fields of a mutation then run in one transaction, so one that
+fails rolls back the ones before it, and the webhooks go out only after the
+transaction committed.
+
+[[extending-bazaar-webhooks]]
+=== Webhooks
+
+An app subscribes with its token:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-webhook-subscribe,indent=0]
+----
+
+The topics are `orders/create`, `orders/paid`, `orders/fulfilled`,
+`orders/cancelled`, `refunds/create`, `inventory/low`, `products/update` and
+`customers/create`. `GET webhooks` lists the app's subscriptions and `DELETE
+webhooks/{webhookId}` removes one. An app's subscriptions are its own: neither
+the store's staff nor another app sees them.
+
+Every installed app also gets these topics without asking, and can't remove
+them:
+
+[cols="1,3",options="header"]
+|===
+| Topic | Sent when
+| `app/uninstalled` | The store removed the app. Its token is already revoked.
+| `customers/data_request` | A customer asked for their data.
+| `customers/redact` | A customer's personal data was erased.
+| `shop/redact` | 48 hours after removal: delete the store's data.
+| `app_subscriptions/update` | One of the app's charges changed status.
+|===
+
+A delivery is a POST with `X-Bazaar-Topic`, `X-Bazaar-Delivery` (its id) and
+`X-Bazaar-Signature`. A delivery that fails is tried again after a minute, and
+the wait doubles with each attempt.
+
+*Verifying a signature.* Bazaar keeps only a hash of the client secret, and a
+hash can't sign anything, so an app's requests are signed with a key derived
+from its secret. The app computes the same key itself:
+
+----
+signingKey = hex(HMAC-SHA256(key = client secret, message = "bazaar-webhooks"))
+----
+
+The signature is `sha256=` and the hex HMAC-SHA256 of the raw body, keyed with
+the UTF-8 bytes of that hex text. This is Bazaar's side of it:
+
+[source,java,role=cn1-no-try]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/webhook/Webhooks.java[tag=bazaar-webhook-signature,indent=0]
+----
+
+Compute it over the bytes exactly as they arrived, before parsing them, compare
+in constant time, and answer anything that doesn't match with 401 so it's
+never counted as delivered. The sample app's `Signatures.body` does exactly
+that. The same signature covers block data, action calls and remote functions.
+
+[[extending-bazaar-metafields]]
+=== Metafields
+
+An app keeps its own data on products, variants, collections, customers and
+orders as metafields in a namespace of its own, `app--<appId>--`. A definition
+made with the app's token is placed in that namespace, and only that app's
+token may write its values. Staff read them and can't change them.
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-metafields,indent=0]
+----
+
+The answer to the definition carries the full key, here
+`app--<appId>--rating`. A type is text, a number, money in minor units, a date
+(`yyyy-mm-dd`), yes or no, or a reference to an entry of one of the store's
+metaobject types, and a value is checked against its type when it's written.
+Reading needs `read_metafields`, which another app or a key may hold too.
+
+[[extending-bazaar-functions]]
+=== Checkout functions
+
+A checkout function changes what checkout offers: a discount, the shipping
+rates, the payment methods, or whether the order may be placed at all. It's
+either a script in Bazaar's function language, which Bazaar runs, or a remote
+function, an HTTPS address the app answers.
+
+`/api/v1/stores/{storeId}/functions` manages them, with `write_functions`:
+
+[cols="2,3",options="header"]
+|===
+| Route | Does
+| `GET functions` | The app's functions in this store, with their last error
+| `POST functions` | Uploads `{name, target, source}` or `{name, target, url}`
+| `POST functions/{functionId}/activate`, `.../deactivate` | Turns one on or off
+| `DELETE functions/{functionId}` | Removes one
+|===
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-function-upload,indent=0]
+----
+
+A script is compiled and verified when it's uploaded; one that doesn't
+compile answers 400 naming the line. An app may keep 20 functions in a store.
+A function runs only while its app is installed with `write_functions`, and
+both are read on every quote, so removing the app or narrowing its grant stops
+it at once. Functions of one target run in upload order, each seeing what the
+ones before it did.
+
+[[extending-bazaar-function-targets]]
+==== Targets
+
+Every target reads the same cart and the cart's `lines`. Shipping also reads
+`rates`, and payment reads `methods`.
+
+[cols="1,2,3",options="header"]
+|===
+| Target | Lists | Emits
+| `discount` | `lines` | `discount(amount, message)`, `line_discount(index, amount, message)`
+| `shipping` | `lines`, `rates` | `hide(id)`, `rename(id, name)`, `reprice(id, price)`, `move(id, position)`
+| `payment` | `lines`, `methods` | `hide(type)`, `move(type, position)`
+| `validation` | `lines` | `error(message)`
+|===
+
+[cols="1,3",options="header"]
+|===
+| Record | Fields
+| `cart` | `subtotal`, `discount` (taken off so far), `quantity` (numbers); `currency`, `country`, `customer`, `code` (strings)
+| each of `lines` | `index`, `quantity`, `price`, `total` (numbers); `sku`, `product`, `variant`, `title` (strings)
+| each of `rates` | `index`, `price` (numbers); `id`, `name`, `kind` (strings)
+| each of `methods` | `index` (a number); `type` (a string)
+|===
+
+Amounts are whole numbers in the minor units of the store's currency: cents for
+`USD`, whole yen for `JPY`. A validation function's errors stop the order, and the
+shopper sees up to five of them.
+
+[[extending-bazaar-function-language]]
+==== The function language
+
+A discount for pairs and for carts of three or more:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-function-discount,indent=0]
+----
+
+A shipping function that renames, reprices and moves the express rate to the
+top, and hides the rest:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-function-shipping,indent=0]
+----
+
+A payment function that hides cards on large carts and puts Affirm first:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-function-payment,indent=0]
+----
+
+The whole language:
+
+* *Values* are whole numbers (64 bits), strings and booleans. Nothing converts
+  between them.
+* *Operators.* `+ - * / %` on numbers; `== != < <= > >=`; `&& || !` on
+  booleans, and both sides of `&&` and `||` are evaluated; `==` and `!=` on
+  strings. Arithmetic that overflows, and division by zero, stop the function
+  with an error.
+* *Built-ins:* `min(a, b)`, `max(a, b)`, `contains(s, part)` and
+  `starts_with(s, prefix)`.
+* *Variables.* `let name = value;` declares one, and its type is the type of its
+  first value. It lives until the end of its block. `name = value;` assigns to it.
+* *Reading.* `cart.<field>` reads the cart, and `<loop variable>.<field>` reads
+  the row a `for` is on.
+* *Control.* `if ... { } else if ... { } else { }`, and `for row in list { }`
+  over one of the target's lists. Lists are only walked by `for`, so every loop
+  ends.
+* *Output.* `emit <operation>(arguments);` records one of the target's
+  operations. `return;` stops the function.
+* *Comments* start with `#` and run to the end of the line.
+
+Limits keep a function cheap to run:
+
+[cols="2,1",options="header"]
+|===
+| Limit | Value
+| Source length | 16,000 characters
+| A string literal | 500 characters
+| A number literal | 10^15^
+| Nesting | 24 levels
+| Locals | 64
+| Compiled program | 8,192 code words (an opcode and its operands)
+| Instructions run (fuel) | 50,000 per run
+| Operations emitted | 64 per run
+|===
+
+A function that fails, whether out of fuel, over the output limit, an
+arithmetic error or a remote that doesn't answer, is recorded as its last
+error and its whole output is dropped, so checkout goes on as it would without
+it.
+
+[[extending-bazaar-remote-functions]]
+==== Remote functions
+
+A remote function is uploaded with an `https` `url` instead of a `source`. On
+each quote Bazaar posts it the same record a script reads, as JSON: `target`,
+`cart`, and each of the target's lists as an array of objects. The request
+carries `X-Bazaar-Function` (the function's id), `X-Bazaar-Function-Target` and
+an `X-Bazaar-Signature` made as a webhook's is. The answer lists operations:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-remote-answer,indent=0]
+----
+
+The answer is checked against the target exactly as a script's emits are. It
+must arrive within 800 milliseconds and be at most 64 KB. Answers are cached for
+a minute by a hash of what was sent, so the same cart quoted twice asks once.
+
+[[extending-bazaar-ui]]
+=== UI extensions
+
+An app adds to the merchant app, the storefront and checkout by uploading
+extensions with `write_extensions`:
+
+[cols="2,3",options="header"]
+|===
+| Route | Does
+| `GET extensions` | The app's extensions in this store
+| `POST extensions` | Uploads `{target, title, place, tree, dataUrl, actionUrl}`
+| `DELETE extensions/{extensionId}` | Removes one
+| `POST app-proxy` | Sets `{subpath, url}`: `/s/{handle}/apps/{subpath}` forwards there
+| `DELETE app-proxy` | Removes the proxy
+|===
+
+A tree that doesn't validate answers 400 naming what's wrong. Extensions
+belong to the installation that uploaded them and are deleted when the app is
+removed.
+
+[[extending-bazaar-targets]]
+==== Targets
+
+[cols="1,3",options="header"]
+|===
+| Target | Where it shows
+| `admin.product.block`, `admin.order.block`, `admin.customer.block` | A block on that page of the merchant app
+| `admin.product.action`, `admin.order.action`, `admin.customer.action` | A single button on that page, posted to the app
+| `storefront.block` | A storefront `place`: `product-below-price`, `cart-below-total` or `checkout-thank-you`
+| `checkout.block` | Checkout, where it may ask for fields
+|===
+
+An action target is a single button with an action. A storefront block has no
+fields and no actions, since its page is shared and cached. A checkout block has
+no actions.
+
+[[extending-bazaar-blocks]]
+==== The block vocabulary
+
+A tree is JSON over a fixed set of nodes:
+
+[cols="1,3",options="header"]
+|===
+| Node | Properties
+| `text` | `text`, `tone`
+| `heading` | `text`
+| `badge` | `text`, `tone`
+| `button` | `label` and exactly one of `url` (a link) or `action` (posted to the app)
+| `image` | `src`, `alt`
+| `list` | `items`, an array of strings
+| `field` | `key`, `label`, `kind` (`text`, `number`, `checkbox`, `select`), `options`, `required`
+| `divider` | nothing
+| `stack` | `direction` (`vertical`, `horizontal`), `children`
+|===
+
+A `tone` is `subdued`, `success`, `warning` or `critical`. Validation is strict:
+an unknown node or property, a tree deeper than 6 or larger than 80 nodes, or a
+URL that isn't a plain `https` address is refused, never dropped. A key, an
+action or a proxy path is 1 to 40 of `a-z`, `0-9`, `-` and `_`.
+
+[[extending-bazaar-block-data]]
+==== Block data and actions
+
+Text may carry `{{key}}` placeholders, and the block's `dataUrl` fills them. An
+admin product block from the sample app:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-admin-block,indent=0]
+----
+
+When the merchant opens a product, Bazaar's server posts to the data URL with
+the store, the resource and a `timestamp` in epoch milliseconds, so the app can
+refuse a replayed call. The call is signed as a webhook is. The answer carries
+the values, at most 50 of them, each cut to 200 characters:
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-block-data,indent=0]
+----
+
+The data call has a short timeout (800 milliseconds) and its answer is cached
+for 30 seconds. A block whose app doesn't answer shows without its data and
+says so. A value replaces its placeholder as text, never as markup.
+
+Pressing a button with an `action` makes the server post to the `actionUrl`,
+signed the same way, with the `action` and the product, order or customer it
+was pressed on. The app has three seconds to answer, and the merchant app shows
+the answer's `message`, cut to 300 characters.
+
+[[extending-bazaar-app-pages]]
+==== App pages and session tokens
+
+An app's own admin page, its registered `appUrl`, opens inside the merchant
+app. Bazaar appends `?shop=<storeId>&session=<token>`. The token is a JWT signed
+with HS256, keyed with the UTF-8 bytes of the app's signing key. Accept it only
+when:
+
+. the signature verifies, compared in constant time;
+. `exp`, in seconds since the epoch, is in the future (a token lives five
+  minutes, so a page should exchange it for a session of its own at once);
+. `aud` is the app's own client id, so a token minted for another app is
+  useless here;
+. `iss` is `bazaar`.
+
+`dest` is the store id and `sub` the merchant the page acts for. `jti` is
+unique per token, for a page that refuses a token it already saw. The sample
+app's `Signatures.session` makes these checks.
+
+[[extending-bazaar-storefront]]
+==== Storefront blocks and the app proxy
+
+A storefront block goes in one of the places listed above:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-storefront-block,indent=0]
+----
+
+The app proxy puts the app's own pages on the store's address. With the proxy
+set, a request for `/s/{handle}/apps/{subpath}/...` is fetched from the app's
+URL and answered on the store's address:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-proxy,indent=0]
+----
+
+The forwarded request is a GET with the shopper's query plus `shop` (the
+store's handle), `path_prefix` (`/apps/<subpath>`), `timestamp` (epoch
+seconds) and `signature`. No cookie or authorization header of the shopper's is
+passed on, and of the app's headers only the content type comes back. The
+answer must arrive within three seconds, be at most 256 KB and be HTML, plain
+text or JSON; anything else answers 502. HTML is served under a sandbox policy,
+so an app's page runs no script with the store's origin.
+
+To check the signature, take every parameter except `signature`, decoded, sort
+them by name, join them as `name=value` with `&`, and compare `signature` with
+the hex HMAC-SHA256 of that text, keyed with the signing key, in constant time.
+Refuse a `timestamp` more than five minutes old. The sample app's
+`Signatures.proxy` makes these checks.
+
+[[extending-bazaar-checkout-fields]]
+==== Checkout fields
+
+A `checkout.block` may ask the shopper for fields:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-checkout-field,indent=0]
+----
+
+The answers are checked by kind (a number field takes a decimal number, a checked box answers `yes` and an
+unchecked one nothing, a select takes one of its options, and text takes at most
+500 characters)
+and kept on the order beside the store's own checkout questions. They're in
+the order's `fields`, each with the id `app:<extensionId>:<key>`, and its label
+names the app so the merchant knows whose question it was.
+
+[[extending-bazaar-directory]]
+=== The app directory and reviews
+
+A developer submits one listing per app with `POST
+/api/developer/apps/{appId}/listing`: a `name`, `tagline`,
+`description`, a `category`, an icon, up to five `screenshots`, `pricing`, and
+the `supportUrl`, `privacyUrl` and `installUrl`. The categories are
+`marketing`, `sales`, `shipping`, `inventory`, `customer-service`, `analytics`,
+`finance` and `productivity`. The listing's `handle`, its address in the
+directory, is made from the name.
+
+A listing waits as `PENDING` until a platform admin approves it, rejects it with
+a reason, or, once approved, delists it with one. Resubmitting puts it back in
+the queue, so a changed listing is off the directory until it has been looked
+at again. Only `APPROVED` listings are shown, at `/apps` on the web and in the
+merchant app, best rated first.
+
+A store may review an app it has, or once had, installed: one review per store,
+rated 1 to 5, which writing again replaces. A platform admin may hide a review,
+and the average rating counts visible reviews only.
+
+[[extending-bazaar-billing]]
+=== Billing
+
+An app asks the store for a charge with its token:
+
+[source,text]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-charge,indent=0]
+----
+
+`kind` is `ONE_TIME` or `RECURRING` (every 30 days), and only a recurring charge
+may have `trialDays`. The answer is the charge, `PENDING`, with a `confirmUrl` to
+send the owner to. The owner approves or declines it there or in the merchant
+app. Deciding on the web page sends the browser to the `returnUrl` with
+`charge_id` and `status`. An approved charge is `ACTIVE`, and
+the platform owes the developer for it at once for a one-time charge, or when
+the trial ends for a recurring one. Removing the app cancels its pending and
+recurring charges. Each change of status is sent to the app as
+`app_subscriptions/update`. `GET app-charges` lists the app's charges in the
+store.
+
+[[extending-bazaar-sample-app]]
+=== Walkthrough: Restock Alerts
+
+Restock Alerts lets shoppers leave their e-mail address on a sold-out product,
+and lets the merchant tell them all at once when it's back. It's three
+classes in `scripts/bazaar/sample-app`. `RestockAlerts` is the app,
+`RestockEndpoints` puts it on the web, and `Signatures` holds the three checks
+described above. It reaches Bazaar only through the public HTTP API, and it
+believes nothing Bazaar sends until the signature checks. To keep the sample
+short it keeps its state in memory; a real app keeps tokens, encrypted, and its
+subscribers in a database. `RestockAppE2ETest` in the backend's tests installs
+it in a store and drives every step below.
+
+*Credentials.* The app is registered with the request shown in
+<<extending-bazaar-register>>, and reads the client id and secret from
+`restock.client-id` and `restock.client-secret`. `useCredentials` derives the
+signing key from the secret once.
+
+*Install.* `installUrl` makes a fresh `state` and PKCE verifier, remembers them,
+and answers the consent address with the challenge. `completeInstall` takes the
+`code` and `state` Bazaar sent back, refuses a state it doesn't know or has
+already used, trades the code and the verifier for a token at
+`/api/apps/oauth/token`, and keeps the token. It asks for `read_inventory`,
+`write_extensions` and `write_functions` (`RestockAlerts.SCOPES`).
+
+*Set up.* Every API call goes through one method that sends the token and pins
+`X-Bazaar-Api-Version: 2026-10`. Right after installing, `setUp` makes six
+calls, each shown earlier in this chapter: it subscribes to `inventory/low`,
+uploads the admin product block with its data and action URLs, the storefront
+block below the price, and the checkout field, claims the proxy path
+`restock`, and uploads the `Fair share` validation function. The privacy topics
+and `app/uninstalled` need no subscription.
+
+*Serve.* `webhook` verifies the signature first and answers 401 when it fails.
+On `inventory/low` it records the variant. On `app/uninstalled` it forgets the
+token, which is already revoked. On `shop/redact` it deletes everything about
+the store. It keeps no Bazaar customer ids, so on `customers/data_request` and
+`customers/redact` it has nothing to hand over or erase, and records that it
+was asked. `blockData` answers the number of shoppers waiting for the product
+the merchant is looking at. `blockAction` handles `notify`: it e-mails everyone
+waiting for that product, once, and answers how many it told. `proxyPage` serves
+the signup form under `/s/{store}/apps/restock` and its submission under
+`.../join`. The form posts back through the store, so the submission is signed
+again. `adminPage` checks the session token and shows the store's counts.
+
+*Leave.* When the owner removes the app, `app/uninstalled` arrives at once and
+`shop/redact` two days later, and the app has nothing left about the store.

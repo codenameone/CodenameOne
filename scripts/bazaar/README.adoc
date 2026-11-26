@@ -14,7 +14,7 @@ together.
 
 == Start here
 
-Two chapters of the developer guide cover this project:
+Three chapters of the developer guide cover this project:
 
 * https://www.codenameone.com/developer-guide/#bazaar-users-guide[The user's guide]
   (link:../../docs/developer-guide/Bazaar-Users-Guide.asciidoc[source]) shows the
@@ -25,6 +25,10 @@ Two chapters of the developer guide cover this project:
   explains how the project is built: the inventory ledger, payments held and
   captured, the offline register, webhooks, automations, documents and the
   server-rendered storefront, and what to replace before it takes real orders.
+* https://www.codenameone.com/developer-guide/#extending-bazaar[Extending Bazaar with apps]
+  (link:../../docs/developer-guide/Extending-Bazaar.asciidoc[source]) is for
+  developers of third-party apps: the install flow, scopes, the API, webhooks,
+  checkout functions, UI extensions, billing and the Restock Alerts sample app.
 
 To see it running first, the two commands under <<Running it>> are all it takes.
 

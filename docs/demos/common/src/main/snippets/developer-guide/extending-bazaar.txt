@@ -1,0 +1,140 @@
+// Snippets of the Extending Bazaar chapter of the developer guide. Edit them here, not inline.
+// Each one is copied from the code that sends or accepts it: the Restock
+// Alerts sample app (scripts/bazaar/sample-app) and the backend's tests.
+
+// tag::extending-bazaar-register[]
+POST /api/developer/apps
+{"name": "Restock Alerts", "description": "Tell shoppers when sold-out items return",
+ "appUrl": "https://restock.example/restock/admin",
+ "webhookUrl": "https://restock.example/restock/webhooks",
+ "redirectUris": ["https://restock.example/restock/callback"],
+ "scopes": ["read_inventory", "write_extensions", "write_functions"],
+ "status": "LISTED"}
+// end::extending-bazaar-register[]
+
+// tag::extending-bazaar-consent-url[]
+https://bazaar.example/account/apps/authorize?store=<storeId>
+    &client_id=<clientId>
+    &scope=read_inventory write_extensions write_functions
+    &redirect_uri=https://restock.example/restock/callback
+    &state=<random>
+    &code_challenge=<S256 challenge of the verifier>
+    &code_challenge_method=S256
+// end::extending-bazaar-consent-url[]
+
+// tag::extending-bazaar-token[]
+POST /api/apps/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&client_id=<clientId>&client_secret=<secret>
+&code=<code>&code_verifier=<verifier>
+&redirect_uri=https://restock.example/restock/callback
+// end::extending-bazaar-token[]
+
+// tag::extending-bazaar-api-call[]
+GET /api/v1/stores/<storeId>/products
+Authorization: Bearer bzk_app_...
+X-Bazaar-Api-Version: 2026-10
+// end::extending-bazaar-api-call[]
+
+// tag::extending-bazaar-graphql-read[]
+{ products(first: 5) { id title variants { sku priceCents } } }
+// end::extending-bazaar-graphql-read[]
+
+// tag::extending-bazaar-graphql-mutation[]
+mutation($p: ProductInput!) { p: productCreate(input: $p) { id title } }
+
+mutation { inventoryAdjust(input: {variantId: "<variantId>",
+    locationId: "<locationId>", delta: 5}) { available } }
+
+mutation { discountCreate(input: {code: "APP10", title: "Ten",
+    kind: "PERCENT", amount: 10, active: true}) { id code } }
+// end::extending-bazaar-graphql-mutation[]
+
+// tag::extending-bazaar-webhook-subscribe[]
+POST /api/v1/stores/<storeId>/webhooks
+{"topic": "inventory/low", "url": "https://restock.example/restock/webhooks"}
+// end::extending-bazaar-webhook-subscribe[]
+
+// tag::extending-bazaar-metafields[]
+POST /api/v1/stores/<storeId>/metafield-definitions
+{"ownerKind": "PRODUCT", "key": "rating", "name": "Rating",
+ "type": "text", "storefront": false}
+
+PUT /api/v1/stores/<storeId>/metafields
+{"defId": "<definition id>", "ownerId": "<productId>", "value": "five"}
+
+GET /api/v1/stores/<storeId>/metafields?ownerKind=PRODUCT&ownerId=<productId>
+// end::extending-bazaar-metafields[]
+
+// tag::extending-bazaar-function-discount[]
+for line in lines {
+  if line.quantity >= 2 { emit line_discount(line.index, line.total / 4, "Pair deal"); }
+}
+if cart.quantity >= 3 { emit discount(100, "Three and up"); }
+// end::extending-bazaar-function-discount[]
+
+// tag::extending-bazaar-function-shipping[]
+for r in rates {
+  if r.name == "Express" { emit rename(r.id, "Rocket"); emit reprice(r.id, 1); emit move(r.id, 0); }
+  else { emit hide(r.id); }
+}
+// end::extending-bazaar-function-shipping[]
+
+// tag::extending-bazaar-function-payment[]
+for m in methods {
+  if m.type == "card" && cart.subtotal >= 2000 { emit hide(m.type); }
+  if m.type == "affirm" { emit move(m.type, 0); }
+}
+// end::extending-bazaar-function-payment[]
+
+// tag::extending-bazaar-function-upload[]
+POST /api/v1/stores/<storeId>/functions
+{"name": "Fair share", "target": "validation",
+ "source": "for l in lines {\n  if l.quantity > 5 { emit error(\"At most five of each item while stock is short\"); }\n}"}
+// end::extending-bazaar-function-upload[]
+
+// tag::extending-bazaar-remote-answer[]
+{"ops": [{"op": "hide", "args": ["rate-id"]}]}
+// end::extending-bazaar-remote-answer[]
+
+// tag::extending-bazaar-admin-block[]
+POST /api/v1/stores/<storeId>/extensions
+{"target": "admin.product.block", "title": "Restock Alerts",
+ "tree": {"type": "stack", "children": [
+   {"type": "text", "text": "Subscribers waiting: {{waiting}}"},
+   {"type": "button", "label": "Notify now", "action": "notify"}]},
+ "dataUrl": "https://restock.example/restock/blocks/data",
+ "actionUrl": "https://restock.example/restock/blocks/action"}
+// end::extending-bazaar-admin-block[]
+
+// tag::extending-bazaar-block-data[]
+{"values": {"waiting": "3"}}
+// end::extending-bazaar-block-data[]
+
+// tag::extending-bazaar-storefront-block[]
+POST /api/v1/stores/<storeId>/extensions
+{"target": "storefront.block", "place": "product-below-price",
+ "title": "Restock Alerts",
+ "tree": {"type": "stack", "children": [
+   {"type": "heading", "text": "Notify me when back in stock"},
+   {"type": "text", "text": "Sold out? Leave your e-mail at /apps/restock and we will tell you."}]}}
+// end::extending-bazaar-storefront-block[]
+
+// tag::extending-bazaar-checkout-field[]
+POST /api/v1/stores/<storeId>/extensions
+{"target": "checkout.block", "title": "Restock Alerts",
+ "tree": {"type": "field", "key": "alerts",
+          "label": "E-mail me when sold-out items return", "kind": "checkbox"}}
+// end::extending-bazaar-checkout-field[]
+
+// tag::extending-bazaar-proxy[]
+POST /api/v1/stores/<storeId>/app-proxy
+{"subpath": "restock", "url": "https://restock.example/restock/proxy/<storeId>"}
+// end::extending-bazaar-proxy[]
+
+// tag::extending-bazaar-charge[]
+POST /api/v1/stores/<storeId>/app-charges
+{"name": "Pro plan", "kind": "RECURRING", "amount": 999,
+ "currency": "USD", "trialDays": 14, "returnUrl": "https://app.example/b"}
+// end::extending-bazaar-charge[]
