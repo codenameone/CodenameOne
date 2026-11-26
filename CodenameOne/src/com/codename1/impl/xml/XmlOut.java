@@ -150,8 +150,12 @@ public final class XmlOut {
         return true;
     }
 
-    /// Writes ` name="value"`.
+    /// Writes ` name="value"`, or nothing when the value is null, so an optional attribute
+    /// is simply absent.
     public XmlOut attr(String name, String value) throws IOException {
+        if (value == null) {
+            return this;
+        }
         put(' ');
         raw(name);
         raw("=\"");

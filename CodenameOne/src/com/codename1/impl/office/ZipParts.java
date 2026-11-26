@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.wordprocessing;
+package com.codename1.impl.office;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,22 +35,35 @@ import java.util.zip.ZipInputStream;
 /// The parts of a package can come in any order -- Word writes the body before the styles it
 /// uses -- so a reader needs them all before it can interpret any. A compressed entry can
 /// unpack to a thousand times its size, so both the total and the number of entries are capped.
-final class ZipParts {
+public final class ZipParts {
     /// The most bytes a package may unpack to: every part is held in memory at once, and
     /// buffering one briefly needs twice its size, so this has to fit a phone.
-    static final long MAX_TOTAL = 64L * 1024 * 1024;
+    public static final long MAX_TOTAL = 64L * 1024 * 1024;
 
     /// The most entries a package may have.
-    static final int MAX_ENTRIES = 20000;
+    public static final int MAX_ENTRIES = 20000;
 
     private ZipParts() {
     }
 
-    /// Reads every file entry. Names lose a leading slash.
-    static Map<String, byte[]> read(InputStream in, String kind) throws IOException {
+    /// Reads every file entry under the `MAX_TOTAL` budget. Names lose a leading slash.
+    public static Map<String, byte[]> read(InputStream in, String kind) throws IOException {
+        return read(in, kind, MAX_TOTAL);
+    }
+
+    /// Reads every file entry under a budget of the caller's own, for a format whose
+    /// packages legitimately carry more, such as design files full of bitmaps. Names lose a
+    /// leading slash.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the package
+    /// - `kind`: what the package is, for error messages
+    /// - `maxTotal`: the most bytes the entries may unpack to, together
+    public static Map<String, byte[]> read(InputStream in, String kind, long maxTotal) throws IOException {
         ZipInputStream zip = new ZipInputStream(in);
         Map<String, byte[]> parts = new HashMap<String, byte[]>();
-        long left = MAX_TOTAL;
+        long left = maxTotal;
         int entries = 0;
         byte[] buffer = new byte[8192];
         try {
@@ -70,7 +83,7 @@ final class ZipParts {
                 for (int n = zip.read(buffer); n > 0; n = zip.read(buffer)) {
                     left -= n;
                     if (left < 0) {
-                        throw new IOException("The " + kind + " unpacks to more than " + MAX_TOTAL
+                        throw new IOException("The " + kind + " unpacks to more than " + maxTotal
                                 + " bytes");
                     }
                     out.write(buffer, 0, n);
@@ -96,7 +109,7 @@ final class ZipParts {
     }
 
     /// Resolves a relationship target against the directory of the part that names it.
-    static String resolve(String base, String target) {
+    public static String resolve(String base, String target) {
         if (target.startsWith("/")) {
             return target.substring(1);
         }

@@ -30,6 +30,10 @@ import java.io.InputStream;
 /// Opens a graphics document in whichever format it is: PSD or PSB, SVG, Sketch, `.cn1gfx`,
 /// or Figma REST API JSON. The format is found from the bytes, not the name.
 public final class ArtFormats {
+    // A Sketch or .cn1gfx package carries its bitmaps whole, so it gets four times the
+    // budget of an office package; ZipParts still caps the entry count the same way.
+    static final long MAX_PACKAGE_BYTES = 256L * 1024 * 1024;
+
     /// The largest file read.
     public static final int MAX_BYTES = 512 * 1024 * 1024;
 

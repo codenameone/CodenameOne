@@ -105,7 +105,7 @@ public final class NativeFormat {
 
     private static ArtDocument readParts(InputStream in) throws IOException {
         NativeFormat f = new NativeFormat();
-        f.parts = ArtZip.read(in, "cn1gfx file");
+        f.parts = com.codename1.impl.office.ZipParts.read(in, "cn1gfx file", ArtFormats.MAX_PACKAGE_BYTES);
         byte[] json = f.parts.get(ENTRY);
         if (json == null) {
             throw new IOException("Not a cn1gfx file: document.json is missing");

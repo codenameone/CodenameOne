@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.impl.office.ZipParts;
 import com.codename1.impl.xml.XmlScanner;
 
 import java.io.ByteArrayInputStream;

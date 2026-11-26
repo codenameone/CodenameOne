@@ -3557,6 +3557,23 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-25T01:01:09+00:00"
+      },
+      "devto": {
+        "id": 5117006,
+        "url": "https://dev.to/codenameone/windows-kiosks-and-command-line-tools-built-from-java-4mpb",
+        "syndicated_at": "2026-11-25T14:18:58+00:00"
+      }
+    },
+    "run-an-llm-on-the-phone": {
+      "hashnode": {
+        "url": "https://debugagent.com/run-an-llm-and-whisper-on-the-phone-with-no-server-bill",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b0784a04d0d3c774004f446",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-26T01:01:11+00:00"
       }
     }
   }

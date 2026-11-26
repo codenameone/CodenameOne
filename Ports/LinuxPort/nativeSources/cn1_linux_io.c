@@ -36,6 +36,11 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
+#include <locale.h>
+#include <langinfo.h>
+
+/* Decodes UTF-8; newStringFromCString widens each byte, which garbles non-ASCII text. */
+extern JAVA_OBJECT newStringFromUtf8Len(CODENAME_ONE_THREAD_STATE, const char* text, int length);
 #include <fcntl.h>
 #include <sys/file.h>
 #include <dirent.h>
@@ -490,7 +495,50 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_formatLocalTime___long_int_R_ja
             buf[0] = 0;
         }
     }
-    return newStringFromCString(threadStateData, buf);
+    /* A month name is not ASCII in most languages (fevrier, Maerz in their own letters). */
+    return newStringFromUtf8Len(threadStateData, buf, (int) strlen(buf));
+}
+
+/*
+ * The monetary conventions of the locale the environment names (LANG, LC_ALL,
+ * LC_MONETARY), as six lines: decimal separator, grouping separator, local symbol,
+ * ISO 4217 code, 1 when the symbol precedes the amount, 1 when a space separates them.
+ *
+ * The locale is opened here rather than read from the process: the embedded target
+ * has no GTK, so nothing ever calls setlocale(LC_ALL, ""), and a desktop process may
+ * have changed LC_NUMERIC for its own parsing. uselocale() is per thread, so the
+ * switch is invisible to every other thread. A minimal image without the locale's
+ * data makes newlocale fail; the empty conventions of the C locale have no decimal
+ * separator. Either way Java keeps its table-driven formatting.
+ */
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_localeCurrency___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    char buf[512];
+    locale_t loc = newlocale(LC_CTYPE_MASK | LC_MONETARY_MASK, "", (locale_t) 0);
+    locale_t previous;
+    struct lconv* lc;
+    const char* codeset;
+    if (loc == (locale_t) 0) {
+        return JAVA_NULL;
+    }
+    /* The symbols are in the locale's own encoding; only UTF-8 can be decoded here. A
+     * legacy ISO-8859 locale keeps the table-driven formatting rather than mojibake. */
+    codeset = nl_langinfo_l(CODESET, loc);
+    if (codeset == 0 || (strcmp(codeset, "UTF-8") != 0 && strcmp(codeset, "utf8") != 0)) {
+        freelocale(loc);
+        return JAVA_NULL;
+    }
+    previous = uselocale(loc);
+    lc = localeconv();
+    snprintf(buf, sizeof(buf), "%s\n%s\n%s\n%s\n%d\n%d",
+             lc->mon_decimal_point ? lc->mon_decimal_point : "",
+             lc->mon_thousands_sep ? lc->mon_thousands_sep : "",
+             lc->currency_symbol ? lc->currency_symbol : "",
+             lc->int_curr_symbol ? lc->int_curr_symbol : "",
+             lc->p_cs_precedes == 1 ? 1 : 0,
+             lc->p_sep_by_space == 1 ? 1 : 0);
+    uselocale(previous);
+    freelocale(loc);
+    return newStringFromUtf8Len(threadStateData, buf, (int) strlen(buf));
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_executableDir___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {

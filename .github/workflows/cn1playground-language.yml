@@ -68,7 +68,11 @@ jobs:
       # installed into the local Maven repo before the smoke build resolves
       # them. Mirrors the website build's bootstrap.
       - name: Bootstrap local Codename One snapshots
-        run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
+        # -e: the 2026-11-25 nightly died four times on "Could not acquire
+        # lock(s)" and -q left nothing naming the artifact or module that held
+        # it; it did not reproduce on a dispatched run. -e keeps the log quiet
+        # and makes the next occurrence print the stack trace that does.
+        run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -e -DskipTests
 
       - name: Run playground language smoke tests
         run: |

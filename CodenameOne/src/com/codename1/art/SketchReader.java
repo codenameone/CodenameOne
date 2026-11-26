@@ -65,7 +65,7 @@ public final class SketchReader {
     /// - `in`: the file; read to its end, not closed
     public static ArtDocument read(InputStream in) throws IOException {
         try {
-            return new SketchReader().parse(ArtZip.read(in, "Sketch file"));
+            return new SketchReader().parse(com.codename1.impl.office.ZipParts.read(in, "Sketch file", ArtFormats.MAX_PACKAGE_BYTES));
         } catch (RuntimeException e) {
             throw ArtFormats.damaged(e);
         }

@@ -21631,6 +21631,34 @@ public class JavaSEPort extends CodenameOneImplementation {
                     return dd.format(d);
                 }
                 
+                @Override
+                public String formatCurrency(double amount, String currencyCode) {
+                    java.util.Currency c = java.util.Currency.getInstance(currencyCode);
+                    NumberFormat f = NumberFormat.getCurrencyInstance();
+                    f.setCurrency(c);
+                    int digits = c.getDefaultFractionDigits();
+                    if (digits >= 0) {
+                        f.setMinimumFractionDigits(digits);
+                        f.setMaximumFractionDigits(digits);
+                    }
+                    return f.format(amount);
+                }
+
+                @Override
+                public String getCurrencySymbol(String currencyCode) {
+                    return java.util.Currency.getInstance(currencyCode).getSymbol();
+                }
+
+                @Override
+                public String getCurrencyCode() {
+                    try {
+                        java.util.Currency c = java.util.Currency.getInstance(Locale.getDefault());
+                        return c == null ? null : c.getCurrencyCode();
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                }
+
                 public String getCurrencySymbol() {
                     return NumberFormat.getInstance().getCurrency().getSymbol();
                 }

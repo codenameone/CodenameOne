@@ -523,6 +523,18 @@
       ]
     },
     {
+      "id": "presentations",
+      "category": "Rich components",
+      "name": "Presentations",
+      "description": "Checks slides painted by the slide renderer: preset shapes with gradients and dashed outlines, column, line, doughnut and stacked area charts, a process and an organisation chart laid out by the graph package, a table, the slide editor with a selected shape and its handles, and filmstrips of a push and a zoom transition and of builds that zoom, fly, fade and wipe in.",
+      "tests": [
+        "SlideBuildAnimationScreenshotTest",
+        "SlideCapabilitiesScreenshotTest",
+        "SlideEditorScreenshotTest",
+        "SlideTransitionAnimationScreenshotTest"
+      ]
+    },
+    {
       "id": "spreadsheet",
       "category": "Rich components",
       "name": "Spreadsheet files and formulas",
@@ -623,6 +635,8 @@
         "AppReviewDialogScreenshotTest",
         "CenteredDialogTitleScreenshotTest",
         "CenteredInteractionDialogTitleScreenshotTest",
+        "CoachMarksScreenshotTest",
+        "LoadingPlaceholdersScreenshotTest",
         "DialogThemeScreenshotTest",
         "FloatingActionButtonThemeScreenshotTest",
         "SpanLabelThemeScreenshotTest"
@@ -843,6 +857,15 @@
       "description": "Checks that text, HTML, image and file representations survive a copy/paste round trip through the system clipboard.",
       "tests": [
         "ClipboardRoundTripTest"
+      ]
+    },
+    {
+      "id": "currency",
+      "category": "Application runtime",
+      "name": "Currencies",
+      "description": "ISO 4217 currencies through java.util.Currency, and amounts formatted in any currency for the user's locale.",
+      "tests": [
+        "CurrencyApiTest"
       ]
     },
     {
@@ -1585,6 +1608,22 @@
       "test": "Chart2ZoomAnimationScreenshotTest"
     },
     {
+      "pattern": "SlideCapabilities*",
+      "test": "SlideCapabilitiesScreenshotTest"
+    },
+    {
+      "pattern": "SlideEditor*",
+      "test": "SlideEditorScreenshotTest"
+    },
+    {
+      "pattern": "SlideTransitionAnimationScreenshotTest*",
+      "test": "SlideTransitionAnimationScreenshotTest"
+    },
+    {
+      "pattern": "SlideBuildAnimationScreenshotTest*",
+      "test": "SlideBuildAnimationScreenshotTest"
+    },
+    {
       "pattern": "chart2-bar-styles",
       "test": "Chart2BarStylesScreenshotTest"
     },
@@ -1835,6 +1874,14 @@
     {
       "pattern": "CenteredInteractionDialogTitle*",
       "test": "CenteredInteractionDialogTitleScreenshotTest"
+    },
+    {
+      "pattern": "CoachMarks*",
+      "test": "CoachMarksScreenshotTest"
+    },
+    {
+      "pattern": "LoadingPlaceholders*",
+      "test": "LoadingPlaceholdersScreenshotTest"
     },
     {
       "pattern": "AppReviewDialog",

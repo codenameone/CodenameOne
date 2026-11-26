@@ -155,6 +155,24 @@ final class BuildHintsAndroid {
                 .def("exit")
                 .platform("android"));
 
+        h.add(new Hint("android.debugGuard")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android"));
+
+        h.add(new Hint("android.debugGuard.checks")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("debugger")
+                .platform("android"));
+
+        h.add(new Hint("android.debugGuard.mode")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("exit")
+                .platform("android"));
+
         h.add(new Hint("android.activityClassBody")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)

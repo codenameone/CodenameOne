@@ -14705,6 +14705,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return dd.format(d);
                 }
 
+                @Override
+                public String formatCurrency(double amount, String currencyCode) {
+                    java.util.Currency c = java.util.Currency.getInstance(currencyCode);
+                    NumberFormat f = NumberFormat.getCurrencyInstance();
+                    f.setCurrency(c);
+                    int digits = c.getDefaultFractionDigits();
+                    if (digits >= 0) {
+                        f.setMinimumFractionDigits(digits);
+                        f.setMaximumFractionDigits(digits);
+                    }
+                    return f.format(amount);
+                }
+
+                @Override
+                public String getCurrencySymbol(String currencyCode) {
+                    return java.util.Currency.getInstance(currencyCode).getSymbol();
+                }
+
+                @Override
+                public String getCurrencyCode() {
+                    try {
+                        java.util.Currency c = java.util.Currency.getInstance(Locale.getDefault());
+                        return c == null ? null : c.getCurrencyCode();
+                    } catch (IllegalArgumentException e) {
+                        return null;
+                    }
+                }
+
                 public String getCurrencySymbol() {
                     return NumberFormat.getInstance().getCurrency().getSymbol();
                 }
@@ -18798,7 +18826,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean isDeviceCompromised() {
-        return getCompromiseReasons().length > 0;
+        // Developer Options and USB debugging are switched on by plenty of ordinary users and
+        // say nothing about tampering on their own; counting them would make every app that
+        // gates on this method refuse those users. They stay visible in getCompromiseReasons().
+        String[] reasons = getCompromiseReasons();
+        for (int i = 0; i < reasons.length; i++) {
+            if (!"developerOptions".equals(reasons[i]) && !"usbDebugging".equals(reasons[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -18885,18 +18922,34 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String[] getCompromiseReasons() {
         java.util.ArrayList<String> reasons = new java.util.ArrayList<String>();
-        if(isRootedViaRootBeer() || isJailbrokenDevice()) {
+        if(isRootedViaRootBeer() || isJailbrokenDevice()
+                || DebugEnvironmentDetector.isRootHidingDetected(getContext())) {
             reasons.add("root");
         }
+        // "frida" covers any hooking or instrumentation framework, as it does on iOS, so the
+        // Xposed family reports under the same reason.
+        boolean instrumented = DebugEnvironmentDetector.isHookFrameworkDetected();
         try {
-            if(FridaDetectionUtil.isFridaDetected()) {
-                reasons.add("frida");
-            }
+            instrumented = instrumented || FridaDetectionUtil.isFridaDetected();
         } catch(Throwable t) {
             // detection must never crash the host app
         }
+        if(instrumented) {
+            reasons.add("frida");
+        }
         if(isProbablyEmulator()) {
             reasons.add("emulator");
+        }
+        if(DebugEnvironmentDetector.isDebuggerAttached()) {
+            reasons.add("debugger");
+        }
+        // Device posture, not compromise: reported so an app can apply its own policy, but
+        // left out of isDeviceCompromised() (see there).
+        if(DebugEnvironmentDetector.isDeveloperOptionsEnabled(getContext())) {
+            reasons.add("developerOptions");
+        }
+        if(DebugEnvironmentDetector.isUsbDebuggingEnabled(getContext())) {
+            reasons.add("usbDebugging");
         }
         return reasons.toArray(new String[reasons.size()]);
     }

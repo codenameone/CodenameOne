@@ -547,6 +547,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DocumentFormatsScreenshotTest(),
             new DocumentLayoutScreenshotTest(),
             new DocumentPagesScreenshotTest(),
+            new SlideCapabilitiesScreenshotTest(),
+            new SlideEditorScreenshotTest(),
+            new SlideTransitionAnimationScreenshotTest(),
+            new SlideBuildAnimationScreenshotTest(),
             new TreeGridThemeScreenshotTest(),
             new NodeGraphThemeScreenshotTest(),
             new FlowChartThemeScreenshotTest(),
@@ -562,6 +566,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DialogThemeScreenshotTest(),
             new CenteredDialogTitleScreenshotTest(),
             new CenteredInteractionDialogTitleScreenshotTest(),
+            new LoadingPlaceholdersScreenshotTest(),
+            new CoachMarksScreenshotTest(),
             new AppReviewDialogScreenshotTest(),
             new FloatingActionButtonThemeScreenshotTest(),
             new SpanLabelThemeScreenshotTest(),
@@ -709,6 +715,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingToStringTest(),
             new StringFormatTest(),
             new ClipboardRoundTripTest(),
+            new CurrencyApiTest(),
             // The app's networking APIs against the CI's own backend
             // (scripts/hellocodenameone/backend), served by the same process that
             // receives these screenshots: Rest, the generated @RestClient,

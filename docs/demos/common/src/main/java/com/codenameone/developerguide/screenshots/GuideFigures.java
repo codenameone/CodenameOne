@@ -44,7 +44,8 @@ public final class GuideFigures {
         FigureVariant[] charts = ChartFigures.variants();
         FigureVariant[] secureKeyboard = SecureKeyboardFigures.variants();
         FigureVariant[] art = ArtFigures.variants();
-        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban, charts, secureKeyboard, art};
+        FigureVariant[] slides = PresentationFigures.variants();
+        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban, charts, secureKeyboard, art, slides};
         int count = 0;
         for (FigureVariant[] part : parts) {
             count += part.length;
@@ -122,6 +123,10 @@ public final class GuideFigures {
             new FigureVariant(new ComponentsDialogBlurFigure(), FigureDevice.ANDROID, false, "components-dialog-blur.png"),
             new FigureVariant(new ComponentsDialogBlurNoTintFigure(), FigureDevice.ANDROID, false, "components-dialog-blur-no-tint.png"),
             new FigureVariant(new ComponentsInteractionDialogFigure(), FigureDevice.ANDROID, false, "components-interaction-dialog.png"),
+            new FigureVariant(new ComponentsCoachMarksFigure(), FigureDevice.ANDROID, false, "components-coach-marks.png"),
+            new FigureVariant(new ComponentsSkeletonFigure(), FigureDevice.ANDROID, false, "components-skeleton.png"),
+            new FigureVariant(new ComponentsEmptyStateFigure(), FigureDevice.ANDROID, false, "components-empty-state.png"),
+            new FigureVariant(new ComponentsCarouselFigure(), FigureDevice.ANDROID, false, "components-carousel.png"),
             new FigureVariant(new ComponentsTreeFigure(), FigureDevice.ANDROID, false, "tree.png"),
             new FigureVariant(new ComponentsTreeXmlFigure(), FigureDevice.ANDROID, false, "components-tree-xml.png"),
             new FigureVariant(new BadgeFloatingButtonFigure(), FigureDevice.ANDROID, false, "badge-floating-button.png"),
