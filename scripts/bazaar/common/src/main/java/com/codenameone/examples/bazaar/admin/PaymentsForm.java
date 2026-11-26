@@ -1,0 +1,104 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.admin;
+
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codenameone.examples.bazaar.Telemetry;
+import com.codenameone.examples.bazaar.api.ReasonDto;
+import com.codenameone.examples.bazaar.api.ReceiptDto;
+import com.codenameone.examples.bazaar.net.Api;
+import com.codename1.appkit.Net;
+import com.codenameone.examples.bazaar.pay.ReceiptForm;
+import com.codenameone.examples.bazaar.ui.Lang;
+import com.codenameone.examples.bazaar.ui.Ui;
+import java.util.List;
+
+/// What was charged, newest first, and for each whether it went through. A
+/// payment opens as its receipt, which is where an admin returns the money.
+public final class PaymentsForm {
+    private PaymentsForm() {
+    }
+
+    static void show(Form previous) {
+        show(Panes.phone(previous));
+    }
+
+    static void show(final Panes panes) {
+        final Container list = Ui.list("payments");
+        final Runnable[] load = new Runnable[1];
+        load[0] = () -> Api.admin().payments(Net.to(found -> fill(panes, list, found),
+                Ui.failed(list, () -> load[0].run())));
+        panes.list("Payments", "Payments", Panes.listed(null, list), load[0]);
+    }
+
+    /// A payment, opened: its receipt. Refunds are made from the store's order.
+    private static void open(final Panes panes, final ReceiptDto payment) {
+        Container page = ReceiptForm.page(payment, true);
+        panes.detail("Receipt", "Receipt", page);
+    }
+
+    /// An order id as a person reads it: a 32-character hex id ran to the
+    /// edge of the row and ended in an ellipsis, so the row shows its first
+    /// eight characters, which is what the receipt beside it starts with.
+    static String shortId(String id) {
+        if (id == null) {
+            return "";
+        }
+        return id.length() > 8 ? Lang.tr("Order") + " #" + id.substring(0, 8) : id;
+    }
+
+    private static void fill(final Panes panes, Container list, List<ReceiptDto> payments) {
+        list.removeAll();
+        if (payments == null || payments.isEmpty()) {
+            list.add(Ui.empty(FontImage.MATERIAL_PAYMENTS, "No payments yet",
+                    "An order shows up here when it is paid for."));
+        }
+        for (int iter = 0; payments != null && iter < payments.size(); iter++) {
+            final ReceiptDto payment = payments.get(iter);
+            Container value = new Container(BoxLayout.y());
+            value.add(Ui.plain(Ui.money(payment.amount(), payment.currency()), "SvRowValue"));
+            value.add(Ui.badge(ReceiptForm.status(payment.status()),
+                    ReceiptForm.badge(payment.status())));
+            String who = payment.customerUsername() == null ? "" : payment.customerUsername();
+            // The row is narrow beside the amount: the name before the "@"
+            // fits, and the receipt beside or behind it has the whole address.
+            int at = who.indexOf('@');
+            if (at > 0) {
+                who = who.substring(0, at);
+            }
+            // Cash or card is the row's icon, and the e-mail is the whole
+            // second line: with the method after it the address broke
+            // mid-word on a phone.
+            boolean cash = "cash".equals(payment.status())
+                    || "Cash".equalsIgnoreCase(payment.methodLabel());
+            final Container picked = Ui.row(cash
+                    ? FontImage.MATERIAL_PAYMENTS : FontImage.MATERIAL_CREDIT_CARD,
+                    shortId(payment.orderId()),
+                    who.length() > 0 ? who : (cash ? Lang.tr("Cash") : payment.methodLabel()), value);
+            list.add(Ui.tap(picked, "payment-" + iter, e -> {
+                panes.picked(picked);
+                open(panes, payment);
+            }));
+        }
+        panes.refresh();
+    }
+}

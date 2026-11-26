@@ -1,0 +1,220 @@
+# The first two levels of the Google product taxonomy
+# (Google_Product_Taxonomy_Version: 2021-09-21), as Google publishes it for
+# merchants to classify products with at
+# https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt
+# One category per line: its numeric id, " - ", and its path with " > "
+# between levels. The ids are what a product feed sends as
+# google_product_category. Read by catalog/Taxonomy.java.
+1 - Animals & Pet Supplies
+3237 - Animals & Pet Supplies > Live Animals
+2 - Animals & Pet Supplies > Pet Supplies
+166 - Apparel & Accessories
+1604 - Apparel & Accessories > Clothing
+167 - Apparel & Accessories > Clothing Accessories
+184 - Apparel & Accessories > Costumes & Accessories
+6552 - Apparel & Accessories > Handbag & Wallet Accessories
+6551 - Apparel & Accessories > Handbags, Wallets & Cases
+188 - Apparel & Accessories > Jewelry
+1933 - Apparel & Accessories > Shoe Accessories
+187 - Apparel & Accessories > Shoes
+8 - Arts & Entertainment
+499969 - Arts & Entertainment > Event Tickets
+5710 - Arts & Entertainment > Hobbies & Creative Arts
+5709 - Arts & Entertainment > Party & Celebration
+537 - Baby & Toddler
+4678 - Baby & Toddler > Baby Bathing
+5859 - Baby & Toddler > Baby Gift Sets
+5252 - Baby & Toddler > Baby Health
+540 - Baby & Toddler > Baby Safety
+2847 - Baby & Toddler > Baby Toys & Activity Equipment
+2764 - Baby & Toddler > Baby Transport
+4386 - Baby & Toddler > Baby Transport Accessories
+548 - Baby & Toddler > Diapering
+561 - Baby & Toddler > Nursing & Feeding
+6952 - Baby & Toddler > Potty Training
+6899 - Baby & Toddler > Swaddling & Receiving Blankets
+111 - Business & Industrial
+5863 - Business & Industrial > Advertising & Marketing
+112 - Business & Industrial > Agriculture
+7261 - Business & Industrial > Automation Control Components
+114 - Business & Industrial > Construction
+7497 - Business & Industrial > Dentistry
+2155 - Business & Industrial > Film & Television
+1813 - Business & Industrial > Finance & Insurance
+135 - Business & Industrial > Food Service
+1827 - Business & Industrial > Forestry & Logging
+7240 - Business & Industrial > Hairdressing & Cosmetology
+1795 - Business & Industrial > Heavy Machinery
+1475 - Business & Industrial > Hotel & Hospitality
+5830 - Business & Industrial > Industrial Storage
+8025 - Business & Industrial > Industrial Storage Accessories
+500086 - Business & Industrial > Janitorial Carts & Caddies
+1556 - Business & Industrial > Law Enforcement
+1470 - Business & Industrial > Manufacturing
+6987 - Business & Industrial > Material Handling
+2496 - Business & Industrial > Medical
+2187 - Business & Industrial > Mining & Quarrying
+4285 - Business & Industrial > Piercing & Tattooing
+138 - Business & Industrial > Retail
+1624 - Business & Industrial > Science & Laboratory
+976 - Business & Industrial > Signage
+2047 - Business & Industrial > Work Safety Protective Gear
+141 - Cameras & Optics
+2096 - Cameras & Optics > Camera & Optic Accessories
+142 - Cameras & Optics > Cameras
+156 - Cameras & Optics > Optics
+39 - Cameras & Optics > Photography
+222 - Electronics
+3356 - Electronics > Arcade Equipment
+223 - Electronics > Audio
+3702 - Electronics > Circuit Boards & Components
+262 - Electronics > Communications
+1801 - Electronics > Components
+278 - Electronics > Computers
+2082 - Electronics > Electronics Accessories
+3895 - Electronics > GPS Accessories
+339 - Electronics > GPS Navigation Systems
+6544 - Electronics > GPS Tracking Devices
+340 - Electronics > Marine Electronics
+342 - Electronics > Networking
+345 - Electronics > Print, Copy, Scan & Fax
+912 - Electronics > Radar Detectors
+500091 - Electronics > Speed Radars
+4488 - Electronics > Toll Collection Devices
+386 - Electronics > Video
+1270 - Electronics > Video Game Console Accessories
+1294 - Electronics > Video Game Consoles
+412 - Food, Beverages & Tobacco
+413 - Food, Beverages & Tobacco > Beverages
+422 - Food, Beverages & Tobacco > Food Items
+435 - Food, Beverages & Tobacco > Tobacco Products
+436 - Furniture
+554 - Furniture > Baby & Toddler Furniture
+6433 - Furniture > Beds & Accessories
+441 - Furniture > Benches
+6356 - Furniture > Cabinets & Storage
+442 - Furniture > Carts & Islands
+7248 - Furniture > Chair Accessories
+443 - Furniture > Chairs
+457 - Furniture > Entertainment Centers & TV Stands
+6345 - Furniture > Furniture Sets
+6860 - Furniture > Futon Frames
+2786 - Furniture > Futon Pads
+450 - Furniture > Futons
+6362 - Furniture > Office Furniture
+503765 - Furniture > Office Furniture Accessories
+458 - Furniture > Ottomans
+4299 - Furniture > Outdoor Furniture
+6963 - Furniture > Outdoor Furniture Accessories
+6915 - Furniture > Room Divider Accessories
+4163 - Furniture > Room Dividers
+464 - Furniture > Shelving
+8023 - Furniture > Shelving Accessories
+7212 - Furniture > Sofa Accessories
+460 - Furniture > Sofas
+6913 - Furniture > Table Accessories
+6392 - Furniture > Tables
+632 - Hardware
+503739 - Hardware > Building Consumables
+115 - Hardware > Building Materials
+128 - Hardware > Fencing & Barriers
+543575 - Hardware > Fuel
+502975 - Hardware > Fuel Containers & Tanks
+2878 - Hardware > Hardware Accessories
+500096 - Hardware > Hardware Pumps
+499873 - Hardware > Heating, Ventilation & Air Conditioning
+1974 - Hardware > Locks & Keys
+133 - Hardware > Plumbing
+127 - Hardware > Power & Electrical Supplies
+499982 - Hardware > Small Engines
+1910 - Hardware > Storage Tanks
+3650 - Hardware > Tool Accessories
+1167 - Hardware > Tools
+469 - Health & Beauty
+491 - Health & Beauty > Health Care
+5573 - Health & Beauty > Jewelry Cleaning & Care
+2915 - Health & Beauty > Personal Care
+536 - Home & Garden
+574 - Home & Garden > Bathroom Accessories
+359 - Home & Garden > Business & Home Security
+696 - Home & Garden > Decor
+5835 - Home & Garden > Emergency Preparedness
+2862 - Home & Garden > Fireplace & Wood Stove Accessories
+6792 - Home & Garden > Fireplaces
+1679 - Home & Garden > Flood, Fire & Gas Safety
+3348 - Home & Garden > Household Appliance Accessories
+604 - Home & Garden > Household Appliances
+630 - Home & Garden > Household Supplies
+638 - Home & Garden > Kitchen & Dining
+689 - Home & Garden > Lawn & Garden
+594 - Home & Garden > Lighting
+2956 - Home & Garden > Lighting Accessories
+4171 - Home & Garden > Linens & Bedding
+4358 - Home & Garden > Parasols & Rain Umbrellas
+985 - Home & Garden > Plants
+729 - Home & Garden > Pool & Spa
+600 - Home & Garden > Smoking Accessories
+6173 - Home & Garden > Umbrella Sleeves & Cases
+2639 - Home & Garden > Wood Stoves
+5181 - Luggage & Bags
+100 - Luggage & Bags > Backpacks
+101 - Luggage & Bags > Briefcases
+108 - Luggage & Bags > Cosmetic & Toiletry Bags
+549 - Luggage & Bags > Diaper Bags
+502974 - Luggage & Bags > Dry Boxes
+103 - Luggage & Bags > Duffel Bags
+104 - Luggage & Bags > Fanny Packs
+105 - Luggage & Bags > Garment Bags
+110 - Luggage & Bags > Luggage Accessories
+106 - Luggage & Bags > Messenger Bags
+5608 - Luggage & Bags > Shopping Totes
+107 - Luggage & Bags > Suitcases
+6553 - Luggage & Bags > Train Cases
+772 - Mature
+773 - Mature > Erotic
+780 - Mature > Weapons
+783 - Media
+784 - Media > Books
+499995 - Media > Carpentry & Woodworking Project Plans
+839 - Media > DVDs & Videos
+886 - Media > Magazines & Newspapers
+855 - Media > Music & Sound Recordings
+5037 - Media > Product Manuals
+887 - Media > Sheet Music
+922 - Office Supplies
+6174 - Office Supplies > Book Accessories
+8078 - Office Supplies > Desk Pads & Blotters
+923 - Office Supplies > Filing & Organization
+932 - Office Supplies > General Office Supplies
+5829 - Office Supplies > Impulse Sealers
+8499 - Office Supplies > Lap Desks
+2435 - Office Supplies > Name Plates
+6519 - Office Supplies > Office & Chair Mats
+6373 - Office Supplies > Office Carts
+950 - Office Supplies > Office Equipment
+2986 - Office Supplies > Office Instruments
+2014 - Office Supplies > Paper Handling
+964 - Office Supplies > Presentation Supplies
+2636 - Office Supplies > Shipping Supplies
+5605 - Religious & Ceremonial
+5606 - Religious & Ceremonial > Memorial Ceremony Supplies
+97 - Religious & Ceremonial > Religious Items
+5455 - Religious & Ceremonial > Wedding Ceremony Supplies
+2092 - Software
+313 - Software > Computer Software
+5032 - Software > Digital Goods & Currency
+1279 - Software > Video Game Software
+988 - Sporting Goods
+499713 - Sporting Goods > Athletics
+990 - Sporting Goods > Exercise & Fitness
+1001 - Sporting Goods > Indoor Games
+1011 - Sporting Goods > Outdoor Recreation
+1239 - Toys & Games
+4648 - Toys & Games > Game Timers
+3793 - Toys & Games > Games
+1249 - Toys & Games > Outdoor Play Equipment
+3867 - Toys & Games > Puzzles
+1253 - Toys & Games > Toys
+888 - Vehicles & Parts
+5613 - Vehicles & Parts > Vehicle Parts & Accessories
+5614 - Vehicles & Parts > Vehicles

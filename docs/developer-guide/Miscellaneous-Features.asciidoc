@@ -262,6 +262,30 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .Localization formatting/parsing and information
 image::img/l10n-manager.png[Localization formatting/parsing and information,scaledwidth=20%]
 
+==== Currencies
+
+A price is often in a currency other than the user's own. A store that sells in euros still has to show those euros the way a user in America, Japan or Brazil writes money. `L10NManager` answers both halves of that: which currency the user has, and how their locale writes an amount of any currency. Each port formats with the platform's own currency support, so the placement of the symbol, the spacing and the separators match the rest of the device:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CurrencySnippets.java[tag=currency-l10n,indent=0]
+----
+
+`formatCurrency(amount, code)` writes the currency's own number of fraction digits: two for the euro, none for the yen, three for the Bahraini dinar. A code that is not three letters throws `IllegalArgumentException`; an unknown three-letter code throws everywhere but Android, whose platform `Currency` accepts any well-formed code.
+
+The facts about a currency itself come from the standard `java.util.Currency`, which has the same ISO 4217 data on every platform, the server included. It knows every ISO 4217 code with its numeric code and fraction digits, and the currency of every country. `java.text.NumberFormat` and `DecimalFormat` accept it through `setCurrency`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/CurrencySnippets.java[tag=currency-java,indent=0]
+----
+
+`L10NManager` formats with the platform's own conventions on every port: Android, iOS, macOS, the browser and the simulator format natively, and native Windows and Linux read the user's locale settings and place the symbol accordingly. A Linux image without locale data falls back to a leading symbol and American English separators.
+
+On iOS, the JavaScript port and the native desktop ports `Currency` knows two symbols per currency: the one used at home (`$` for the dollar in America) and the one American English writes everywhere else (`US$`). Its display names are in English. Use `L10NManager` when the user should see a symbol or an amount in their own language.
+
+On iOS `getCurrencySymbol()` returns the symbol (`$`), as on the other platforms; it used to return the ISO code (`USD`). Code that needs the code calls `getCurrencyCode()`.
+
 ==== RTL/Bidi
 
 RTL stands for right to left, in the world of internationalization it refers to languages that are written from right to left (Arabic, Hebrew, Syriac, Thaana).

@@ -1,0 +1,171 @@
+/* Bazaar storefront. No external fonts or CDNs; --accent is the store's
+   colour, applied from the body's data-accent by storefront.js. */
+:root{--accent:#4f46e5;--ink:#1f2328;--muted:#5f6670;--line:#e3e5e8;--bg:#fff;--soft:#f6f7f9}
+@media (prefers-color-scheme:dark){:root{--ink:#e8eaed;--muted:#a3a9b1;--line:#30353b;--bg:#15181c;--soft:#1d2126}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+a{color:inherit}
+img,svg{display:block;width:100%;height:auto}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+/* The header is a stacking context, so its menus rise no higher than it does.
+   While one is open (hover, focus, an open picker) it sits above the support
+   chat (z-index 40); otherwise the chat, which reaches the top of a phone,
+   stays above the header. */
+.bar{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:2}
+.bar:hover,.bar:focus-within,.bar:has([open]){z-index:45}
+.bar-in{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center}
+.brand{font-weight:700;font-size:1.15rem;text-decoration:none;color:var(--accent)}
+.search{flex:1}
+.search input{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--soft);color:var(--ink);font:inherit}
+.cart-link{text-decoration:none;font-weight:600}
+h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15;margin:24px 0 8px}
+.lede{color:var(--muted);margin-top:0}
+.crumbs{margin-top:16px;font-size:.9rem;color:var(--muted)}
+.hero{position:relative;overflow:hidden;max-height:360px}
+.hero .art img,.hero .art svg{max-height:360px;object-fit:cover}
+.hero-text{position:absolute;inset:auto 0 0 0;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.5);padding-bottom:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}
+.chips a,.sorts a,.pager a{padding:6px 12px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:.9rem}
+.sorts a.current,.pager a.current{background:var(--accent);border-color:var(--accent);color:#fff}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;margin:12px 0;color:var(--muted)}
+.sorts,.pager{display:flex;flex-wrap:wrap;gap:6px}
+.pager{justify-content:center;margin:24px 0}
+.grid{list-style:none;padding:0;margin:0 0 24px;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.card a{text-decoration:none;display:block}
+.card .art,.gallery .art{position:relative;border-radius:12px;overflow:hidden;background:var(--soft);aspect-ratio:1}
+.card .art img,.gallery .art img{height:100%;object-fit:cover}
+.art text{font:700 120px system-ui,sans-serif;fill:rgba(255,255,255,.85)}
+.card h2,.card h3{font-size:1rem;margin:8px 0 2px}
+.price{font-weight:600;margin:0}
+.price s{color:var(--muted);font-weight:400}
+.stars{color:var(--muted);font-size:.9rem;margin:2px 0}
+.badge{position:absolute;top:8px;left:8px;background:var(--ink);color:var(--bg);font-size:.75rem;padding:2px 8px;border-radius:999px}
+.product{display:grid;gap:24px;grid-template-columns:1fr;margin:16px 0}
+@media (min-width:800px){.product{grid-template-columns:1.2fr 1fr}}
+.gallery{display:grid;gap:8px}
+.gallery figure{margin:0}
+.gallery .art video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.gallery .media-link{display:flex;align-items:center;justify-content:center;height:100%;font-weight:600}
+.digital{margin:8px 0}
+.downloads li{margin:6px 0}
+.vendor{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.8rem;margin:0}
+.buy form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.buy select,.buy input,.lines input{padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--bg);color:var(--ink)}
+.buy input[type=number],.lines input[type=number]{width:5em}
+.description{white-space:pre-line;margin-top:16px}
+.button{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 18px;font:600 1rem system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.button[disabled]{opacity:.5;cursor:not-allowed}
+.quiet{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);font:inherit;cursor:pointer}
+.reviews .review{border-top:1px solid var(--line);padding:12px 0}
+.review h3{margin:4px 0;font-size:1rem}
+.meta{color:var(--muted);font-size:.85rem}
+.lines{width:100%;border-collapse:collapse;margin:16px 0}
+.lines th,.lines td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.lines form{display:flex;gap:6px}
+.lines tr.gone{opacity:.55}
+.variant,.unit{display:block;color:var(--muted);font-size:.85rem}
+.totals{display:grid;grid-template-columns:1fr auto;gap:4px 16px;max-width:320px;margin-left:auto}
+.totals dd{margin:0;text-align:right}
+.totals .total{font-weight:700}
+.checkout{float:right;margin:16px 0}
+.problems{background:var(--soft);border-left:4px solid var(--accent);padding:8px 24px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.empty-state{text-align:center;padding:48px 0;color:var(--muted)}
+.empty-state .big{font-size:4rem;font-weight:800;color:var(--accent);margin:0}
+.status{font-size:1.2rem;font-weight:700;color:var(--accent)}
+.status.gone{color:var(--muted)}
+.stages{list-style:none;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:.85rem}
+.stages li{border-top:4px solid var(--line);padding-top:6px;color:var(--muted)}
+.stages li.on{border-color:var(--accent);color:var(--ink)}
+.timeline{padding-left:20px}
+.timeline li{margin:10px 0}
+.foot{border-top:1px solid var(--line);margin-top:48px;padding:24px 0;color:var(--muted);font-size:.9rem}
+@media (max-width:540px){.lines thead{display:none}.lines td{display:block;border:0;padding:4px 0}.lines tr{display:block;border-bottom:1px solid var(--line);padding:8px 0}}
+.co{display:grid;gap:32px;grid-template-columns:minmax(0,1fr) 340px;align-items:start}@media (max-width:820px){.co{grid-template-columns:1fr}}
+.co fieldset{border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 20px}.co legend{font-weight:700;padding:0 6px}
+.field{display:flex;flex-direction:column;gap:4px;margin:0 0 12px}.field label{font-weight:600;font-size:.92rem}.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:540px){.row2{grid-template-columns:1fr}}
+.co input,.co select,.co textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.co input[type=radio]{width:auto}.co [aria-invalid=true]{border-color:#c0362c}.err{color:#c0362c;font-size:.9rem;margin:0}
+.choice{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line)}.choice:last-child{border-bottom:0}.choice .meta{color:var(--muted);font-size:.9rem}
+.summary{position:sticky;top:72px;background:var(--soft);border-radius:12px;padding:16px}.summary .totals{max-width:none}.summary ul{list-style:none;margin:0 0 12px;padding:0}.summary li{display:flex;justify-content:space-between;gap:8px;padding:4px 0}
+.codes{display:flex;gap:8px;margin:0 0 8px}.codes input{flex:1}.place{width:100%;margin-top:12px;font-size:1.05rem}.alert{border-left:4px solid #c0362c;background:var(--soft);padding:8px 16px;margin:0 0 16px}
+.confirm dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px}
+/* App slots and the cookie consent banner. */
+.foot .wrap a+a{margin-left:12px}
+.slot-place{margin:12px 0}
+.slot-frame{display:block;width:100%;border:0}
+.consent{position:fixed;left:16px;right:16px;bottom:16px;max-width:40rem;margin:auto;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:0 8px 32px #0004;z-index:30}
+.consent p{margin:0 0 12px}
+.consent button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:inherit;cursor:pointer}
+.consent details{margin-top:10px}
+.consent label{margin-right:12px}
+
+/* Bot protection: the honeypot field people never see (BotGuard). */
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+/* Theme: the body carries th-<palette> font-<font> radius-<radius> from the
+   store's published theme (content/Themes); every value is a custom property. */
+body.th-warm{--bg:#fffaf3;--soft:#f7efe3;--line:#eadfce;--ink:#2b2118;--muted:#6b5d4f}
+body.th-dark{--bg:#121417;--soft:#1c1f24;--line:#2d3238;--ink:#eceef1;--muted:#a1a8b0}
+body.th-contrast{--bg:#fff;--soft:#f2f2f2;--line:#000;--ink:#000;--muted:#222}
+body{--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--radius:10px;font-family:var(--font)}
+body.font-serif{--font:Georgia,"Times New Roman",serif}
+body.font-mono{--font:ui-monospace,Menlo,Consolas,monospace}
+body.font-humanist{--font:"Gill Sans","Trebuchet MS",Optima,sans-serif}
+body.font-rounded{--font:ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif}
+body.radius-square{--radius:0}
+body.radius-round{--radius:22px}
+.button,.card,input,select,textarea{border-radius:var(--radius)}
+.logo{max-height:40px;width:auto;vertical-align:middle}
+.menu ul{list-style:none;margin:0;padding:0;display:flex;gap:16px;flex-wrap:wrap}
+.menu li{position:relative}
+.menu li ul{display:none;position:absolute;background:var(--bg);border:1px solid var(--line);padding:8px;flex-direction:column;z-index:5}
+.menu li:hover>ul,.menu li:focus-within>ul{display:flex}
+.foot-links{display:flex;gap:16px;flex-wrap:wrap}
+.preview-note{background:var(--accent);color:#fff;text-align:center;margin:0;padding:6px}
+.rich{max-width:720px}
+.rt-b{font-weight:700}
+.rt-i{font-style:italic}
+.post-list{list-style:none;padding:0}
+.post-list li{border-bottom:1px solid var(--line);padding:12px 0}
+.specs dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px}
+.specs dt{font-weight:600}
+.specs dd{margin:0}
+/* Header tools: the app link, the language and market menus, the cart. The
+   menus are <details> elements, so they open without script; shop.js adds
+   the menu roles, Escape, arrow keys and closing on an outside click. */
+.tools{display:flex;align-items:center;gap:4px;margin-inline-start:auto}
+.tools svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.app-link,.cart-link,.pick-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;text-decoration:none;font-size:.92rem;font-weight:600;color:var(--ink);cursor:pointer;white-space:nowrap}
+.app-link:hover,.cart-link:hover,.pick-btn:hover,.pick[open]>.pick-btn{background:var(--soft)}
+.app-link{color:var(--accent)}
+.pick{position:relative}
+.pick-btn{list-style:none}
+.pick-btn::-webkit-details-marker{display:none}
+.pick-btn .caret{width:14px;height:14px;opacity:.6;transition:transform .15s}
+.pick[open]>.pick-btn .caret{transform:rotate(180deg)}
+.pick-menu{position:absolute;inset-inline-end:0;top:calc(100% + 6px);min-width:200px;max-height:70vh;overflow:auto;margin:0;padding:6px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0003;z-index:20}
+.pick-title{margin:4px 10px 6px;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pick-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;text-align:start;cursor:pointer}
+.pick-item:hover,.pick-item:focus-visible{background:var(--soft);outline:none}
+.pick-item .tick{width:16px;height:16px;stroke:var(--accent);stroke-width:2.4;visibility:hidden}
+.pick-item[aria-checked=true]{font-weight:700}
+.pick-item[aria-checked=true] .tick{visibility:visible}
+.app-link:focus-visible,.cart-link:focus-visible,.pick-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:720px){.bar-in{flex-wrap:wrap}.search{order:3;flex-basis:100%}.app-link span,.cart-link span,.pick-btn .pick-cur{display:none}.pick-btn .caret{display:none}}
+
+/* The platform home's app card. */
+.app-card{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:24px;align-items:center;margin:24px 0 32px;padding:28px;border-radius:calc(var(--radius) + 8px);background:var(--accent);background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));color:#fff;overflow:hidden}
+.app-card .kicker{margin:0;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.app-card h2{margin:6px 0 8px;font-size:clamp(1.4rem,3vw,2rem);line-height:1.15}
+.app-card p{margin:0 0 18px;max-width:34rem;opacity:.92}
+.app-card .button{background:#fff;color:var(--accent)}
+.app-card svg{width:100%;max-width:180px;justify-self:center;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.app-card .d1{fill:#ffffff1f}
+.app-card .d2,.app-card .d3,.app-card .d4{fill:#ffffff40;stroke:none}
+.app-card .d5{fill:#fff;stroke:none}
+@media (max-width:620px){.app-card{grid-template-columns:1fr;padding:22px}.app-card svg{display:none}}
+
+/* Unit pricing beside a price, and the 3D model viewer in the gallery. */
+.unit-price{display:inline-block;font-size:.8em;font-weight:400;color:var(--muted,#666)}
+.gallery model-viewer.model{display:block;width:100%;aspect-ratio:1/1;height:auto;background:var(--soft,#f4f4f4);border-radius:inherit}
+.gallery figure figcaption{font-size:.85em;margin-top:.4em}

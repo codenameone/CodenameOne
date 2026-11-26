@@ -1,0 +1,17 @@
+<!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
+<!-- cn1:model form com.codenameone.examples.bazaar.web.auth.SignInView -->
+<!doctype html>
+<html th:attr="lang=${shell.lang},dir=${shell.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<body class="auth"><main id="main" class="auth-card" tabindex="-1"><a class="brand" href="/">Bazaar</a>
+<h1 th:text="${shell.heading}">Sign in</h1>
+<p class="toast bad" role="alert" th:unless="${form.problem.empty}" th:text="${form.problem}">Wrong</p>
+<form th:unless="${form.secondFactor}" method="post" action="/auth/signin" class="stack">
+<input type="hidden" name="_ft" th:value="${form.fillToken}"><div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+<label for="username" th:text="${shell.t['email']}">Email</label><input id="username" name="username" type="email" autocomplete="username" required autofocus>
+<label for="password" th:text="${shell.t['password']}">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+<button class="button" type="submit" th:text="${shell.t['signIn']}">Sign in</button></form>
+<form th:if="${form.secondFactor}" method="post" action="/auth/2fa" class="stack">
+<p th:text="${shell.t['twoFactor']}">Enter the six-digit code from your authenticator app.</p>
+<label for="code" th:text="${shell.t['code']}">Code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
+<button class="button" type="submit" th:text="${shell.t['verify']}">Verify</button></form>
+<p class="muted"><span th:text="${shell.t['newHere']}">New here?</span> <a href="/auth/signup" th:text="${shell.t['createAccount']}">Create an account</a></p></main></body></html>

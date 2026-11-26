@@ -122,7 +122,11 @@ public class Command implements ActionListener<ActionEvent> {
         Command cmd = new Command(name) {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                ev.actionPerformed(evt);
+                // A command made with no listener is a plain button (a dialog's
+                // "Cancel"); it used to throw a NullPointerException when tapped.
+                if (ev != null) {
+                    ev.actionPerformed(evt);
+                }
             }
         };
         cmd.setIcon(icon);
@@ -149,7 +153,11 @@ public class Command implements ActionListener<ActionEvent> {
         Command cmd = new Command(name) {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                ev.actionPerformed(evt);
+                // A command made with no listener is a plain button (a dialog's
+                // "Cancel"); it used to throw a NullPointerException when tapped.
+                if (ev != null) {
+                    ev.actionPerformed(evt);
+                }
             }
         };
         cmd.setMaterialIcon(icon);

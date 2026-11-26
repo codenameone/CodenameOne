@@ -1,0 +1,11 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model track com.codenameone.examples.bazaar.web.TrackView -->
+<!doctype html>
+<html th:attr="lang=${page.lang},dir=${page.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main id="main" tabindex="-1" class="wrap"><h1><span th:text="${page.t['tracking']}">Tracking</span> <span th:text="${track.number}">1Z</span></h1>
+<p class="lede"><span th:text="${track.store}">Store</span> <span th:text="${page.t['via']}">via</span> <span th:text="${track.carrier}">Carrier</span></p>
+<p class="status" th:classappend="${track.delivered ? 'done' : (track.cancelled ? 'gone' : '')}" th:text="${track.status}">In transit</p>
+<ol class="stages" th:unless="${track.cancelled}"><li class="on" th:text="${page.t['st.packed']}">Packed</li><li th:classappend="${track.stage >= 1 ? 'on' : ''}" th:text="${page.t['st.shipped']}">Shipped</li><li th:classappend="${track.stage >= 3 ? 'on' : ''}" th:text="${page.t['st.out']}">Out for delivery</li><li th:classappend="${track.stage >= 4 ? 'on' : ''}" th:text="${page.t['st.delivered']}">Delivered</li></ol>
+<ol class="timeline"><li th:each="s : ${track.steps}"><strong th:text="${s.status}">Status</strong> <span th:text="${s.message}">Message</span> <span class="meta"><span th:text="${s.place}">Place</span> <span th:text="${s.when}">When</span></span></li></ol>
+<p th:unless="${track.storeUrl.empty}"><a class="button" th:href="${track.storeUrl}" th:text="${page.t['visitStore']}">Visit the store</a></p></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

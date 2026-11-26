@@ -1847,6 +1847,14 @@ public class AndroidGradleBuilder extends Executor {
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
         rootCheck = request.getArg("android.rootCheck", "false").equals("true");
+        if (request.getArg("android.debugGuard", "false").equals("true")) {
+            // Validated before anything is generated, so a typo is a one-line build error.
+            try {
+                debugGuardChecks(request.getArg("android.debugGuard.checks", ""));
+            } catch (IllegalArgumentException bad) {
+                throw new BuildException(bad.getMessage());
+            }
+        }
         fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
         playIntegrity = request.getArg("android.playIntegrity", "false").equals("true");
         accessibilityGuard = request.getArg("android.accessibilityGuard", "false").equals("true");
@@ -5325,6 +5333,14 @@ public class AndroidGradleBuilder extends Executor {
                     // device would skip Push Kit.
                     + (useHMS ? "<package android:name=\"com.huawei.hwid\" />\n" : "")
                     + request.getArg("android.manifest.queries", "")
+                    // android.rootCheck asks DebugEnvironmentDetector to look the root
+                    // managers up by name; from API 30 an undeclared package is invisible.
+                    + (rootCheck ? "<package android:name=\"com.topjohnwu.magisk\" />\n"
+                            + "<package android:name=\"io.github.vvb2060.magisk\" />\n"
+                            + "<package android:name=\"io.github.huskydg.magisk\" />\n"
+                            + "<package android:name=\"me.weishu.kernelsu\" />\n"
+                            + "<package android:name=\"com.rifsxd.ksunext\" />\n"
+                            + "<package android:name=\"me.bmax.apatch\" />\n" : "")
                     + healthQueriesFragment + smartHomeQueriesFragment
                     + "</queries>\n";
         }
@@ -7165,7 +7181,7 @@ public class AndroidGradleBuilder extends Executor {
             }
 
             rootCheckCall = "        com.scottyab.rootbeer.RootBeer rootBeer = new com.scottyab.rootbeer.RootBeer(this);\n"
-                    + "        if (rootBeer.isRooted()) {\n"
+                    + "        if (rootBeer.isRooted() || com.codename1.impl.android.DebugEnvironmentDetector.isRootHidingDetected(this)) {\n"
                     + "            android.util.Log.e(\"Codename One\", \"Device is rooted. Exiting app.\");\n"
                     + "            System.exit(0);\n"
                     + "        }\n";
@@ -7175,6 +7191,16 @@ public class AndroidGradleBuilder extends Executor {
         if (fridaDetection) {
             fridaDetectionCall = "        com.codename1.impl.android.FridaDetectionUtil.runFridaDetection(this);\n";
         }
+
+        // android.debugGuard: launch gate for an attached debugger, Developer Options and USB
+        // debugging. android.debugGuard.checks picks them (csv of debugger,developerOptions,
+        // usbDebugging; empty = debugger alone) and android.debugGuard.mode (exit|warn, default exit)
+        // decides whether to terminate or just log. The checks live in the port's
+        // DebugEnvironmentDetector so DeviceIntegrity.getCompromiseReasons() reports the same.
+        String debugGuardCall = debugGuardCall(
+                request.getArg("android.debugGuard", "false"),
+                request.getArg("android.debugGuard.checks", ""),
+                request.getArg("android.debugGuard.mode", "exit"));
 
         // android.playIntegrity bundles the Google Play Integrity SDK so the
         // DeviceIntegrity.requestIntegrityToken() runtime API works. When
@@ -7328,6 +7354,7 @@ public class AndroidGradleBuilder extends Executor {
                     + fridaDetectionCall
                     + rootCheckCall
                     + accessibilityGuardCall
+                    + debugGuardCall
                     + playIntegrityCall
                     + facebookHashCode
                     + facebookSupport
@@ -13030,4 +13057,46 @@ public class AndroidGradleBuilder extends Executor {
         return parsed == null ? 0 : parsed;
     }
 
+
+    private static final String[] DEBUG_GUARD_CHECKS = {"debugger", "developerOptions", "usbDebugging"};
+
+    /// Validates `android.debugGuard.checks` and answers it normalized. Empty means `debugger`
+    /// alone: Developer Options and USB debugging are on for many ordinary users and for every
+    /// Play pre-launch and Firebase Test Lab device, so exiting on them has to be asked for. An
+    /// unknown name fails the build -- a typo would otherwise switch the gate off silently.
+    static String debugGuardChecks(String checks) {
+        StringBuilder out = new StringBuilder();
+        String[] parts = (checks == null ? "" : checks).split(",");
+        for (int i = 0; i < parts.length; i++) {
+            String p = parts[i].trim();
+            if (p.length() == 0) {
+                continue;
+            }
+            boolean known = false;
+            for (int j = 0; j < DEBUG_GUARD_CHECKS.length; j++) {
+                known |= DEBUG_GUARD_CHECKS[j].equals(p);
+            }
+            if (!known) {
+                throw new IllegalArgumentException("android.debugGuard.checks: unknown check '" + p
+                        + "'. Use a comma separated list of debugger, developerOptions and usbDebugging.");
+            }
+            if (out.length() > 0) {
+                out.append(',');
+            }
+            out.append(p);
+        }
+        return out.length() == 0 ? "debugger" : out.toString();
+    }
+
+    /// The `onCreate` statement for `android.debugGuard`, or "" when the hint is off. Any mode
+    /// other than `warn` exits, matching `android.accessibilityGuard`.
+    static String debugGuardCall(String enabled, String checks, String mode) {
+        if (!"true".equals(enabled)) {
+            return "";
+        }
+        boolean exit = !"warn".equals(mode);
+        String c = debugGuardChecks(checks);
+        return "        com.codename1.impl.android.DebugEnvironmentDetector.runDebugGuard(this, \""
+                + c.replace("\\", "\\\\").replace("\"", "\\\"") + "\", " + exit + ");\n";
+    }
 }

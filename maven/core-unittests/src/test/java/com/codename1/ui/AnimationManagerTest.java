@@ -104,4 +104,71 @@ class AnimationManagerTest extends UITestBase {
         assertEquals(1, updateStateCalls.get(), "The payload must not be applied a second time");
         assertEquals(1, completionCalls.get(), "Completion callback should not run a second time");
     }
+
+    /// A post-animation task that starts an animation makes the next task see the
+    /// manager busy; that task re-queues itself through `flushAnimation` (as
+    /// `Sheet.showOnHost` does) and must wait for the new animation rather than be
+    /// run again in the same pass. The drain used to re-run it forever with the
+    /// EDT pinned. The retry here stops itself after 50 rounds so a regression
+    /// fails instead of hanging the suite.
+    @FormTest
+    void testTaskRequeuedDuringDrainWaitsForTheNextPass() {
+        Form form = CN.getCurrentForm();
+        final AnimationManager manager = form.getAnimationManager();
+        final AtomicInteger retries = new AtomicInteger();
+        final ComponentAnimation started = new ComponentAnimation() {
+            private int remainingSteps = 2;
+
+            @Override
+            public boolean isInProgress() {
+                return remainingSteps > 0;
+            }
+
+            @Override
+            protected void updateState() {
+                remainingSteps--;
+            }
+        };
+        final Runnable[] retry = new Runnable[1];
+        retry[0] = new Runnable() {
+            @Override
+            public void run() {
+                if (retries.incrementAndGet() < 50 && manager.isAnimating()) {
+                    manager.flushAnimation(retry[0]);
+                }
+            }
+        };
+        // Something already running, so both tasks below are queued rather than
+        // run on the spot.
+        manager.addAnimation(new ComponentAnimation() {
+            private int remainingSteps = 1;
+
+            @Override
+            public boolean isInProgress() {
+                return remainingSteps > 0;
+            }
+
+            @Override
+            protected void updateState() {
+                remainingSteps--;
+            }
+        });
+        manager.flushAnimation(new Runnable() {
+            @Override
+            public void run() {
+                manager.addAnimation(started);
+            }
+        });
+        manager.flushAnimation(retry[0]);
+
+        // step the blocker, retire it, then drain the queue
+        manager.updateAnimations();
+        manager.updateAnimations();
+        manager.updateAnimations();
+        assertEquals(0, retries.get(), "The task must wait while the animation a previous task started runs");
+        for (int iter = 0; iter < 10 && retries.get() == 0; iter++) {
+            manager.updateAnimations();
+        }
+        assertEquals(1, retries.get(), "The task runs once the animation has finished");
+    }
 }
