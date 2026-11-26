@@ -90,6 +90,38 @@ class SlideShowTest extends UITestBase {
     }
 
     @Test
+    void liveChartKeepsAStyleTheAppChangesAfterAFit() {
+        com.codename1.ui.chart.Chart c = new com.codename1.ui.chart.Chart();
+        com.codename1.ui.plaf.Style all = c.getAllStyles();
+        all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        all.setPadding(20, 20, 20, 20);
+        float k = SlideRenderer.chartPixelsPerPoint();
+        SlideShow.fitText(c, k / 2);
+        c.getUnselectedStyle().setPadding(40, 40, 40, 40);
+        SlideShow.fitText(c, k / 4);
+        assertEquals(10, c.getUnselectedStyle().getPaddingTop(),
+                "the app's later padding is the new base, not the stale theme one");
+    }
+
+    @Test
+    void liveChartScalesEachStateFromItsOwnStyle() {
+        com.codename1.ui.chart.Chart c = new com.codename1.ui.chart.Chart();
+        com.codename1.ui.plaf.Style all = c.getAllStyles();
+        all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        c.getUnselectedStyle().setPadding(20, 20, 20, 20);
+        c.getSelectedStyle().setPadding(8, 8, 8, 8);
+        SlideShow.fitText(c, SlideRenderer.chartPixelsPerPoint() / 2);
+        assertEquals(10, c.getUnselectedStyle().getPaddingTop(), "unselected from its own base");
+        assertEquals(4, c.getSelectedStyle().getPaddingTop(), "selected from its own base");
+    }
+
+    @Test
     void layingOutAShowFitsItsLiveCharts() {
         SlideShow show = new SlideShow(Decks.everything());
         Form f = new Form("Show", new BorderLayout());

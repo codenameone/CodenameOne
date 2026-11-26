@@ -22,10 +22,10 @@
  */
 package com.codename1.backend.messaging.kafka;
 
+import com.codename1.backend.ByteSink;
 import com.codename1.backend.Tcp;
 import com.codename1.impl.backend.WireBuffer;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -414,15 +414,17 @@ final class KafkaConnection {
     }
 
     private static byte[] gunzip(byte[] data) throws IOException {
+        // Through Inflate's capped sink like the other three codecs: a small gzip batch
+        // of zeros otherwise expands without bound before records() can look at it.
         InputStream in = new GZIPInputStream(new ByteArrayInputStream(data));
         try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream(data.length * 4);
+            ByteSink out = Inflate.sink(data.length * 4);
             byte[] buffer = new byte[8192];
             int n;
             while ((n = in.read(buffer)) > 0) {
-                out.write(buffer, 0, n);
+                Inflate.put(out, buffer, 0, n);
             }
-            return out.toByteArray();
+            return Inflate.toArray(out);
         } finally {
             in.close();
         }

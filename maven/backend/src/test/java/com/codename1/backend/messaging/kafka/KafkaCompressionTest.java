@@ -188,6 +188,19 @@ class KafkaCompressionTest {
     }
 
     @Test
+    @DisplayName("A gzip batch that inflates past the limit is refused, like the other codecs")
+    void gzipBomb() throws IOException {
+        // 65 MiB of zeros packs into about 64 KiB; the limit is 64 MiB
+        byte[] packed = through(new byte[65 << 20], GZIPOutputStream::new);
+        try {
+            KafkaConnection.decompress(1, packed);
+            fail("a 65 MiB gzip batch was inflated whole");
+        } catch (IOException expected) {
+            assertEquals(true, expected.getMessage().contains("MiB"), expected.getMessage());
+        }
+    }
+
+    @Test
     @DisplayName("Corrupt input is refused with an IOException and never anything else")
     void corruptInput() throws IOException {
         byte[] in = sample(3, 200000, 9);

@@ -403,31 +403,51 @@ public class SlideShow extends Container {
     /// derived to an arbitrary size and is left alone.
     static void fitText(Component c, float scale) {
         float ratio = scale / SlideRenderer.chartPixelsPerPoint();
-        Object last = c.getClientProperty("cn1$textRatio");
-        if (last instanceof Float && Math.abs(((Float) last).floatValue() - ratio) < 0.005f) {
+        // Each state keeps its own font and padding (a selected style may be bold), so each
+        // is scaled from its own base.
+        fitStyle(c, c.getUnselectedStyle(), "u", ratio);
+        fitStyle(c, c.getSelectedStyle(), "s", ratio);
+        fitStyle(c, c.getPressedStyle(), "p", ratio);
+        fitStyle(c, c.getDisabledStyle(), "d", ratio);
+        c.putClientProperty("cn1$textRatio", Float.valueOf(ratio));
+    }
+
+    /// Scales one style from its base. The base is the style as the application left it:
+    /// when the style no longer holds what the last fit wrote, the application changed it,
+    /// and that becomes the new base instead of being overwritten by a stale one.
+    private static void fitStyle(Component c, Style s, String key, float ratio) {
+        Object saved = c.getClientProperty("cn1$textBase" + key);
+        Object[] base = saved instanceof Object[] ? (Object[]) saved : null;
+        int[] now = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(),
+            s.getPaddingRightNoRTL()};
+        if (base == null || base[2] != s.getFont() || !samePadding((int[]) base[3], now)) {
+            base = new Object[] {s.getFont(), now, null, null};
+        } else if (base[4] instanceof Float
+                && Math.abs(((Float) base[4]).floatValue() - ratio) < 0.005f) {
             return;
         }
-        Style s = c.getStyle();
-        Object saved = c.getClientProperty("cn1$textBase");
-        Object[] base;
-        if (saved instanceof Object[]) {
-            base = (Object[]) saved;
-        } else {
-            base = new Object[] {s.getFont(), new int[] {s.getPaddingTop(), s.getPaddingBottom(),
-                s.getPaddingLeftNoRTL(), s.getPaddingRightNoRTL()}};
-            c.putClientProperty("cn1$textBase", base);
-        }
-        c.putClientProperty("cn1$textRatio", Float.valueOf(ratio));
-        Style all = c.getAllStyles();
         Font font = (Font) base[0];
         if (font != null && font.isTTFNativeFont()) {
-            all.setFont(font.derive(Math.max(1f, font.getPixelSize() * ratio), font.getStyle()));
+            s.setFont(font.derive(Math.max(1f, font.getPixelSize() * ratio), font.getStyle()));
         }
         int[] pad = (int[]) base[1];
-        all.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
                 Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
-        all.setPadding(Math.round(pad[0] * ratio), Math.round(pad[1] * ratio),
+        s.setPadding(Math.round(pad[0] * ratio), Math.round(pad[1] * ratio),
                 Math.round(pad[2] * ratio), Math.round(pad[3] * ratio));
+        int[] written = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(),
+            s.getPaddingRightNoRTL()};
+        c.putClientProperty("cn1$textBase" + key,
+                new Object[] {base[0], base[1], s.getFont(), written, Float.valueOf(ratio)});
+    }
+
+    private static boolean samePadding(int[] a, int[] b) {
+        for (int i = 0; i < 4; i++) {
+            if (a[i] != b[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Places each live chart over its element.
