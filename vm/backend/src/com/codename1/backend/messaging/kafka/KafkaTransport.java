@@ -279,7 +279,7 @@ public final class KafkaTransport extends PollingTransport {
         while (p < n) {
             p = skipSpaces(jaas, p);
             int start = p;
-            while (p < n && jaas.charAt(p) != '=' && jaas.charAt(p) != ' '
+            while (p < n && jaas.charAt(p) != '=' && jaas.charAt(p) > ' '
                     && jaas.charAt(p) != ';' && jaas.charAt(p) != '"') {
                 p++;
             }
@@ -311,7 +311,7 @@ public final class KafkaTransport extends PollingTransport {
             }
             return p + 1;
         }
-        while (p < jaas.length() && jaas.charAt(p) != ' ' && jaas.charAt(p) != ';') {
+        while (p < jaas.length() && jaas.charAt(p) > ' ' && jaas.charAt(p) != ';') {
             p++;
         }
         return p;
@@ -322,7 +322,7 @@ public final class KafkaTransport extends PollingTransport {
     /// which would send its password in the clear. Null when it implies none.
     static String mechanismOf(String jaas) throws IOException {
         int end = 0;
-        while (end < jaas.length() && jaas.charAt(end) != ' ') {
+        while (end < jaas.length() && jaas.charAt(end) > ' ') {
             end++;
         }
         String module = jaas.substring(0, end);
@@ -342,7 +342,7 @@ public final class KafkaTransport extends PollingTransport {
 
     private static int skipSpaces(String s, int from) {
         int p = from;
-        while (p < s.length() && s.charAt(p) == ' ') {
+        while (p < s.length() && s.charAt(p) <= ' ') {
             p++;
         }
         return p;
@@ -363,7 +363,7 @@ public final class KafkaTransport extends PollingTransport {
                 v.append(c);
             }
         } else {
-            for (; p < jaas.length() && jaas.charAt(p) != ' ' && jaas.charAt(p) != ';'; p++) {
+            for (; p < jaas.length() && jaas.charAt(p) > ' ' && jaas.charAt(p) != ';'; p++) {
                 v.append(jaas.charAt(p));
             }
         }
@@ -1351,6 +1351,9 @@ public final class KafkaTransport extends PollingTransport {
                     in.int64();
                     in.int64();
                     int n = in.int32();
+                    if (n > in.remaining() / 16) {
+                        throw new IOException("Kafka sent a malformed fetch response");
+                    }
                     long[][] aborted = n < 0 ? new long[0][] : new long[n][];
                     for (int a = 0; a < n; a++) {
                         aborted[a] = new long[] {in.int64(), in.int64()};

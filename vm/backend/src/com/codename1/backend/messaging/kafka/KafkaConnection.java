@@ -99,7 +99,8 @@ final class KafkaConnection {
     private synchronized void authenticate() throws IOException {
         long lifetime = sasl.authenticate(this, host);
         reauthenticateAt = lifetime > 0
-                ? System.currentTimeMillis() + Math.max(1000, lifetime * 85 / 100) : 0;
+                ? System.currentTimeMillis() + (lifetime < 2000 ? lifetime / 2
+                        : Math.max(1000, lifetime * 85 / 100)) : 0;
     }
 
     /// Sends one request and reads its response, positioned after the header;

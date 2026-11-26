@@ -167,4 +167,14 @@ class KafkaSaslTest {
         assertEquals("kafka://***@h:1/a@b", KafkaTransport.redact("kafka://u:secret@h:1/a@b"));
         assertEquals("kafka://h:1/a@b", KafkaTransport.redact("kafka://h:1/a@b"));
     }
+
+    @Test
+    @DisplayName("JAAS lines separated by tabs or line breaks parse the same as with spaces")
+    void jaasWhitespace() {
+        String jaas = "org.apache.kafka.common.security.scram.ScramLoginModule\trequired\n"
+                + "\tusername=\"u\"\n\tpassword=\"p\";";
+        assertThrows(IOException.class, () -> KafkaTransport.mechanismOf(jaas));
+        assertEquals("u", KafkaTransport.jaasOption(jaas, "username"));
+        assertEquals("p", KafkaTransport.jaasOption(jaas, "password"));
+    }
 }
