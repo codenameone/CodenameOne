@@ -26,6 +26,8 @@ import com.codename1.junit.UITestBase;
 import com.codename1.components.InteractionDialog;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.Display;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -194,6 +196,15 @@ class SecureKeyboardTest extends UITestBase {
         TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
         f.add(tf);
         SecureKeyboard kb = SecureKeyboard.install(tf);
+        // An instant show. A form an earlier test in this JVM left current can carry a
+        // transition out, which ends on the clock while every flush below takes no time at all:
+        // the bounded retries were all spent before the form had a size, and the test failed
+        // in a full suite run while passing alone. Transitions are not what this test covers.
+        Form previous = Display.getInstance().getCurrent();
+        if (previous != null) {
+            previous.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        }
+        f.setTransitionInAnimator(CommonTransitions.createEmpty());
         f.show();
         // Straight after show(), as a show listener would: nothing is laid out yet.
         kb.show();
