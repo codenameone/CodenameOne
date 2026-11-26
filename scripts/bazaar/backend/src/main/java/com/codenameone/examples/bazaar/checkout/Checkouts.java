@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.checkout;
 
 import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
@@ -77,6 +78,9 @@ import java.util.List;
 ///    customer record (orders and spend), the cart emptied.
 @Component
 public class Checkouts {
+    /// Apps' checkout fields; a field, since extensions sit above checkout.
+    @Autowired
+    com.codenameone.examples.bazaar.extensions.Extensions extensions;
     /// Field-injected, so the constructor stays as it was.
     @com.codename1.backend.annotations.Autowired
     private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
@@ -272,7 +276,13 @@ public class Checkouts {
         final long tip = CheckoutSettings.tip(rules, req.tip(),
                 quote.subtotalCents - quote.discountCents());
         final List<com.codenameone.examples.bazaar.api.OrderFieldDto> answers =
-                CheckoutSettings.answers(rules, req.fields());
+                new java.util.ArrayList<com.codenameone.examples.bazaar.api.OrderFieldDto>(
+                    CheckoutSettings.answers(rules, req.fields()));
+        // Fields an app's checkout block declares (`app:<extension>:<key>`),
+        // validated by their type and kept with the store's own.
+        if (extensions != null) {
+            answers.addAll(extensions.checkoutAnswers(storeId, req.fields()));
+        }
         String payCurrency = pricer != null ? pricer.currency() : quote.store.getCurrency();
         if (via != null && via.methodType != null && (!rules.methods().contains(via.methodType)
                 || !com.codenameone.examples.bazaar.pay.PaymentTypes.allowed(via.methodType,

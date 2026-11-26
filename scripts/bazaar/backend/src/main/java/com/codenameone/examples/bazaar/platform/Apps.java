@@ -530,6 +530,14 @@ public class Apps {
             // Its recurring and pending charges end with it, each sent to the
             // app as app_subscriptions/update before app/uninstalled.
             billing.cancelAll(installationId, username);
+            // Its UI goes with it: no block, action, checkout field or proxy
+            // of an uninstalled app is shown or forwarded again, and a
+            // reinstall starts with none.
+            db.execute("DELETE FROM app_extension WHERE app_installation_id = ?",
+                    new Object[] {installationId});
+            db.execute("DELETE FROM app_proxy WHERE app_installation_id = ?",
+                    new Object[] {installationId});
+            com.codenameone.examples.bazaar.extensions.Extensions.touch(db, storeId);
             Map<String, Object> payload = new LinkedHashMap<String, Object>();
             payload.put("store_id", storeId);
             payload.put("app_id", Rows.text(inst.get("app_id")));

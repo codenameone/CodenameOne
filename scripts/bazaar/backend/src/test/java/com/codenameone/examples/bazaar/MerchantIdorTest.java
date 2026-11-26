@@ -68,6 +68,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MerchantIdorTest {
     /// Method and path after `/api/merchant/stores/{storeId}`.
     static final String[] ROUTES = {
+        "GET /extensions", "POST /extensions/{extensionId}/action",
+        "POST /apps/{installationId}/session",
         "DELETE /automations/{automationId}", "DELETE /collections/{collectionId}",
         "DELETE /discounts/{discountId}", "DELETE /hero", "DELETE /locations/{locationId}",
         "DELETE /logo", "DELETE /products/{productId}/photos/{photoId}",

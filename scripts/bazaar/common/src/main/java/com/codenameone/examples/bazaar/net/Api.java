@@ -131,6 +131,7 @@ public final class Api {
     private static ChannelsApi channels;
     private static DigitalApi digital;
     private static TwoFactorApi twoFactor;
+    private static com.codenameone.examples.bazaar.api.AppExtensionApi extensions;
 
     private Api() {
     }
@@ -154,6 +155,8 @@ public final class Api {
         catalog = RestClients.create(CatalogApi.class, baseUrl);
         cart = RestClients.create(CartApi.class, baseUrl);
         checkout = RestClients.create(CheckoutApi.class, baseUrl);
+        extensions = RestClients.create(
+                com.codenameone.examples.bazaar.api.AppExtensionApi.class, baseUrl);
         orders = RestClients.create(OrderApi.class, baseUrl);
         giftCards = RestClients.create(GiftCardApi.class, baseUrl);
         inventory = RestClients.create(InventoryApi.class, baseUrl);
@@ -243,6 +246,11 @@ public final class Api {
 
     public static CheckoutApi checkout() {
         return checkout;
+    }
+
+    /// Installed apps' blocks, actions and embedded pages.
+    public static com.codenameone.examples.bazaar.api.AppExtensionApi extensions() {
+        return extensions;
     }
 
     public static OrderApi orders() {

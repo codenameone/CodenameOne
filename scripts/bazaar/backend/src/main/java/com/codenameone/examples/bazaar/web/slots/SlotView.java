@@ -38,4 +38,8 @@ public class SlotView {
     public boolean frame;
     /// A script of the `head` place: the loader appends it to the head.
     public boolean head;
+    /// An app's storefront block (`ops.Blocks`): printed as text by the
+    /// page itself, one [BlockLine] per line, never as markup.
+    public boolean block;
+    public final java.util.List<BlockLine> lines = new java.util.ArrayList<BlockLine>();
 }

@@ -135,6 +135,20 @@ public class WebSecurity {
         return http.build();
     }
 
+    /// The app proxy (`/s/{handle}/apps/...`, `extensions.AppProxyPages`):
+    /// an app's answer on the store's address, so no session is read or made
+    /// for it -- the shopper's cookie never reaches the app -- and the route
+    /// writes its own sandbox policy in place of the page headers.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain appProxyChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/s/*/apps/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
     /// The buy button (StoreSite.embed): framed by other sites, so none of
     /// the default headers (X-Frame-Options above all) and no session; the
     /// route writes its own policy.

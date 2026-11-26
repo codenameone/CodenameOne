@@ -782,6 +782,12 @@ public final class Ui {
         };
     }
 
+    /// Shows `message` as it is: text from an app or the server, not a word
+    /// to translate.
+    public static void sayPlain(String message) {
+        toast(message, false);
+    }
+
     public static void say(String message) {
         toast(Lang.tr(message), false);
     }

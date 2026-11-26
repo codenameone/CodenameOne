@@ -98,6 +98,8 @@ final class CheckoutForm {
     private TextField phone;
     private TextField email;
     private TextField note;
+    /// Fields installed apps add to checkout (`checkout.block`).
+    private com.codenameone.examples.bazaar.ui.AppBlocks.Checkout appFields;
 
     private CheckoutForm(Form previous) {
         this.previous = previous;
@@ -381,6 +383,14 @@ final class CheckoutForm {
         Container noteBox = new Container(BoxLayout.y());
         note = Ui.field(noteBox, "Note for the store (optional)", "order-note", "");
         reviewBox.add(noteBox);
+        if (appFields == null) {
+            appFields = com.codenameone.examples.bazaar.ui.AppBlocks.checkout(
+                    ShopState.store().handle());
+        }
+        if (appFields.view.getParent() != null) {
+            appFields.view.remove();
+        }
+        reviewBox.add(appFields.view);
         Button place = Ui.primary("Place order", "place-order", null);
         place.setEnabled(methodId != null && Estimate.agrees(quoted, rateId) && address != null
                 && !CheckoutHandoff.required(options));
@@ -412,8 +422,20 @@ final class CheckoutForm {
         button.setText(Lang.tr("Placing order..."));
         final String storeId = ShopState.store().id();
         String mail = text(email).length() > 0 ? text(email) : emailOf();
+        java.util.List<com.codenameone.examples.bazaar.api.FieldAnswerDto> answers = null;
+        if (appFields != null) {
+            try {
+                answers = appFields.answers();
+            } catch (com.codenameone.examples.bazaar.ops.Blocks.Invalid bad) {
+                placing = false;
+                button.setEnabled(true);
+                button.setText(Lang.tr("Place order"));
+                Ui.sayPlain(bad.getMessage());
+                return;
+            }
+        }
         Api.checkout().place(storeId, key, new PlaceOrderDto(address, rateId, methodId, mail,
-                text(note), key, 0, null), Net.to(order -> {
+                text(note), key, 0, answers), Net.to(order -> {
                     placing = false;
                     ShopState.rememberAddress(address);
                     ShopState.forgetCartStore();

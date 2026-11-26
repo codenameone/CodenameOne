@@ -91,6 +91,9 @@ final class OrderDetail extends Container {
         columns.add(left);
         columns.add(right);
         page.add(columns);
+        // Installed apps' blocks for this order, drawn natively.
+        page.add(com.codenameone.examples.bazaar.ui.AppBlocks.admin(MerchantState.storeId(),
+                "order", o.id()));
 
         Ui.section(left, "Items");
         Container lines = new Container(BoxLayout.y());

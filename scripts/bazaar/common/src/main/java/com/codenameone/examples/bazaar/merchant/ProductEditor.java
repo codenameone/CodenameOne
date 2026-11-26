@@ -149,6 +149,10 @@ final class ProductEditor extends Container {
             columns.add(side);
         }
         page.add(columns);
+        if (p != null && p.id() != null) {
+            page.add(com.codenameone.examples.bazaar.ui.AppBlocks.admin(
+                    MerchantState.storeId(), "product", p.id()));
+        }
 
         Container words = card(main, "Details");
         title = MUi.text(words, "Title", "product-title", p == null ? "" : p.title());

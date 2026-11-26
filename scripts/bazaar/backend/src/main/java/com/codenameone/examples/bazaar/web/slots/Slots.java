@@ -32,6 +32,9 @@ import com.codenameone.examples.bazaar.repository.AuditEventRepository;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 import com.codenameone.examples.bazaar.web.PageMeta;
 import com.codenameone.examples.bazaar.web.security.CspSources;
+import com.codenameone.examples.bazaar.extensions.Extensions;
+import com.codenameone.examples.bazaar.ops.Blocks;
+import com.codename1.backend.annotations.Autowired;
 import com.codenameone.examples.bazaar.web.security.PageEtags;
 import com.codenameone.examples.bazaar.web.security.WebHeaders;
 
@@ -93,6 +96,10 @@ public class Slots {
 
     private final DataSource db;
     private final StoreAccess access;
+    /// Apps' declarative storefront blocks; a field, since extensions read
+    /// the store's slots too.
+    @Autowired
+    Extensions extensions;
     private final AuditEventRepository audits;
 
     public Slots(DataSource db, StoreAccess access, AuditEventRepository audits) {
@@ -348,11 +355,19 @@ public class Slots {
             throws IOException {
         List<AppSlot> all = enabled(store.getId());
         page.privacyUrl = "/s/" + store.getHandle() + "/privacy";
-        if (all.isEmpty()) {
-            return;
-        }
         String path = request.getTarget();
         int q = path.indexOf('?');
+        boolean blocks = blocks(page, store, path.indexOf("/orders/") >= 0
+                && path.indexOf("/checkout") < 0);
+        if (all.isEmpty()) {
+            if (blocks) {
+                SecurityExchange exchange = SecurityExchange.current();
+                if (exchange != null) {
+                    exchange.setAttribute(PageEtags.SALT, "slots:" + version(store.getId()));
+                }
+            }
+            return;
+        }
         page.consentBack = q < 0 ? path : path.substring(0, q);
         if (q >= 0) {
             path = path.substring(0, q);
@@ -416,6 +431,47 @@ public class Slots {
             }
         }
         page.consentAsk = gated && !consent.answered && !checkout;
+    }
+
+    /// Adds the apps' storefront blocks to their places on `page`; true when
+    /// there was any. They are text the template escapes, plus links and
+    /// images whose https origin the policy is widened by.
+    private boolean blocks(PageMeta page, Store store, boolean order) throws IOException {
+        if (extensions == null) {
+            return false;
+        }
+        List<Extensions.Printed> printed = extensions.storefront(store.getId());
+        if (printed.isEmpty()) {
+            return false;
+        }
+        CspSources sources = new CspSources();
+        for (int iter = 0; iter < printed.size(); iter++) {
+            Extensions.Printed p = printed.get(iter);
+            List<SlotView> target = place(page, p.place, order);
+            if (target == null) {
+                continue;
+            }
+            SlotView v = new SlotView();
+            v.id = p.id;
+            v.kind = "block";
+            v.block = true;
+            v.title = p.title;
+            for (int r = 0; r < p.rows.size(); r++) {
+                Blocks.Row row = p.rows.get(r);
+                v.lines.add(BlockLine.of(row));
+                if (Blocks.IMAGE.equals(row.kind) && row.url.length() > 0) {
+                    String origin = scriptOrigin(row.url);
+                    if (origin != null) {
+                        sources.add(CspSources.IMG, origin);
+                    }
+                }
+            }
+            target.add(v);
+        }
+        if (!sources.isEmpty()) {
+            WebHeaders.allow(sources);
+        }
+        return true;
     }
 
     private static void allowAll(CspSources sources, String origins) {

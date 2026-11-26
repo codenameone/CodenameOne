@@ -68,6 +68,11 @@ public class StoreEvents {
     @Autowired
     private com.codenameone.examples.bazaar.catalog.Downloads downloads;
 
+    /// Reads the order's checkout answers (the store's fields and apps'),
+    /// which the order webhooks carry as `attributes`.
+    @Autowired
+    private com.codename1.backend.DataSource db;
+
     /// The order whose placing is under way on this thread, so the payment
     /// its own digital delivery takes does not mail the links a second time.
     private static final ThreadLocal<String> PLACING = new ThreadLocal<String>();
@@ -259,6 +264,7 @@ public class StoreEvents {
         List<OrderLine> lines;
         Customer customer;
         final List<String[]> low = new ArrayList<String[]>();
+        final List<String[]> attributes = new ArrayList<String[]>();
     }
 
     @Transactional(readOnly = true)
@@ -271,6 +277,19 @@ public class StoreEvents {
         s.order = o;
         s.lines = lines.findByOrderId(orderId);
         s.customer = o.getCustomerId().length() == 0 ? null : customers.findById(o.getCustomerId());
+        if (db != null) {
+            try {
+                List<Map> rows = db.query("SELECT label, answer FROM order_field WHERE "
+                        + "order_id = ? ORDER BY sort_order", new Object[] {orderId});
+                for (int iter = 0; iter < rows.size(); iter++) {
+                    Map r = rows.get(iter);
+                    s.attributes.add(new String[] {String.valueOf(r.get("label")),
+                        String.valueOf(r.get("answer"))});
+                }
+            } catch (java.io.IOException unreadable) {
+                // The event still goes out, without its attributes.
+            }
+        }
         for (int iter = 0; iter < s.lines.size(); iter++) {
             OrderLine line = s.lines.get(iter);
             if (line.getLocationId().length() == 0) {
@@ -370,6 +389,14 @@ public class StoreEvents {
         m.put("financial", o.getFinancial());
         m.put("fulfilment", o.getFulfilment());
         m.put("email", o.getEmail());
+        List<Map<String, Object>> attributes = new ArrayList<Map<String, Object>>();
+        for (int iter = 0; iter < s.attributes.size(); iter++) {
+            Map<String, Object> one = new LinkedHashMap<String, Object>();
+            one.put("label", s.attributes.get(iter)[0]);
+            one.put("value", s.attributes.get(iter)[1]);
+            attributes.add(one);
+        }
+        m.put("attributes", attributes);
         m.put("customerId", o.getCustomerId());
         m.put("subtotalCents", Long.valueOf(o.getSubtotalCents()));
         m.put("discountCents", Long.valueOf(o.getDiscountCents()));

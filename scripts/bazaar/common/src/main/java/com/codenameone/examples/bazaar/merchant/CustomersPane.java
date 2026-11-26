@@ -319,6 +319,8 @@ final class CustomersPane extends MerchantPane {
         page.removeAll();
         final CustomerDto c = d.customer();
         page.add(Ui.person(name(c), c.email() == null ? c.username() : c.email(), null));
+        page.add(com.codenameone.examples.bazaar.ui.AppBlocks.admin(MerchantState.storeId(),
+                "customer", c.id()));
         Container tiles = DashGrid.of(40f, 4);
         tiles.setUIID("MeTiles");
         tiles.add(MUi.tile(MerchantState.money(d.lifetimeValueCents()), Lang.tr("Lifetime value"),
