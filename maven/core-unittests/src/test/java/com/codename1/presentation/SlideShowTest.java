@@ -68,4 +68,39 @@ class SlideShowTest extends UITestBase {
         show.setLiveCharts(false);
         assertEquals(0, show.getComponentCount());
     }
+
+    @Test
+    void liveChartTextScalesWithTheSlideLikeThePaintedChart() {
+        com.codename1.ui.chart.Chart c = new com.codename1.ui.chart.Chart();
+        com.codename1.ui.plaf.Style all = c.getAllStyles();
+        all.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        all.setPadding(20, 20, 20, 20);
+        float k = SlideRenderer.chartPixelsPerPoint();
+        SlideShow.fitText(c, k / 2);
+        assertEquals(10, c.getStyle().getPaddingTop(), "half the real size, half the padding");
+        SlideShow.fitText(c, k / 2);
+        assertEquals(10, c.getStyle().getPaddingTop(), "the same scale changes nothing");
+        SlideShow.fitText(c, k / 4);
+        assertEquals(5, c.getStyle().getPaddingTop(), "measured from the base, not compounded");
+        SlideShow.fitText(c, k);
+        assertEquals(20, c.getStyle().getPaddingTop(), "the real size restores the theme's");
+    }
+
+    @Test
+    void layingOutAShowFitsItsLiveCharts() {
+        SlideShow show = new SlideShow(Decks.everything());
+        Form f = new Form("Show", new BorderLayout());
+        f.add(BorderLayout.CENTER, show);
+        f.show();
+        show.goTo(1);
+        f.revalidate();
+        com.codename1.ui.Component chart = show.getComponentAt(0);
+        Object ratio = chart.getClientProperty("cn1$textRatio");
+        assertTrue(ratio instanceof Float, "the layout fitted the chart");
+        float expected = show.slideArea()[4] / SlideRenderer.chartPixelsPerPoint();
+        assertEquals(expected, ((Float) ratio).floatValue(), 0.001f);
+    }
 }

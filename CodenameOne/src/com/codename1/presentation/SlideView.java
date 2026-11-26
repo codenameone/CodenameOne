@@ -58,10 +58,12 @@ import java.util.List;
 /// `PresentationModel`, so `getModel().undo()` undoes it.
 ///
 /// ```java
-/// PresentationModel model = new PresentationModel(Presentation.read(bytes));
-/// SlideView editor = new SlideView(model);
-/// form.add(BorderLayout.CENTER, editor);
-/// editor.addShape("roundRect");
+/// void edit(Form form, byte[] bytes) throws IOException {
+///     PresentationModel model = new PresentationModel(Presentation.read(bytes));
+///     SlideView editor = new SlideView(model);
+///     form.add(BorderLayout.CENTER, editor);
+///     editor.addShape("roundRect");
+/// }
 /// ```
 public class SlideView extends Container {
     private static final int DESK = 0xe4e7eb;

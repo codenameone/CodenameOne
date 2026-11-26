@@ -35,6 +35,8 @@ import java.util.List;
 /// which is how a `SlideView` and its thumbnails follow the model.
 ///
 /// ```java
+/// import com.codename1.wordprocessing.TextStyle;
+///
 /// PresentationModel model = new PresentationModel(new Presentation());
 /// String slideId = model.addSlide(-1);
 /// model.addElement(0, ShapeElement.textBox(model.newId('e'), 60, 40, 840, 90,
