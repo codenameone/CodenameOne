@@ -67,12 +67,14 @@ public class DomainVerification {
     }
 
     private final StoreRepository stores;
+    private final com.codename1.backend.DataSource db;
     private final StoreAccess access;
     private Probe probe;
 
-    public DomainVerification(StoreRepository stores, StoreAccess access,
-            com.codename1.backend.Config config) throws IOException {
+    public DomainVerification(StoreRepository stores, com.codename1.backend.DataSource db,
+            StoreAccess access, com.codename1.backend.Config config) throws IOException {
         this.stores = stores;
+        this.db = db;
         this.access = access;
         this.probe = new WebProbe(config.get("bazaar.domains.doh-url",
                 "https://cloudflare-dns.com/dns-query"));
@@ -95,15 +97,15 @@ public class DomainVerification {
             throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
         Store store = stores.findById(storeId);
-        assign(stores, store, domain);
+        assign(store, domain);
         stores.save(store);
         return dto(store, store.getCustomDomain() == null ? "" : "Publish the token, then verify");
     }
 
     /// Sets `store`'s domain to `raw` (folded; empty removes it), with a new
-    /// token and no proof when it changes. Saving `store` is the caller's.
-    public static void assign(StoreRepository stores, Store store, String raw)
-            throws IOException {
+    /// token and no proof when it changes. Saving `store` is the caller's,
+    /// inside the same transaction.
+    public void assign(Store store, String raw) throws IOException {
         String folded = SiteUrls.domain(raw);
         if (folded == null) {
             throw new ResponseStatusException(400, "That is not a hostname");
@@ -117,10 +119,17 @@ public class DomainVerification {
             if (holder.getDomainVerifiedAt() > 0) {
                 throw new ResponseStatusException(400, "Another store uses that domain");
             }
-            holder.setCustomDomain(null);
-            holder.setDomainToken("");
-            holder.setDomainVerifiedAt(0);
-            stores.save(holder);
+            // Released by a statement that runs now, not by saving `holder`:
+            // the session flushes its pending updates in no fixed order, and
+            // writing this store's claim first breaks the unique index on
+            // store.custom_domain. The proof check is repeated in the WHERE
+            // so a claim proved meanwhile is never released.
+            int released = db.execute("UPDATE store SET custom_domain = NULL, domain_token = '', "
+                    + "domain_verified_at = 0 WHERE id = ? AND domain_verified_at = 0",
+                    new Object[] {holder.getId()});
+            if (released != 1) {
+                throw new ResponseStatusException(400, "Another store uses that domain");
+            }
         }
         store.setCustomDomain(folded);
         store.setDomainToken(folded.length() == 0 ? "" : Tokens.token());

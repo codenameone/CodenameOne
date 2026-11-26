@@ -68,11 +68,13 @@ public class StoreSite {
     private final Stores storeService;
     private final StoreAccess access;
     private final SiteUrls urls;
+    private final DomainVerification domains;
 
     public StoreSite(StoreRepository stores, ProductRepository products,
             StoreStaffRepository staff, Catalog catalog, Stores storeService, StoreAccess access,
-            SiteUrls urls) {
+            SiteUrls urls, DomainVerification domains) {
         this.stores = stores;
+        this.domains = domains;
         this.products = products;
         this.staff = staff;
         this.catalog = catalog;
@@ -257,7 +259,7 @@ public class StoreSite {
         Store store = stores.findById(storeId);
         if (domain != null) {
             // A new domain gets a new token and is not served until proved.
-            DomainVerification.assign(stores, store, domain);
+            domains.assign(store, domain);
         }
         store.setSearchSynonyms(synonyms == null ? "" : synonyms.trim());
         store.setStorefrontPassword(password == null ? "" : password.trim());
