@@ -132,7 +132,7 @@ jobs:
       - name: Compute cn1-built cache key
         id: cn1_built_key
         # Single source of truth for the cache key, exposed as a job output
-        # so dependent jobs (build-ios, build-ios-metal in scripts-ios.yml,
+        # so dependent jobs (the suite jobs in scripts-ios.yml,
         # the iOS-native and packaging workflows) restore the EXACT key this
         # job saved against. Computing the same hash again on each consumer
         # job has been observed to produce a different value on some runners

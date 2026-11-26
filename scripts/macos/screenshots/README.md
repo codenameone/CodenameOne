@@ -17,7 +17,7 @@ compares `scripts/hellocodenameone` output against these PNGs via
 
 ## Review rules
 
-Open each new golden beside its counterpart in `../../ios/screenshots-metal/`
+Open each new golden beside its counterpart in `../../ios/screenshots-metal-27/`
 as a **review aid, never as a source**. Then:
 
 - **Layout differences are bugs.** A widget that is shifted, clipped, wrapped

@@ -36,94 +36,14 @@ on:
         type: string
   schedule:
     - cron: '45 1 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/linux-build-run.yml'
-      # The package install goes through these, and they run from this workflow
-      # too -- a change to either must be exercised by the job that depends on
-      # it, the same way archetype-smoke, designer and pr.yml list them.
-      - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci/apt-get-update.sh'
-      - 'scripts/ci/steam-runtime-smoke.sh'
-      - 'scripts/test_gc_heap_removal.py'
-      - 'vm/**'
-      - 'Ports/LinuxPort/**'
-      - 'maven/linux/**'
-      - 'scripts/linux/**'
-      - 'scripts/hellocodenameone/**'
-      # The Rive screenshot tests draw classes this translator generates.
-      - 'maven/rive-transcoder/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      # The screenshots these legs compare are produced by the core renderer and
-      # the port's native theme, so a change to either can move them. Without
-      # these the leg does not run on the pull request that changes them and the
-      # baselines only go stale on master - which is how the Sheet and
-      # AppReviewDialog captures were left recording a double paint (issue
-      # #5606). scripts/linux holds the baselines themselves, so a reseed is
-      # verified by the leg that produced it.
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'native-themes/gnome-adwaita/**'
-      - '!native-themes/gnome-adwaita/**/*.md'
-      - '!vm/**/README.md'
-      - '!vm/**/readme.md'
-      - '!vm/**/docs/**'
-  push:
-    branches: [ master, main ]
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/linux-build-run.yml'
-      - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci/apt-get-update.sh'
-      - 'scripts/ci/steam-runtime-smoke.sh'
-      - 'scripts/test_gc_heap_removal.py'
-      - 'vm/**'
-      - 'Ports/LinuxPort/**'
-      - 'maven/linux/**'
-      - 'scripts/linux/**'
-      - 'scripts/hellocodenameone/**'
-      # The Rive screenshot tests draw classes this translator generates.
-      - 'maven/rive-transcoder/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      # The screenshots these legs compare are produced by the core renderer and
-      # the port's native theme, so a change to either can move them. Without
-      # these the leg does not run on the pull request that changes them and the
-      # baselines only go stale on master - which is how the Sheet and
-      # AppReviewDialog captures were left recording a double paint (issue
-      # #5606). scripts/linux holds the baselines themselves, so a reseed is
-      # verified by the leg that produced it.
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'native-themes/gnome-adwaita/**'
-      - '!native-themes/gnome-adwaita/**/*.md'
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: linux-build-run-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -137,19 +57,10 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
@@ -158,8 +69,7 @@ jobs:
   # the mock ad provider, the Unity runtime). These are architecture-independent (they are translated to C later),
   # so both arch legs translate from these same classes.
   prepare-suite:
-    if: needs.golden-plan.outputs.run == 'true'
-    needs: [golden-plan, unity-gallery]
+    needs: [unity-gallery]
     name: build suite classes (x64)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -248,9 +158,8 @@ jobs:
           retention-days: 1
 
   build-run:
-    if: needs.golden-plan.outputs.run == 'true'
     name: build + run suite (${{ matrix.arch }})
-    needs: [golden-plan, prepare-suite]
+    needs: [prepare-suite]
     runs-on: ${{ matrix.runner }}
     # 90 for the suite plus the ParparVM vs JDK 25 performance gate below.
     timeout-minutes: 140
@@ -661,9 +570,9 @@ jobs:
   # using the host's glibc node.
   build-run-musl:
     name: build + run suite (musl, Alpine x64)
-    needs: [golden-plan, prepare-suite]
+    needs: [prepare-suite]
     # No golden directory of its own, so a golden capture skips it.
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (inputs.cn1ss_capture == '') }}
+    if: ${{ (inputs.cn1ss_capture == '') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -739,7 +648,7 @@ jobs:
   # sync (mirrors the iOS/watch jobs).
   compare-comment:
     name: screenshot-comment
-    needs: [golden-plan, build-run]
+    needs: [build-run]
     # !cancelled() rather than a plain event check: without it GitHub skips this
     # job whenever a build-run leg fails, and skipping it is precisely the wrong
     # response to a failing suite. Normalization is what publishes the fail /
@@ -747,7 +656,7 @@ jobs:
     # green report -- a failure masked as a pass. The workflow still goes red
     # because build-run itself failed; this only keeps the reporting honest.
     if: >-
-      needs.golden-plan.outputs.run == 'true' && (
+      (
       !cancelled() &&
       (github.event_name == 'pull_request' || github.event_name == 'push' ||
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

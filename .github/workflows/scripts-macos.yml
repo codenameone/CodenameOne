@@ -25,126 +25,10 @@ on:
         type: string
   schedule:
     - cron: '25 1 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/scripts-macos.yml'
-      - '.github/workflows/_build-mac-port.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-mac-port.sh'
-      - 'scripts/build-macos-app.sh'
-      - 'scripts/run-macos-ui-tests.sh'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/ios/tests/**'
-      - 'scripts/macos/**'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'scripts/common/java/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/lib/xcode.sh'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/MacPort/**'
-      - '!Ports/MacPort/**/*.md'
-      # The mac module stages and compiles shared sources out of Ports/iOSPort --
-      # IOSImplementation, IOSNative.m, the Metal renderer, the whole drawing
-      # core. An iOS-port-only change to any of that reaches this port, so
-      # without this filter the AppKit suite never starts and the change ships
-      # untested here. The reusable build workflow's source hash cannot save
-      # it: the workflow is not invoked at all.
-      - 'Ports/iOSPort/**'
-      - '!Ports/iOSPort/**/*.md'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
-      - 'vm/**'
-      - '!vm/**/*.md'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - 'maven/**'
-      - '!maven/cn1-ai-*/**'
-      - '!maven/cn1-admob/**'
-      - '!maven/cn1-applovin/**'
-      - '!maven/cn1-unity-levelplay/**'
-      - '!maven/core-unittests/**'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-  push:
-    branches: [ master ]
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/scripts-macos.yml'
-      - '.github/workflows/_build-mac-port.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-mac-port.sh'
-      - 'scripts/build-macos-app.sh'
-      - 'scripts/run-macos-ui-tests.sh'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/ios/tests/**'
-      - 'scripts/macos/**'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'scripts/common/java/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/lib/xcode.sh'
-      - 'CodenameOne/src/**'
-      - 'Ports/MacPort/**'
-      - 'Ports/iOSPort/**'
-      - 'native-themes/ios-modern/**'
-      - 'vm/**'
-      - 'tests/**'
-      - 'maven/**'
-      - '!maven/cn1-ai-*/**'
-      - '!maven/cn1-admob/**'
-      - '!maven/cn1-applovin/**'
-      - '!maven/cn1-unity-levelplay/**'
-      - '!maven/core-unittests/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 env:
   # A method the translator culled as unreachable is still emitted as a stub,
   # because dispatch tables name it. With this on, the stub aborts with the
@@ -158,35 +42,23 @@ env:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: scripts-macos-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   build-port:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     # AppKit has its own source hash and producer; it does not invalidate
     # the iOS coordinator's bundle.
     uses: ./.github/workflows/_build-mac-port.yml
 
   build-macos:
-    if: needs.golden-plan.outputs.run == 'true'
-    needs: [golden-plan, build-port, unity-gallery]
+    needs: [build-port, unity-gallery]
     permissions:
       contents: read
       pull-requests: write

@@ -5,46 +5,18 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
-  pull_request:
-    paths:
-      - '.github/workflows/scripts-javase.yml'
-      - 'scripts/run-javase-simulator-integration-tests.sh'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
-      - 'scripts/javase/**'
-      - '!scripts/javase/**/*.md'
-      - 'Ports/JavaSE/**'
-      - '!Ports/JavaSE/**/*.md'
-  push:
-    branches: [ master ]
-    paths:
-      - '.github/workflows/scripts-javase.yml'
-      - 'scripts/run-javase-simulator-integration-tests.sh'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
-      - 'scripts/javase/**'
-      - '!scripts/javase/**/*.md'
-      - 'Ports/JavaSE/**'
-      - '!Ports/JavaSE/**/*.md'
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: scripts-javase-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   javase-simulator-tests:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     permissions:
       contents: read
       pull-requests: write

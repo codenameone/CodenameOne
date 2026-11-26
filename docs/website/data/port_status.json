@@ -19,7 +19,7 @@
   ],
   "golden_directories": [
     "scripts/android/screenshots",
-    "scripts/ios/screenshots-metal",
+    "scripts/ios/screenshots-metal-27",
     "scripts/ios/screenshots-watch",
     "scripts/ios/screenshots-tv",
     "scripts/macos/screenshots",

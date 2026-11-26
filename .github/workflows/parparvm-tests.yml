@@ -1,221 +1,18 @@
 name: ParparVM Java Tests
 
 on:
-  pull_request:
-    paths:
-      - 'scripts/ci/retry.sh'
-      - '.github/workflows/parparvm-tests.yml'
-      - 'scripts/ci/start-sqlserver-strict.sh'
-      - 'vm/**'
-      - 'Ports/JavaScriptPort/**'
-      # GpuBlendContractTest reads each GPU backend's blend factors out of its
-      # source; a change to one of these alone must still run it.
-      - 'Ports/LinuxPort/nativeSources/cn1_linux_gl.c'
-      - 'Ports/iOSPort/nativeSources/CN1GL3D.m'
-      - 'Ports/WindowsPort/nativeSources/cn1_windows_d3d.cpp'
-      - 'Ports/Android/src/com/codename1/impl/android/AndroidGraphicsDevice.java'
-      - 'Ports/JavaSE/src/com/codename1/impl/javase/JavaSEGLDevice.java'
-      # NativeFontStyleContractTest compiles the function that reads a native:
-      # font name out of each of these and reads where the style goes.
-      - 'Ports/LinuxPort/nativeSources/cn1_linux_text.c'
-      - 'Ports/WindowsPort/nativeSources/cn1_windows_text.c'
-      # The GENERATOR, because the translated backend tests run what it writes:
-      # a change to the @Entity processor or BackendPackageMojo alone reaches
-      # PostgreSQL and MySQL through the daos it generates, and this is the only
-      # matrix that stands those servers up. maven/backend has no source of its
-      # own -- it compiles vm/backend/src, which 'vm/**' already covers, plus the
-      # shared core classes listed below -- but its pom decides what the install
-      # step below produces.
-      #
-      # NOT maven/core: the contract compiles against it, so a core change can
-      # break this matrix, but almost every PR touches core and this is a long
-      # job. The translated tests in pr.yml catch a core break first.
-      - 'maven/codenameone-maven-plugin/**'
-      - 'maven/build-engine/**'
-      - 'maven/project-model/**'
-      - 'maven/backend/**'
-      - 'maven/backend-test/**'
-      # The Python SQLAlchemy step runs these against the PostgreSQL service.
-      - 'maven/python-runtime/**'
-      - 'maven/python-transpiler/**'
-      - 'scripts/python-backend/sqlalchemy-realdb-test.sh'
-      - 'scripts/python-backend/build.sh'
-      - 'scripts/python-backend/e2e-test.sh'
-      - 'scripts/python-backend/e2e_client.py'
-      - 'scripts/python-backend/samples/**'
-      # sqlalchemy-realdb-test.sh compiles the host file system shims from here.
-      - 'scripts/python-bench/hostfs/**'
-      - 'scripts/hellocodenameone/pom.xml'
-      - 'scripts/hellocodenameone/backend/**'
-      # The core classes the backend compiles as its own (the ORM and the entity
-      # annotations, marked @SharedWithBackend and listed by
-      # vm/backend/shared-sources.sh). They have no copy under vm/ any more, so
-      # 'vm/**' no longer sees a change to them. A path filter cannot read the
-      # marker; a class marked outside these directories needs its path here.
-      - 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java'
-      - 'CodenameOne/src/com/codename1/impl/orm/**'
-      - 'CodenameOne/src/com/codename1/db/sql/**'
-      - 'CodenameOne/src/com/codename1/hardware/**'
-      - 'CodenameOne/src/com/codename1/realtime/**'
-      - 'CodenameOne/src/com/codename1/qrcode/QrCode.java'
-      - 'CodenameOne/src/com/codename1/impl/office/Snappy.java'
-      - 'CodenameOne/src/com/codename1/impl/MdnsEngine.java'
-      - 'CodenameOne/src/com/codename1/util/regex/**'
-      - 'CodenameOne/src/com/codename1/pdf/**'
-      - 'CodenameOne/src/com/codename1/impl/pdf/**'
-      - 'CodenameOne/src/com/codename1/xml/**'
-      - 'CodenameOne/src/com/codename1/orm/session/**'
-      - 'CodenameOne/src/com/codename1/orm/repository/**'
-      - 'CodenameOne/src/com/codename1/annotations/db/**'
-      - 'CodenameOne/src/com/codename1/annotations/Entity.java'
-      - 'CodenameOne/src/com/codename1/annotations/Id.java'
-      - 'CodenameOne/src/com/codename1/annotations/Column.java'
-      - 'CodenameOne/src/com/codename1/annotations/DbTransient.java'
-      - 'CodenameOne/src/com/codename1/annotations/JsonIgnore.java'
-      - 'CodenameOne/src/com/codename1/annotations/JsonProperty.java'
-      - 'CodenameOne/src/com/codename1/io/gzip/**'
-      - 'CodenameOne/src/com/codename1/io/outbox/**'
-      - 'CodenameOne/src/com/codename1/io/JSONParser.java'
-      - 'CodenameOne/src/com/codename1/io/PrettyPrinter.java'
-      - 'CodenameOne/src/com/codename1/io/JSONParseCallback.java'
-      - 'CodenameOne/src/com/codename1/io/JSONSanitizer.java'
-      - 'CodenameOne/src/com/codename1/io/CharArrayReader.java'
-      - 'CodenameOne/src/com/codename1/util/BigInteger.java'
-      - 'CodenameOne/src/com/codename1/util/MathUtil.java'
-      - 'CodenameOne/src/com/codename1/util/TBigInteger.java'
-      - 'CodenameOne/src/com/codename1/util/TBitLevel.java'
-      - 'CodenameOne/src/com/codename1/util/TConversion.java'
-      - 'CodenameOne/src/com/codename1/util/TDivision.java'
-      - 'CodenameOne/src/com/codename1/util/TElementary.java'
-      - 'CodenameOne/src/com/codename1/util/TLogical.java'
-      - 'CodenameOne/src/com/codename1/util/TMultiplication.java'
-      - 'CodenameOne/src/com/codename1/util/TPrimality.java'
-      - 'CodenameOne/src/com/codename1/migration/**'
-      - 'CodenameOne/src/com/codename1/impl/migration/**'
-      - 'CodenameOne/src/com/codename1/security/Hash.java'
-      - 'CodenameOne/src/com/codename1/security/Hmac.java'
-      - 'CodenameOne/src/com/codename1/security/MessageDigestImpl.java'
-      - 'CodenameOne/src/com/codename1/security/Secp256k1.java'
-      - 'CodenameOne/src/com/codename1/security/Otp.java'
-      - 'CodenameOne/src/com/codename1/security/Base32.java'
-      - 'CodenameOne/src/com/codename1/security/CryptoException.java'
-      - 'CodenameOne/src/com/codename1/security/**'
-      - 'CodenameOne/src/com/codename1/crypto/**'
-      - '!vm/**/README.md'
-      - '!vm/**/readme.md'
-      - '!vm/**/docs/**'
-  push:
-    branches: [ master, main ]
-    paths:
-      - 'scripts/ci/retry.sh'
-      - '.github/workflows/parparvm-tests.yml'
-      - 'scripts/ci/start-sqlserver-strict.sh'
-      - 'vm/**'
-      - 'Ports/JavaScriptPort/**'
-      # GpuBlendContractTest reads each GPU backend's blend factors out of its
-      # source; a change to one of these alone must still run it.
-      - 'Ports/LinuxPort/nativeSources/cn1_linux_gl.c'
-      - 'Ports/iOSPort/nativeSources/CN1GL3D.m'
-      - 'Ports/WindowsPort/nativeSources/cn1_windows_d3d.cpp'
-      - 'Ports/Android/src/com/codename1/impl/android/AndroidGraphicsDevice.java'
-      - 'Ports/JavaSE/src/com/codename1/impl/javase/JavaSEGLDevice.java'
-      # NativeFontStyleContractTest compiles the function that reads a native:
-      # font name out of each of these and reads where the style goes.
-      - 'Ports/LinuxPort/nativeSources/cn1_linux_text.c'
-      - 'Ports/WindowsPort/nativeSources/cn1_windows_text.c'
-      # The GENERATOR, because the translated backend tests run what it writes:
-      # a change to the @Entity processor or BackendPackageMojo alone reaches
-      # PostgreSQL and MySQL through the daos it generates, and this is the only
-      # matrix that stands those servers up. maven/backend has no source of its
-      # own -- it compiles vm/backend/src, which 'vm/**' already covers, plus the
-      # shared core classes listed below -- but its pom decides what the install
-      # step below produces.
-      #
-      # NOT maven/core: the contract compiles against it, so a core change can
-      # break this matrix, but almost every PR touches core and this is a long
-      # job. The translated tests in pr.yml catch a core break first.
-      - 'maven/codenameone-maven-plugin/**'
-      - 'maven/build-engine/**'
-      - 'maven/project-model/**'
-      - 'maven/backend/**'
-      - 'maven/backend-test/**'
-      # The Python SQLAlchemy step runs these against the PostgreSQL service.
-      - 'maven/python-runtime/**'
-      - 'maven/python-transpiler/**'
-      - 'scripts/python-backend/sqlalchemy-realdb-test.sh'
-      - 'scripts/python-backend/build.sh'
-      - 'scripts/python-backend/e2e-test.sh'
-      - 'scripts/python-backend/e2e_client.py'
-      - 'scripts/python-backend/samples/**'
-      # sqlalchemy-realdb-test.sh compiles the host file system shims from here.
-      - 'scripts/python-bench/hostfs/**'
-      - 'scripts/hellocodenameone/pom.xml'
-      - 'scripts/hellocodenameone/backend/**'
-      # The core classes the backend compiles as its own (the ORM and the entity
-      # annotations, marked @SharedWithBackend and listed by
-      # vm/backend/shared-sources.sh). They have no copy under vm/ any more, so
-      # 'vm/**' no longer sees a change to them. A path filter cannot read the
-      # marker; a class marked outside these directories needs its path here.
-      - 'CodenameOne/src/com/codename1/impl/SharedWithBackend.java'
-      - 'CodenameOne/src/com/codename1/impl/orm/**'
-      - 'CodenameOne/src/com/codename1/db/sql/**'
-      - 'CodenameOne/src/com/codename1/hardware/**'
-      - 'CodenameOne/src/com/codename1/realtime/**'
-      - 'CodenameOne/src/com/codename1/qrcode/QrCode.java'
-      - 'CodenameOne/src/com/codename1/impl/office/Snappy.java'
-      - 'CodenameOne/src/com/codename1/impl/MdnsEngine.java'
-      - 'CodenameOne/src/com/codename1/util/regex/**'
-      - 'CodenameOne/src/com/codename1/pdf/**'
-      - 'CodenameOne/src/com/codename1/impl/pdf/**'
-      - 'CodenameOne/src/com/codename1/xml/**'
-      - 'CodenameOne/src/com/codename1/orm/session/**'
-      - 'CodenameOne/src/com/codename1/orm/repository/**'
-      - 'CodenameOne/src/com/codename1/annotations/db/**'
-      - 'CodenameOne/src/com/codename1/annotations/Entity.java'
-      - 'CodenameOne/src/com/codename1/annotations/Id.java'
-      - 'CodenameOne/src/com/codename1/annotations/Column.java'
-      - 'CodenameOne/src/com/codename1/annotations/DbTransient.java'
-      - 'CodenameOne/src/com/codename1/annotations/JsonIgnore.java'
-      - 'CodenameOne/src/com/codename1/annotations/JsonProperty.java'
-      - 'CodenameOne/src/com/codename1/io/gzip/**'
-      - 'CodenameOne/src/com/codename1/io/outbox/**'
-      - 'CodenameOne/src/com/codename1/io/JSONParser.java'
-      - 'CodenameOne/src/com/codename1/io/PrettyPrinter.java'
-      - 'CodenameOne/src/com/codename1/io/JSONParseCallback.java'
-      - 'CodenameOne/src/com/codename1/io/JSONSanitizer.java'
-      - 'CodenameOne/src/com/codename1/io/CharArrayReader.java'
-      - 'CodenameOne/src/com/codename1/util/BigInteger.java'
-      - 'CodenameOne/src/com/codename1/util/MathUtil.java'
-      - 'CodenameOne/src/com/codename1/util/TBigInteger.java'
-      - 'CodenameOne/src/com/codename1/util/TBitLevel.java'
-      - 'CodenameOne/src/com/codename1/util/TConversion.java'
-      - 'CodenameOne/src/com/codename1/util/TDivision.java'
-      - 'CodenameOne/src/com/codename1/util/TElementary.java'
-      - 'CodenameOne/src/com/codename1/util/TLogical.java'
-      - 'CodenameOne/src/com/codename1/util/TMultiplication.java'
-      - 'CodenameOne/src/com/codename1/util/TPrimality.java'
-      - 'CodenameOne/src/com/codename1/migration/**'
-      - 'CodenameOne/src/com/codename1/impl/migration/**'
-      - 'CodenameOne/src/com/codename1/security/Hash.java'
-      - 'CodenameOne/src/com/codename1/security/Hmac.java'
-      - 'CodenameOne/src/com/codename1/security/MessageDigestImpl.java'
-      - 'CodenameOne/src/com/codename1/security/Secp256k1.java'
-      - 'CodenameOne/src/com/codename1/security/Otp.java'
-      - 'CodenameOne/src/com/codename1/security/Base32.java'
-      - 'CodenameOne/src/com/codename1/security/CryptoException.java'
-      - 'CodenameOne/src/com/codename1/security/**'
-      - 'CodenameOne/src/com/codename1/crypto/**'
-      - '!vm/**/README.md'
-      - '!vm/**/readme.md'
-      - '!vm/**/docs/**'
   release:
     types:
       - published
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: parparvm-tests-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -234,14 +31,6 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   # EVERY DOCUMENTED RUNTIME CONFIGURATION MUST STILL COMPILE.
   #
   # ParparVM's runtime carries ~40 compile-time arms: QA instruments, and ablations
@@ -260,8 +49,6 @@ jobs:
   # a compile-and-link sweep, not a behaviour suite, and what each arm DOES is its own
   # gate's business.
   ablation-arms:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -301,8 +88,6 @@ jobs:
           if-no-files-found: warn
 
   vm-tests:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     # The full suite and serial GC benchmarks took 69 and 47 minutes in run
     # 38355108612. Both passed, but setup plus reporting exceeded two hours.
@@ -779,8 +564,6 @@ jobs:
   # has to match the committed manifest so the suite cannot quietly shrink to the
   # cases it happens to pass.
   backend-compiled-tests:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     # The backend test framework's two runners over one test source: surefire on
     # the JVM, then the same classes translated by ParparVM into a native test
     # binary (cn1:backend-test), the way an application's own tests run when it
@@ -867,8 +650,6 @@ jobs:
           retention-days: 14
 
   python-backend-native:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     # The Flask and FastAPI samples built NATIVELY (ParparVM, clang) and
     # driven over sockets by the same client as the JVM run. The only place
     # Python handlers run on the backend's virtual threads, so the only run
@@ -940,8 +721,6 @@ jobs:
           JAVA17_HOME: ${{ env.JDK_17_HOME }}
 
   backend-websocket-conformance:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     name: WebSocket conformance (Autobahn)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -990,8 +769,7 @@ jobs:
 
 
   release-jars:
-    needs: golden-plan
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'release' && github.event.action == 'published') }}
+    if: ${{ (github.event_name == 'release' && github.event.action == 'published') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:

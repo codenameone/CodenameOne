@@ -16,31 +16,17 @@ permissions:
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - master
-  push:
-    branches:
-      - master
-
+  # Pull requests and master pushes run this as part of ci.yml's precheck,
+  # which every other job of that run waits on.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: source-gates-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   source-gates:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -75,6 +61,15 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: scripts/check-author-tags.py
+
+      # The same check javadocs.yml runs, here so a missing package-info.java
+      # fails in seconds instead of after the javadoc build.
+      - name: Every documented package has a package-info.java
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          scripts/check-package-info.sh
+          scripts/check-package-info.sh vm/backend/src
 
       - name: Reject since markers in API docs
         if: ${{ !cancelled() }}

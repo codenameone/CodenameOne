@@ -29,86 +29,14 @@ on:
         type: string
   schedule:
     - cron: '5 2 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/parparvm-tests-windows.yml'
-      - 'vm/**'
-      - 'Ports/WindowsPort/**'
-      - 'scripts/hellocodenameone/**'
-      # The Rive screenshot tests draw classes this translator generates.
-      - 'maven/rive-transcoder/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      # The screenshots this leg compares are produced by the core renderer and
-      # the port's native theme, so a change to either can move them. Without
-      # these the leg does not run on the pull request that changes them and the
-      # baselines only go stale on master - which is how the Sheet and
-      # AppReviewDialog captures were left recording a double paint (issue
-      # #5606). scripts/windows holds the baselines themselves, so a reseed is
-      # verified by the leg that produced it.
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'native-themes/windows-fluent/**'
-      - '!native-themes/windows-fluent/**/*.md'
-      - 'scripts/windows/**'
-      - '!scripts/windows/**/*.md'
-      - '!vm/**/README.md'
-      - '!vm/**/readme.md'
-      - '!vm/**/docs/**'
-  push:
-    branches: [ master, main ]
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/parparvm-tests-windows.yml'
-      - 'vm/**'
-      - 'Ports/WindowsPort/**'
-      - 'scripts/hellocodenameone/**'
-      # The Rive screenshot tests draw classes this translator generates.
-      - 'maven/rive-transcoder/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      # The screenshots this leg compares are produced by the core renderer and
-      # the port's native theme, so a change to either can move them. Without
-      # these the leg does not run on the pull request that changes them and the
-      # baselines only go stale on master - which is how the Sheet and
-      # AppReviewDialog captures were left recording a double paint (issue
-      # #5606). scripts/windows holds the baselines themselves, so a reseed is
-      # verified by the leg that produced it.
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'native-themes/windows-fluent/**'
-      - '!native-themes/windows-fluent/**/*.md'
-      - 'scripts/windows/**'
-      - '!scripts/windows/**/*.md'
-      - '!vm/**/README.md'
-      - '!vm/**/readme.md'
-      - '!vm/**/docs/**'
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: parparvm-tests-windows-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -137,25 +65,15 @@ env:
   CXXFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   vm-tests-windows:
-    needs: golden-plan
     # Not a screenshot suite: a golden capture skips it.
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (inputs.cn1ss_capture == '') }}
+    if: ${{ (inputs.cn1ss_capture == '') }}
     name: clean-target (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
@@ -407,9 +325,9 @@ jobs:
   # Separate from the clean-target gate so rendering failures are reported as
   # their own blocking check with dedicated diagnostics.
   windows-port-screenshot:
-    needs: [golden-plan, unity-gallery]
+    needs: [unity-gallery]
     name: screenshot-capture (x64)
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: windows-latest
     # 90 for the suite plus the ParparVM vs JDK 25 performance gate.
     timeout-minutes: 140
@@ -769,7 +687,7 @@ jobs:
   # requests and on master-report runs.
   windows-port-screenshot-arm64:
     name: screenshot-capture (arm64)
-    needs: [golden-plan, windows-port-screenshot]
+    needs: [windows-port-screenshot]
     # Runs when the x64 job FAILED too, not only when it passed: what this leg needs
     # from it (the compiled classes) is uploaded early, and the x64 job's last step is
     # the performance verdict. Requiring success let an x64 perf regression skip the
@@ -778,7 +696,7 @@ jobs:
     # Not in a golden capture: the x64 leg's rendering is the golden
     # (golden-capture.sh), and this leg is held to it by the normal run.
     if: >-
-      needs.golden-plan.outputs.run == 'true' && inputs.cn1ss_capture == '' && (
+      inputs.cn1ss_capture == '' && (
       !cancelled() && needs.windows-port-screenshot.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
       )
@@ -1013,9 +931,9 @@ jobs:
   # carries that arch's own benchmark table (SSE2 on x64, NEON on arm64).
   windows-port-screenshot-comment-x64:
     name: screenshot-comment (x64)
-    needs: [golden-plan, windows-port-screenshot]
+    needs: [windows-port-screenshot]
     if: >-
-      needs.golden-plan.outputs.run == 'true' && (
+      (
       !cancelled() &&
       needs.windows-port-screenshot.result != 'cancelled' &&
       needs.windows-port-screenshot.result != 'skipped' &&
@@ -1133,12 +1051,12 @@ jobs:
 
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
-    needs: [golden-plan, windows-port-screenshot-arm64]
+    needs: [windows-port-screenshot-arm64]
     # The capture job uploads its raw evidence with if: ${{ !cancelled() }}. Normalize it
     # even when capture failed so diagnostics remain available. The failed
     # capture still remains a blocking red check.
     if: >-
-      needs.golden-plan.outputs.run == 'true' && (
+      (
       !cancelled() &&
       needs.windows-port-screenshot-arm64.result != 'cancelled' &&
       needs.windows-port-screenshot-arm64.result != 'skipped' &&
@@ -1264,9 +1182,8 @@ jobs:
   # Windows-host toolchain as a second real-compiler check beyond the Linux
   # xwin leg. Compile-only (/c): any compile error fails the job.
   widgetboard-compile-check:
-    needs: golden-plan
     # Not a screenshot suite: a golden capture skips it.
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (inputs.cn1ss_capture == '') }}
+    if: ${{ (inputs.cn1ss_capture == '') }}
     name: widgetboard-compile-check (x64)
     runs-on: windows-latest
     timeout-minutes: 20

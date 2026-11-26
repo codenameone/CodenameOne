@@ -14,166 +14,26 @@ name: Test Android build scripts
         type: string
   schedule:
     - cron: '5 1 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/scripts-android.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/ci/retry.sh'
-      - 'scripts/build-android-port.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/verify-android-app-compile-sdk.sh'
-      - 'scripts/check-android-api-removals.py'
-      - 'scripts/android/newest-platform-package.sh'
-      - 'scripts/run-android-instrumentation-tests.sh'
-      - 'scripts/generate-android-coverage-report.sh'
-      - 'scripts/android/lib/**/*.java'
-      - 'scripts/android/tests/**/*.java'
-      - 'scripts/device-runner-app/**/*.java'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/android/screenshots/**'
-      - '!scripts/android/screenshots/**/*.md'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/Android/**'
-      - '!Ports/Android/**/*.md'
-      - 'native-themes/android-material/**'
-      - '!native-themes/android-material/**/*.md'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/ci/tests/cn1ss-selfcheck-test.sh'
-  push:
-    branches:
-      - master
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/scripts-android.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/ci/retry.sh'
-      - 'scripts/build-android-port.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/verify-android-app-compile-sdk.sh'
-      - 'scripts/check-android-api-removals.py'
-      - 'scripts/android/newest-platform-package.sh'
-      - 'scripts/run-android-instrumentation-tests.sh'
-      - 'scripts/generate-android-coverage-report.sh'
-      - 'scripts/android/lib/**/*.java'
-      - 'scripts/android/tests/**/*.java'
-      - 'scripts/device-runner-app/**/*.java'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/android/screenshots/**'
-      - '!scripts/android/screenshots/**/*.md'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/Android/**'
-      - '!Ports/Android/**/*.md'
-      - 'native-themes/android-material/**'
-      - '!native-themes/android-material/**/*.md'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/ci/tests/cn1ss-selfcheck-test.sh'
-
-# The token in secrets.CN1SS_GH_TOKEN was generated on
-# Oct 16th 2025. If in Oct 2026 builds start failing, it
-# means the token needs to be regenerated:
-#	1.	Go to https://github.com/settings/tokens -> "Developer settings" -> "Personal access tokens".
-#	2.	Choose Fine-grained token (recommended).
-#	3.	Grant:
-#	*	Repository access -> select Codename One
-#	*	Permissions:
-#	*	Contents -> Read and Write
-#	*	Pull requests -> Read and Write
-#	*	Issues -> Read and Write
-#	4.	Copy the generated token
-#   5. Go to https://github.com/codenameone/CodenameOne/settings/secrets/actions
-#     and edit the CN1SS_GH_TOKEN to use the new token
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: scripts-android-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   build-android:
-    if: needs.golden-plan.outputs.run == 'true'
     name: Build Android ${{ matrix.name }}
-    needs: [golden-plan, unity-gallery]
+    needs: [unity-gallery]
     strategy:
       fail-fast: false
       # A golden capture runs the Default leg alone. All three legs share

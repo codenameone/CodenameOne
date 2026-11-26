@@ -134,7 +134,7 @@ Per-post assets (screenshots, diagrams, animated GIFs) live in `docs/website/sta
 Real screenshots beat ASCII mockups. Always. Before asking the user to take a screenshot, look for an existing test fixture:
 
 ```
-scripts/ios/screenshots-metal/<TestName>.png       # iOS
+scripts/ios/screenshots-metal-27/<TestName>.png       # iOS
 scripts/android/screenshots/<TestName>.png         # Android
 scripts/javase/screenshots/<TestName>.png          # JavaSE simulator
 ```
@@ -149,7 +149,7 @@ Example (from the 2026-05-31 platform-APIs post):
 
 ```python
 from PIL import Image
-src = Image.open('scripts/ios/screenshots-metal/ChatView_light.png')
+src = Image.open('scripts/ios/screenshots-metal-27/ChatView_light.png')
 W, H = src.size
 out = src.crop((0, 360, W, H))   # drop caption
 target_w = 480
@@ -257,7 +257,7 @@ Before requesting review on a batch PR:
 ```python
 from PIL import Image, ImageDraw
 
-src = Image.open('scripts/ios/screenshots-metal/LottieAnimatedScreenshotTest.png')
+src = Image.open('scripts/ios/screenshots-metal-27/LottieAnimatedScreenshotTest.png')
 W, H = src.size
 cw, ch = 589, 852          # cells in a 2x3 grid
 order = [(0,0),(1,0),(0,1),(1,1),(0,2),(1,2)]

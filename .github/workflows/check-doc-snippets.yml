@@ -7,53 +7,21 @@ name: Documentation snippets run in the Playground
 # filter skips docs/.
 
 on:
-  pull_request:
-    paths:
-      - 'docs/developer-guide/**'
-      # Every tree a guide page includes Java from: changing an included file
-      # changes the published snippet without touching the .asciidoc.
-      - 'docs/demos/**'
-      - 'scripts/wayline/**'
-      - 'scripts/savor/**'
-      - 'scripts/bazaar/**'
-      - 'scripts/bastion/**'
-      - 'scripts/pulse/**'
-      - 'scripts/slate/**'
-      - 'scripts/splat/**'
-      - 'scripts/skirmish/**'
-      - 'scripts/papercut/**'
-      - 'scripts/dash/**'
-      - 'scripts/hellocodenameone/common/src/main/kmp/**'
-      - 'docs/website/content/blog/**'
-      - 'CodenameOne/src/**/*.java'
-      - 'Ports/CLDC11/src/**/*.java'
-      - 'scripts/cn1playground/common/**'
-      - 'vm/JavaCompiler/**'
-      - 'scripts/check-doc-snippets.py'
-      - 'scripts/doc-snippet-baseline.txt'
-      - 'scripts/extract-javadoc-java-snippets.sh'
-      - '.github/workflows/check-doc-snippets.yml'
   workflow_dispatch:
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: check-doc-snippets-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   doc-snippets:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

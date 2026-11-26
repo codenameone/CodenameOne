@@ -1,46 +1,23 @@
 name: Build JavaDocs
 
 on:
-  pull_request:
-    paths:
-      - 'CodenameOne/src/**/*.java'
-      - 'Ports/**/src/**/*.java'
-      # The backend API reference is built by the same script, from these.
-      - 'vm/backend/src/**/*.java'
-      - 'vm/backend/impl/**/*.java'
-      - 'vm/backend/shared-sources.sh'
-      - 'vm/backend/package-docs/**'
-      - 'maven/**/src/main/java/**/*.java'
-      - '.github/scripts/build_javadocs.sh'
-      - 'scripts/check-package-info.sh'
-      - '.github/workflows/javadocs.yml'
-  push:
-    branches:
-      - master
-      - main
   release:
     types:
       - published
   workflow_dispatch:
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: javadocs-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   build-javadocs:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

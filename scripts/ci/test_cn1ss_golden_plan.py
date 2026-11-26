@@ -171,8 +171,8 @@ class GoldenPlanTest(unittest.TestCase):
             fh.write("\n// dropped the light variant\n")
         self.assertEqual(f.plan(base=base), ([], []))
 
-    def test_alias_declares_both_metal_directories(self):
-        dirs = {"g/phone": {"ios-metal"}, "g/phone27": {"ios-metal-27"}}
+    def test_alias_ios_metal_declares_the_metal_27_directory(self):
+        dirs = {"g/phone27": {"ios-metal-27"}}
         src = dict(BASE_SOURCES)
         src["WatchSkipScreenshotTest.java"] = src["WatchSkipScreenshotTest.java"].replace(
             "cn1ss-skip: watchos", "cn1ss-skip: ios-metal")

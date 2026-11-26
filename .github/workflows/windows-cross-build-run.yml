@@ -30,66 +30,14 @@ on:
         type: string
   schedule:
     - cron: '55 1 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/windows-cross-build-run.yml'
-      - 'vm/**'
-      - 'Ports/WindowsPort/**'
-      - 'maven/windows/**'
-      - 'scripts/windows/**'
-      - 'scripts/hellocodenameone/**'
-      # The Rive screenshot tests draw classes this translator generates.
-      - 'maven/rive-transcoder/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      # This job's first step runs through both CI shell helpers, so a change to either has
-      # to be exercised here rather than merged untested -- the same reason every other
-      # consumer lists them.
-      - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci/apt-get-update.sh'
-      - 'scripts/ci/retry.sh'
-      - '!vm/**/README.md'
-      - '!vm/**/readme.md'
-      - '!vm/**/docs/**'
-  push:
-    branches: [ master, main ]
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/windows-cross-build-run.yml'
-      - 'vm/**'
-      - 'Ports/WindowsPort/**'
-      - 'maven/windows/**'
-      - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci/apt-get-update.sh'
-      - 'scripts/ci/retry.sh'
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: windows-cross-build-run-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -103,24 +51,14 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   cross-build:
-    if: needs.golden-plan.outputs.run == 'true'
-    needs: [golden-plan, unity-gallery]
+    needs: [unity-gallery]
     name: cross-build suite exe (Linux, x64 + WebView2)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -343,9 +281,8 @@ jobs:
           retention-days: 1
 
   run-on-windows:
-    if: needs.golden-plan.outputs.run == 'true'
     name: run cross-built exe + capture (Windows x64)
-    needs: [golden-plan, cross-build]
+    needs: [cross-build]
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -411,7 +348,7 @@ jobs:
   # a marker distinct from the native-Windows screenshot comment so both coexist.
   compare-comment:
     name: cross-compiled screenshot-comment
-    needs: [golden-plan, run-on-windows]
+    needs: [run-on-windows]
     # !cancelled(), for the same reason as linux-build-run.yml: without it GitHub
     # skips this job whenever run-on-windows fails, so the run that most needs
     # reporting uploads raw evidence but no port-status artifact. The nightly
@@ -420,7 +357,7 @@ jobs:
     # Windows failure masked by a stale pass. The workflow still goes red because
     # run-on-windows itself failed.
     if: >-
-      needs.golden-plan.outputs.run == 'true' && (
+      (
       !cancelled() &&
       (github.event_name == 'pull_request' || github.event_name == 'push' ||
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

@@ -14,12 +14,15 @@ on:
   # reports" deadlock that path-filtered workflows cause. The job itself detects
   # whether any blog content changed and fast-skips (passing) when none did, so
   # non-blog PRs stay cheap.
-  pull_request:
   schedule:
     # Weekly whole-corpus backlog report (Mondays 06:00 UTC). Non-blocking.
     - cron: '0 6 * * 1'
   workflow_dispatch:
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 permissions:
   contents: read
   pull-requests: write
@@ -30,25 +33,16 @@ env:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: blog-prose-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   # --------------------------------------------------------------------------- #
   # PR gate — fails only on net-new findings in changed posts.
   # --------------------------------------------------------------------------- #
   gate:
-    needs: golden-plan
     name: Blog prose gate
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'pull_request') }}
+    if: ${{ (github.event_name == 'pull_request') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
@@ -248,8 +242,7 @@ jobs:
   # Weekly / on-demand whole-corpus backlog report. NEVER fails the build.
   # --------------------------------------------------------------------------- #
   report:
-    needs: golden-plan
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository

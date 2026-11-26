@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Hold each duplicated CI leg to being the same job as the one it copies.
 
-Two jobs here are COPIES of another job -- build-ios-metal-27 of build-ios-metal,
-and fidelity-ios-metal-27 of fidelity-ios-metal -- because each pair must run
-identical steps on different toolchains. A copy that nobody checks drifts: a step
+One job here is a COPY of another -- fidelity-ios-metal-27 of fidelity-ios-metal
+-- because the pair must run identical steps on different toolchains (the
+screenshot suite's iOS 26 leg is gone; its iOS 27 leg is the only one). A copy that nobody checks drifts: a step
 added to one, a timeout raised on the other, and the "identical" claim in the
 workflow comment quietly stops being true while both jobs stay green. Nothing
 else in the repository would notice, because each job passes on its own terms.
@@ -28,64 +28,6 @@ ROOT = Path(__file__).resolve().parent.parent
 # over is drift. `only_in_*_steps` names whole steps that exist in one leg on
 # purpose, matched by their `- name:`.
 PAIRS = [
-    {
-        "workflow": ".github/workflows/scripts-ios.yml",
-        "original": "build-ios-metal",
-        "copy": "build-ios-metal-27",
-        "subs": [
-            ("runs-on: xcode-27", "runs-on: macos-15"),
-            ("-metal27-${{ github.ref_name }}", "-metal-${{ github.ref_name }}"),
-            ("ios-ui-tests-metal-27", "ios-ui-tests-metal"),
-            ("screenshots-metal-27", "screenshots-metal"),
-            ("CN1SS_IOS_METAL27_COMMENT", "CN1SS_IOS_METAL_COMMENT"),
-            ("CN1SS_PREVIEW_SUBDIR: ios-metal-27", "CN1SS_PREVIEW_SUBDIR: ios-metal"),
-            # A SUBSTITUTION, not an only_in_copy entry. Declared as "extra" it
-            # matched a line the copy also still carried at ios-sim-debug, so the
-            # guard saw no drift while the leg silently used the iOS 26 ratchet.
-            ("CN1_WARNING_LEG: ios-sim-debug-xcode27", "CN1_WARNING_LEG: ios-sim-debug"),
-            # Each leg's golden capture lands under its own artifact name.
-            ("name: cn1ss-capture-ios-metal-27", "name: cn1ss-capture-ios-metal"),
-            # A capture starts only the legs whose goldens are missing
-            # (scripts-ios.yml's select job), so each leg has its own switch.
-            ("needs.select.outputs.metal27 ==", "needs.select.outputs.metal =="),
-        ],
-        # Lines the COPY must contain, checked before any substitution. The
-        # subs list cannot do this job: it describes differences that are
-        # ALLOWED, so a copy that quietly reverts to the original's value shows
-        # up as no difference at all. That is not hypothetical -- the iOS 27 leg
-        # carried the iOS 26 warning ratchet for two full runs, compared a 27
-        # build against a 26 baseline, failed the census before taking a single
-        # screenshot, and this guard reported the legs identical throughout.
-        "required_in_copy": [
-            "CN1_WARNING_LEG: ios-sim-debug-xcode27",
-            # The image carries three 27 releases; without the pin the selector
-            # takes the newest and the 27.1 baselines score a 27.2 build.
-            "CN1_XCODE_VERSION_PIN: '27.1'",
-            "SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-27",
-            # The simulator this leg captures on. Both lines, because each alone
-            # is a silent fallback: no boot step and the destination names a
-            # device that does not exist; no destination and run-ios-ui-tests.sh
-            # asks for "iPhone 16" by name, finds none on the Xcode 27 image, and
-            # captures on whatever it falls back to -- an iPad, the run that
-            # exposed it. Declaring them as allowed extras only permitted them;
-            # deleting both still read as "the legs match".
-            "boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16'",
-            "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
-        ],
-        "only_in_copy": [
-            "CN1_XCODE_MAJOR: '27'",
-            "CN1_XCODE_VERSION_PIN: '27.1'",
-            "IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'",
-            "IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'",
-        ],
-        # The published port report is keyed on the port id `ios-metal` and there
-        # is one iOS port; a second upload under that id would publish whichever
-        # leg finished last.
-        "only_in_original_steps": ["Upload iOS Metal port status"],
-        # The 26 leg finds its iPhone 16 already on the image; the 27 image has
-        # none, so this leg creates one rather than accepting a fallback device.
-        "only_in_copy_steps": ["Boot an iPhone 16 on iOS 27"],
-    },
     {
         "workflow": ".github/workflows/scripts-fidelity.yml",
         "original": "fidelity-ios-metal",

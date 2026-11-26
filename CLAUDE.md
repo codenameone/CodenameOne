@@ -1179,15 +1179,17 @@ Traps:
   Windows translations (`vm/tests`, `helloSuiteLibraryClasses`) and the
   JavaScript build script read it; a list of class directories per workflow
   is how the Unity runtime was missing from three of them.
-- **The artifact name is fixed, so the workflow is called once per run.** A
-  workflow that is itself called (`scripts-ios-native.yml`, `ios-packaging.yml`)
-  takes `unity_prepared` and skips its own call
-  when `scripts-ios.yml` already made one.
+- **The artifact name is fixed, so the archive is made once per run.**
+  `ci.yml` builds it before any member; a member's own call then finds the
+  archive already in the run (the workflow's first step asks the API) and
+  returns at once. `scripts-ios-native.yml` and `ios-packaging.yml` also take
+  `unity_prepared` and skip their call outright.
 - **Anything new that determines the archive goes into the cache key** in the
   reusable workflow. A stale cached archive is not refused downstream -- it is
   self-consistent -- it is simply used.
 - **Every PR-gating workflow that builds the application lists the gallery, both
-  modules, the script, the workflow and the action in its `paths`**, and
+  modules, the script, the workflow and the action in its `paths`** (for a
+  `ci.yml` member, its entry in `.github/ci/ci-members.json`), and
   `.github/ci/apple-checks.json` lists them for the four Apple suites.
   A nightly suite (see *Nightly CI*) lists only its own tree and is exempt.
 - **`unpack` after `mvn clean` on the application, never before**: the output
@@ -1441,6 +1443,32 @@ Traps that have already cost a fix:
 target's upload (`.github/workflows/kmp-compat.yml`). `scripts/kmp-bench` runs
 the same Compose source against Compose Multiplatform on an iOS simulator; see
 its README for the numbers and what they do not show.
+
+### Pull request CI is one workflow: `ci.yml`
+
+A pull request or master push starts `ci.yml` ("CI") and the path-scoped
+workflows of the samples, cn1libs and feature trees; nothing else.
+
+- **Precheck first.** `golden-plan.yml`, `source-gates.yml` and
+  `check-workflows.yml` run in parallel on Linux in a few minutes. Every other
+  job of the run `needs:` all three, so a missing golden, a missing
+  `package-info.java`, a header, a workflow lint error or a broken gate test
+  ends the run before any build starts. A cheap check that keeps failing PRs
+  late belongs in `source-gates.yml`.
+- **The heavy workflows are members**, called from `ci.yml` as reusable
+  workflows: `pr`, the `scripts-*` device suites, the ParparVM, Linux and
+  Windows native suites and the docs workflows. They have no `pull_request` or
+  `push` trigger of their own; their old `paths` filters are in
+  `.github/ci/ci-members.json` and `scripts/ci/select-ci-members.py` applies
+  them (`test_select_ci_members.py`). A new heavy workflow is a member: an entry
+  there and a job in `ci.yml`. They keep `workflow_dispatch` and their
+  schedules, so golden capture and the nightlies dispatch them as before.
+- **One run shares its artifacts.** The Unity gallery is built once per run.
+  Inside a member `github.workflow` is `CI`, so each member's concurrency group
+  starts with its own file name; keep that on a new one.
+- **Check names are `CI / <member> / <job>`.** Branch protection and anything
+  that looks a PR run up by workflow name must use them; `golden-harvest.sh`
+  lists `ci.yml` beside the members for that reason.
 
 ### Screenshot goldens: capture, harvest, and how to watch them
 

@@ -1,105 +1,22 @@
 name: Build Developer Guide Docs
 
 on:
-  pull_request:
-    paths:
-      - 'scripts/ci/retry.sh'
-      - 'docs/developer-guide/**'
-      - 'docs/demos/**'
-      - 'scripts/developer-guide/**'
-      # The Wayline chapters include the sample's own sources by tag, so moving
-      # or deleting a tagged region there changes the guide without touching
-      # docs/. Only the trigger, not the `docs` filter below: the Asciidoctor
-      # lint runs on every trigger and fails on a tag it cannot find, and the
-      # sample itself is compiled and tested by wayline.yml, so the demo build
-      # and the figure render have nothing to add for it.
-      - 'scripts/wayline/**'
-      # The Savor and Parley chapters, the same way; savor.yml and parley.yml
-      # compile and test the samples.
-      - 'scripts/savor/**'
-      - 'scripts/bazaar/**'
-      # The Bastion chapters, the same way; bastion.yml compiles and tests it.
-      - 'scripts/bastion/**'
-      - 'scripts/pulse/**'
-      - 'scripts/slate/**'
-      - 'scripts/splat/**'
-      - 'scripts/skirmish/**'
-      - 'scripts/papercut/**'
-      - 'scripts/dash/**'
-      - 'scripts/parley/**'
-      - 'scripts/hellocodenameone/common/src/main/kmp/**'
-      - 'scripts/reel/**'
-      # The Wayline chapter includes the app kit's push senders.
-      - 'maven/cn1-app-kit/**'
-      # The API-name check derives the published pages from the javadoc's own
-      # sources, and the guide links into the java.* compatibility classes --
-      # java/util/List.html among them. A change that renames or deletes one
-      # of those without touching docs/ would otherwise skip this job and
-      # leave a dead link behind.
-      - 'Ports/CLDC11/**'
-      # And the script that decides what javadoc publishes at all. The check
-      # mirrors its source roots, its excluded package and its -protected
-      # setting, so a change to any of those moves which links are alive
-      # without touching a page.
-      - '.github/scripts/build_javadocs.sh'
-      - '.github/workflows/developer-guide-docs.yml'
-      # The build hint table is rendered rather than committed, so a change to
-      # anything it is rendered FROM changes what this guide contains without
-      # touching a single file under docs/. While the table was checked in that
-      # edit showed up as a docs diff and triggered this workflow for free;
-      # generating it on the fly took that away, and a malformed table would then
-      # have merged and surfaced in the release documentation build.
-      #
-      # All four inputs, not just the catalog: the annotations are the source of
-      # truth for the hints they expose and their prose goes straight into the
-      # Description column, and build-hint-tools is the renderer itself.
-      - 'CodenameOne/src/com/codename1/annotations/buildhints/**'
-      - 'maven/build-hint-catalog/**'
-      - 'maven/build-hint-tools/**'
-      - 'scripts/gen-build-hint-table.sh'
-      # The themed figures are rendered against the compiled native themes, so
-      # what those themes look like is an input to this guide exactly the way the
-      # build hint sources above are. build-native-themes.sh compiles
-      # native-themes/<name>/theme.css with maven/css-compiler through its
-      # command line in maven/css-cli, so a change to any of them changes the
-      # pictures without touching docs/ at all -- and the committed figures
-      # would then go stale silently until some later run failed against them.
-      - 'native-themes/**'
-      - 'maven/css-compiler/**'
-      - 'maven/css-cli/**'
-      - 'scripts/build-native-themes.sh'
-      # The figures are rendered by the framework itself, so a change to how a
-      # component paints, how a layout measures, or how the JavaSE port
-      # rasterizes changes every generated PNG without touching docs/ at all.
-      # The comparison is byte-exact, so without these the committed figures go
-      # stale silently and some later docs or release build is the one that
-      # fails.
-      - 'CodenameOne/**'
-      - 'Ports/JavaSE/**'
-      - 'maven/core/**'
-      - 'maven/javase/**'
   release:
     types: [published]
   workflow_dispatch:
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: developer-guide-docs-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   build:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write

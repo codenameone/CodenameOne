@@ -62,7 +62,27 @@ jobs:
       DOTNET_NOLOGO: '1'
       PACK: ${{ github.workspace }}/artifacts/unity-gallery-prebuilt/unity-gallery-prebuilt.tgz
     steps:
+      # ci.yml builds the archive once, before any member workflow, and every
+      # member still calls this workflow so it also works when dispatched on its
+      # own. A second upload under the fixed name is refused, so a call that
+      # finds the archive already in this run does nothing and succeeds.
+      # A download needs no token permission, so callers keep the permissions
+      # they had (asking for actions: read here would fail every caller that
+      # grants less, at startup). Only a missing artifact fails it.
+      - name: Is the archive already in this run?
+        id: existing
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: unity-gallery-prebuilt
+          path: ${{ runner.temp }}/unity-gallery-existing
+      - if: steps.existing.outcome == 'success'
+        run: |
+          echo "The archive is already in this run; nothing to do."
+          echo "UNITY_IN_RUN=true" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v6
+        if: env.UNITY_IN_RUN != 'true'
 
       # Everything below this step but the upload is skipped on a hit, and
       # state.txt names the jars it was built with, not the builder that ran:
@@ -72,6 +92,7 @@ jobs:
       # CompileUnityMojo resolves and runs. The plugin's other dependencies
       # (css-cli, the transcoders, the hint catalogs) are not on that path.
       - name: Cache the Unity gallery prebuilt
+        if: env.UNITY_IN_RUN != 'true'
         id: pack
         uses: actions/cache@v5
         with:
@@ -80,32 +101,34 @@ jobs:
 
       # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
       - name: Set up JDK 17 for the application build
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
       - name: Use Google's copy of Maven Central first
+        if: env.UNITY_IN_RUN != 'true'
         uses: ./.github/actions/maven-central-mirror
-      - if: steps.pack.outputs.cache-hit != 'true'
+      - if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         uses: actions/setup-java@v5
         with:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
       - name: Use Google's copy of Maven Central first
+        if: env.UNITY_IN_RUN != 'true'
         uses: ./.github/actions/maven-central-mirror
       - name: Set up .NET
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
       # xvfb as in the other Maven builds of the framework.
       - name: Install xvfb
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         run: bash scripts/ci/apt-get-install.sh xvfb
 
       # The least of the framework that compiles the gallery: the Maven plugin
@@ -113,7 +136,7 @@ jobs:
       # depends on, plus the two Unity modules. These steps only build, so a
       # blanket retry cannot turn a flaky test into a pass.
       - name: Build the plugin, the Unity modules and the application's dependencies
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         run: |
           cd maven
           bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -Dunity-compat -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,rive-runtime,android-compat,cil-translator,unity-compat -am
@@ -121,7 +144,7 @@ jobs:
       # generate-sources is as far as the application has to go: compile-unity
       # is bound to it, and nothing after it writes what the archive carries.
       - name: Compile the gallery
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         run: |
           set -euo pipefail
           export JAVA_HOME="$JDK_17_HOME"
@@ -132,12 +155,13 @@ jobs:
           test -s scripts/hellocodenameone/common/target/unity/state.txt
 
       - name: Pack
-        if: steps.pack.outputs.cache-hit != 'true'
+        if: env.UNITY_IN_RUN != 'true' && (steps.pack.outputs.cache-hit != 'true')
         run: bash scripts/unity-gallery-prebuilt.sh pack "$PACK"
 
       # On a hit as well: an entry that was cut short is caught here, in the
       # job that can say so, and not in a dozen consumers.
       - name: Check the archive
+        if: env.UNITY_IN_RUN != 'true'
         run: |
           set -euo pipefail
           ls -la "$PACK"
@@ -157,6 +181,7 @@ jobs:
           fi
 
       - name: Upload the Unity gallery prebuilt
+        if: env.UNITY_IN_RUN != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: unity-gallery-prebuilt
@@ -167,7 +192,7 @@ jobs:
           overwrite: true
 
       - name: Upload the build logs
-        if: failure()
+        if: env.UNITY_IN_RUN != 'true' && (failure())
         uses: actions/upload-artifact@v7
         with:
           name: unity-gallery-prebuilt-logs
