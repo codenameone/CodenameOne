@@ -13,13 +13,13 @@
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codenameone.devruntime;
-
-import com.codename1.components.SpanLabel;
-import com.codename1.ui.Container;
 package com.codenameone.devruntime;
 
 import com.codename1.components.SpanLabel;
