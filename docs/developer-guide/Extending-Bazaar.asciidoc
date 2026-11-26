@@ -267,7 +267,8 @@ them:
 | `app_subscriptions/update` | One of the app's charges changed status.
 |===
 
-A delivery is a POST with `X-Bazaar-Topic`, `X-Bazaar-Delivery` (its id) and
+A delivery is a POST with `X-Bazaar-Topic`, `X-Bazaar-Delivery` (its id),
+`X-Bazaar-Timestamp` (when it was signed, in seconds since the epoch) and
 `X-Bazaar-Signature`. A delivery that fails is tried again after a minute, and
 the wait doubles with each attempt.
 
@@ -279,8 +280,10 @@ from its secret. The app computes the same key itself:
 signingKey = hex(HMAC-SHA256(key = client secret, message = "bazaar-webhooks"))
 ----
 
-The signature is `sha256=` and the hex HMAC-SHA256 of the raw body, keyed with
-the UTF-8 bytes of that hex text. This is Bazaar's side of it:
+The signature is `sha256=` and the hex HMAC-SHA256 of the timestamp, a `.` and
+the raw body, keyed with the UTF-8 bytes of that hex text. Signing the
+timestamp with the body is what makes a recorded request useless later. This
+is Bazaar's side of it:
 
 [source,java,role=cn1-no-try]
 ----
@@ -288,9 +291,12 @@ include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/baz
 ----
 
 Compute it over the bytes exactly as they arrived, before parsing them, compare
-in constant time, and answer anything that doesn't match with 401 so it's
-never counted as delivered. The sample app's `Signatures.body` does exactly
-that. The same signature covers block data, action calls and remote functions.
+in constant time, and refuse an `X-Bazaar-Timestamp` more than five minutes
+from your own clock. Answer anything that fails with 401 so it's never counted
+as delivered. Each attempt of a delivery is signed afresh, so a retry an hour
+later still passes. The sample app's `Signatures.body` does exactly that. The
+same headers and signature cover block data, action calls and remote
+functions.
 
 [[extending-bazaar-metafields]]
 === Metafields
@@ -590,8 +596,11 @@ answer must arrive within three seconds, be at most 256 KB and be HTML, plain
 text or JSON; anything else answers 502. HTML is served under a sandbox policy,
 so an app's page runs no script with the store's origin.
 
-To check the signature, take every parameter except `signature`, decoded, sort
-them by name, join them as `name=value` with `&`, and compare `signature` with
+To check the signature, take every parameter except `signature`, decoded, and
+sort them by name. Percent-encode each name and each value again, as RFC 3986
+does: the UTF-8 bytes, with letters, digits and `-._~` kept and every other
+byte written `%XX` in upper-case hex, so a space is `%20`. Join them as
+`name=value` with `&`, and compare `signature` with
 the hex HMAC-SHA256 of that text, keyed with the signing key, in constant time.
 Refuse a `timestamp` more than five minutes old. The sample app's
 `Signatures.proxy` makes these checks.

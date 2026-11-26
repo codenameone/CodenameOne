@@ -47,6 +47,10 @@ class CurrencyDigitsTest {
         assertEquals(1250, Money.parse("1250", "JPY"));
         assertEquals(1250, Money.parse("1.25", "BHD"));
         assertEquals(1205, Money.parse("1.205", "BHD"));
+        // More decimals than the currency has is refused, never cut.
+        assertEquals(-1, Money.parse("12.345", "USD"));
+        assertEquals(-1, Money.parse("1250.5", "JPY"));
+        assertEquals(1250, Money.parse("12.500", "USD"));
         long[] amounts = {0, 5, 1205, 1250, 99999};
         String[] codes = {"USD", "JPY", "BHD"};
         for (String code : codes) {
@@ -66,6 +70,14 @@ class CurrencyDigitsTest {
         assertEquals(1250, ProductCsv.cents("1250", "JPY"));
         assertEquals(1250, ProductCsv.cents("1.25", "BHD"));
         assertEquals(1250, ProductCsv.cents("1,25", "BHD"));
+        // A price with more decimals than the currency is not a price: the
+        // field keeps its value rather than saving a cut-down one.
+        assertEquals(com.codenameone.examples.bazaar.ops.Amounts.NOT_AN_AMOUNT,
+                ProductCsv.amount("12.345", "USD"));
+        assertEquals(com.codenameone.examples.bazaar.ops.Amounts.NOT_AN_AMOUNT,
+                ProductCsv.amount("1250.5", "JPY"));
+        assertEquals(1250, ProductCsv.amount("12.500", "USD"));
+        assertEquals(0, ProductCsv.cents("12.345", "USD"));
         long[] amounts = {5, 1205, 1250, 99999};
         String[] codes = {"USD", "JPY", "BHD"};
         for (String code : codes) {

@@ -511,8 +511,7 @@ public class Payments {
             }
             String key = authorizeKey(orderId, references[1], amountCents);
             if (journaled) {
-                recordAttempt(orderId, username, key, references[0], references[1], amountCents,
-                        currency);
+                recordAttempt(orderId, username, key, references[0], amountCents, currency);
             }
             try {
                 reference = cut(provider.authorize(key,
@@ -535,15 +534,38 @@ public class Payments {
     /// should the server stop before the order records the answer, the row is
     /// what [PaymentRecovery] finds. Its own statement, so it stands whatever
     /// happens after.
+    ///
+    /// Only a [PaymentRecovery#STARTED] row of an earlier try is replaced.
+    /// One the reconciler holds ([PaymentRecovery#RECONCILING]) is never
+    /// touched: the reconciler may be releasing that very hold, and a retry
+    /// that wiped its row would leave the order with a hold the reconciler
+    /// lets go, or a second one nobody tracks. Such a retry is refused with
+    /// 409 before anything is asked of the processor, and checking out again
+    /// a moment later works (the reconciler settles the row and drops it).
+    /// Refusing is the safe choice over waiting: the reconciler talks to the
+    /// processor and can take seconds, and a checkout request must not hold
+    /// its thread for that.
+    ///
+    /// The card's token is not kept: what recovery needs of the hold, it
+    /// asks the processor for by the idempotency key
+    /// ([PaymentProvider#findHold]).
     private void recordAttempt(String orderId, String username, String key, String customer,
-            String token, long amountCents, String currency) throws IOException {
-        db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {orderId});
+            long amountCents, String currency) throws IOException {
+        db.execute("DELETE FROM payment_attempt WHERE order_id = ? AND status = ?",
+                new Object[] {orderId, PaymentRecovery.STARTED});
+        if (db.queryOne("SELECT order_id FROM payment_attempt WHERE order_id = ?",
+                new Object[] {orderId}) != null) {
+            throw new ResponseStatusException(409,
+                    "This order's payment is being settled; try again in a minute");
+        }
         db.execute("INSERT INTO payment_attempt (order_id, username, idem_key, customer, token, "
-                + "amount_cents, currency, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                + "amount_cents, currency, status, created_at, claimed_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 new Object[] {orderId, username == null ? "" : username, key,
-                    customer == null ? "" : customer, token == null ? "" : token,
+                    customer == null ? "" : customer, "",
                     Long.valueOf(amountCents), currency == null ? "" : currency,
-                    PaymentRecovery.STARTED, Long.valueOf(System.currentTimeMillis())});
+                    PaymentRecovery.STARTED, Long.valueOf(System.currentTimeMillis()),
+                    Long.valueOf(0)});
     }
 
     /// The order recorded its hold, or nothing was held: the attempt is over.
@@ -621,7 +643,7 @@ public class Payments {
         String reference;
         String key = authorizeKey(orderId, card.token, amountCents);
         if (journaled) {
-            recordAttempt(orderId, payer, key, card.customer, card.token, amountCents, currency);
+            recordAttempt(orderId, payer, key, card.customer, amountCents, currency);
         }
         try {
             reference = cut(provider.authorize(key,

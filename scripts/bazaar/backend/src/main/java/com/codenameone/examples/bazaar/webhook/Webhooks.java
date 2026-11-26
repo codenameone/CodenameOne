@@ -21,7 +21,6 @@ package com.codenameone.examples.bazaar.webhook;
 import com.codename1.backend.Config;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.ResponseStatusException;
-import com.codename1.backend.Web;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
@@ -47,7 +46,11 @@ import java.util.List;
 /// [#emit] only queues: a delivery row per active webhook of the topic, in
 /// the caller's transaction or its own. The scheduled [#deliverDue] sends
 /// what is due as a JSON POST signed with the webhook's secret:
-/// `X-Bazaar-Signature: sha256=<hex HMAC-SHA256 of the body>`. A delivery
+/// `X-Bazaar-Timestamp: <epoch seconds>` and
+/// `X-Bazaar-Signature: sha256=<hex HMAC-SHA256 of timestamp + "." + body>`.
+/// A receiver refuses a timestamp more than [#MAX_AGE_SECONDS] away from its
+/// own clock, so a delivery it saw once cannot be sent to it again later
+/// ([#verify]). Each attempt is signed afresh. A delivery
 /// not answered 2xx is tried again after [#backoffMillis] -- 1, 2, 4, 8 and
 /// 16 minutes -- and is FAILED after [#MAX_ATTEMPTS] tries.
 ///
@@ -62,6 +65,10 @@ public class Webhooks {
     public static final String FAILED = "FAILED";
     public static final int MAX_ATTEMPTS = 6;
     public static final String SIGNATURE_HEADER = "X-Bazaar-Signature";
+    /// When the request was signed, in epoch seconds; part of the signature.
+    public static final String TIMESTAMP_HEADER = "X-Bazaar-Timestamp";
+    /// How far a signed request's timestamp may be from the receiver's clock.
+    public static final long MAX_AGE_SECONDS = 300;
 
     public static final String ORDERS_CREATE = "orders/create";
     public static final String ORDERS_PAID = "orders/paid";
@@ -129,19 +136,20 @@ public class Webhooks {
         }
     }
 
+    /// How long one delivery may take, all of it.
+    static final int DELIVERY_TIMEOUT_MILLIS = 10000;
+    /// The most of a receiver's answer that is read; only its status counts.
+    static final int MAX_ANSWER_BYTES = 64 * 1024;
+
     /// Sends over HTTP.
     static final class HttpTransport implements Transport {
         @Override
         public int post(String url, List<String> headers, byte[] body) throws IOException {
-            // Checked again at delivery, against what the name resolves to now.
-            String unsafe = com.codenameone.examples.bazaar.web.security.UrlGuard.refuse(url,
-                    com.codenameone.examples.bazaar.web.security.UrlGuard.DNS);
-            if (unsafe != null) {
-                throw new IOException(unsafe);
-            }
-            List copy = new ArrayList(headers);
-            Web.Result answer = Web.request("POST", url, copy, body);
-            return answer.getStatus();
+            // Checked again at delivery, against what the name resolves to
+            // now; timed, capped and never redirected (a 3xx is a failed
+            // delivery): see OutboundHttp.
+            return com.codenameone.examples.bazaar.web.security.OutboundHttp.send("POST", url,
+                    headers, body, DELIVERY_TIMEOUT_MILLIS, MAX_ANSWER_BYTES).status;
         }
     }
 
@@ -176,21 +184,53 @@ public class Webhooks {
         return 60000L << (n - 1);
     }
 
-    /// `sha256=` and the hex HMAC-SHA256 of `body` keyed with `secret`.
+    /// `sha256=` and the hex HMAC-SHA256 of `timestamp`, a `.` and `body`,
+    /// keyed with `secret`.
     // tag::bazaar-webhook-signature[]
-    public static String signature(String secret, byte[] body) throws IOException {
-        return "sha256=" + Ids.hex(Crypto.hmacSha256(secret.getBytes("UTF-8"), body));
+    public static String signature(String secret, long timestamp, byte[] body)
+            throws IOException {
+        byte[] prefix = (timestamp + ".").getBytes("UTF-8");
+        byte[] message = new byte[prefix.length + body.length];
+        System.arraycopy(prefix, 0, message, 0, prefix.length);
+        System.arraycopy(body, 0, message, prefix.length, body.length);
+        return "sha256=" + Ids.hex(Crypto.hmacSha256(secret.getBytes("UTF-8"), message));
     }
     // end::bazaar-webhook-signature[]
 
-    /// Whether `header` is the signature of `body` under `secret`, compared
-    /// in constant time: what a receiver does.
-    public static boolean verify(String secret, byte[] body, String header) throws IOException {
-        if (header == null) {
+    /// Adds the timestamp and signature headers of a request whose body is
+    /// `body`, signed now under `secret`.
+    public static void sign(List<String> headers, String secret, byte[] body)
+            throws IOException {
+        long now = System.currentTimeMillis() / 1000L;
+        headers.add(TIMESTAMP_HEADER + ": " + now);
+        headers.add(SIGNATURE_HEADER + ": " + signature(secret, now, body));
+    }
+
+    /// Whether `signatureHeader` signs `body` with `timestampHeader` under
+    /// `secret`, compared in constant time, and the timestamp is within
+    /// [#MAX_AGE_SECONDS] of `nowSeconds`: what a receiver does.
+    public static boolean verify(String secret, byte[] body, String signatureHeader,
+            String timestampHeader, long nowSeconds) throws IOException {
+        if (signatureHeader == null || timestampHeader == null || body == null) {
             return false;
         }
-        return Crypto.equalsConstantTime(signature(secret, body).getBytes("UTF-8"),
-                header.trim().getBytes("UTF-8"));
+        String ts = timestampHeader.trim();
+        if (ts.length() == 0 || ts.length() > 12) {
+            return false;
+        }
+        long at = 0;
+        for (int iter = 0; iter < ts.length(); iter++) {
+            char c = ts.charAt(iter);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+            at = at * 10 + (c - '0');
+        }
+        if (Math.abs(nowSeconds - at) > MAX_AGE_SECONDS) {
+            return false;
+        }
+        return Crypto.equalsConstantTime(signature(secret, at, body).getBytes("UTF-8"),
+                signatureHeader.trim().getBytes("UTF-8"));
     }
 
     // -------------------------------------------------------------- queueing
@@ -287,7 +327,7 @@ public class Webhooks {
             headers.add("Content-Type: application/json");
             headers.add("X-Bazaar-Topic: " + d.getTopic());
             headers.add("X-Bazaar-Delivery: " + d.getId());
-            headers.add(SIGNATURE_HEADER + ": " + signature(hook.getSecret(), body));
+            sign(headers, hook.getSecret(), body);
             try {
                 code = transport.post(hook.getUrl(), headers, body);
             } catch (IOException | RuntimeException unreachable) {

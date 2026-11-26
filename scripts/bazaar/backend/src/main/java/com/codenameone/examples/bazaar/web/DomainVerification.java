@@ -20,7 +20,6 @@ package com.codenameone.examples.bazaar.web;
 
 import com.codename1.backend.Json;
 import com.codename1.backend.ResponseStatusException;
-import com.codename1.backend.Web;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.api.CustomDomainDto;
@@ -28,6 +27,7 @@ import com.codenameone.examples.bazaar.domain.Store;
 import com.codenameone.examples.bazaar.marketing.Tokens;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.store.StoreAccess;
+import com.codenameone.examples.bazaar.web.security.OutboundHttp;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -214,26 +214,37 @@ public class DomainVerification {
     static final class WebProbe implements Probe {
         private final String doh;
 
+        /// Each lookup's whole budget.
+        static final int TIMEOUT_MILLIS = 5000;
+        /// A token file is one line; anything longer is not one.
+        static final int MAX_FILE_BYTES = 4096;
+        /// A resolver's answer for one name.
+        static final int MAX_DNS_BYTES = 64 * 1024;
+
         WebProbe(String doh) {
             this.doh = doh;
         }
 
         @Override
         public String fetch(String url) throws IOException {
-            Web.Result r = Web.get(url);
-            return r.getStatus() == 200 ? r.getBodyAsString() : null;
+            // The merchant names this host: guarded, timed, capped and never
+            // redirected, as every call to a URL someone else chose is.
+            OutboundHttp.Reply r = OutboundHttp.send("GET", url, null, null, TIMEOUT_MILLIS,
+                    MAX_FILE_BYTES);
+            return r.status == 200 ? r.text() : null;
         }
 
         @Override
         public List<String> txt(String name) throws IOException {
             List<String> headers = new ArrayList<String>();
             headers.add("Accept: application/dns-json");
-            Web.Result r = Web.request("GET", doh + "?type=TXT&name=" + name, headers, null);
+            OutboundHttp.Reply r = OutboundHttp.send("GET", doh + "?type=TXT&name="
+                    + encode(name), headers, null, TIMEOUT_MILLIS, MAX_DNS_BYTES);
             List<String> out = new ArrayList<String>();
-            if (r.getStatus() != 200) {
+            if (r.status != 200) {
                 return out;
             }
-            Object answers = Json.parseObject(r.getBodyAsString()).get("Answer");
+            Object answers = Json.parseObject(r.text()).get("Answer");
             if (!(answers instanceof List)) {
                 return out;
             }
@@ -246,6 +257,25 @@ public class DomainVerification {
                 }
             }
             return out;
+        }
+
+        /// `name` percent-encoded for a query value: a merchant's text never
+        /// adds a parameter of its own to the resolver's URL.
+        static String encode(String name) throws IOException {
+            byte[] b = name.getBytes("UTF-8");
+            StringBuilder out = new StringBuilder();
+            String hexDigits = "0123456789ABCDEF";
+            for (int iter = 0; iter < b.length; iter++) {
+                int c = b[iter] & 0xff;
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                        || c == '-' || c == '.' || c == '_' || c == '~') {
+                    out.append((char) c);
+                } else {
+                    out.append('%').append(hexDigits.charAt(c >> 4))
+                            .append(hexDigits.charAt(c & 0xf));
+                }
+            }
+            return out.toString();
         }
 
         /// A TXT record's data as DoH writes it: quoted strings, joined.

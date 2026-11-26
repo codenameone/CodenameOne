@@ -180,13 +180,32 @@ public class SimulatedPayments implements PaymentProvider {
     @Override
     public String authorize(String key, String customer, String token, long amountCents,
             String currency, String description) throws IOException {
+        String reference;
         if (token.startsWith(FAILING_TOKEN)) {
-            return FAILING_HOLD + key;
+            reference = FAILING_HOLD + key;
+        } else if (token.startsWith(FAULTY_TOKEN)) {
+            reference = FAULTY_HOLD + key;
+        } else {
+            reference = charge(key, customer, token, amountCents, currency, description);
         }
-        if (token.startsWith(FAULTY_TOKEN)) {
-            return FAULTY_HOLD + key;
+        rememberHold(key, reference);
+        return reference;
+    }
+
+    /// The holds made, by idempotency key, for [#findHold].
+    private final java.util.LinkedHashMap<String, String> holds =
+            new java.util.LinkedHashMap<String, String>();
+
+    private synchronized void rememberHold(String key, String reference) {
+        if (!holds.containsKey(key) && holds.size() >= 20000) {
+            holds.remove(holds.keySet().iterator().next());
         }
-        return charge(key, customer, token, amountCents, currency, description);
+        holds.put(key, reference);
+    }
+
+    @Override
+    public synchronized String findHold(String key, String customer, long since) {
+        return holds.get(key);
     }
 
     @Override

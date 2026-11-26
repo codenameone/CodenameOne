@@ -263,8 +263,9 @@ class ExtensionsTest {
         assertEquals(1, b.size());
         assertEquals("", b.get(0).error());
         assertEquals("42", value(b.get(0).values(), "points"));
-        assertEquals(Webhooks.signature(apps.signingKeyOf((String) app.get("id")),
-                f.bodies.get(0)), f.header(Webhooks.SIGNATURE_HEADER));
+        assertTrue(Webhooks.verify(apps.signingKeyOf((String) app.get("id")),
+                f.bodies.get(0), f.header(Webhooks.SIGNATURE_HEADER),
+                f.header(Webhooks.TIMESTAMP_HEADER), System.currentTimeMillis() / 1000L));
         Map sent = Json.parseObject(new String(f.bodies.get(0), "UTF-8"));
         assertEquals(o.id(), sent.get("resourceId"));
         extensions.blocks(s.owner, s.storeId, "order", o.id());
@@ -309,8 +310,9 @@ class ExtensionsTest {
         assertEquals("https://app.example/act", f.urls.get(0));
         String body = new String(f.bodies.get(0), "UTF-8");
         assertTrue(body.indexOf("\"action\":\"tag\"") >= 0, body);
-        assertEquals(Webhooks.signature(apps.signingKeyOf((String) app.get("id")),
-                f.bodies.get(0)), f.header(Webhooks.SIGNATURE_HEADER));
+        assertTrue(Webhooks.verify(apps.signingKeyOf((String) app.get("id")),
+                f.bodies.get(0), f.header(Webhooks.SIGNATURE_HEADER),
+                f.header(Webhooks.TIMESTAMP_HEADER), System.currentTimeMillis() / 1000L));
     }
 
     @Test
@@ -367,6 +369,17 @@ class ExtensionsTest {
         q.put("ref", "tampered");
         assertFalse(ProxySignature.verify(q, key, now));
         assertFalse(ProxySignature.verify(queryOf(url), key, now + 3600));
+        // Names and values are encoded before they are joined: a value that
+        // holds "&" and "=" does not sign like two parameters.
+        Map<String, String> one = new java.util.TreeMap<String, String>();
+        one.put("a", "1&b=2");
+        Map<String, String> two = new java.util.TreeMap<String, String>();
+        two.put("a", "1");
+        two.put("b", "2");
+        assertFalse(ProxySignature.message(one).equals(ProxySignature.message(two)));
+        assertEquals("a=1%26b%3D2", ProxySignature.message(one));
+        assertEquals("ref=a%20b", ProxySignature.message(java.util.Collections.singletonMap(
+                "ref", "a b")));
         for (String h : f.headers.get(0)) {
             assertFalse(h.startsWith("Cookie") || h.startsWith("Authorization"), h);
         }

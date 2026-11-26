@@ -37,15 +37,25 @@ class SignaturesTest {
     private static final String SECRET = "bzs_test-client-secret";
 
     @Test
-    void aBodySignatureMatchesOnlyItsOwnBody() throws Exception {
+    void aBodySignatureMatchesOnlyItsOwnBodyAndTimestamp() throws Exception {
         String key = Signatures.signingKey(SECRET);
         assertEquals(64, key.length());
+        long now = 1700000000L;
+        String ts = Long.toString(now);
         byte[] body = "{\"a\":1}".getBytes("UTF-8");
         String header = "sha256=" + Signatures.hex(Crypto.hmacSha256(key.getBytes("UTF-8"),
-                body));
-        assertTrue(Signatures.body(key, body, header));
-        assertFalse(Signatures.body(key, "{\"a\":2}".getBytes("UTF-8"), header));
-        assertFalse(Signatures.body(key, body, null));
+                (ts + ".{\"a\":1}").getBytes("UTF-8")));
+        assertTrue(Signatures.body(key, body, header, ts, now));
+        assertTrue(Signatures.body(key, body, header, ts, now + 300));
+        assertFalse(Signatures.body(key, "{\"a\":2}".getBytes("UTF-8"), header, ts, now));
+        assertFalse(Signatures.body(key, body, null, ts, now));
+        // A replay outside the window, and a timestamp moved to look fresh.
+        assertFalse(Signatures.body(key, body, header, ts, now + 301));
+        assertFalse(Signatures.body(key, body, header, Long.toString(now + 301), now + 301));
+        assertFalse(Signatures.body(key, body, header, null, now));
+        // The body alone is no longer what is signed.
+        assertFalse(Signatures.body(key, body, "sha256=" + Signatures.hex(Crypto.hmacSha256(
+                key.getBytes("UTF-8"), body)), ts, now));
     }
 
     @Test
@@ -57,13 +67,29 @@ class SignaturesTest {
         q.put("path_prefix", "/apps/restock");
         q.put("timestamp", Long.toString(now));
         q.put("product", "a b");
-        String message = "path_prefix=/apps/restock&product=a b&shop=mugs&timestamp=" + now;
+        // Each name and value percent-encoded before they are joined.
+        String message = "path_prefix=%2Fapps%2Frestock&product=a%20b&shop=mugs&timestamp=" + now;
         q.put("signature", Signatures.hex(Crypto.hmacSha256(key.getBytes("UTF-8"),
                 message.getBytes("UTF-8"))));
         assertTrue(Signatures.proxy(q, key, now));
         assertFalse(Signatures.proxy(q, key, now + 301));
         q.put("product", "other");
         assertFalse(Signatures.proxy(q, key, now));
+        // A value holding "&" and "=" does not sign like two parameters.
+        Map<String, String> one = new LinkedHashMap<String, String>();
+        one.put("timestamp", Long.toString(now));
+        one.put("a", "1&b=2");
+        Map<String, String> two = new LinkedHashMap<String, String>();
+        two.put("timestamp", Long.toString(now));
+        two.put("a", "1");
+        two.put("b", "2");
+        String joined = "a=1&b=2&timestamp=" + now;
+        String forged = Signatures.hex(Crypto.hmacSha256(key.getBytes("UTF-8"),
+                joined.getBytes("UTF-8")));
+        two.put("signature", forged);
+        assertTrue(Signatures.proxy(two, key, now));
+        one.put("signature", forged);
+        assertFalse(Signatures.proxy(one, key, now));
     }
 
     @Test

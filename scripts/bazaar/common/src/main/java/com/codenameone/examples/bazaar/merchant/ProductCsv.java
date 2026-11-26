@@ -292,10 +292,24 @@ public final class ProductCsv {
 
     /// [#cents(String)] with `digits` decimals. A comma followed by 1 to
     /// `digits` digits at the end is a decimal comma, so for a currency
-    /// without decimals every comma groups thousands.
+    /// without decimals every comma groups thousands. More decimals than
+    /// `digits` (other than trailing zeros) are not a price: refused, never
+    /// cut.
     static long cents(String text, int digits) {
+        long v = amount(text, digits);
+        return v == Amounts.NOT_AN_AMOUNT ? 0 : v;
+    }
+
+    /// A price as typed into a field, in the minor units of `currency`, or
+    /// [Amounts#NOT_AN_AMOUNT] when it is not one -- so a field can show the
+    /// typo instead of saving 0 or a cut-down amount.
+    public static long amount(String text, String currency) {
+        return amount(text, Amounts.digits(currency));
+    }
+
+    static long amount(String text, int digits) {
         if (text == null) {
-            return 0;
+            return Amounts.NOT_AN_AMOUNT;
         }
         String t = text.trim();
         int lastComma = t.lastIndexOf(',');
@@ -310,12 +324,12 @@ public final class ProductCsv {
             char c = t.charAt(iter);
             if (c == '-') {
                 if (iter != 0) {
-                    return 0;
+                    return Amounts.NOT_AN_AMOUNT;
                 }
                 negative = true;
             } else if (c == '.' || (c == ',' && decimalComma && iter == lastComma)) {
                 if (fracDigits >= 0) {
-                    return 0;
+                    return Amounts.NOT_AN_AMOUNT;
                 }
                 fracDigits = 0;
             } else if (c >= '0' && c <= '9') {
@@ -323,16 +337,18 @@ public final class ProductCsv {
                 if (fracDigits < 0) {
                     whole = whole * 10 + (c - '0');
                     if (whole > 100000000000L) {
-                        return 0;
+                        return Amounts.NOT_AN_AMOUNT;
                     }
                 } else if (fracDigits < digits) {
                     frac = frac * 10 + (c - '0');
                     fracDigits++;
+                } else if (c != '0') {
+                    return Amounts.NOT_AN_AMOUNT;
                 }
             }
         }
         if (!any) {
-            return 0;
+            return Amounts.NOT_AN_AMOUNT;
         }
         for (int d = Math.max(0, fracDigits); d < digits; d++) {
             frac *= 10;

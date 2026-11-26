@@ -134,44 +134,69 @@ public final class Amounts {
     }
 
     /// Minor units of a decimal string in `code` (`"12.3"` USD is 1230,
-    /// `"1250"` JPY is 1250). Decimals past the currency's own are cut; 0
-    /// when it is not a number or would not fit.
+    /// `"1250"` JPY is 1250). 0 when it is not a number, has more decimals
+    /// than the currency (`"12.345"` USD; trailing zeros past them are fine,
+    /// `"1250.0"` JPY is 1250), or would not fit in a long. Nothing is ever
+    /// cut or rounded: an amount it answers is exactly the one written.
     public static long parse(String value, String code) {
         return parse(value, digits(code));
     }
 
     /// [#parse(String, String)] for a digit count.
     public static long parse(String value, int digits) {
+        long minor = read(value, digits);
+        return minor == NOT_AN_AMOUNT ? 0 : minor;
+    }
+
+    /// What [#read] answers for text that is not an exact amount.
+    public static final long NOT_AN_AMOUNT = Long.MIN_VALUE;
+
+    /// [#parse(String, int)], but [#NOT_AN_AMOUNT] rather than 0 when the
+    /// text is not a number, has more (non-zero) decimals than `digits`, or
+    /// does not fit: for a field that must tell a typo from a zero.
+    public static long read(String value, int digits) {
         String s = value == null ? "" : value.trim();
         boolean negative = s.startsWith("-");
         int at = negative ? 1 : 0;
-        if (at >= s.length() || s.length() > 18) {
-            return 0;
+        if (at >= s.length() || s.length() > 40) {
+            return NOT_AN_AMOUNT;
         }
         long whole = 0;
         long frac = 0;
         int fracDigits = 0;
         boolean dot = false;
-        for (; at < s.length(); at++) {
-            char c = s.charAt(at);
-            if (c == '.' && !dot) {
-                dot = true;
-            } else if (c >= '0' && c <= '9') {
-                if (!dot) {
-                    whole = whole * 10 + (c - '0');
-                } else if (fracDigits < digits) {
-                    frac = frac * 10 + (c - '0');
-                    fracDigits++;
+        boolean any = false;
+        try {
+            for (; at < s.length(); at++) {
+                char c = s.charAt(at);
+                if (c == '.' && !dot) {
+                    dot = true;
+                } else if (c >= '0' && c <= '9') {
+                    any = true;
+                    if (!dot) {
+                        whole = Math.addExact(Math.multiplyExact(whole, 10L), (long) (c - '0'));
+                    } else if (fracDigits < digits) {
+                        frac = frac * 10 + (c - '0');
+                        fracDigits++;
+                    } else if (c != '0') {
+                        // A decimal the currency cannot hold: refused, never cut.
+                        return NOT_AN_AMOUNT;
+                    }
+                } else {
+                    return NOT_AN_AMOUNT;
                 }
-            } else {
-                return 0;
             }
+            if (!any) {
+                return NOT_AN_AMOUNT;
+            }
+            for (; fracDigits < digits; fracDigits++) {
+                frac *= 10;
+            }
+            long minor = Math.addExact(Math.multiplyExact(whole, unit(digits)), frac);
+            return negative ? -minor : minor;
+        } catch (ArithmeticException tooLarge) {
+            return NOT_AN_AMOUNT;
         }
-        for (; fracDigits < digits; fracDigits++) {
-            frac *= 10;
-        }
-        long minor = whole * unit(digits) + frac;
-        return negative ? -minor : minor;
     }
 
     /// `numerator / denominator` rounded half to even; 0 for a denominator

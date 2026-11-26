@@ -29,7 +29,9 @@ class ReceiptAmountTest {
     void typedAmountsUseTheCurrencysDecimals() {
         assertEquals(1250, ReceiptForm.cents("12.5", "USD"));
         assertEquals(1250, ReceiptForm.cents("1250", "JPY"));
-        assertEquals(1250, ReceiptForm.cents("1250.9", "JPY"));
+        // More decimals than the currency has: refused, never cut.
+        assertEquals(0, ReceiptForm.cents("1250.9", "JPY"));
+        assertEquals(1250, ReceiptForm.cents("1250.0", "JPY"));
         assertEquals(1250, ReceiptForm.cents("1,25", "BHD"));
         assertEquals(1205, ReceiptForm.cents("1.205", "BHD"));
         assertEquals(0, ReceiptForm.cents("1x", "BHD"));

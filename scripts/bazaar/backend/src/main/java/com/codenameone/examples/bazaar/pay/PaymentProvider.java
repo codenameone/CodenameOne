@@ -111,6 +111,17 @@ public interface PaymentProvider {
     void release(String reference) throws IOException;
     // end::bazaar-payment-provider[]
 
+    /// The hold [#authorize] made under `key` for `customer`, or null when the
+    /// processor holds nothing under that key: how a hold a crash orphaned is
+    /// found without keeping the card's token. `since` is when the attempt
+    /// was written down (epoch milliseconds); the hold is no older.
+    ///
+    /// - `IOException`: when the processor could not be asked, or cannot look
+    ///   a hold up; the attempt is left for a later pass
+    default String findHold(String key, String customer, long since) throws IOException {
+        throw new IOException(name() + " cannot look a hold up by its key");
+    }
+
     // tag::bazaar-payment-intents[]
     /// Opens a payment the shopper completes in the browser -- a wallet sheet
     /// (Apple Pay, Google Pay) or a payment method that is not a card (Klarna,

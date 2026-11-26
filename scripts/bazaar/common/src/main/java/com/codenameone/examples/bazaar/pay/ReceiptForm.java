@@ -107,8 +107,12 @@ public final class ReceiptForm {
         int point = text.indexOf('.');
         String whole = point < 0 ? text : text.substring(0, point);
         String part = point < 0 ? "" : text.substring(point + 1);
+        while (part.length() > digits && part.charAt(part.length() - 1) == '0') {
+            part = part.substring(0, part.length() - 1);
+        }
         if (part.length() > digits) {
-            part = part.substring(0, digits);
+            // More decimals than the currency has: not an amount, never cut.
+            return 0;
         }
         while (part.length() < digits) {
             part += "0";

@@ -23,7 +23,6 @@ import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.Jwt;
 import com.codename1.backend.ResponseStatusException;
-import com.codename1.backend.WebClient;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.Rows;
@@ -39,6 +38,7 @@ import com.codenameone.examples.bazaar.ops.Blocks;
 import com.codenameone.examples.bazaar.platform.Apps;
 import com.codenameone.examples.bazaar.platform.StoreApiKeys;
 import com.codenameone.examples.bazaar.store.StoreAccess;
+import com.codenameone.examples.bazaar.web.security.OutboundHttp;
 import com.codenameone.examples.bazaar.web.security.UrlGuard;
 import com.codenameone.examples.bazaar.webhook.Webhooks;
 
@@ -65,10 +65,12 @@ import java.util.Map;
 ///   text; **checkout blocks** may ask for fields, whose answers are checked
 ///   by kind and kept on the order beside the store's own checkout fields.
 ///
-/// Every call to an app is a POST whose `X-Bazaar-Signature` is
-/// `sha256=<hex HMAC-SHA256 of the body>` keyed with the app's signing key,
-/// exactly as its webhooks are; the body carries the store, the resource
-/// and a `timestamp` (epoch milliseconds) so an app can refuse a replay.
+/// Every call to an app is a POST signed exactly as its webhooks are
+/// ([Webhooks#sign]): `X-Bazaar-Timestamp` (epoch seconds) and an
+/// `X-Bazaar-Signature` of `sha256=<hex HMAC-SHA256 of timestamp + "." +
+/// body>` keyed with the app's signing key, so an app refuses a replay by
+/// the signed header. The body also carries the store, the resource and a
+/// `timestamp` (epoch milliseconds).
 ///
 /// Extensions belong to the installation that uploaded them: they are read
 /// only while it is installed with `write_extensions` and are deleted when
@@ -118,23 +120,11 @@ public class Extensions {
         @Override
         public Reply send(String method, String url, List<String> headers, byte[] body,
                 int timeoutMillis, int maxBytes) throws IOException {
-            String unsafe = UrlGuard.refuse(url, UrlGuard.DNS);
-            if (unsafe != null) {
-                throw new IOException(unsafe);
-            }
-            WebClient client = new WebClient().setConnectTimeoutMillis(timeoutMillis)
-                    .setReadTimeoutMillis(timeoutMillis).setRequestTimeoutMillis(timeoutMillis);
-            try {
-                com.codename1.backend.Web.Result r = client.request(method, url,
-                        new ArrayList<String>(headers), body);
-                byte[] reply = r.getBody();
-                if (reply != null && reply.length > maxBytes) {
-                    throw new IOException("The app's answer is too long");
-                }
-                return new Reply(r.getStatus(), r.getHeader("Content-Type"), reply);
-            } finally {
-                client.close();
-            }
+            // Guarded, bounded in time, capped while it is read and never
+            // redirected: see OutboundHttp.
+            OutboundHttp.Reply r = OutboundHttp.send(method, url, headers, body, timeoutMillis,
+                    maxBytes);
+            return new Reply(r.status, r.contentType, r.body);
         }
     }
 
@@ -504,8 +494,7 @@ public class Extensions {
         h.add("Content-Type: application/json");
         h.add("X-Bazaar-Extension: " + e.id);
         h.add("X-Bazaar-Extension-Target: " + e.target);
-        h.add(Webhooks.SIGNATURE_HEADER + ": " + Webhooks.signature(apps.signingKeyOf(e.appId),
-                body));
+        Webhooks.sign(h, apps.signingKeyOf(e.appId), body);
         return h;
     }
 

@@ -41,12 +41,14 @@ import java.util.Map;
 ///
 /// | What arrives | How it is signed |
 /// |---|---|
-/// | webhooks, block data and action calls | `X-Bazaar-Signature: sha256=<hex HMAC of the raw body>` |
-/// | app proxy requests | `signature` query parameter: hex HMAC of the other parameters, sorted, `name=value` joined with `&` |
+/// | webhooks, block data and action calls | `X-Bazaar-Timestamp: <epoch seconds>` and `X-Bazaar-Signature: sha256=<hex HMAC of timestamp + "." + raw body>` |
+/// | app proxy requests | `signature` query parameter: hex HMAC of the other parameters, sorted, each name and value percent-encoded, `name=value` joined with `&` |
 /// | embedded page sessions | an HS256 JWT, `aud` = the app's client id, `iss` = `bazaar` |
 public final class Signatures {
     /// How old a proxied request may be before it is refused.
     public static final long PROXY_MAX_AGE_SECONDS = 300;
+    /// How far a signed call's `X-Bazaar-Timestamp` may be from this clock.
+    public static final long BODY_MAX_AGE_SECONDS = 300;
 
     private Signatures() {
     }
@@ -56,15 +58,46 @@ public final class Signatures {
         return hex(Crypto.hmacSha256(utf8(clientSecret), utf8("bazaar-webhooks")));
     }
 
-    /// True when `header` (the `X-Bazaar-Signature` value) signs `body`.
-    /// Compute over the bytes exactly as they arrived, before parsing them.
-    public static boolean body(String signingKey, byte[] body, String header)
-            throws IOException {
+    /// True when `header` (the `X-Bazaar-Signature` value) signs
+    /// `timestamp` (the `X-Bazaar-Timestamp` value), a `.` and `body`, and the
+    /// timestamp is within five minutes of `nowSeconds`: a call recorded once
+    /// cannot be sent again later. Compute over the bytes exactly as they
+    /// arrived, before parsing them.
+    public static boolean body(String signingKey, byte[] body, String header, String timestamp,
+            long nowSeconds) throws IOException {
         if (header == null || body == null) {
             return false;
         }
-        String expected = "sha256=" + hex(Crypto.hmacSha256(utf8(signingKey), body));
+        long at = seconds(timestamp);
+        if (at < 0 || Math.abs(nowSeconds - at) > BODY_MAX_AGE_SECONDS) {
+            return false;
+        }
+        byte[] prefix = utf8(at + ".");
+        byte[] message = new byte[prefix.length + body.length];
+        System.arraycopy(prefix, 0, message, 0, prefix.length);
+        System.arraycopy(body, 0, message, prefix.length, body.length);
+        String expected = "sha256=" + hex(Crypto.hmacSha256(utf8(signingKey), message));
         return Crypto.equalsConstantTime(utf8(expected), utf8(header.trim()));
+    }
+
+    /// Epoch seconds written as digits, or -1 for anything else.
+    static long seconds(String text) {
+        if (text == null) {
+            return -1;
+        }
+        String t = text.trim();
+        if (t.length() == 0 || t.length() > 12) {
+            return -1;
+        }
+        long at = 0;
+        for (int iter = 0; iter < t.length(); iter++) {
+            char c = t.charAt(iter);
+            if (c < '0' || c > '9') {
+                return -1;
+            }
+            at = at * 10 + (c - '0');
+        }
+        return at;
     }
 
     /// True when the decoded query `params` of a proxied request carry a
@@ -72,14 +105,8 @@ public final class Signatures {
     public static boolean proxy(Map<String, String> params, String signingKey, long nowSeconds)
             throws IOException {
         String given = params.get("signature");
-        String ts = params.get("timestamp");
-        if (given == null || ts == null || ts.length() == 0 || ts.length() > 12) {
-            return false;
-        }
-        long at;
-        try {
-            at = Long.parseLong(ts);
-        } catch (NumberFormatException bad) {
+        long at = seconds(params.get("timestamp"));
+        if (given == null || at < 0) {
             return false;
         }
         if (Math.abs(nowSeconds - at) > PROXY_MAX_AGE_SECONDS) {
@@ -95,7 +122,8 @@ public final class Signatures {
         StringBuilder message = new StringBuilder();
         for (int iter = 0; iter < names.size(); iter++) {
             String n = names.get(iter);
-            message.append(iter == 0 ? "" : "&").append(n).append('=').append(params.get(n));
+            message.append(iter == 0 ? "" : "&").append(encode(n)).append('=')
+                    .append(encode(params.get(n)));
         }
         String expected = hex(Crypto.hmacSha256(utf8(signingKey), utf8(message.toString())));
         return Crypto.equalsConstantTime(utf8(expected), utf8(given));
@@ -115,6 +143,29 @@ public final class Signatures {
             throw new IOException("Meant for another app");
         }
         return claims;
+    }
+
+    /// `text` percent-encoded as RFC 3986 does: the UTF-8 bytes, letters,
+    /// digits and `-._~` as they are, every other byte `%XX` in upper case
+    /// hex (a space is `%20`, never `+`). What the proxy signature encodes
+    /// each name and value with.
+    static String encode(String text) throws IOException {
+        if (text == null) {
+            return "";
+        }
+        byte[] b = utf8(text);
+        String hexDigits = "0123456789ABCDEF";
+        StringBuilder out = new StringBuilder(b.length + 8);
+        for (int iter = 0; iter < b.length; iter++) {
+            int c = b[iter] & 0xff;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || c == '-' || c == '.' || c == '_' || c == '~') {
+                out.append((char) c);
+            } else {
+                out.append('%').append(hexDigits.charAt(c >> 4)).append(hexDigits.charAt(c & 0xf));
+            }
+        }
+        return out.toString();
     }
 
     static byte[] utf8(String s) throws IOException {

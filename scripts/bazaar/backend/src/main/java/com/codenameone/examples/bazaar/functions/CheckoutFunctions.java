@@ -21,7 +21,6 @@ package com.codenameone.examples.bazaar.functions;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
-import com.codename1.backend.WebClient;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.Rows;
@@ -81,27 +80,15 @@ public class CheckoutFunctions {
         @Override
         public String post(String url, List<String> headers, byte[] body, int timeoutMillis)
                 throws IOException {
-            String unsafe = com.codenameone.examples.bazaar.web.security.UrlGuard.refuse(url,
-                    com.codenameone.examples.bazaar.web.security.UrlGuard.DNS);
-            if (unsafe != null) {
-                throw new IOException(unsafe);
+            // Guarded, bounded in time, capped while it is read (never
+            // buffered past MAX_REPLY) and never redirected: see OutboundHttp.
+            com.codenameone.examples.bazaar.web.security.OutboundHttp.Reply r =
+                    com.codenameone.examples.bazaar.web.security.OutboundHttp.send("POST", url,
+                            headers, body, timeoutMillis, MAX_REPLY);
+            if (r.status < 200 || r.status >= 300) {
+                throw new IOException("The function answered " + r.status);
             }
-            WebClient client = new WebClient().setConnectTimeoutMillis(timeoutMillis)
-                    .setReadTimeoutMillis(timeoutMillis).setRequestTimeoutMillis(timeoutMillis);
-            try {
-                com.codename1.backend.Web.Result r = client.request("POST", url,
-                        new ArrayList<String>(headers), body);
-                if (!r.isSuccess()) {
-                    throw new IOException("The function answered " + r.getStatus());
-                }
-                byte[] reply = r.getBody();
-                if (reply != null && reply.length > MAX_REPLY) {
-                    throw new IOException("The function's answer is too long");
-                }
-                return r.getBodyAsString();
-            } finally {
-                client.close();
-            }
+            return r.text();
         }
     }
 
@@ -308,8 +295,7 @@ public class CheckoutFunctions {
         headers.add("Content-Type: application/json");
         headers.add("X-Bazaar-Function: " + fn.id);
         headers.add("X-Bazaar-Function-Target: " + fn.target.name);
-        headers.add("X-Bazaar-Signature: " + Webhooks.signature(apps.signingKeyOf(fn.appId),
-                body));
+        Webhooks.sign(headers, apps.signingKeyOf(fn.appId), body);
         int budget = timeoutMillis;
         long started = System.currentTimeMillis();
         String reply = transport.post(fn.url, headers, body, budget);

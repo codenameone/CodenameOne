@@ -128,7 +128,8 @@ public final class Money {
     }
 
     /// [#parse(String)] in `currency`: as many decimals as it has, so `12.5`
-    /// is 1250 cents, `1250` is 1250 yen and `1.25` is 1250 fils.
+    /// is 1250 cents, `1250` is 1250 yen and `1.25` is 1250 fils. More
+    /// decimals than that (`12.345` dollars) is -1, not a cut-down amount.
     public static long parse(String text, String currency) {
         int digits = Amounts.digits(currency);
         if (text == null) {
@@ -154,6 +155,10 @@ public final class Money {
                     if (partDigits < digits) {
                         part = part * 10 + (c - '0');
                         partDigits++;
+                    } else if (c != '0') {
+                        // More decimals than the currency has: not an amount,
+                        // never a cut-down one.
+                        return -1;
                     }
                 } else {
                     whole = whole * 10 + (c - '0');

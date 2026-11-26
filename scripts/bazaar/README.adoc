@@ -178,7 +178,7 @@ whole app and reads top to bottom in the order a store meets it:
   proxy path `/s/{store}/apps/restock`, and a validation function uploaded
   through the functions API.
 * *Verify* -- `Signatures` checks everything Bazaar sends: the
-  `X-Bazaar-Signature` of webhooks and block calls, the proxy's query
+  timestamped `X-Bazaar-Signature` of webhooks and block calls, the proxy's query
   signature, and the session token of the embedded admin page. All three use
   one signing key the app derives from its client secret.
 * *Leave* -- `app/uninstalled` drops the token, `shop/redact` everything else.

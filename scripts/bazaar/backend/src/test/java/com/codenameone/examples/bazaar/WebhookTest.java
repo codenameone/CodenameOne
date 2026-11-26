@@ -108,10 +108,22 @@ class WebhookTest {
         assertEquals(1, sent.size());
         byte[] body = sent.get(0)[2].getBytes("UTF-8");
         String sig = header(sent.get(0)[1], Webhooks.SIGNATURE_HEADER);
-        assertEquals(Webhooks.signature(SECRET, body), sig);
+        String ts = header(sent.get(0)[1], Webhooks.TIMESTAMP_HEADER);
+        long signedAt = Long.parseLong(ts);
+        long now = System.currentTimeMillis() / 1000L;
+        assertTrue(Math.abs(now - signedAt) < 60, ts);
+        // The timestamp is part of what is signed, not the body alone.
+        assertEquals(Webhooks.signature(SECRET, signedAt, body), sig);
+        assertFalse(Webhooks.signature(SECRET, signedAt + 1, body).equals(sig));
         assertTrue(sig.startsWith("sha256="));
-        assertTrue(Webhooks.verify(SECRET, body, sig));
-        assertFalse(Webhooks.verify("another-secret-0000", body, sig));
+        assertTrue(Webhooks.verify(SECRET, body, sig, ts, now));
+        assertFalse(Webhooks.verify("another-secret-0000", body, sig, ts, now));
+        // A replay: the same delivery, accepted once, refused ten minutes on.
+        assertFalse(Webhooks.verify(SECRET, body, sig, ts, signedAt + 600));
+        // Nor can the timestamp be moved forward to dodge the window.
+        assertFalse(Webhooks.verify(SECRET, body, sig, String.valueOf(signedAt + 600),
+                signedAt + 600));
+        assertFalse(Webhooks.verify(SECRET, body, sig, null, now));
         assertEquals(Webhooks.ORDERS_CREATE, header(sent.get(0)[1], "X-Bazaar-Topic"));
         assertTrue(sent.get(0)[2].indexOf("\"totalCents\"") > 0, sent.get(0)[2]);
 

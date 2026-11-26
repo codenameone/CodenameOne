@@ -314,7 +314,9 @@ class AppsTest {
         assertEquals(1, orders.size());
         String key = Apps.signingKey((String) app.get("clientSecret"));
         assertTrue(Webhooks.verify(key, orders.get(0)[2].getBytes("UTF-8"),
-                header(orders.get(0)[1], Webhooks.SIGNATURE_HEADER)));
+                header(orders.get(0)[1], Webhooks.SIGNATURE_HEADER),
+                header(orders.get(0)[1], Webhooks.TIMESTAMP_HEADER),
+                System.currentTimeMillis() / 1000L));
 
         // The privacy topics reach the installed app at the right moments.
         String buyer = People.customer(accounts, "apps-gone-buyer2");
@@ -333,7 +335,9 @@ class AppsTest {
         List<String[]> gone = to(rec, Webhooks.APP_UNINSTALLED);
         assertEquals(1, gone.size());
         assertTrue(Webhooks.verify(key, gone.get(0)[2].getBytes("UTF-8"),
-                header(gone.get(0)[1], Webhooks.SIGNATURE_HEADER)));
+                header(gone.get(0)[1], Webhooks.SIGNATURE_HEADER),
+                header(gone.get(0)[1], Webhooks.TIMESTAMP_HEADER),
+                System.currentTimeMillis() / 1000L));
         // Its own subscriptions are off now.
         s.buy(People.customer(accounts, "apps-gone-buyer3"), 1);
         webhooks.deliverDue(System.currentTimeMillis());

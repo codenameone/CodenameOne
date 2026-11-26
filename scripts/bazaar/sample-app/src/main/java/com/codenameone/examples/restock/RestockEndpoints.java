@@ -86,19 +86,21 @@ public class RestockEndpoints {
     @PostMapping("/restock/webhooks")
     public HttpServer.Response webhook(HttpServer.Request request) throws IOException {
         int status = app.webhook(request.getHeader("X-Bazaar-Topic"), body(request),
-                request.getHeader("X-Bazaar-Signature"));
+                request.getHeader("X-Bazaar-Signature"), request.getHeader("X-Bazaar-Timestamp"));
         return new HttpServer.Response(status, "text/plain", new byte[0]);
     }
 
     @PostMapping("/restock/blocks/data")
     public HttpServer.Response blockData(HttpServer.Request request) throws IOException {
-        String answer = app.blockData(body(request), request.getHeader("X-Bazaar-Signature"));
+        String answer = app.blockData(body(request), request.getHeader("X-Bazaar-Signature"),
+                request.getHeader("X-Bazaar-Timestamp"));
         return answer == null ? refused() : json(answer);
     }
 
     @PostMapping("/restock/blocks/action")
     public HttpServer.Response blockAction(HttpServer.Request request) throws IOException {
-        String answer = app.blockAction(body(request), request.getHeader("X-Bazaar-Signature"));
+        String answer = app.blockAction(body(request), request.getHeader("X-Bazaar-Signature"),
+                request.getHeader("X-Bazaar-Timestamp"));
         return answer == null ? refused() : json(answer);
     }
 

@@ -46,6 +46,9 @@ final class ScriptedPayments extends SimulatedPayments {
     /// The references of the holds released, in order.
     final List<String> released = new ArrayList<String>();
 
+    /// Run inside the next holds, before they are made.
+    volatile Runnable duringAuthorize;
+
     /// Back to a processor that does what the simulated one does.
     void reset() {
         keys.clear();
@@ -54,6 +57,17 @@ final class ScriptedPayments extends SimulatedPayments {
         detachFails = false;
         detached.clear();
         released.clear();
+        duringAuthorize = null;
+    }
+
+    @Override
+    public String authorize(String key, String customer, String token, long amountCents,
+            String currency, String description) throws IOException {
+        Runnable during = duringAuthorize;
+        if (during != null) {
+            during.run();
+        }
+        return super.authorize(key, customer, token, amountCents, currency, description);
     }
 
     @Override

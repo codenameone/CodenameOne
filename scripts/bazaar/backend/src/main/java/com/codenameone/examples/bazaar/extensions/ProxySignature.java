@@ -30,7 +30,8 @@ import java.util.Map;
 /// parameters plus `shop` (the store's handle), `path_prefix`
 /// (`/apps/<subpath>`), `timestamp` (epoch seconds) and `signature`. To
 /// check it: take every parameter but `signature`, decoded, sort them by
-/// name, join them as `name=value` with `&`, and compare `signature` with
+/// name, percent-encode each name and value again ([#encode]), join them as
+/// `name=value` with `&`, and compare `signature` with
 /// the hex HMAC-SHA256 of that text keyed with the app's signing key (the
 /// key its webhooks are signed with), in constant time. Refuse a
 /// `timestamp` more than five minutes old. [#verify] does all of that.
@@ -42,7 +43,9 @@ public final class ProxySignature {
     }
 
     /// The text that is signed: the parameters but `signature`, sorted by
-    /// name, as `name=value` joined with `&`.
+    /// name, as `name=value` joined with `&`, each name and value
+    /// [#encode]d -- so a value holding `&` or `=` cannot pass for two
+    /// parameters, and two different sets never sign the same text.
     public static String message(Map<String, String> params) {
         List<String> names = new ArrayList<String>();
         for (String n : params.keySet()) {
@@ -54,9 +57,37 @@ public final class ProxySignature {
         StringBuilder b = new StringBuilder();
         for (int iter = 0; iter < names.size(); iter++) {
             String n = names.get(iter);
-            b.append(iter == 0 ? "" : "&").append(n).append('=').append(params.get(n));
+            b.append(iter == 0 ? "" : "&").append(encode(n)).append('=')
+                    .append(encode(params.get(n)));
         }
         return b.toString();
+    }
+
+    /// `text` percent-encoded as RFC 3986 does: the UTF-8 bytes, letters,
+    /// digits and `-._~` as they are and every other byte as `%XX` in upper
+    /// case hex (a space is `%20`, never `+`). Null is empty.
+    public static String encode(String text) {
+        if (text == null) {
+            return "";
+        }
+        byte[] b;
+        try {
+            b = text.getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException never) {
+            throw new IllegalStateException(never.getMessage());
+        }
+        String hexDigits = "0123456789ABCDEF";
+        StringBuilder out = new StringBuilder(b.length + 8);
+        for (int iter = 0; iter < b.length; iter++) {
+            int c = b[iter] & 0xff;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                    || c == '-' || c == '.' || c == '_' || c == '~') {
+                out.append((char) c);
+            } else {
+                out.append('%').append(hexDigits.charAt(c >> 4)).append(hexDigits.charAt(c & 0xf));
+            }
+        }
+        return out.toString();
     }
 
     /// The hex signature of `params` under `signingKey`.

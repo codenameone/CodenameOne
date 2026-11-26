@@ -238,6 +238,44 @@ public class StripePayments implements PaymentProvider {
         return id(intent);
     }
 
+    /// The customer's manual-capture intents created since the attempt, read
+    /// newest first, and the one whose `metadata.bazaar_charge` is `key`. The
+    /// list endpoint rather than search: search is only eventually
+    /// consistent, and the list is filtered by customer, so it stays short.
+    @Override
+    public String findHold(String key, String customer, long since) throws IOException {
+        String after = "";
+        for (int page = 0; page < 10; page++) {
+            String path = "/v1/payment_intents?limit=100&customer="
+                    + URLEncoder.encode(customer, "UTF-8") + "&created%5Bgte%5D="
+                    + (Math.max(0, since - 60000L) / 1000L)
+                    + (after.length() == 0 ? "" : "&starting_after="
+                        + URLEncoder.encode(after, "UTF-8"));
+            Map answer = ask("GET", path, null, null);
+            Object data = answer.get("data");
+            if (!(data instanceof List)) {
+                return null;
+            }
+            List rows = (List) data;
+            for (int iter = 0; iter < rows.size(); iter++) {
+                if (!(rows.get(iter) instanceof Map)) {
+                    continue;
+                }
+                Map row = (Map) rows.get(iter);
+                after = text(row, "id");
+                Object metadata = row.get("metadata");
+                if (metadata instanceof Map && key.equals(((Map) metadata).get("bazaar_charge"))
+                        && !"canceled".equals(text(row, "status"))) {
+                    return after;
+                }
+            }
+            if (!Boolean.TRUE.equals(answer.get("has_more")) || rows.isEmpty()) {
+                return null;
+            }
+        }
+        throw new IOException("Too many payments to look the hold up");
+    }
+
     /// Asked again after a lost answer, Stripe refuses to capture an intent
     /// twice; so the intent is read first and one already `succeeded` is done.
     @Override

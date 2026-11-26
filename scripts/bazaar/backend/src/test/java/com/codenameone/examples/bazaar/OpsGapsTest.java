@@ -41,11 +41,13 @@ import com.codenameone.examples.bazaar.checkout.IdempotencyKeys;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.pay.PaymentRecovery;
+import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.store.StoreClock;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -97,6 +99,8 @@ class OpsGapsTest {
     private IdempotencyKeys keys;
     @Autowired
     private PaymentRecovery recovery;
+    @Autowired
+    private Payments payments;
     @Autowired
     private StoreClock clock;
     @Autowired
@@ -246,8 +250,13 @@ class OpsGapsTest {
         db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {orderId});
         db.execute("INSERT INTO payment_attempt (order_id, username, idem_key, customer, token, "
                 + "amount_cents, currency, status, created_at) VALUES (?, ?, ?, 'cus', "
-                + "'sim_pm_ops', 1000, 'USD', ?, ?)", new Object[] {orderId, user, key,
+                + "'', 1000, 'USD', ?, ?)", new Object[] {orderId, user, key,
                     PaymentRecovery.STARTED, Long.valueOf(System.currentTimeMillis() - 3600000L)});
+    }
+
+    /// The hold the processor made under `key` before the crash.
+    private void heldAtProcessor(String key) throws Exception {
+        processor.authorize(key, "cus", "sim_pm_ops", 1000, "USD", "Bazaar order");
     }
 
     /// The order as it stood before checkout's last step wrote its payment.
@@ -300,6 +309,7 @@ class OpsGapsTest {
         db.execute("DELETE FROM payment WHERE order_id = ?", new Object[] {o.id()});
         unfinish(o.id());
         String key = "k-void-" + o.id();
+        heldAtProcessor(key);
         attempt(o.id(), key, o.username());
         recovery.recover(System.currentTimeMillis());
         assertNull(db.queryOne("SELECT id FROM store_order WHERE id = ?", new Object[] {o.id()}),
@@ -317,6 +327,7 @@ class OpsGapsTest {
         processor.reset();
         String orphan = Ids.next();
         String key = "k-orphan-" + orphan;
+        heldAtProcessor(key);
         attempt(orphan, key, "nobody");
         String fresh = Ids.next();
         attempt(fresh, "k-fresh-" + fresh, "nobody");
@@ -328,6 +339,89 @@ class OpsGapsTest {
         assertTrue(journaled(fresh), "a checkout still within its grace is not touched");
         assertFalse(processor.released.contains("sim_ch_k-fresh-" + fresh));
         db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {fresh});
+    }
+
+    @Test
+    void noCardTokenIsKeptAndAnAttemptThatHeldNothingReleasesNothing() throws Exception {
+        processor.reset();
+        Shop s = new Shop("ops-token", 5, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        OrderDto o = s.buy(People.customer(accounts, "ops-token-buyer"), 1);
+        // Checkout writes the journal row without the card's token.
+        db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {o.id()});
+        String orphan = Ids.next();
+        String key = "k-never-" + orphan;
+        attempt(orphan, key, "nobody");
+        recovery.recover(System.currentTimeMillis());
+        assertFalse(journaled(orphan));
+        assertFalse(processor.released.contains("sim_ch_" + key),
+                "nothing was held under the key, and nothing is held now to be let go");
+        assertNull(processor.findHold(key, "cus", 0), "recovery never asks for a hold again");
+    }
+
+    @Test
+    void checkoutWritesNoTokenIntoTheJournal() throws Exception {
+        processor.reset();
+        Shop s = new Shop("ops-notoken", 5, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        String buyer = People.customer(accounts, "ops-notoken-buyer");
+        final String[] seen = new String[1];
+        processor.duringAuthorize = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Map row = db.queryOne("SELECT token FROM payment_attempt WHERE username = ?",
+                            new Object[] {buyer});
+                    seen[0] = row == null ? null : Rows.text(row.get("token"));
+                } catch (IOException e) {
+                    seen[0] = e.getMessage();
+                }
+            }
+        };
+        s.buy(buyer, 1);
+        processor.duringAuthorize = null;
+        assertEquals("", seen[0], "the journal row exists while the hold is asked for, tokenless");
+    }
+
+    @Test
+    void aClaimLeftByAReconcilerThatDiedIsTakenOverAfterTheLease() throws Exception {
+        processor.reset();
+        String orphan = Ids.next();
+        String key = "k-stranded-" + orphan;
+        heldAtProcessor(key);
+        attempt(orphan, key, "nobody");
+        long now = System.currentTimeMillis();
+        // A pass claimed it and the server stopped before it settled.
+        db.execute("UPDATE payment_attempt SET status = ?, claimed_at = ? WHERE order_id = ?",
+                new Object[] {PaymentRecovery.RECONCILING, Long.valueOf(now - 60000L), orphan});
+        recovery.recover(now);
+        assertTrue(journaled(orphan), "a claim within its lease is left to its pass");
+        assertFalse(processor.released.contains("sim_ch_" + key));
+        recovery.recover(now + PaymentRecovery.LEASE_MILLIS);
+        assertFalse(journaled(orphan), "past the lease the row is taken over and settled");
+        assertTrue(processor.released.contains("sim_ch_" + key));
+    }
+
+    @Test
+    void aRetriedCheckoutNeverReplacesARowTheReconcilerHolds() throws Exception {
+        processor.reset();
+        Shop s = new Shop("ops-held", 5, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        OrderDto o = s.buy(People.customer(accounts, "ops-held-buyer"), 1);
+        db.execute("DELETE FROM payment WHERE order_id = ?", new Object[] {o.id()});
+        attempt(o.id(), "k-held-" + o.id(), o.username());
+        long claim = System.currentTimeMillis();
+        db.execute("UPDATE payment_attempt SET status = ?, claimed_at = ? WHERE order_id = ?",
+                new Object[] {PaymentRecovery.RECONCILING, Long.valueOf(claim), o.id()});
+        ResponseStatusException refused = assertThrows(ResponseStatusException.class,
+                () -> payments.authorize(o.id(), o.username(), null, 1000, "USD", true));
+        assertEquals(409, refused.getStatus());
+        Map row = db.queryOne("SELECT status, claimed_at, idem_key FROM payment_attempt "
+                + "WHERE order_id = ?", new Object[] {o.id()});
+        assertEquals(PaymentRecovery.RECONCILING, Rows.text(row.get("status")));
+        assertEquals(claim, Rows.number(row.get("claimed_at")));
+        assertEquals("k-held-" + o.id(), Rows.text(row.get("idem_key")));
+        db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {o.id()});
     }
 
     // ------------------------------------------------------- reconciliation

@@ -280,9 +280,11 @@ public class RestockAlerts {
     // ============================================================== webhooks
 
     /// A webhook: answers the HTTP status to reply with. 401 for a forged
-    /// one, so Bazaar never counts it as delivered.
-    public int webhook(String topic, byte[] body, String signature) throws IOException {
-        if (!Signatures.body(key(), body, signature)) {
+    /// one, or one signed more than five minutes ago (a replay), so Bazaar
+    /// never counts it as delivered.
+    public int webhook(String topic, byte[] body, String signature, String timestamp) throws IOException {
+        if (!Signatures.body(key(), body, signature, timestamp,
+                System.currentTimeMillis() / 1000L)) {
             return 401;
         }
         Map payload = Json.parseObject(new String(body, "UTF-8"));
@@ -312,8 +314,9 @@ public class RestockAlerts {
 
     /// The product block's data: `{"values":{"waiting":"3"}}`, or null when
     /// the call is not signed by Bazaar.
-    public String blockData(byte[] body, String signature) throws IOException {
-        if (!Signatures.body(key(), body, signature)) {
+    public String blockData(byte[] body, String signature, String timestamp) throws IOException {
+        if (!Signatures.body(key(), body, signature, timestamp,
+                System.currentTimeMillis() / 1000L)) {
             return null;
         }
         Map call = Json.parseObject(new String(body, "UTF-8"));
@@ -322,8 +325,9 @@ public class RestockAlerts {
     }
 
     /// "Notify now": e-mails everyone waiting for the product, once.
-    public String blockAction(byte[] body, String signature) throws IOException {
-        if (!Signatures.body(key(), body, signature)) {
+    public String blockAction(byte[] body, String signature, String timestamp) throws IOException {
+        if (!Signatures.body(key(), body, signature, timestamp,
+                System.currentTimeMillis() / 1000L)) {
             return null;
         }
         Map call = Json.parseObject(new String(body, "UTF-8"));

@@ -400,7 +400,12 @@ final class OrdersPane extends MerchantPane {
 
         @Override
         public Object parse(String text, Object previous) {
-            return Long.valueOf(ProductCsv.cents(text, MerchantState.currency()));
+            // Text that is not a price (a typo, or more decimals than the
+            // currency has) keeps the cell's value, as GridFormatter asks,
+            // rather than saving 0 or a cut-down amount.
+            long v = ProductCsv.amount(text, MerchantState.currency());
+            return v == com.codenameone.examples.bazaar.ops.Amounts.NOT_AN_AMOUNT ? previous
+                    : Long.valueOf(v);
         }
     }
 

@@ -449,9 +449,11 @@ them, and on a desktop lets the user drag the file out of the window.
 A store can register addresses to be told about `orders/create`, `orders/paid`,
 `orders/fulfilled`, `orders/cancelled`, `refunds/create`, `inventory/low`,
 `products/update` and `customers/create`. Every delivery is a `POST` of the event
-as JSON, signed with the webhook's secret in the `X-Bazaar-Signature` header. A
-receiver computes the same value over the exact bytes it received and compares
-the two in constant time before trusting the body:
+as JSON with an `X-Bazaar-Timestamp` header (seconds since the epoch), signed
+with the webhook's secret over the timestamp, a `.` and the body in the
+`X-Bazaar-Signature` header. A receiver computes the same value over the exact
+bytes it received, compares the two in constant time and refuses a timestamp
+more than five minutes from its own clock before trusting the body:
 
 [source,java,role=cn1-no-try]
 ----
@@ -1108,6 +1110,16 @@ business contracts for. Plan for these before taking real orders:
   server crash interrupted between its claim and the processor's answer. A
   product finishes or reverses such operations itself, as `PaymentRecovery`
   does for checkout's holds.
+* *Outbound requests and DNS rebinding.* Webhooks, app blocks and actions,
+  the app proxy, remote functions and the custom domain check call URLs that
+  merchants and app developers choose. Each request is checked against
+  private, loopback and metadata addresses as its host resolves, is never
+  redirected, and is cut off at its time and size limits. The HTTP client
+  resolves the host again when it connects, though, so a name with a short
+  lifetime can answer a public address to the check and a private one to the
+  connection. Send these requests through an egress proxy that applies the
+  same rules to the address it connects to, or run the server on a network
+  that can't reach anything private.
 * *A tax engine.* The tax rates are a table the merchant edits. Real sales tax and
   VAT depend on the product category, the destination, thresholds per
   jurisdiction and filing obligations, which a tax service tracks.

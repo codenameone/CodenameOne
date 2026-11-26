@@ -41,16 +41,17 @@ import java.util.Map;
 /// the processor for a hold and deletes it once the order records the hold
 /// ([Payments#authorize] with `journaled`). A row older than [#GRACE_MILLIS]
 /// therefore belongs to a checkout that stopped part way, and [#recover]
-/// settles it by what the order shows:
+/// settles it by what the order shows (a row whose settling itself was cut
+/// short is taken again once its claim is older than [#LEASE_MILLIS]):
 ///
 /// - the order recorded its payment, or was settled some other way: nothing
 ///   to do;
 /// - the payment table has the hold and the order is still waiting: the
 ///   order is **completed**, as the checkout would have;
 /// - the order has no payment, or there is no order: the hold is
-///   **voided**. The processor is asked for the hold again with the same
-///   idempotency key, which answers the first hold if it was made, and that
-///   hold is released; the order's stock, gift card, store credit and
+///   **voided**. The processor is asked which hold it made under the
+///   attempt's idempotency key ([PaymentProvider#findHold]), and that hold
+///   is released; the order's stock, gift card, store credit and
 ///   discount uses go back.
 ///
 /// **Daily reconciliation.** [#reconcileDay] lists the processor's payments
@@ -61,7 +62,11 @@ import java.util.Map;
 @Component
 public class PaymentRecovery {
     public static final String STARTED = "STARTED";
-    static final String RECONCILING = "RECONCILING";
+    public static final String RECONCILING = "RECONCILING";
+    /// How long a claim lasts. A row still RECONCILING past it belongs to a
+    /// pass that died part way (the server stopped mid-settle) and is
+    /// claimed again; a live pass settles a row in seconds.
+    public static final long LEASE_MILLIS = 10L * 60000L;
     /// How long a checkout may take between its journal row and its order
     /// recording the hold before the row is taken as left behind.
     public static final long GRACE_MILLIS = 15L * 60000L;
@@ -99,16 +104,28 @@ public class PaymentRecovery {
         recover(System.currentTimeMillis());
     }
 
-    /// Settles every attempt older than [#GRACE_MILLIS] at `now`.
+    /// Settles every attempt older than [#GRACE_MILLIS] at `now`, and every
+    /// one whose claim is older than [#LEASE_MILLIS].
+    ///
+    /// A row is claimed by moving it to RECONCILING with the time, compared
+    /// against the status and claim time it was read with, so two passes
+    /// never both take it. When settling fails the row goes back to STARTED
+    /// for the next pass -- only if the claim is still this pass's own. When
+    /// the server stops instead, nothing puts it back: the lease does.
     public Outcome recover(long now) throws IOException {
         Outcome out = new Outcome();
-        List rows = db.query("SELECT * FROM payment_attempt WHERE status = ? AND created_at < ? "
-                + "ORDER BY created_at", new Object[] {STARTED, Long.valueOf(now - GRACE_MILLIS)});
+        List rows = db.query("SELECT * FROM payment_attempt WHERE (status = ? AND created_at < ?) "
+                + "OR (status = ? AND claimed_at < ?) ORDER BY created_at",
+                new Object[] {STARTED, Long.valueOf(now - GRACE_MILLIS), RECONCILING,
+                    Long.valueOf(now - LEASE_MILLIS)});
         for (int iter = 0; iter < rows.size() && iter < BATCH; iter++) {
             Map row = (Map) rows.get(iter);
             String orderId = Rows.text(row.get("order_id"));
-            if (db.execute("UPDATE payment_attempt SET status = ? WHERE order_id = ? AND status = ?",
-                    new Object[] {RECONCILING, orderId, STARTED}) != 1) {
+            Long claim = Long.valueOf(now);
+            if (db.execute("UPDATE payment_attempt SET status = ?, claimed_at = ? "
+                    + "WHERE order_id = ? AND status = ? AND claimed_at = ?",
+                    new Object[] {RECONCILING, claim, orderId, Rows.text(row.get("status")),
+                        Long.valueOf(Rows.number(row.get("claimed_at")))}) != 1) {
                 continue;
             }
             boolean settled = false;
@@ -123,8 +140,9 @@ public class PaymentRecovery {
             if (settled) {
                 payments.dropAttempt(orderId);
             } else {
-                db.execute("UPDATE payment_attempt SET status = ? WHERE order_id = ?",
-                        new Object[] {STARTED, orderId});
+                db.execute("UPDATE payment_attempt SET status = ?, claimed_at = 0 "
+                        + "WHERE order_id = ? AND status = ? AND claimed_at = ?",
+                        new Object[] {STARTED, orderId, RECONCILING, claim});
             }
         }
         return out;
@@ -159,19 +177,13 @@ public class PaymentRecovery {
         out.voided++;
     }
 
-    /// Asks for the hold again under its own idempotency key, which answers the
-    /// first hold if the processor made one (or makes one now, which is let
-    /// go at once), and releases it. A refusal means nothing was ever held.
+    /// Looks the hold up at the processor by the attempt's idempotency key
+    /// and releases it. No hold under the key means the request never got
+    /// through, and there is nothing to let go. The card's token is not kept
+    /// on the row, so the hold is never asked for again.
     private void releaseOrphan(Map row) throws IOException {
-        String reference;
-        try {
-            reference = provider.authorize(Rows.text(row.get("idem_key")),
-                    Rows.text(row.get("customer")), Rows.text(row.get("token")),
-                    Rows.number(row.get("amount_cents")), Rows.text(row.get("currency")),
-                    "Bazaar order");
-        } catch (PaymentDeclinedException declined) {
-            return;
-        }
+        String reference = provider.findHold(Rows.text(row.get("idem_key")),
+                Rows.text(row.get("customer")), Rows.number(row.get("created_at")));
         if (reference != null && Payments.atProcessor(reference)) {
             provider.release(reference);
         }

@@ -102,9 +102,24 @@ class CurrencyUnitsTest {
         String shown = Money.format(1250, "JPY");
         assertTrue(shown.endsWith("1250") && shown.indexOf('.') < 0, shown);
         assertEquals(1250, Amounts.parse("1250", "JPY"));
-        assertEquals(1250, Amounts.parse("1250.9", "JPY"));
+        // A decimal yen cannot hold is refused, never cut; zeros are exact.
+        assertEquals(0, Amounts.parse("1250.9", "JPY"));
+        assertEquals(1250, Amounts.parse("1250.0", "JPY"));
+        assertEquals(Amounts.NOT_AN_AMOUNT, Amounts.read("1250.9", 0));
         assertEquals("$12.50", Money.format(1250, "USD"));
         assertEquals("12.50", Money.plain(1250, "USD"));
+    }
+
+    @Test
+    void anAmountTooLargeForALongIsRefusedNotWrapped() {
+        // 10^17 dollars is 10^19 cents: past Long.MAX_VALUE.
+        assertEquals(Amounts.NOT_AN_AMOUNT, Amounts.read("100000000000000000", 2));
+        assertEquals(0, Amounts.parse("100000000000000000", "USD"));
+        assertEquals(Amounts.NOT_AN_AMOUNT, Amounts.read("99999999999999999999", 0));
+        assertEquals(92233720368547758L, Amounts.parse("922337203685477.58", "USD"));
+        assertEquals(-1250, Amounts.parse("-12.50", "USD"));
+        assertEquals(Amounts.NOT_AN_AMOUNT, Amounts.read(".", 2));
+        assertEquals(Amounts.NOT_AN_AMOUNT, Amounts.read("1.2.3", 2));
     }
 
     @Test
@@ -113,7 +128,8 @@ class CurrencyUnitsTest {
         assertEquals("0.005", Amounts.plain(5, "BHD"));
         assertEquals("-0.050", Amounts.plain(-50, "BHD"));
         assertEquals("BHD 1.250", Money.format(1250, "BHD"));
-        assertEquals(1234, Amounts.parse("1.2345", "BHD"));
+        assertEquals(0, Amounts.parse("1.2345", "BHD"));
+        assertEquals(1234, Amounts.parse("1.2340", "BHD"));
         assertEquals(1200, Amounts.parse("1.2", "BHD"));
         // Ten dollars at 0.376 dinars each: 3.760 dinars, not 0.376.
         assertEquals(3760, Markets.convert(1000, "USD", "BHD", 376000, 0, Markets.NONE));
