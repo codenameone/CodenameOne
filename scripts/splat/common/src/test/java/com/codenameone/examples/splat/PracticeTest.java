@@ -76,12 +76,37 @@ public class PracticeTest extends E2e {
 
         // Getting painted, and the instant replay from the shooter's side. The bot drives until the moment you are hit
         // and no longer, or it would wipe the paint off and the ref would see.
-        onEdt(() -> view.setAutopilot(new Rng(7)));
-        until(() -> view.replayQueued() || view.driver().match().over(), 90000, "a hit");
-        onEdt(() -> view.setAutopilot(null));
-        if (view.replayQueued()) {
-            until(() -> view.replayingShooter() >= 0, 8000, "the instant replay");
+        // The autopilot is switched off one 100 ms poll after the hit, and in that
+        // window it can still wipe. A wipe the ref misses (Match.wipe, WIPE_OK)
+        // puts you back in play, and ArenaView.shown() then drops the queued
+        // replay before it ever plays -- the game working as designed, so get
+        // painted again. A replay that vanishes while you are still out is the
+        // opposite: the feature failing (a gap in the recorded history), and it
+        // fails the test, as does never seeing a replay at all.
+        boolean replayed = false;
+        for (int attempt = 0; attempt < 3 && !replayed && !view.driver().match().over(); attempt++) {
+            onEdt(() -> view.setAutopilot(new Rng(7)));
+            until(() -> view.replayQueued() || view.driver().match().over(), 90000, "a hit");
+            onEdt(() -> view.setAutopilot(null));
+            if (!view.replayQueued()) {
+                break;
+            }
+            until(() -> view.replayingShooter() >= 0 || !view.replayQueued(), 8000, "the instant replay");
+            replayed = view.replayingShooter() >= 0;
+            if (!replayed) {
+                assertTrue(view.driver().match().player(view.driver().me()).alive(),
+                        "the instant replay was dropped while still out");
+            }
+        }
+        if (!view.driver().match().over()) {
+            assertTrue(replayed, "an instant replay played");
+        }
+        if (replayed) {
             waitFor(900);
+            // replayingShooter() turns true on the clock, before shown() has drawn a
+            // frame; a replay shown() drops on its first frame would read as played.
+            // The shots last several seconds, so it must still be on screen here.
+            assertTrue(view.replayQueued(), "the instant replay stayed on screen");
             shotNow("instant-replay");
         }
         finish(view, 10 * 60 * Match.TICK_HZ);
