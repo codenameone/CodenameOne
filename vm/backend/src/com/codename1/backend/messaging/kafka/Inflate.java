@@ -22,87 +22,83 @@
  */
 package com.codename1.backend.messaging.kafka;
 
+import com.codename1.backend.ByteSink;
 import java.io.IOException;
 
-/// The output of a decompressor: a growing array with a ceiling, and the
-/// back-reference copy the LZ77 family of codecs share.
+/// What the decompressors add to the backend's [ByteSink]: a ceiling on what one
+/// batch may inflate to, the back-reference copy the LZ77 family of codecs share,
+/// and bounds-checked little-endian reads.
 ///
 /// Every bound is checked here rather than left to an index exception: on
 /// ParparVM an array access out of range is not reliably an exception, so a
 /// corrupt batch must be refused before it is read past.
-final class ByteSink {
+final class Inflate {
     /// The most one batch may decompress to. A fetch is capped at 4 MiB, so
     /// anything near this is a decompression bomb rather than a batch.
     static final int LIMIT = 64 * 1024 * 1024;
 
-    private byte[] data;
-    private int length;
-
-    ByteSink(int expected) {
-        data = new byte[Math.max(64, Math.min(expected, 16 * 1024 * 1024))];
+    private Inflate() {
     }
 
-    int length() {
-        return length;
+    /// A sink sized for `expected` bytes, without trusting a huge estimate.
+    static ByteSink sink(int expected) {
+        return new ByteSink(Math.max(64, Math.min(expected, 16 * 1024 * 1024)));
     }
 
-    private void room(int n) throws IOException {
-        if (n < 0 || n > LIMIT - length) {
+    private static void room(ByteSink out, int n) throws IOException {
+        if (n < 0 || n > LIMIT - out.length()) {
             throw new IOException("A Kafka batch decompresses to more than "
                     + (LIMIT >> 20) + " MiB");
         }
-        if (length + n > data.length) {
-            long want = Math.max((long) data.length * 2, (long) length + n);
-            byte[] bigger = new byte[(int) Math.min(want, LIMIT)];
-            System.arraycopy(data, 0, bigger, 0, length);
-            data = bigger;
-        }
-    }
-
-    void put(int b) throws IOException {
-        room(1);
-        data[length++] = (byte) b;
     }
 
     /// `n` bytes of `src` from `at`, which the caller has bounds checked.
-    void put(byte[] src, int at, int n) throws IOException {
-        room(n);
-        System.arraycopy(src, at, data, length, n);
-        length += n;
+    static void put(ByteSink out, byte[] src, int at, int n) throws IOException {
+        room(out, n);
+        out.put(src, at, n);
     }
 
     /// `n` copies of `b`.
-    void fill(int b, int n) throws IOException {
-        room(n);
-        byte v = (byte) b;
-        for (int i = 0; i < n; i++) {
-            data[length + i] = v;
+    static void fill(ByteSink out, int b, int n) throws IOException {
+        room(out, n);
+        if (n == 0) {
+            return;
         }
-        length += n;
+        out.put(b);
+        // Each pass copies the run written so far, so it doubles: log n calls.
+        int run = 1;
+        while (run < n) {
+            int c = Math.min(run, n - run);
+            out.put(out.bytes(), out.length() - c, c);
+            run += c;
+        }
     }
 
     /// Copies `n` bytes from `distance` back, which may overlap what it
     /// writes; `floor` is where back-references may reach to.
-    void copy(long distance, int n, int floor) throws IOException {
-        if (distance <= 0 || distance > length - floor) {
+    static void copy(ByteSink out, long distance, int n, int floor) throws IOException {
+        if (distance <= 0 || distance > out.length() - floor) {
             throw new IOException("A compressed Kafka batch refers back past its start");
         }
-        room(n);
-        int from = length - (int) distance;
-        if (distance >= n) {
-            System.arraycopy(data, from, data, length, n);
-        } else {
-            for (int i = 0; i < n; i++) {
-                data[length + i] = data[from + i];
-            }
+        room(out, n);
+        int d = (int) distance;
+        // A chunk no longer than the distance never reads what it writes, so
+        // an overlapping copy is a run of plain ones. ByteSink.put may grow the
+        // array mid-call; it copies from the array it was handed, whose first
+        // length bytes are unchanged.
+        int left = n;
+        while (left > 0) {
+            int c = Math.min(left, d);
+            out.put(out.bytes(), out.length() - d, c);
+            left -= c;
         }
-        length += n;
     }
 
-    byte[] toArray() {
-        byte[] out = new byte[length];
-        System.arraycopy(data, 0, out, 0, length);
-        return out;
+    /// The sink's contents as an array of their own.
+    static byte[] toArray(ByteSink out) {
+        byte[] copy = new byte[out.length()];
+        System.arraycopy(out.bytes(), 0, copy, 0, out.length());
+        return copy;
     }
 
     /// The little-endian `n`-byte integer at `at` of `in`, checked against `end`.

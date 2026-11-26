@@ -172,9 +172,9 @@ class KafkaCompressionTest {
         }
         final LZ4Compressor hc = LZ4Factory.fastestJavaInstance().highCompressor(17);
         roundTrip("lz4 hc block", in -> hc.compress(in), in -> {
-            ByteSink out = new ByteSink(16);
+            com.codename1.backend.ByteSink out = new com.codename1.backend.ByteSink(16);
             Lz4.block(in, 0, in.length, out, 0);
-            return out.toArray();
+            return Inflate.toArray(out);
         });
     }
 

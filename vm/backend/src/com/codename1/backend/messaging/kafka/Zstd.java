@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.messaging.kafka;
 
+import com.codename1.backend.ByteSink;
 import java.io.IOException;
 
 /// Zstandard decompression, for batches a producer sent with
@@ -89,13 +90,13 @@ final class Zstd {
     }
 
     static byte[] decompress(byte[] in) throws IOException {
-        ByteSink out = new ByteSink(in.length * 4);
+        ByteSink out = Inflate.sink(in.length * 4);
         int p = 0;
         while (p < in.length) {
-            int magic = (int) ByteSink.le(in, p, 4, in.length);
+            int magic = (int) Inflate.le(in, p, 4, in.length);
             p += 4;
             if ((magic & 0xfffffff0) == 0x184D2A50) {
-                long skip = ByteSink.le(in, p, 4, in.length);
+                long skip = Inflate.le(in, p, 4, in.length);
                 p += 4;
                 if (skip > in.length - p) {
                     throw corrupt();
@@ -107,7 +108,7 @@ final class Zstd {
                 throw new IOException("A zstd Kafka batch is not a Zstandard frame");
             }
         }
-        return out.toArray();
+        return Inflate.toArray(out);
     }
 
     static IOException corrupt() {
@@ -151,14 +152,14 @@ final class Zstd {
                 p++;
             }
             int dictBytes = dictFlag == 3 ? 4 : dictFlag;
-            if (dictBytes > 0 && ByteSink.le(in, p, dictBytes, end) != 0) {
+            if (dictBytes > 0 && Inflate.le(in, p, dictBytes, end) != 0) {
                 throw new IOException("A zstd Kafka batch needs a dictionary");
             }
             p += dictBytes;
             int sizeBytes = sizeFlag == 0 ? (single ? 1 : 0) : 1 << sizeFlag;
             long contentSize = -1;
             if (sizeBytes > 0) {
-                contentSize = ByteSink.le(in, p, sizeBytes, end);
+                contentSize = Inflate.le(in, p, sizeBytes, end);
                 if (sizeBytes == 2) {
                     contentSize += 256;
                 }
@@ -166,7 +167,7 @@ final class Zstd {
             }
             floor = out.length();
             while (true) {
-                long header = ByteSink.le(in, p, 3, end);
+                long header = Inflate.le(in, p, 3, end);
                 p += 3;
                 boolean last = (header & 1) != 0;
                 int type = (int) ((header >>> 1) & 3);
@@ -175,13 +176,13 @@ final class Zstd {
                     if (size > end - p) {
                         throw corrupt();
                     }
-                    out.put(in, p, size);
+                    Inflate.put(out, in, p, size);
                     p += size;
                 } else if (type == 1) {
                     if (p >= end) {
                         throw corrupt();
                     }
-                    out.fill(in[p], size);
+                    Inflate.fill(out, in[p], size);
                     p++;
                 } else if (type == 2) {
                     if (size > end - p) {
@@ -216,7 +217,7 @@ final class Zstd {
             int count = in[p++] & 0xff;
             if (count >= 128) {
                 if (count == 255) {
-                    count = (int) ByteSink.le(in, p, 2, end) + 0x7f00;
+                    count = (int) Inflate.le(in, p, 2, end) + 0x7f00;
                     p += 2;
                 } else {
                     if (p >= end) {
@@ -243,7 +244,7 @@ final class Zstd {
                 throw corrupt();
             }
             if (used < literalCount) {
-                out.put(literals, used, literalCount - used);
+                Inflate.put(out, literals, used, literalCount - used);
             }
         }
 
@@ -320,9 +321,9 @@ final class Zstd {
                 if (literalLength > literalCount - lit) {
                     throw corrupt();
                 }
-                out.put(literals, lit, literalLength);
+                Inflate.put(out, literals, lit, literalLength);
                 lit += literalLength;
-                out.copy(offset, matchLength, floor);
+                Inflate.copy(out, offset, matchLength, floor);
             }
             if (bits.remaining() != 0) {
                 throw corrupt();
@@ -347,10 +348,10 @@ final class Zstd {
                     size = b0 >>> 3;
                 } else if (format == 1) {
                     header = 2;
-                    size = (int) (ByteSink.le(in, from, 2, end) >>> 4);
+                    size = (int) (Inflate.le(in, from, 2, end) >>> 4);
                 } else {
                     header = 3;
-                    size = (int) (ByteSink.le(in, from, 3, end) >>> 4);
+                    size = (int) (Inflate.le(in, from, 3, end) >>> 4);
                 }
                 int p = from + header;
                 room(size);
@@ -375,17 +376,17 @@ final class Zstd {
             int compressed;
             boolean four = format != 0;
             if (format < 2) {
-                long v = ByteSink.le(in, from, 3, end);
+                long v = Inflate.le(in, from, 3, end);
                 header = 3;
                 size = (int) ((v >>> 4) & 0x3ff);
                 compressed = (int) ((v >>> 14) & 0x3ff);
             } else if (format == 2) {
-                long v = ByteSink.le(in, from, 4, end);
+                long v = Inflate.le(in, from, 4, end);
                 header = 4;
                 size = (int) ((v >>> 4) & 0x3fff);
                 compressed = (int) ((v >>> 18) & 0x3fff);
             } else {
-                long v = ByteSink.le(in, from, 5, end);
+                long v = Inflate.le(in, from, 5, end);
                 header = 5;
                 size = (int) ((v >>> 4) & 0x3ffff);
                 compressed = (int) ((v >>> 22) & 0x3ffff);
@@ -406,7 +407,7 @@ final class Zstd {
             if (!four) {
                 huffman.decode(in, p, streamsEnd, literals, 0, size);
             } else {
-                long jump = ByteSink.le(in, p, 6, streamsEnd);
+                long jump = Inflate.le(in, p, 6, streamsEnd);
                 p += 6;
                 int s1 = (int) (jump & 0xffff);
                 int s2 = (int) ((jump >>> 16) & 0xffff);

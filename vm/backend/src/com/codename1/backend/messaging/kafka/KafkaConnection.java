@@ -255,7 +255,7 @@ final class KafkaConnection {
     /// when the set held no whole batch
     /// How many decompressed bytes one fetch may hold before the remaining
     /// batches are left for the next fetch. A single batch may still reach
-    /// `ByteSink.LIMIT`, so one record batch is always readable.
+    /// `Inflate.LIMIT`, so one record batch is always readable.
     static final long FETCH_INFLATE_LIMIT = 128L * 1024 * 1024;
 
     static long records(byte[] set, long from, List<Record> out, long[][] aborted)

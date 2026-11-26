@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.messaging.kafka;
 
+import com.codename1.backend.ByteSink;
 import java.io.IOException;
 
 /// Snappy decompression, for batches a producer sent with
@@ -40,7 +41,7 @@ final class Snappy {
     }
 
     static byte[] decompress(byte[] in) throws IOException {
-        ByteSink out = new ByteSink(in.length * 3);
+        ByteSink out = Inflate.sink(in.length * 3);
         if (xerial(in)) {
             int p = 16;
             while (p < in.length) {
@@ -55,7 +56,7 @@ final class Snappy {
         } else {
             block(in, 0, in.length, out);
         }
-        return out.toArray();
+        return Inflate.toArray(out);
     }
 
     private static boolean xerial(byte[] in) {
@@ -92,7 +93,7 @@ final class Snappy {
                 break;
             }
         }
-        if (size > ByteSink.LIMIT) {
+        if (size > Inflate.LIMIT) {
             throw new IOException("A snappy Kafka batch claims " + size + " bytes");
         }
         int floor = out.length();
@@ -104,7 +105,7 @@ final class Snappy {
                 int n = tag >>> 2;
                 if (n >= 60) {
                     int bytes = n - 59;
-                    n = (int) ByteSink.le(in, p, bytes, end);
+                    n = (int) Inflate.le(in, p, bytes, end);
                     p += bytes;
                     if (n < 0) {
                         throw new IOException("A snappy Kafka batch is malformed");
@@ -114,7 +115,7 @@ final class Snappy {
                 if (n > end - p) {
                     throw new IOException("A snappy Kafka batch is truncated");
                 }
-                out.put(in, p, n);
+                Inflate.put(out, in, p, n);
                 p += n;
             } else if (kind == 1) {
                 if (p >= end) {
@@ -122,12 +123,12 @@ final class Snappy {
                 }
                 int n = 4 + ((tag >>> 2) & 7);
                 int distance = ((tag >>> 5) << 8) | (in[p++] & 0xff);
-                out.copy(distance, n, floor);
+                Inflate.copy(out, distance, n, floor);
             } else {
                 int bytes = kind == 2 ? 2 : 4;
-                long distance = ByteSink.le(in, p, bytes, end);
+                long distance = Inflate.le(in, p, bytes, end);
                 p += bytes;
-                out.copy(distance, (tag >>> 2) + 1, floor);
+                Inflate.copy(out, distance, (tag >>> 2) + 1, floor);
             }
             if (out.length() > expected) {
                 throw new IOException("A snappy Kafka batch is longer than it claims");

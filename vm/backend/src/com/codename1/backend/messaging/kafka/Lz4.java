@@ -22,6 +22,7 @@
  */
 package com.codename1.backend.messaging.kafka;
 
+import com.codename1.backend.ByteSink;
 import java.io.IOException;
 
 /// LZ4 decompression, for batches a producer sent with
@@ -37,14 +38,14 @@ final class Lz4 {
     }
 
     static byte[] decompress(byte[] in) throws IOException {
-        ByteSink out = new ByteSink(in.length * 3);
+        ByteSink out = Inflate.sink(in.length * 3);
         int p = 0;
         int end = in.length;
         while (p < end) {
-            int magic = (int) ByteSink.le(in, p, 4, end);
+            int magic = (int) Inflate.le(in, p, 4, end);
             p += 4;
             if ((magic & 0xfffffff0) == 0x184D2A50) {
-                long skip = ByteSink.le(in, p, 4, end);
+                long skip = Inflate.le(in, p, 4, end);
                 p += 4;
                 if (skip > end - p) {
                     throw new IOException("An lz4 Kafka batch is truncated");
@@ -57,7 +58,7 @@ final class Lz4 {
             }
             p = frame(in, p, end, out);
         }
-        return out.toArray();
+        return Inflate.toArray(out);
     }
 
     private static int frame(byte[] in, int at, int end, ByteSink out) throws IOException {
@@ -80,7 +81,7 @@ final class Lz4 {
         p++;
         int floor = out.length();
         while (true) {
-            long word = ByteSink.le(in, p, 4, end);
+            long word = Inflate.le(in, p, 4, end);
             p += 4;
             if (word == 0) {
                 break;
@@ -91,7 +92,7 @@ final class Lz4 {
                 throw new IOException("An lz4 Kafka batch is truncated");
             }
             if (stored) {
-                out.put(in, p, size);
+                Inflate.put(out, in, p, size);
             } else {
                 block(in, p, p + size, out, floor);
             }
@@ -120,12 +121,12 @@ final class Lz4 {
             if (literals > end - p) {
                 throw new IOException("An lz4 Kafka batch is truncated");
             }
-            out.put(in, p, literals);
+            Inflate.put(out, in, p, literals);
             p += literals;
             if (p == end) {
                 return;
             }
-            int distance = (int) ByteSink.le(in, p, 2, end);
+            int distance = (int) Inflate.le(in, p, 2, end);
             p += 2;
             int length = token & 15;
             if (length == 15) {
@@ -133,7 +134,7 @@ final class Lz4 {
                 length += extra(in, at, end);
                 p = at[0];
             }
-            out.copy(distance, length + 4, floor);
+            Inflate.copy(out, distance, length + 4, floor);
         }
     }
 
@@ -147,7 +148,7 @@ final class Lz4 {
             }
             int b = in[p++] & 0xff;
             n += b;
-            if (n > ByteSink.LIMIT) {
+            if (n > Inflate.LIMIT) {
                 throw new IOException("An lz4 Kafka batch is malformed");
             }
             if (b != 255) {
