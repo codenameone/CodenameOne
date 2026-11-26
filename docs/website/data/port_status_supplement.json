@@ -57,6 +57,62 @@
       ]
     },
     {
+      "test": "SlideCapabilitiesScreenshotTest",
+      "reason": "The baseline is a phone-sized sheet of shapes, charts, diagrams and a table. The watch form factor has no comparable layout to capture.",
+      "platform_support": "The presentation API has no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders it and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "slides-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SlideEditorScreenshotTest",
+      "reason": "The baseline is a phone-sized slide editor with its thumbnail strip, canvas and selection handles. The watch form factor has no comparable layout to capture.",
+      "platform_support": "The presentation API has no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders it and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "slides-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SlideTransitionAnimationScreenshotTest",
+      "reason": "The baseline is a phone-sized frame strip of a slide transition. The watch form factor has no comparable layout to capture.",
+      "platform_support": "The presentation API has no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders it and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "slides-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SlideBuildAnimationScreenshotTest",
+      "reason": "The baseline is a phone-sized frame strip of a slide build animation. The watch form factor has no comparable layout to capture.",
+      "platform_support": "The presentation API has no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders it and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "slides-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "CenteredDialogTitleScreenshotTest",
       "reason": "The centered dialog title baseline is a phone-sized dialog. The watch form factor lays dialogs out differently and has no comparable phone dialog to capture.",
       "platform_support": "Dialogs and centered titles work on watchOS; only this phone-geometry baseline does not apply there.",

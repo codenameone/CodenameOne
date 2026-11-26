@@ -87,7 +87,7 @@ final class NativeFormat {
         x.raw("</").raw(element).raw(">");
     }
 
-    private static void blocks(XmlOut x, List<Block> blocks) throws IOException {
+    static void blocks(XmlOut x, List<Block> blocks) throws IOException {
         for (Block b : blocks) {
             if (b instanceof Paragraph) {
                 paragraph(x, (Paragraph) b);
@@ -315,7 +315,7 @@ final class NativeFormat {
 
     /// Reads the block whose start tag the scanner is on into `out`, or answers false when the
     /// element is not a block.
-    private static boolean block(XmlScanner x, List<Block> out, Set<String> ids)
+    static boolean block(XmlScanner x, List<Block> out, Set<String> ids)
             throws IOException {
         if ("p".equals(x.name)) {
             out.add(readParagraph(x, ids));
