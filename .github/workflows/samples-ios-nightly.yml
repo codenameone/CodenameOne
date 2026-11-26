@@ -54,7 +54,7 @@ jobs:
     if: needs.golden-plan.outputs.run == 'true'
     name: iOS builds (${{ matrix.shard }})
     needs: [golden-plan, build-ios-port]
-    runs-on: macos-15
+    runs-on: xcode-27
     # Five steps at their 45-minute cap; a slow night must fail a step, not
     # kill the job and leave the rest of the shard unrun.
     timeout-minutes: 240

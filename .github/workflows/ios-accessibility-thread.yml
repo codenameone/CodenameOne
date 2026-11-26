@@ -35,7 +35,7 @@ jobs:
   native-contract:
     needs: golden-plan
     if: needs.golden-plan.outputs.run == 'true'
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6

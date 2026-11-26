@@ -23,7 +23,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
     outputs:
       cn1_built_mac_cache_key: ${{ steps.cn1_built_mac_key.outputs.key }}
@@ -228,7 +228,7 @@ jobs:
       # not evicted for the life of the run (and survive partial `--failed`
       # re-runs), so the handoff is reliable. tar relative to / so the home
       # (~/.m2) and workspace paths restore to identical absolute locations on
-      # the consumer (same macos-15 image -> same /Users/runner paths).
+      # the consumer (same xcode-27 image -> same /Users/runner paths).
       - name: Bundle built CN1 + mac port artifacts
         run: |
           set -euo pipefail

@@ -67,7 +67,7 @@ jobs:
     # library. Keep both ARC modes and both AdMob link destinations.
     needs: [golden-plan, select]
     if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.libraries != '' || needs.select.outputs.link == 'true') }}
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6

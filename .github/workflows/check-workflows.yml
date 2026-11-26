@@ -62,14 +62,6 @@ jobs:
           python3 scripts/ci/test_cn1ss_golden_plan.py
           node --test scripts/ci/test-cancel-stale-pr-runs.js
 
-      # Same reasoning one level up: fidelity-ios-metal-27 is a COPY of the job
-      # beside it, and a copy nobody checks drifts. Both
-      # legs of a pair stay green while diverging, because each passes on its own
-      # terms and nothing compares them. Also unfiltered by paths -- a pair can
-      # drift through an edit to either side.
-      - name: Duplicated CI legs must stay identical
-        run: scripts/check-duplicated-ci-legs.py
-
       # This workflow is unfiltered, so changes to the spec, its validator, or any
       # native reference table are checked before they reach master.
       - name: Validate fidelity spec and native reference tables

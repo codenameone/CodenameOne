@@ -123,11 +123,6 @@ jobs:
       # test cannot leave this workflow green and then be published from master.
       CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # Pin the toolchain rather than taking the image default: scripts/lib/
-      # xcode.sh resolves CN1_XCODE_MAJOR, and leaving it at 26 on an image that
-      # ships only Xcode 27 fails resolution outright instead of quietly using
-      # the wrong one.
-      CN1_XCODE_MAJOR: '27'
       # The image carries 27.0, 27.1 and 27.2 side by side; the 27 baselines are
       # measured on 27.1, so take exactly that rather than the newest.
       CN1_XCODE_VERSION_PIN: '27.1'
@@ -569,7 +564,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -762,7 +757,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: macos-15
+    runs-on: xcode-27
     # Measured: the sample build takes 15-22 min and the tvOS screenshot run
     # 28-33 min on a hosted macos-15, so 60 left nothing for a slow runner and
     # cancelled the suite mid-run on unrelated branches.

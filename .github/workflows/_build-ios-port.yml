@@ -20,7 +20,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: xcode-27
     # 90, not 60: without the cn1-built cache this job is setup-workspace plus
     # the port build, and setup-workspace alone was measured at 27, 34 and 40+
     # minutes on three macOS runners in one night (2026-11-18). See the step
@@ -192,7 +192,7 @@ jobs:
       # not evicted for the life of the run (and survive partial `--failed`
       # re-runs), so the handoff is reliable. tar relative to / so the home
       # (~/.m2) and workspace paths restore to identical absolute locations on
-      # the consumer (same macos-15 image -> same /Users/runner paths).
+      # the consumer (same xcode-27 image -> same /Users/runner paths).
       - name: Bundle built CN1 + iOS port artifacts
         run: |
           set -euo pipefail
@@ -219,7 +219,7 @@ jobs:
       # Every screenshot job used to build it for itself, at the top of its
       # test step: install the backend runtime, the build engine and the
       # plugin from this checkout, then compile the server. Measured, that was
-      # 3 to 3.6 minutes in each macos-15 job and 6.5 to 9.7 minutes on the
+      # 3 to 3.6 minutes in each macOS job and 6.5 to 9.7 minutes on the
       # Xcode 27 leg, whose runner is slower and whose 95 minute limit it was
       # spending -- five or six builds of the same classes per run. Built once
       # here it costs this job the 3.5 minutes one of them paid.

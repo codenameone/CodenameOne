@@ -474,7 +474,7 @@ jobs:
     name: iOS build (simulator)
     if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name != 'schedule') }}
     needs: [golden-plan, build-ios-port]
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 50
     env:
       CN1_APP_DIR: scripts/parley

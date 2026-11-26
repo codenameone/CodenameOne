@@ -50,7 +50,7 @@ public class NativeThemesTest {
         assertEquals("iOS7Theme", NativeThemes.themeFor("auto", "26", false));
         assertEquals("iOS7Theme", NativeThemes.themeFor("FLAT", "26", false));
         assertEquals("iOSModernTheme", NativeThemes.themeFor("modern", "26", false));
-        assertEquals("iOSModernTheme", NativeThemes.themeFor("liquid", null, false));
+        assertEquals("iOSModern27Theme", NativeThemes.themeFor("liquid", null, false));
         assertEquals("iOSModern27Theme", NativeThemes.themeFor("modern", "27", false));
         assertEquals("iPhoneTheme", NativeThemes.themeFor("legacy", "26", false));
         assertEquals("iPhoneTheme", NativeThemes.themeFor("material", "26", false));
@@ -61,8 +61,8 @@ public class NativeThemesTest {
         assertEquals("MacOSAquaTheme", NativeThemes.themeFor("aqua", null, true));
         assertEquals("MacOSAquaTheme", NativeThemes.themeFor("auto", null, true));
         assertEquals("MacOSAquaTheme", NativeThemes.themeFor("native", null, true));
-        // The macOS stub never sets a generation, so the modern theme there is 26.
-        assertEquals("iOSModernTheme", NativeThemes.themeFor("modern", null, true));
+        // No generation means the default one, 27, as on iOS.
+        assertEquals("iOSModern27Theme", NativeThemes.themeFor("modern", null, true));
         assertEquals("iOS7Theme", NativeThemes.themeFor("ios7", null, true));
     }
 

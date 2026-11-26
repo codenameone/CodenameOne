@@ -123,7 +123,7 @@ jobs:
             case "$leg" in
               gnome)   runner=ubuntu-24.04 ;;
               windows) runner=windows-11-arm ;;
-              macos)   runner=macos-15 ;;
+              macos)   runner=xcode-27 ;;
             esac
             entries="$entries{\"platform\":\"$leg\",\"runner\":\"$runner\"},"
           done

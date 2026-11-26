@@ -3584,8 +3584,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// caching: the simulator picks up a project's settings without a restart,
     /// so a cached answer would survive the change that was meant to alter it.
     private static String modernIosTheme() {
-        return "27".equals(buildHint("ios.themeGeneration"))
-                ? "iOSModern27Theme" : "iOSModernTheme";
+        // 27 unless the project asks for 26, as the builder defaults it.
+        return "26".equals(buildHint("ios.themeGeneration"))
+                ? "iOSModernTheme" : "iOSModern27Theme";
     }
 
     private static String resolveAutoNativeTheme(String platformName) {

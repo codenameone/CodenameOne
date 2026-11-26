@@ -3138,9 +3138,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Which generation of the MODERN theme this build ships. "26" or "27",
     /// emitted into the generated stub by IPhoneBuilder from the
-    /// ios.themeGeneration hint. Defaults to 26 so a build that says nothing --
-    /// including one produced before the hint existed -- keeps the theme it had.
-    private static String iosThemeGeneration = "26";
+    /// ios.themeGeneration hint. Defaults to 27, the builder's own default.
+    private static String iosThemeGeneration = "27";
 
     /// Invoked from the generated stub (do not rename).
     public static void setIosThemeGeneration(String g) {

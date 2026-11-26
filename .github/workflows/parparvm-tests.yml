@@ -483,7 +483,9 @@ jobs:
             exit 0
           fi
 
-          run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}"
+          # Its own branch: pr.yml force-pushes quality-report-previews in the same ci.yml
+          # run, and a force-push replaces the whole branch.
+          run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}-parparvm"
           tmp_dir=$(mktemp -d)
           dest_dir="${tmp_dir}/${run_dir}/coverage"
           mkdir -p "${dest_dir}"
@@ -504,7 +506,7 @@ jobs:
           remote_url="${SERVER_URL}/${REPOSITORY}.git"
           token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
           for push_attempt in 1 2 3 4 5; do
-            if git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null; then
+            if git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews-parparvm >/dev/null; then
               break
             fi
             if [ "${push_attempt}" -eq 5 ]; then

@@ -48,7 +48,7 @@ jobs:
     needs: [build-port, unity-gallery]
     permissions:
       contents: read
-    runs-on: macos-15
+    runs-on: xcode-27
     # This job runs device Release and simulator UI builds in sequence. The
     # numbers below are from when a third build, for the notification tests,
     # followed them; it is gone (see the end of the job) and the limit has been

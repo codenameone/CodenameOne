@@ -67,7 +67,7 @@ class DesktopNativeThemeSelectionTest {
                         assertNull(resolver.invoke(null, "ios"));
                         assertNull(resolver.invoke(null, "and"));
                     } else if ("modern".equals(mode)) {
-                        assertEquals("iOSModernTheme", resolver.invoke(null, "ios"));
+                        assertEquals("iOSModern27Theme", resolver.invoke(null, "ios"));
                         assertEquals("AndroidMaterialTheme", resolver.invoke(null, "and"));
                     }
                 }
@@ -113,7 +113,7 @@ class DesktopNativeThemeSelectionTest {
                         JavaSEPort.resolvePackagedDesktopNativeTheme("win", new Properties()), hint);
                 // The mobile half of the hint is unchanged: native is modern plus desktop,
                 // not a different mobile theme.
-                assertEquals("iOSModernTheme", resolver.invoke(null, "ios"), hint);
+                assertEquals("iOSModern27Theme", resolver.invoke(null, "ios"), hint);
                 assertEquals("AndroidMaterialTheme", resolver.invoke(null, "and"), hint);
                 // An explicit desktop hint still decides, in both directions.
                 System.setProperty(keys[0], "legacy");
@@ -356,8 +356,8 @@ class DesktopNativeThemeSelectionTest {
             System.setProperty(modeKey, "modern");
 
             System.clearProperty(key);
-            assertEquals("iOSModernTheme", resolver.invoke(null, "ios"),
-                    "unset must stay on generation 26 so an existing project does not move");
+            assertEquals("iOSModern27Theme", resolver.invoke(null, "ios"),
+                    "unset must resolve to generation 27, the builder's default");
 
             System.setProperty(key, "26");
             assertEquals("iOSModernTheme", resolver.invoke(null, "ios"));

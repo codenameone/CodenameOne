@@ -63,7 +63,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    runs-on: macos-15
+    runs-on: xcode-27
     # build step (<=45) + screenshot-run step (<=45) <= 90, matching the
     # iOS Metal job headroom bump (a08e87b32). The 45-min job cap used to
     # SIGKILL the screenshot run mid-post-processing on slow runners. Plus 50 for the

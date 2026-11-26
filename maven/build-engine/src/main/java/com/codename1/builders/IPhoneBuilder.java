@@ -83,7 +83,7 @@ public class IPhoneBuilder extends Executor {
     /// generated stub. Package-private so WatchNativeBuilder and
     /// MacOSNativeBuilder emit the SAME value -- a phone and its watch resolving
     /// to different generations would be a skew nobody would think to look for.
-    String iosThemeGeneration = "26";
+    String iosThemeGeneration = "27";
 
 
     /// Where each entry-point stub lives once they have been separated, or null when there is one
@@ -2437,11 +2437,11 @@ public class IPhoneBuilder extends Executor {
         // design generation the modern theme targets.
         //
         // An unrecognised value is a build error rather than a silent fallback.
-        // Falling back would ship the 26 look to someone who asked for 27 and
+        // Falling back would ship the default look to someone who asked for another and
         // say nothing, and a theme is exactly the kind of thing nobody notices
         // is wrong until it is in front of users -- the same failure the
         // nativeTheme comment above records for iosMode.
-        iosThemeGeneration = request.getArg("ios.themeGeneration", "26").trim();
+        iosThemeGeneration = request.getArg("ios.themeGeneration", "27").trim();
         if (!"26".equals(iosThemeGeneration) && !"27".equals(iosThemeGeneration)) {
             throw new BuildException("ios.themeGeneration must be 26 or 27, got '"
                     + iosThemeGeneration + "'");
