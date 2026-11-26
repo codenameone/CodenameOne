@@ -70,9 +70,42 @@ import java.util.concurrent.atomic.AtomicInteger;
 /// A new group starts at the earliest offset, so nothing sent before a
 /// listener first started is skipped; `cn1.messaging.kafka.auto-offset-reset`
 /// (or Spring Boot's `spring.kafka.consumer.auto-offset-reset`) set to `latest`
-/// starts at the end instead. Records compressed with gzip can be read;
-/// snappy, lz4 and zstd cannot, and a topic holding them fails its consumer.
-/// Transactions and SASL are not supported.
+/// starts at the end instead. Records compressed with gzip, snappy, lz4 or
+/// zstd are read; what this transport sends is uncompressed.
+///
+/// `cn1.messaging.kafka.isolation-level` (or Spring Boot's
+/// `spring.kafka.consumer.isolation-level`) set to `read_committed` hides the
+/// records of aborted transactions and of transactions still open, as the
+/// Java client does; the default, `read_uncommitted`, is the Java client's
+/// default too. Sending in a transaction is not supported.
+///
+/// ## Authentication
+///
+/// SASL is configured as the Java client configures it, under
+/// `cn1.messaging.kafka.sasl.*` or Spring Boot's own keys:
+///
+/// ```properties
+/// cn1.messaging.url=kafkas://pkc-xxxxx.eu-west-1.aws.confluent.cloud:9092
+/// cn1.messaging.kafka.sasl.mechanism=PLAIN
+/// cn1.messaging.kafka.sasl.username=<api key>
+/// cn1.messaging.kafka.sasl.password=<api secret>
+/// ```
+///
+/// | Key | Spring Boot equivalent |
+/// |---|---|
+/// | `cn1.messaging.kafka.sasl.mechanism` | `spring.kafka.properties.sasl.mechanism` |
+/// | `cn1.messaging.kafka.sasl.username`, `.password` | the `username` and `password` of `spring.kafka.properties.sasl.jaas.config` |
+/// | `cn1.messaging.kafka.security.protocol` | `spring.kafka.security.protocol` |
+/// | `cn1.messaging.kafka.sasl.aws-region` | none: the region of an MSK host name, or `AWS_REGION` |
+///
+/// The mechanisms are `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512` and
+/// `AWS_MSK_IAM`. A security protocol of `SSL` or `SASL_SSL` turns TLS on as
+/// `kafkas://` does. Credentials in the URL, `kafka://user:password@host`
+/// (percent-encoded), mean PLAIN unless a mechanism is set. Azure Event Hubs
+/// takes PLAIN with the user name `$ConnectionString` and the connection
+/// string as the password, on port 9093 over TLS; Amazon MSK takes
+/// `SCRAM-SHA-512` or `AWS_MSK_IAM`, whose credentials come from the
+/// environment, the container or the instance, as for S3.
 public final class KafkaTransport extends PollingTransport {
     private static final int SESSION_TIMEOUT = 30000;
     private static final int REBALANCE_TIMEOUT = 60000;
@@ -84,6 +117,8 @@ public final class KafkaTransport extends PollingTransport {
     private final boolean tls;
     private final int timeout;
     private final boolean earliest;
+    private final KafkaSasl sasl;
+    private final boolean readCommitted;
     private final Object metaLock = new Object();
     private final Map<Integer, String[]> brokers = new HashMap<Integer, String[]>();
     private final Map<String, int[]> leaders = new HashMap<String, int[]>();
@@ -98,33 +133,72 @@ public final class KafkaTransport extends PollingTransport {
         @Override
         public MessageTransport open(String url, Config config, RetryPolicy retry)
                 throws IOException {
-            String reset = config == null ? null
-                    : config.get("cn1.messaging.kafka.auto-offset-reset");
-            if (reset == null && config != null) {
-                reset = config.get("spring.kafka.consumer.auto-offset-reset");
-            }
-            return new KafkaTransport(url, retry,
-                    config == null ? 5000 : config.getInt("cn1.messaging.timeout", 5000),
-                    reset == null || !"latest".equalsIgnoreCase(reset.trim()));
+            return new KafkaTransport(url, retry, config);
         }
     }
 
     /// A transport to the brokers `url` lists (`kafka://host:port,...`, or
-    /// `kafkas://` for TLS); it connects on first use.
+    /// `kafkas://` for TLS), without SASL; it connects on first use.
     public KafkaTransport(String url, RetryPolicy retry, int timeoutMillis, boolean earliest)
+            throws IOException {
+        this(url, retry, timeoutMillis, earliest, null, null, false);
+    }
+
+    /// A transport to the brokers `url` lists, configured by `config` as the
+    /// class description says: the timeout, the offset reset, the isolation
+    /// level, TLS and SASL. It connects on first use.
+    public KafkaTransport(String url, RetryPolicy retry, Config config) throws IOException {
+        this(url, retry, config == null ? 5000 : config.getInt("cn1.messaging.timeout", 5000),
+                !"latest".equalsIgnoreCase(setting(config, "cn1.messaging.kafka.auto-offset-reset",
+                        "spring.kafka.consumer.auto-offset-reset")),
+                config, setting(config, "cn1.messaging.kafka.security.protocol",
+                        "spring.kafka.security.protocol",
+                        "spring.kafka.properties.security.protocol"),
+                "read_committed".equalsIgnoreCase(setting(config,
+                        "cn1.messaging.kafka.isolation-level",
+                        "spring.kafka.consumer.isolation-level",
+                        "spring.kafka.consumer.properties.isolation.level")));
+    }
+
+    private KafkaTransport(String url, RetryPolicy retry, int timeoutMillis, boolean earliest,
+                           Config config, String protocol, boolean readCommitted)
             throws IOException {
         super(retry);
         int scheme = url.indexOf("://");
         String s = scheme < 0 ? "" : url.substring(0, scheme);
         if (!"kafka".equalsIgnoreCase(s) && !"kafkas".equalsIgnoreCase(s)) {
-            throw new IOException("Not a Kafka URL: " + url);
+            throw new IOException("Not a Kafka URL: " + redact(url));
         }
-        this.tls = "kafkas".equalsIgnoreCase(s);
         String rest = url.substring(scheme + 3);
+        String user = null;
+        String password = null;
+        int at = rest.lastIndexOf('@');
+        if (at >= 0) {
+            String info = rest.substring(0, at);
+            rest = rest.substring(at + 1);
+            int colon = info.indexOf(':');
+            user = KafkaSasl.percentDecode(colon < 0 ? info : info.substring(0, colon));
+            password = colon < 0 ? "" : KafkaSasl.percentDecode(info.substring(colon + 1));
+        }
         int slash = rest.indexOf('/');
         if (slash >= 0) {
             rest = rest.substring(0, slash);
         }
+        boolean secure = "kafkas".equalsIgnoreCase(s);
+        boolean saslProtocol = false;
+        if (protocol != null) {
+            String p = protocol.trim();
+            if ("SSL".equalsIgnoreCase(p) || "SASL_SSL".equalsIgnoreCase(p)) {
+                secure = true;
+            } else if (!"PLAINTEXT".equalsIgnoreCase(p) && !"SASL_PLAINTEXT".equalsIgnoreCase(p)) {
+                throw new IOException("Kafka security protocol " + p + " is not one of "
+                        + "PLAINTEXT, SSL, SASL_PLAINTEXT and SASL_SSL");
+            }
+            saslProtocol = p.length() > 5 && "SASL_".equalsIgnoreCase(p.substring(0, 5));
+        }
+        this.tls = secure;
+        this.sasl = sasl(config, user, password, saslProtocol);
+        this.readCommitted = readCommitted;
         bootstrap = new ArrayList<String[]>();
         int from = 0;
         while (from <= rest.length()) {
@@ -140,10 +214,109 @@ public final class KafkaTransport extends PollingTransport {
                     : new String[] {h, "9092"});
         }
         if (bootstrap.isEmpty()) {
-            throw new IOException("The Kafka URL names no broker: " + url);
+            throw new IOException("The Kafka URL names no broker: " + redact(url));
         }
         this.timeout = timeoutMillis;
         this.earliest = earliest;
+    }
+
+    /// The first of `keys` that `config` sets, trimmed, or null.
+    private static String setting(Config config, String... keys) throws IOException {
+        if (config == null) {
+            return null;
+        }
+        for (String k : keys) {
+            String v = config.get(k);
+            if (v != null && v.trim().length() > 0) {
+                return v.trim();
+            }
+        }
+        return null;
+    }
+
+    /// The SASL settings `config` and the URL's credentials make, or null for
+    /// none. A JAAS line is read only for its `username` and `password`.
+    private static KafkaSasl sasl(Config config, String urlUser, String urlPassword,
+                                  boolean saslProtocol) throws IOException {
+        String mechanism = setting(config, "cn1.messaging.kafka.sasl.mechanism",
+                "spring.kafka.properties.sasl.mechanism");
+        String user = config == null ? null : config.get("cn1.messaging.kafka.sasl.username");
+        String password = config == null ? null : config.get("cn1.messaging.kafka.sasl.password");
+        String jaas = setting(config, "cn1.messaging.kafka.sasl.jaas-config",
+                "spring.kafka.properties.sasl.jaas.config");
+        if (jaas != null) {
+            if (user == null) {
+                user = jaasOption(jaas, "username");
+            }
+            if (password == null) {
+                password = jaasOption(jaas, "password");
+            }
+        }
+        if (user == null && urlUser != null) {
+            user = urlUser;
+            password = urlPassword;
+        }
+        if (mechanism == null) {
+            if (user == null && !saslProtocol) {
+                return null;
+            }
+            mechanism = KafkaSasl.PLAIN;
+        }
+        return new KafkaSasl(mechanism, user, password,
+                setting(config, "cn1.messaging.kafka.sasl.aws-region"));
+    }
+
+    /// The value of `name="..."` (or `name=value`) in a JAAS configuration
+    /// line, with `\` escapes undone; null when it is not there.
+    static String jaasOption(String jaas, String name) {
+        int at = jaas.indexOf(name);
+        while (at >= 0) {
+            int p = skipSpaces(jaas, at + name.length());
+            boolean starts = at == 0 || !Character.isLetterOrDigit(jaas.charAt(at - 1));
+            if (starts && p < jaas.length() && jaas.charAt(p) == '=') {
+                return jaasValue(jaas, skipSpaces(jaas, p + 1));
+            }
+            at = jaas.indexOf(name, at + name.length());
+        }
+        return null;
+    }
+
+    private static int skipSpaces(String s, int from) {
+        int p = from;
+        while (p < s.length() && s.charAt(p) == ' ') {
+            p++;
+        }
+        return p;
+    }
+
+    /// The JAAS option value starting at `from`: quoted with backslash
+    /// escapes, or bare up to a space or the closing `;`.
+    private static String jaasValue(String jaas, int from) {
+        StringBuilder v = new StringBuilder();
+        int p = from;
+        if (p < jaas.length() && jaas.charAt(p) == '"') {
+            for (p++; p < jaas.length() && jaas.charAt(p) != '"'; p++) {
+                char c = jaas.charAt(p);
+                if (c == '\\' && p + 1 < jaas.length()) {
+                    p++;
+                    c = jaas.charAt(p);
+                }
+                v.append(c);
+            }
+        } else {
+            for (; p < jaas.length() && jaas.charAt(p) != ' ' && jaas.charAt(p) != ';'; p++) {
+                v.append(jaas.charAt(p));
+            }
+        }
+        return v.toString();
+    }
+
+    /// `url` without the password it may carry.
+    private static String redact(String url) {
+        int scheme = url.indexOf("://");
+        int at = url.lastIndexOf('@');
+        return scheme >= 0 && at > scheme ? url.substring(0, scheme + 3) + "***@"
+                + url.substring(at + 1) : url;
     }
 
     @Override
@@ -155,7 +328,7 @@ public final class KafkaTransport extends PollingTransport {
 
     private KafkaConnection connect(String host, String port) throws IOException {
         try {
-            return KafkaConnection.open(host, Integer.parseInt(port), tls, timeout);
+            return KafkaConnection.open(host, Integer.parseInt(port), tls, timeout, sasl);
         } catch (NumberFormatException err) {
             throw new IOException("Not a port: " + port, err);
         }
@@ -174,6 +347,7 @@ public final class KafkaTransport extends PollingTransport {
                 control = connect(b[0], b[1]);
                 return control;
             } catch (IOException err) {
+                refused(err);
                 last = err;
             }
         }
@@ -198,6 +372,7 @@ public final class KafkaTransport extends PollingTransport {
                     req.int32(1).string(topic).bool(true);
                     in = control().call(KafkaConnection.METADATA, 4, req);
                 } catch (IOException err) {
+                    refused(err);
                     dropControl();
                     problem = err.getMessage();
                     pause(200);
@@ -253,6 +428,14 @@ public final class KafkaTransport extends PollingTransport {
             }
             throw new IOException("Kafka has no partitions for " + topic
                     + (problem == null ? "" : ": " + problem));
+        }
+    }
+
+    /// Rethrows `err` when the broker refused the credentials, which no
+    /// retry or other broker of the cluster will accept either.
+    private static void refused(IOException err) throws IOException {
+        if (err instanceof KafkaSasl.Refused) {
+            throw err;
         }
     }
 
@@ -317,6 +500,7 @@ public final class KafkaTransport extends PollingTransport {
             try {
                 c = producer(parts[partition]);
             } catch (IOException err) {
+                refused(err);
                 last = err;
                 continue;
             }
@@ -332,6 +516,7 @@ public final class KafkaTransport extends PollingTransport {
                 in.int32();
                 error = in.int16();
             } catch (IOException err) {
+                refused(err);
                 dropProducer(parts[partition], c);
                 last = err;
                 continue;
@@ -1060,7 +1245,7 @@ public final class KafkaTransport extends PollingTransport {
         private void fetchFrom(int leader, List<Part> list, int wait) throws IOException {
             Map<String, List<Part>> byTopic = byTopic(list);
             KafkaConnection.Out req = new KafkaConnection.Out();
-            req.int32(-1).int32(wait).int32(1).int32(4 * 1024 * 1024).int8(0)
+            req.int32(-1).int32(wait).int32(1).int32(4 * 1024 * 1024).int8(readCommitted ? 1 : 0)
                     .int32(byTopic.size());
             for (Map.Entry<String, List<Part>> e : byTopic.entrySet()) {
                 req.string(e.getKey()).int32(e.getValue().size());
@@ -1088,10 +1273,10 @@ public final class KafkaTransport extends PollingTransport {
                     int error = in.int16();
                     in.int64();
                     in.int64();
-                    int aborted = in.int32();
-                    for (int a = 0; a < aborted; a++) {
-                        in.int64();
-                        in.int64();
+                    int n = in.int32();
+                    long[][] aborted = n < 0 ? new long[0][] : new long[n][];
+                    for (int a = 0; a < n; a++) {
+                        aborted[a] = new long[] {in.int64(), in.int64()};
                     }
                     byte[] set = in.bytes();
                     Part p = find(list, name, index);
@@ -1114,7 +1299,8 @@ public final class KafkaTransport extends PollingTransport {
                         continue;
                     }
                     List<KafkaConnection.Record> records = new ArrayList<KafkaConnection.Record>();
-                    long next = KafkaConnection.records(set, p.fetchOffset, records);
+                    long next = KafkaConnection.records(set, p.fetchOffset, records,
+                            readCommitted ? aborted : null);
                     synchronized (this) {
                         if (parts.get(p.name()) == p) { // NOPMD CompareObjectsWithEquals - still this member's
                             p.fetchOffset = Math.max(p.fetchOffset, next);

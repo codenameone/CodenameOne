@@ -34,7 +34,8 @@ import java.util.zip.GZIPInputStream;
 
 /// One connection to a Kafka broker: requests in the non-flexible encoding
 /// of the versions this transport uses, answered in order. Every version used
-/// is one Kafka 2.1 through 4.x accept, so no version negotiation is needed.
+/// is one Kafka 2.1 through 4.x accept, so no version negotiation is needed;
+/// SASL takes SaslAuthenticate v1, which needs Kafka 2.2.
 final class KafkaConnection {
     static final int PRODUCE = 0;
     static final int FETCH = 1;
@@ -47,26 +48,38 @@ final class KafkaConnection {
     static final int HEARTBEAT = 12;
     static final int LEAVE_GROUP = 13;
     static final int SYNC_GROUP = 14;
+    static final int SASL_HANDSHAKE = 17;
+    static final int SASL_AUTHENTICATE = 36;
 
     private static final byte[] CLIENT_ID = WireBuffer.utf8("cn1");
     private final WireBuffer wire;
     private final String address;
+    private final String host;
+    private final KafkaSasl sasl;
     private int correlation;
+    /// When to authenticate again, or 0 for never; guarded by this.
+    private long reauthenticateAt;
 
-    private KafkaConnection(WireBuffer wire, String address) {
+    private KafkaConnection(WireBuffer wire, String host, int port, KafkaSasl sasl) {
         this.wire = wire;
-        this.address = address;
+        this.host = host;
+        this.address = host + ":" + port;
+        this.sasl = sasl;
     }
 
-    static KafkaConnection open(String host, int port, boolean tls, int timeoutMillis)
-            throws IOException {
+    /// - `sasl`: how to authenticate, or null for a listener without SASL
+    static KafkaConnection open(String host, int port, boolean tls, int timeoutMillis,
+                                KafkaSasl sasl) throws IOException {
         Tcp tcp = Tcp.connect(host, port, timeoutMillis);
         boolean opened = false;
         try {
             if (tls) {
                 tcp.startTls(host);
             }
-            KafkaConnection c = new KafkaConnection(new WireBuffer(tcp, 65536), host + ":" + port);
+            KafkaConnection c = new KafkaConnection(new WireBuffer(tcp, 65536), host, port, sasl);
+            if (sasl != null) {
+                c.authenticate();
+            }
             opened = true;
             return c;
         } finally {
@@ -80,8 +93,26 @@ final class KafkaConnection {
         return address;
     }
 
-    /// Sends one request and reads its response, positioned after the header.
+    /// Authenticates, and schedules the next authentication at 85% of the
+    /// session lifetime the broker set, as the Java client does: early enough
+    /// that a slow round trip cannot outlast the session.
+    private synchronized void authenticate() throws IOException {
+        long lifetime = sasl.authenticate(this, host);
+        reauthenticateAt = lifetime > 0
+                ? System.currentTimeMillis() + Math.max(1000, lifetime * 85 / 100) : 0;
+    }
+
+    /// Sends one request and reads its response, positioned after the header;
+    /// authenticates again first when the session is due to end.
     synchronized In call(int apiKey, int version, Out body) throws IOException {
+        if (reauthenticateAt > 0 && System.currentTimeMillis() >= reauthenticateAt) {
+            authenticate();
+        }
+        return exchange(apiKey, version, body);
+    }
+
+    /// [#call] without the re-authentication check, for the SASL requests.
+    synchronized In exchange(int apiKey, int version, Out body) throws IOException {
         int id = ++correlation;
         wire.writeIntBE(2 + 2 + 4 + 2 + CLIENT_ID.length + body.length);
         wire.writeShortBE(apiKey);
@@ -141,6 +172,16 @@ final class KafkaConnection {
                 return "TOPIC_AUTHORIZATION_FAILED";
             case 30:
                 return "GROUP_AUTHORIZATION_FAILED";
+            case 31:
+                return "CLUSTER_AUTHORIZATION_FAILED";
+            case 33:
+                return "UNSUPPORTED_SASL_MECHANISM";
+            case 34:
+                return "ILLEGAL_SASL_STATE";
+            case 35:
+                return "UNSUPPORTED_VERSION";
+            case 58:
+                return "SASL_AUTHENTICATION_FAILED";
             default:
                 return "error " + code;
         }
@@ -203,12 +244,18 @@ final class KafkaConnection {
     /// off at the end of the set -- the fetch size ended inside it -- is left
     /// for the next fetch; control batches carry no records of the
     /// application's.
+    ///
+    /// - `aborted`: for a `read_committed` fetch, the aborted transactions the
+    ///   broker listed, as producer id and first offset pairs; their records
+    ///   are dropped as the Java client drops them. Null reads everything.
     /// @return the offset after the last whole batch read -- past control,
     /// empty and already-read batches too, so a fetch position always moves
     /// even when no record of the application's was in them -- or `from`
     /// when the set held no whole batch
-    static long records(byte[] set, long from, List<Record> out) throws IOException {
+    static long records(byte[] set, long from, List<Record> out, long[][] aborted)
+            throws IOException {
         long next = from;
+        Aborts aborts = aborted == null ? null : new Aborts(aborted);
         In in = new In(set);
         while (in.remaining() >= 12) {
             long base = in.int64();
@@ -229,22 +276,25 @@ final class KafkaConnection {
             next = Math.max(next, base + lastDelta + 1);
             batch.int64();
             batch.int64();
-            batch.int64();
+            long producer = batch.int64();
             batch.int16();
             batch.int32();
             int count = batch.int32();
-            if ((attributes & 0x20) != 0) {
+            boolean control = (attributes & 0x20) != 0;
+            if (aborts != null && producer >= 0) {
+                aborts.upTo(base + lastDelta);
+                if (control) {
+                    if (abortMarker(batch)) {
+                        aborts.end(producer);
+                    }
+                } else if ((attributes & 0x10) != 0 && aborts.isAborted(producer)) {
+                    continue;
+                }
+            }
+            if (control) {
                 continue;
             }
-            int compression = attributes & 7;
-            In records = batch;
-            if (compression == 1) {
-                records = new In(gunzip(batch.take(batch.remaining())));
-            } else if (compression != 0) {
-                throw new IOException("Kafka sent a batch compressed with "
-                        + (compression == 2 ? "snappy" : compression == 3 ? "lz4" : "zstd")
-                        + "; only gzip and uncompressed batches can be read");
-            }
+            In records = new In(decompress(attributes & 7, batch.take(batch.remaining())));
             for (int i = 0; i < count; i++) {
                 int size = records.varint();
                 In r = new In(records.take(size));
@@ -268,6 +318,78 @@ final class KafkaConnection {
             }
         }
         return next;
+    }
+
+    /// The records of a batch, decompressed with the codec its attributes name.
+    static byte[] decompress(int codec, byte[] data) throws IOException {
+        switch (codec) {
+            case 0:
+                return data;
+            case 1:
+                return gunzip(data);
+            case 2:
+                return Snappy.decompress(data);
+            case 3:
+                return Lz4.decompress(data);
+            case 4:
+                return Zstd.decompress(data);
+            default:
+                throw new IOException("Kafka sent a batch with unknown compression " + codec);
+        }
+    }
+
+    /// True when the control batch whose records `batch` is positioned at
+    /// ends a transaction by aborting it: its one record's key is a version
+    /// and a type, and type 0 is ABORT (1 is COMMIT).
+    private static boolean abortMarker(In batch) throws IOException {
+        In copy = new In(batch.b);
+        copy.p = batch.p;
+        if (copy.remaining() == 0) {
+            return false;
+        }
+        copy.varint();
+        copy.int8();
+        copy.varlong();
+        copy.varint();
+        byte[] key = copy.varbytes();
+        return key != null && key.length >= 4 && key[2] == 0 && key[3] == 0;
+    }
+
+    /// The aborted transactions of one partition of a `read_committed` fetch,
+    /// walked in offset order beside the batches: a transaction's batches are
+    /// dropped from its first offset until its abort marker.
+    private static final class Aborts {
+        private final long[][] list;
+        private int at;
+        private final java.util.Set<Long> open = new java.util.HashSet<Long>();
+
+        Aborts(long[][] list) {
+            this.list = list;
+            java.util.Arrays.sort(list, new ByFirstOffset());
+        }
+
+        /// Orders (producer id, first offset) pairs by first offset.
+        private static final class ByFirstOffset implements java.util.Comparator<long[]> {
+            @Override
+            public int compare(long[] a, long[] b) {
+                return a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0;
+            }
+        }
+
+        void upTo(long lastOffset) {
+            while (at < list.length && list[at][1] <= lastOffset) {
+                open.add(Long.valueOf(list[at][0]));
+                at++;
+            }
+        }
+
+        boolean isAborted(long producer) {
+            return open.contains(Long.valueOf(producer));
+        }
+
+        void end(long producer) {
+            open.remove(Long.valueOf(producer));
+        }
     }
 
     private static byte[] gunzip(byte[] data) throws IOException {
@@ -446,8 +568,8 @@ final class KafkaConnection {
 
     /// A response being read.
     static final class In {
-        private final byte[] b;
-        private int p;
+        final byte[] b;
+        int p;
 
         In(byte[] b) {
             this.b = b;
