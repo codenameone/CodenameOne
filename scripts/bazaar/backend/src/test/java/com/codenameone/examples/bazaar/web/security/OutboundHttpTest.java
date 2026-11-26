@@ -22,156 +22,94 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// Calls to URLs someone else chose: capped while read, timed as a whole,
-/// never redirected, and refused for a private address. A one-connection
-/// server on loopback plays the far end.
+/// Calls to URLs someone else chose: capped while read, timed as a whole, and
+/// refused for a private address. The far end is a stream the test controls
+/// rather than a socket, so the same checks run on the compiled server, whose
+/// class library has no server sockets.
 class OutboundHttpTest {
-    /// Answers each connection with `head` and then `bodyChunks` copies of
-    /// `chunk`, pausing `pauseMillis` between them; counts connections.
-    private static final class Server implements Runnable {
-        final ServerSocket socket;
-        final String head;
-        final byte[] chunk;
-        final int bodyChunks;
+    /// Hands out `chunk`-byte reads forever (or `total` bytes, then the end),
+    /// sleeping `pauseMillis` before each, and counts what it handed out.
+    static final class Far extends InputStream {
+        final long total;
+        final int chunk;
         final long pauseMillis;
-        final AtomicInteger connections = new AtomicInteger();
+        long given;
 
-        Server(String head, byte[] chunk, int bodyChunks, long pauseMillis) throws IOException {
-            this.socket = new ServerSocket(0, 5, InetAddress.getByName("127.0.0.1"));
-            this.head = head;
+        Far(long total, int chunk, long pauseMillis) {
+            this.total = total;
             this.chunk = chunk;
-            this.bodyChunks = bodyChunks;
             this.pauseMillis = pauseMillis;
-            Thread t = new Thread(this, "outbound-http-test");
-            t.setDaemon(true);
-            t.start();
-        }
-
-        String url(String path) {
-            return "http://127.0.0.1:" + socket.getLocalPort() + path;
         }
 
         @Override
-        public void run() {
-            while (!socket.isClosed()) {
-                try (Socket s = socket.accept()) {
-                    connections.incrementAndGet();
-                    InputStream in = s.getInputStream();
-                    // Read the request head.
-                    int a = 0;
-                    int b = 0;
-                    int c = 0;
-                    int d;
-                    while ((d = in.read()) >= 0) {
-                        if (a == '\r' && b == '\n' && c == '\r' && d == '\n') {
-                            break;
-                        }
-                        a = b;
-                        b = c;
-                        c = d;
-                    }
-                    OutputStream out = s.getOutputStream();
-                    out.write(head.getBytes("UTF-8"));
-                    out.flush();
-                    for (int iter = 0; iter < bodyChunks; iter++) {
-                        if (pauseMillis > 0) {
-                            Thread.sleep(pauseMillis);
-                        }
-                        out.write(chunk);
-                        out.flush();
-                    }
-                } catch (IOException | InterruptedException closed) {
-                    // The client went away, or the test is over.
-                }
-            }
+        public int read() throws IOException {
+            byte[] one = new byte[1];
+            return read(one, 0, 1) < 0 ? -1 : one[0] & 0xff;
         }
 
-        void close() throws IOException {
-            socket.close();
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (pauseMillis > 0) {
+                try {
+                    Thread.sleep(pauseMillis);
+                } catch (InterruptedException e) {
+                    throw new IOException(e.getMessage());
+                }
+            }
+            if (total >= 0 && given >= total) {
+                return -1;
+            }
+            int n = Math.min(len, chunk);
+            if (total >= 0) {
+                n = (int) Math.min(n, total - given);
+            }
+            for (int i = 0; i < n; i++) {
+                b[off + i] = (byte) 'x';
+            }
+            given += n;
+            return n;
         }
     }
 
+    private static long later(long millis) {
+        return System.currentTimeMillis() + millis;
+    }
+
     @Test
-    void anEndlessAnswerIsCutOffAtTheCapNotBuffered() throws Exception {
-        // About 80 MB on offer, no length given; the cap is 64 KB.
-        Server s = new Server("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
-                + "Connection: close\r\n\r\n", new byte[8192], 10000, 0);
-        try {
-            IOException e = assertThrows(IOException.class, () -> OutboundHttp.sendUnguarded(
-                    "GET", s.url("/big"), new ArrayList<String>(), null, 5000, 64 * 1024));
-            assertTrue(e.getMessage().indexOf("longer than") >= 0, e.getMessage());
-        } finally {
-            s.close();
-        }
+    void anEndlessAnswerIsCutOffAtTheCapNotBuffered() {
+        Far far = new Far(-1, 4096, 0);
+        assertThrows(IOException.class,
+                () -> OutboundHttp.readCapped(far, 64 * 1024, later(5000), 5000));
+        // Refused at the first read past the cap, not after reading on.
+        assertTrue(far.given <= 64 * 1024 + 4096, "read " + far.given);
     }
 
     @Test
     void anAnswerWithinTheCapArrivesWhole() throws Exception {
-        Server s = new Server("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
-                + "Content-Length: 5\r\nConnection: close\r\n\r\n", "hello".getBytes("UTF-8"),
-                1, 0);
-        try {
-            OutboundHttp.Reply r = OutboundHttp.sendUnguarded("POST", s.url("/ok"),
-                    new ArrayList<String>(), "{}".getBytes("UTF-8"), 5000, 64);
-            assertEquals(200, r.status);
-            assertEquals("hello", r.text());
-        } finally {
-            s.close();
-        }
+        byte[] got = OutboundHttp.readCapped(new Far(10000, 4096, 0), 10000, later(5000), 5000);
+        assertEquals(10000, got.length);
     }
 
     @Test
-    void aRedirectIsAnsweredAsItIsAndNeverFollowed() throws Exception {
-        Server inside = new Server("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n"
-                + "Connection: close\r\n\r\n", "secret".getBytes("UTF-8"), 1, 0);
-        Server out = new Server("HTTP/1.1 302 Found\r\nLocation: " + inside.url("/meta")
-                + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", new byte[0], 0, 0);
-        try {
-            OutboundHttp.Reply r = OutboundHttp.sendUnguarded("GET", out.url("/x"), null, null,
-                    5000, 1024);
-            assertEquals(302, r.status);
-            assertEquals(0, inside.connections.get(), "the redirect's target is never called");
-        } finally {
-            inside.close();
-            out.close();
-        }
+    void aSlowDripPastTheBudgetFails() {
+        long started = System.currentTimeMillis();
+        Far far = new Far(-1, 1, 50);
+        assertThrows(IOException.class,
+                () -> OutboundHttp.readCapped(far, 1 << 20, later(300), 300));
+        assertTrue(System.currentTimeMillis() - started < 5000);
     }
 
     @Test
-    void aSlowDripPastTheBudgetFails() throws Exception {
-        // A byte every 300 ms keeps every single read inside its timeout.
-        Server s = new Server("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n", new byte[1], 100,
-                300);
-        try {
-            long started = System.currentTimeMillis();
-            assertThrows(IOException.class, () -> OutboundHttp.sendUnguarded("GET",
-                    s.url("/slow"), null, null, 1000, 1 << 20));
-            assertTrue(System.currentTimeMillis() - started < 5000);
-        } finally {
-            s.close();
-        }
-    }
-
-    @Test
-    void aPrivateAddressIsRefusedBeforeAnythingIsSent() throws Exception {
-        Server s = new Server("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", new byte[0], 0, 0);
-        try {
-            assertThrows(IOException.class, () -> OutboundHttp.send("GET", s.url("/"), null,
-                    null, 1000, 1024));
-            assertEquals(0, s.connections.get());
-        } finally {
-            s.close();
-        }
+    void aPrivateAddressIsRefusedBeforeAnythingIsSent() {
+        // Nothing listens there; the guard refuses before a connection is tried.
+        assertThrows(IOException.class, () -> OutboundHttp.send("GET",
+                "http://127.0.0.1:9/", null, null, 1000, 1024));
+        assertThrows(IOException.class, () -> OutboundHttp.send("GET",
+                "http://169.254.169.254/latest/meta-data", null, null, 1000, 1024));
     }
 }

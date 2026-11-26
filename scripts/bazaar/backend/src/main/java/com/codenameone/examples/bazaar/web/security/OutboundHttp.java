@@ -88,9 +88,8 @@ public final class OutboundHttp {
         return sendUnguarded(method, url, headers, body, timeoutMillis, maxBytes);
     }
 
-    /// [#send] without the address check: for the tests, which talk to a
-    /// server on this machine, and nothing else.
-    static Reply sendUnguarded(String method, String url, List<String> headers, byte[] body,
+    /// [#send] once the address check has passed.
+    private static Reply sendUnguarded(String method, String url, List<String> headers, byte[] body,
             int timeoutMillis, int maxBytes) throws IOException {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         WebClient client = new WebClient().setConnectTimeoutMillis(timeoutMillis)
@@ -107,24 +106,9 @@ public final class OutboundHttp {
             }
             int status = exchange.getStatus();
             String type = exchange.getHeader("Content-Type");
-            InputStream in = exchange.getResponseBody();
-            ByteArrayOutputStream kept = new ByteArrayOutputStream();
-            byte[] chunk = new byte[8192];
-            while (true) {
-                if (System.currentTimeMillis() > deadline) {
-                    throw new IOException("The answer did not arrive within " + timeoutMillis
-                            + " ms");
-                }
-                int n = in.read(chunk, 0, chunk.length);
-                if (n < 0) {
-                    break;
-                }
-                if (kept.size() + n > maxBytes) {
-                    throw new IOException("The answer is longer than " + maxBytes + " bytes");
-                }
-                kept.write(chunk, 0, n);
-            }
-            return new Reply(status, type, kept.toByteArray());
+            byte[] read = readCapped(exchange.getResponseBody(), maxBytes, deadline,
+                    timeoutMillis);
+            return new Reply(status, type, read);
         } finally {
             // The exchange first: before its body is read to the end, closing
             // it cancels the transfer rather than draining it, and the client
@@ -133,6 +117,33 @@ public final class OutboundHttp {
                 exchange.close();
             }
             client.close();
+        }
+    }
+
+    /// Reads `in` to its end, refusing it once it passes `maxBytes` or the
+    /// clock passes `deadline`: the cap holds while reading, so an endless or
+    /// slow answer costs at most `maxBytes` and the time budget, never more.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the answer is too long or too late
+    static byte[] readCapped(InputStream in, int maxBytes, long deadline, int timeoutMillis)
+            throws IOException {
+        ByteArrayOutputStream kept = new ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        while (true) {
+            if (System.currentTimeMillis() > deadline) {
+                throw new IOException("The answer did not arrive within " + timeoutMillis
+                        + " ms");
+            }
+            int n = in.read(chunk, 0, chunk.length);
+            if (n < 0) {
+                return kept.toByteArray();
+            }
+            if (kept.size() + n > maxBytes) {
+                throw new IOException("The answer is longer than " + maxBytes + " bytes");
+            }
+            kept.write(chunk, 0, n);
         }
     }
 }
