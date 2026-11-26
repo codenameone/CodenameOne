@@ -273,7 +273,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/C
 
 `formatCurrency(amount, code)` writes the currency's own number of fraction digits: two for the euro, none for the yen, three for the Bahraini dinar. A code that is not three letters throws `IllegalArgumentException`; an unknown three-letter code throws everywhere but Android, whose platform `Currency` accepts any well-formed code.
 
-The facts about a currency itself come from the standard `java.util.Currency`, which works the same on every platform, the server included. It knows every ISO 4217 code with its numeric code and fraction digits, and the currency of every country. `java.text.NumberFormat` and `DecimalFormat` accept it through `setCurrency`:
+The facts about a currency itself come from the standard `java.util.Currency`, which has the same ISO 4217 data on every platform, the server included. It knows every ISO 4217 code with its numeric code and fraction digits, and the currency of every country. `java.text.NumberFormat` and `DecimalFormat` accept it through `setCurrency`:
 
 [source,java]
 ----

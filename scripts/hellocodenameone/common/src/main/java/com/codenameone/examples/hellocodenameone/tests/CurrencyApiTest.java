@@ -24,6 +24,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.l10n.L10NManager;
+import com.codename1.ui.Display;
 
 import java.text.NumberFormat;
 import java.util.Currency;
@@ -72,6 +73,19 @@ public class CurrencyApiTest extends BaseTest {
             threw = true;
         }
         assertBool(threw, "a malformed code is rejected");
+        if (!onAndroid()) {
+            threw = false;
+            try {
+                Currency.getInstance("XYZ");
+            } catch (IllegalArgumentException e) {
+                threw = true;
+            }
+            assertBool(threw, "an unknown code is rejected");
+        }
+    }
+
+    private static boolean onAndroid() {
+        return "and".equals(Display.getInstance().getPlatformName());
     }
 
     private void deviceCurrency() {
@@ -103,6 +117,15 @@ public class CurrencyApiTest extends BaseTest {
             threw = true;
         }
         assertBool(threw, "formatCurrency rejects a malformed code");
+        if (!onAndroid()) {
+            threw = false;
+            try {
+                l10n.formatCurrency(1, "XYZ");
+            } catch (IllegalArgumentException e) {
+                threw = true;
+            }
+            assertBool(threw, "formatCurrency rejects an unknown code");
+        }
     }
 
     private void numberFormatTakesACurrency() {
