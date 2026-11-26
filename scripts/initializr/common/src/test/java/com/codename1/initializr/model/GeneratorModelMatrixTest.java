@@ -133,6 +133,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateSplatGate();
         validateSlateGate();
         validateFieldlineGate();
+        validateBazaarGate();
         validateCommandLineProject();
         for (Template template : Template.values()) {
             for (ProjectOptions.ProjectType type : ProjectOptions.ProjectType.values()) {
@@ -429,6 +430,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         boolean studio = template == Template.PULSE;
         boolean booking = template == Template.SLATE;
         boolean field = template == Template.FIELDLINE;
+        boolean shop = template == Template.BAZAAR;
         String name = template.SOURCE_MAIN_CLASS;
         String upper = template.name();
         String lower = GeneratorModel.toLowerCaseInvariant(name);
@@ -443,12 +445,12 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : arena ? "arena shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : arena ? "arena shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : shop ? "commerce platform" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
-            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : field ? "`tech@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
+            assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : field ? "`tech@" : shop ? "`shopper@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
                     label + "README lists the template's own demo accounts");
-            assertFalse(readme.indexOf(rides || chat || bank || video || studio || booking || field ? "courier@" : "rider@") >= 0,
+            assertFalse(readme.indexOf(rides || chat || bank || video || studio || booking || field || shop ? "courier@" : "rider@") >= 0,
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
@@ -687,6 +689,19 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
                 GeneratorModel.FIELDLINE_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.FIELDLINE)),
                 "The page offers Fieldline from its gate on");
+    }
+
+    /// The commerce template ships from its own gate: below it it is refused,
+    /// and the page does not list it.
+    private void validateBazaarGate() throws Exception {
+        assertFalse(GeneratorModel.isVersionAtLeast(FULL_STACK_VERSION, GeneratorModel.BAZAAR_SINCE),
+                "Bazaar's gate is past the other complete apps'");
+        assertRefused(GeneratorModel.createForPluginVersion(IDE.INTELLIJ, Template.BAZAAR, "OldBazaar",
+                "com.acme.oldbazaar", ProjectOptions.defaults().forFullStack(), FULL_STACK_VERSION),
+                GeneratorModel.BAZAAR_SINCE, "Bazaar is not generated before its gate");
+        assertEqual(Boolean.valueOf(GeneratorModel.isVersionAtLeast(GeneratorModel.cn1PluginVersion(),
+                GeneratorModel.BAZAAR_SINCE)), Boolean.valueOf(GeneratorModel.isTemplateOffered(Template.BAZAAR)),
+                "The page offers Bazaar from its gate on");
     }
 
     private static ProjectOptions mavenOptions(ProjectOptions.ProjectType type, boolean allModules) {

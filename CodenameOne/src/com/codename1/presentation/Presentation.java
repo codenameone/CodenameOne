@@ -38,9 +38,11 @@ import java.util.List;
 /// `SlideView` edits; `SlideShow` plays one.
 ///
 /// ```java
-/// Presentation deck = Presentation.read(in, Presentation.Format.PPTX);
-/// Log.p(deck.getSlides().size() + " slides, first: " + deck.getSlides().get(0).title());
-/// deck.write(out, Presentation.Format.PDF);
+/// void toPdf(InputStream in, OutputStream out) throws IOException {
+///     Presentation deck = Presentation.read(in, Presentation.Format.PPTX);
+///     Log.p(deck.getSlides().size() + " slides, first: " + deck.getSlides().get(0).title());
+///     deck.write(out, Presentation.Format.PDF);
+/// }
 /// ```
 ///
 /// Text inside slides is the word processing model of `com.codename1.wordprocessing`, so

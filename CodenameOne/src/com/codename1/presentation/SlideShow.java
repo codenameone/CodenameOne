@@ -35,6 +35,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.wordprocessing.DocumentLayout;
 import com.codename1.wordprocessing.LayoutPainter;
@@ -49,11 +50,13 @@ import java.util.Map;
 /// the elapsed time, for a second display or a rehearsal.
 ///
 /// ```java
-/// Form f = new Form("Deck", new BorderLayout());
-/// SlideShow show = new SlideShow(Presentation.read(bytes));
-/// show.addSlideListener(e -> Log.p("now on slide " + show.getSlideIndex()));
-/// f.add(BorderLayout.CENTER, show);
-/// f.show();
+/// void play(byte[] bytes) throws IOException {
+///     Form f = new Form("Deck", new BorderLayout());
+///     SlideShow show = new SlideShow(Presentation.read(bytes));
+///     show.addSlideListener(e -> Log.p("now on slide " + show.getSlideIndex()));
+///     f.add(BorderLayout.CENTER, show);
+///     f.show();
+/// }
 /// ```
 ///
 /// Transitions and builds move on `com.codename1.ui.animations.Motion` against
@@ -388,6 +391,65 @@ public class SlideShow extends Container {
         return new float[] {sx, sy, sw, sh, scale};
     }
 
+    /// Sizes a live chart's text and padding in the proportion the painted chart has.
+    ///
+    /// `SlideRenderer.chartImage` draws a chart at the size it has on a slide shown at its
+    /// real size and scales the picture into place, because a chart sizes its text for the
+    /// device. A live chart placed at screen pixels did not: on a phone, where a slide is
+    /// shown at well under its real size, the title and legend kept their full size and
+    /// left the plot a sliver, and every chart visibly jumped when the painted picture
+    /// handed over to the live one at the end of a transition. Scaling the font and padding
+    /// by the same ratio makes the two agree. A font that is not a TrueType font cannot be
+    /// derived to an arbitrary size and is left alone.
+    static void fitText(Component c, float scale) {
+        float ratio = scale / SlideRenderer.chartPixelsPerPoint();
+        // Each state keeps its own font and padding (a selected style may be bold), so each
+        // is scaled from its own base.
+        fitStyle(c, c.getUnselectedStyle(), "u", ratio);
+        fitStyle(c, c.getSelectedStyle(), "s", ratio);
+        fitStyle(c, c.getPressedStyle(), "p", ratio);
+        fitStyle(c, c.getDisabledStyle(), "d", ratio);
+        c.putClientProperty("cn1$textRatio", Float.valueOf(ratio));
+    }
+
+    /// Scales one style from its base. The base is the style as the application left it:
+    /// when the style no longer holds what the last fit wrote, the application changed it,
+    /// and that becomes the new base instead of being overwritten by a stale one.
+    private static void fitStyle(Component c, Style s, String key, float ratio) {
+        Object saved = c.getClientProperty("cn1$textBase" + key);
+        Object[] base = saved instanceof Object[] ? (Object[]) saved : null;
+        int[] now = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(),
+            s.getPaddingRightNoRTL()};
+        if (base == null || base[2] != s.getFont() || !samePadding((int[]) base[3], now)) {
+            base = new Object[] {s.getFont(), now, null, null};
+        } else if (base[4] instanceof Float
+                && Math.abs(((Float) base[4]).floatValue() - ratio) < 0.005f) {
+            return;
+        }
+        Font font = (Font) base[0];
+        if (font != null && font.isTTFNativeFont()) {
+            s.setFont(font.derive(Math.max(1f, font.getPixelSize() * ratio), font.getStyle()));
+        }
+        int[] pad = (int[]) base[1];
+        s.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+        s.setPadding(Math.round(pad[0] * ratio), Math.round(pad[1] * ratio),
+                Math.round(pad[2] * ratio), Math.round(pad[3] * ratio));
+        int[] written = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(),
+            s.getPaddingRightNoRTL()};
+        c.putClientProperty("cn1$textBase" + key,
+                new Object[] {base[0], base[1], s.getFont(), written, Float.valueOf(ratio)});
+    }
+
+    private static boolean samePadding(int[] a, int[] b) {
+        for (int i = 0; i < 4; i++) {
+            if (a[i] != b[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Places each live chart over its element.
     static final class ChartPlacement extends Layout {
         @Override
@@ -405,6 +467,7 @@ public class SlideShow extends Container {
                     c.setY(Math.round(a[1] + e.y * a[4]));
                     c.setWidth(Math.max(1, Math.round(e.width * a[4])));
                     c.setHeight(Math.max(1, Math.round(e.height * a[4])));
+                    fitText(c, a[4]);
                 }
             }
         }

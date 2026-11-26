@@ -67,7 +67,7 @@ jobs:
           - shard: a
             samples: ' parley savor dash pulse bastion fieldline papercut '
           - shard: b
-            samples: ' wayline reel splat slate skirmish '
+            samples: ' wayline reel splat slate skirmish bazaar '
     steps:
       - uses: actions/checkout@v6
 
@@ -151,6 +151,10 @@ jobs:
       - name: 'iOS: savor'
         if: ${{ !cancelled() && contains(matrix.samples, ' savor ') }}
         run: scripts/ci/build-sample-ios-simulator.sh scripts/savor
+        timeout-minutes: 45
+      - name: 'iOS: bazaar'
+        if: ${{ !cancelled() && contains(matrix.samples, ' bazaar ') }}
+        run: scripts/ci/build-sample-ios-simulator.sh scripts/bazaar
         timeout-minutes: 45
       - name: 'iOS: dash'
         if: ${{ !cancelled() && contains(matrix.samples, ' dash ') }}

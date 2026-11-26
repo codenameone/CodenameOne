@@ -50,8 +50,10 @@ import java.util.Map;
 /// `com.codename1.graph.arrange` -- nothing here measures or draws text by itself.
 ///
 /// ```java
-/// SlideRenderer renderer = new SlideRenderer();
-/// Image thumb = renderer.toImage(deck, deck.getSlides().get(0), 320);
+/// Image thumbnail(Presentation deck) {
+///     SlideRenderer renderer = new SlideRenderer();
+///     return renderer.toImage(deck, deck.getSlides().get(0), 320);
+/// }
 /// ```
 public class SlideRenderer {
     private static final int MAX_CACHE = 256;
@@ -672,8 +674,7 @@ public class SlideRenderer {
     /// at the pixels a thumbnail covers, a legend in a 12 pixel font swamps a plot 60 pixels
     /// high. The caller scales the image into place, so text keeps its proportion at any zoom.
     static Image chartImage(ChartElement c, float widthPoints, float heightPoints) {
-        float perPoint = com.codename1.ui.CN.convertToPixels(25.4f / 72 * 100) / 100f;
-        float k = Math.max(0.25f, perPoint);
+        float k = chartPixelsPerPoint();
         float big = Math.max(widthPoints, heightPoints) * k;
         if (big > MAX_CHART_PIXELS) {
             k *= MAX_CHART_PIXELS / big;
@@ -682,6 +683,14 @@ public class SlideRenderer {
         chart.setAnimationDuration(0);
         return chart.toImage(Math.max(1, Math.round(widthPoints * k)),
                 Math.max(1, Math.round(heightPoints * k)));
+    }
+
+    /// The device pixels a slide point covers when a chart is drawn at its real size: what
+    /// `chartImage` draws at, and what a live chart's text is measured against
+    /// (`SlideShow.fitText`), so the two show text in the same proportion.
+    static float chartPixelsPerPoint() {
+        float perPoint = com.codename1.ui.CN.convertToPixels(25.4f / 72 * 100) / 100f;
+        return Math.max(0.25f, perPoint);
     }
 
     /// The longest side of a chart image, in pixels.

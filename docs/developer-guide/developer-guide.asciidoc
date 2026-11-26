@@ -181,6 +181,14 @@ include::Savor-Users-Guide.asciidoc[]
 
 include::Savor-Implementors-Guide.asciidoc[]
 
+include::Bazaar-Users-Guide.asciidoc[]
+
+include::Bazaar-Implementors-Guide.asciidoc[]
+
+include::Extending-Bazaar.asciidoc[]
+
+include::Bazaar-Feature-Comparison.asciidoc[]
+
 
 include::Skirmish-Implementors-Guide.asciidoc[]
 

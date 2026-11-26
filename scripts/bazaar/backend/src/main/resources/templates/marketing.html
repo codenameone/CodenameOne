@@ -1,0 +1,46 @@
+<!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
+<!-- cn1:model view com.codenameone.examples.bazaar.web.commerce.MarketingView -->
+<!-- cn1:model table com.codenameone.examples.bazaar.web.table.DataTable -->
+<!doctype html>
+<html th:attr="lang=${shell.lang},dir=${shell.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<body hx-boost="true"><header th:replace="~{shell :: topbar}"></header><div class="frame"><nav th:replace="~{shell :: sidebar}"></nav>
+<main id="main" tabindex="-1">
+
+<p th:unless="${view.back.empty}"><a th:href="${view.back}" th:text="${view.backLabel}">Back</a></p>
+<h1 th:text="${view.heading}">Marketing</h1>
+<p th:unless="${view.intro.empty}" class="muted" th:text="${view.intro}">About this page.</p>
+<p th:unless="${view.links.empty}" class="row"><a class="button" th:each="l : ${view.links}" th:href="${l.url}" th:text="${l.title}">Link</a></p>
+<ul th:unless="${view.problems.empty}" class="card problems" aria-label="Problems"><li th:each="p : ${view.problems}" th:text="${p.title}">Problem</li></ul>
+<dl th:unless="${view.facts.empty}" class="card facts"><th:block th:each="f : ${view.facts}"><dt th:text="${f.title}">Status</dt><dd th:text="${f.detail}">Draft</dd></th:block></dl>
+
+<form th:unless="${view.searchAction.empty}" class="toolbar" method="get" role="search" th:action="${view.searchAction}"><label class="sr" for="m-q">Search</label><input id="m-q" type="search" name="q" placeholder="Search" th:value="${view.q}"><label class="sr" for="m-since">Placed</label><select id="m-since" name="since"><option th:each="o : ${view.sinceOptions}" th:value="${o.id}" th:selected="${o.flag}" th:text="${o.title}">Any time</option></select><button class="quiet" type="submit">Apply</button></form>
+<section th:unless="${view.cards.empty}" class="card" aria-label="Items"><h2 th:unless="${view.cardsTitle.empty}" th:text="${view.cardsTitle}">Items</h2>
+<ul><li class="item" th:each="k : ${view.cards}"><a th:unless="${k.url.empty}" th:href="${k.url}" th:text="${k.title}">Item</a><b th:if="${k.url.empty}" th:text="${k.title}">Item</b> <span class="pill" th:unless="${k.status.empty}" th:text="${k.status}">ACTIVE</span> <span th:text="${k.detail}">Detail</span> <small class="muted" th:text="${k.meta}">Meta</small> <b th:text="${k.amount}">$1</b> <a th:unless="${k.extraUrl.empty}" th:href="${k.extraUrl}" th:text="${k.extraLabel}">PDF</a>
+<span class="row"><form th:each="btn : ${k.buttons}" method="post" th:action="${btn.action}"><button type="submit" th:classappend="${btn.flag ? 'danger' : ''}" th:text="${btn.title}" th:attr="aria-label=${btn.title + ': ' + k.title}">Go</button></form></span></li></ul></section>
+
+<section th:unless="${view.liveStore.empty}" id="inbox-live" class="card live-chat" th:attr="data-store=${view.liveStore},data-chat=${view.liveChat},data-ticket=${view.liveTicket}"><div class="live-head"><h2 th:text="${view.liveChat.empty ? 'Live' : 'Conversation'}">Conversation</h2><span class="live-state muted" role="status">Live updates need JavaScript.</span></div>
+<div class="live-ring" hidden role="alert"><span class="live-ring-t">Incoming call</span> <a class="button live-open" hidden href="#">Open the conversation</a><button type="button" class="button live-accept" hidden>Answer</button> <button type="button" class="live-decline" hidden>Decline</button></div>
+<div class="live-call" hidden><video class="live-remote" autoplay playsinline></video><video class="live-local" autoplay playsinline muted></video><p class="row"><b class="live-call-t">On a call</b> <button type="button" class="live-mute" aria-pressed="false">Mute</button> <button type="button" class="live-end">Hang up</button></p></div>
+<ul class="live-news" hidden aria-live="polite"></ul>
+<ol th:unless="${view.liveChat.empty}" class="live-log" aria-live="polite" aria-label="Messages"><li th:each="r : ${view.thread}" th:attr="class=${r.flag ? 'live-msg staff' : 'live-msg'},data-at=${r.id}"><p th:text="${r.detail}">Message</p><small><span th:text="${r.title}">Name</span> <time th:text="${r.amount}">When</time></small></li></ol>
+<p th:unless="${view.liveChat.empty}" class="live-typing muted" hidden>The shopper is typing...</p></section>
+<section th:unless="${view.rowsTitle.empty}" class="card"><h2 th:text="${view.rowsTitle}">Rows</h2><p th:if="${view.rows.empty}" class="muted" th:text="${view.rowsEmpty}">Nothing yet.</p>
+<div class="table-wrap" th:unless="${view.rows.empty}"><table class="data"><thead><tr><th scope="col" th:text="${view.headA}">A</th><th scope="col" th:text="${view.headB}">B</th><th scope="col" th:text="${view.headC}">C</th><th scope="col" class="num" th:text="${view.headD}">D</th></tr></thead><tbody>
+<tr th:each="r : ${view.rows}"><td th:text="${r.title}">A</td><td th:text="${r.detail}">B</td><td th:text="${r.meta}">C</td><td class="num" th:text="${r.amount}">D</td></tr></tbody></table></div></section>
+
+<form th:each="fm : ${view.forms}" method="post" class="card" th:classappend="${fm.danger ? 'danger' : ''}" th:action="${fm.action}" th:attr="hx-confirm=${fm.confirm}"><h2 th:text="${fm.title}">Form</h2><p th:unless="${fm.text.empty}" class="muted" th:text="${fm.text}">About it.</p>
+<div class="stack"><th:block th:each="f : ${fm.fields}">
+<input th:if="${f.type == 'hidden'}" type="hidden" th:attr="name=${f.name}" th:value="${f.value}">
+<label th:if="${f.type == 'checkbox'}" class="check"><input type="checkbox" value="1" th:attr="name=${f.name}" th:checked="${f.checked}"> <span th:text="${f.label}">On</span></label>
+<th:block th:unless="${f.type == 'hidden' or f.type == 'checkbox'}"><label th:attr="for=${'f-' + fm.id + '-' + f.name}" th:text="${f.label}">Field</label>
+<select th:if="${f.type == 'select'}" th:attr="id=${'f-' + fm.id + '-' + f.name}, name=${f.name}"><option th:each="o : ${f.options}" th:value="${o.id}" th:selected="${o.flag}" th:text="${o.title}">Choice</option></select>
+<textarea th:if="${f.type == 'textarea'}" rows="4" th:attr="id=${'f-' + fm.id + '-' + f.name}, name=${f.name}" th:text="${f.value}"></textarea>
+<input th:unless="${f.type == 'select' or f.type == 'textarea'}" th:attr="type=${f.type}, id=${'f-' + fm.id + '-' + f.name}, name=${f.name}" th:value="${f.value}">
+<small th:unless="${f.hint.empty}" class="muted" th:text="${f.hint}">Hint</small></th:block>
+</th:block></div>
+<p><button type="submit" th:classappend="${fm.danger ? 'danger' : 'primary'}" th:text="${fm.submit}">Save</button></p></form>
+
+<section th:if="${view.hasTable}" th:replace="~{table :: grid}"></section>
+
+</main></div>
+<div th:replace="~{shell :: toasts}"></div><div th:replace="~{shell :: help}"></div></body></html>

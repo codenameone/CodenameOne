@@ -38,9 +38,11 @@ import java.util.Map;
 /// follow the measured text, and pictures are decoded once and kept.
 ///
 /// ```java
-/// DocumentLayout layout = new DocumentLayout(doc, new ScreenMeasurer());
-/// LayoutPainter painter = new LayoutPainter(layout.getMeasurer());
-/// painter.paint(g, layout.getPage(0).getItems(), x, y, 2f);
+/// void paintFirstPage(Graphics g, Document doc, int x, int y) {
+///     DocumentLayout layout = new DocumentLayout(doc, new ScreenMeasurer());
+///     LayoutPainter painter = new LayoutPainter(layout.getMeasurer());
+///     painter.paint(g, layout.getPage(0).getItems(), x, y, 2f);
+/// }
 /// ```
 public class LayoutPainter {
     private static final int INSERT_COLOR = 0x1f6feb;
@@ -319,9 +321,25 @@ public class LayoutPainter {
                     g.drawString(c, cx + (cell - g.getFont().stringWidth(c)) / 2, y);
                 }
             } else {
-                // centring the word splits the rounding difference between the gaps on either
-                // side instead of piling it on one
-                g.drawString(word, at + (box - g.getFont().stringWidth(word)) / 2, y);
+                Font f = g.getFont();
+                int ww = f.stringWidth(word);
+                if (ww > box && box > 0 && f.isTTFNativeFont()) {
+                    // At a few pixels a glyph's advance rounds up, so a word drawn at the
+                    // scaled size comes out wider than the box it was measured into, and
+                    // centred there it covered its neighbours: a thumbnail's title read
+                    // "Shapeandfills". Shrink just that word until it fits, on the same
+                    // baseline. At ordinary sizes no word overflows and nothing is derived.
+                    Font fit = f.derive(Math.max(1f, f.getPixelSize() * box / (float) ww),
+                            f.getStyle());
+                    g.setFont(fit);
+                    g.drawString(word, at + (box - fit.stringWidth(word)) / 2,
+                            y + f.getAscent() - fit.getAscent());
+                    g.setFont(f);
+                } else {
+                    // centring the word splits the rounding difference between the gaps on
+                    // either side instead of piling it on one
+                    g.drawString(word, at + (box - ww) / 2, y);
+                }
             }
             start = end;
         }

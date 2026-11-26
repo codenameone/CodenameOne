@@ -354,6 +354,17 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sawARoot = true;
+            // The conventional place first. A Java source lives in its package's
+            // directory, so this answers almost every class with one file read;
+            // walking the whole tree for each annotated class made a large
+            // module's build spend minutes here. The walk below still runs when
+            // the file is elsewhere (Kotlin allows that) or is not there at all.
+            File conventional = new File(dir, pkg.length() == 0 ? sourceFile
+                    : pkg.replace('.', File.separatorChar) + File.separator + sourceFile);
+            if (conventional.isFile()
+                    && matches(conventional, pkg, simpleName, nestedName, wholeName, sourceEncoding)) {
+                return true;
+            }
             if (declaresPackage(dir, sourceFile, pkg, simpleName, nestedName, wholeName, 0,
                     sourceEncoding)) {
                 return true;

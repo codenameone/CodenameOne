@@ -61,6 +61,15 @@ public enum Template {
             "The food-delivery template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/savor-modules.zip", "/savor-settings.properties"),
+    // A commerce platform: a storefront, a merchant back office with a point of
+    // sale and an admin console, and its server. It is the project in
+    // scripts/bazaar, and its resources come from
+    // `scripts/sync-initializr-template.py bazaar`.
+    BAZAAR(false, "/bazaar-src.zip", "/bazaar-css.zip", "/bazaar-pom.xml",
+            "com.codenameone.examples.bazaar", "Bazaar", "/bazaar-preview.jpg",
+            "The commerce template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/bazaar-modules.zip", "/bazaar-settings.properties"),
     // A card battler: a real-time arena, and the rules in
     // `shared`, which the app and the server both run. It is the project in
     // scripts/skirmish; its resources come from

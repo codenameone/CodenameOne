@@ -1,0 +1,244 @@
+= Bazaar
+
+A commerce platform and its server, in one Maven project and one language.
+Shoppers browse a store, fill a cart and check out; the merchant's staff run the
+catalog, the stock, the orders and their fulfilment; a cashier sells over the
+counter on a register that keeps working offline; and an administrator runs the
+platform the stores live on. Which of these a person sees is decided by the roles
+the server gives their account: a shopper opens on the storefront, store staff on
+the merchant dashboard, a cashier on the register, an administrator on the
+platform console.
+
+It is a sample of how a Codename One application and a Codename One Backend fit
+together.
+
+== Start here
+
+Three chapters of the developer guide cover this project:
+
+* https://www.codenameone.com/developer-guide/#bazaar-users-guide[The user's guide]
+  (link:../../docs/developer-guide/Bazaar-Users-Guide.asciidoc[source]) shows the
+  application as a shopper, a merchant, a cashier and an administrator see it,
+  with the demo accounts and test cards.
+* https://www.codenameone.com/developer-guide/#bazaar-implementors-guide[The implementor's guide]
+  (link:../../docs/developer-guide/Bazaar-Implementors-Guide.asciidoc[source])
+  explains how the project is built: the inventory ledger, payments held and
+  captured, the offline register, webhooks, automations, documents and the
+  server-rendered storefront, and what to replace before it takes real orders.
+* https://www.codenameone.com/developer-guide/#extending-bazaar[Extending Bazaar with apps]
+  (link:../../docs/developer-guide/Extending-Bazaar.asciidoc[source]) is for
+  developers of third-party apps: the install flow, scopes, the API, webhooks,
+  checkout functions, UI extensions, billing and the Restock Alerts sample app.
+
+To see it running first, the two commands under <<Running it>> are all it takes.
+
+== The modules
+
+[cols="1,4"]
+|===
+| `shared`
+| The contract: the data classes both sides exchange and the `@RestClient`
+  interfaces that name every call. The app's build generates a client from them
+  and the server's build generates the interfaces it implements, so a change the
+  other side did not follow is a compile error.
+
+| `common`
+| The application: sign-in, the storefront (`shop`), the merchant screens
+  (`merchant`), the register (`pos`), the platform console (`admin`), the wallet,
+  the settings and the live channel. Styled in `src/main/css/theme.css`, whose
+  first block of variables holds the colors and the corner radius everything else
+  is drawn with. The text is in `src/main/l10n`, in English, Spanish, French,
+  German and Hebrew. The translations are machine-generated samples that no
+  native speaker has reviewed; have them checked before you ship.
+  What it reports to Codename One analytics about how it is used, once the user
+  has agreed, is all in `Telemetry`.
+
+| `backend`
+| The server: accounts and roles, stores and staff, the catalog, the inventory
+  ledger, carts and checkout, discounts, taxes and shipping, orders, fulfilment,
+  returns and gift cards, payments held at checkout and captured at shipping, the
+  register's offline sync, signed webhooks, automations, PDF documents,
+  statistics, the HTML storefront, and a WebSocket that pushes changes as they
+  happen. The data is entity classes in `domain`, read and written by the
+  repositories in `repository`. The schema is the migration scripts in
+  `src/main/resources/db/migration`, and the same server runs on SQLite,
+  PostgreSQL, MySQL and MariaDB.
+
+| `sample-app`
+| Restock Alerts, a third-party app for the app platform: a separate server
+  that knows nothing of Bazaar's code. See <<sample-app>>.
+
+|===
+
+There are no platform modules: `common` builds the application for the
+simulator, the desktop, Android, iOS and the browser itself.
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, and text messages are printed on the console.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the application in the simulator, from another terminal:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+The development profile creates these accounts, all with the password
+`bazaar-demo`, and two stores, Northwind Outfitters (`northwind`) and Little Clay
+Studio (`littleclay`), with their products, stock and discount codes:
+
+[cols="2,3"]
+|===
+| `shopper@bazaar.example`, `shopper2@bazaar.example` | shoppers
+| `shopper3@bazaar.example` | a shopper an administrator has flagged
+| `owner@bazaar.example` | owns Northwind Outfitters
+| `cashier@bazaar.example` | works the Northwind register, PIN `1234`
+| `admin@bazaar.example` | runs the platform
+|===
+
+On a phone, set the server's address on the welcome screen: `localhost` on a
+phone is the phone.
+
+=== In a browser, with nothing installed
+
+The server can host the application itself. Build the browser version once, and
+again when the application changes; it takes about a minute:
+
+[source,bash]
+----
+backend/server.sh web
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then open `http://localhost:8080/`. `server.sh run --web` does both in one step.
+
+`server.sh web` runs `cn1:backend-webapp`, which builds the application for the
+browser and stages it in `backend/target/webapp`; a server that finds it there
+serves it at `/`, after its own routes. In the browser the application takes the
+page's address as the server's, signs in through the same authorization-code
+flow with the code sent back to `/signin/code` on that server, and opens its live
+channel to the same origin. To deploy it, put `backend/target/webapp` beside the
+server binary as `webapp`.
+
+The same server also renders each store as plain HTML at `/s/<handle>`, with a
+sitemap at `/sitemap.xml`, so search engines can index the catalog that the app
+shows.
+
+Beside the store pages it renders, with no JavaScript, checkout on the store's
+own pages (in the shopper's market currency, with pre-orders and cart recovery
+links) and the shopper's account at `/account`. Everything else in a browser,
+the merchant and platform back offices included, is the app at `/app/`; an old
+`/admin` address redirects there. The user's guide walks through each, and the
+implementor's guide says where the code lives.
+
+== What is real and what is simulated
+
+Text messages go through the provider `bazaar.sms.provider` names: `twilio`,
+`vonage` or `messagebird`, each with its own credentials. On a development
+profile they are printed on the console instead, and the app is handed the code
+so a sign-up can finish.
+
+Payments are simulated on a development profile: the card
+`4242 4242 4242 4242` is accepted, `4000 0000 0000 0002` is declined, and no
+money moves. With `bazaar.payments.provider=stripe` and
+`BAZAAR_PAYMENTS_STRIPE_SECRET` set in the server's environment, a card is added
+on Stripe's own page, an order's total is held at checkout and captured when the
+first fulfilment ships, and a cancelled order releases the hold. Try it with a
+Stripe test key before trusting it with money.
+
+Shipping rates, tax rates and labels are the store's own tables and documents;
+the implementor's guide lists what a real deployment connects instead.
+
+`backend/application.properties` lists every setting a deployment supplies. The
+database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
+address, or the path of a SQLite file. Every setting is also read from the
+environment in upper case with `_` for every dot (`BAZAAR_SMS_TWILIO_TOKEN`).
+
+[[sample-app]]
+== A sample third-party app
+
+`sample-app` is what a developer outside the project would write against
+Bazaar's app platform: its own Codename One Backend, talking to Bazaar only over
+HTTP and plain JSON. Shoppers leave an e-mail address for a sold-out product;
+the merchant tells them all at once when it is back. `RestockAlerts` is the
+whole app and reads top to bottom in the order a store meets it:
+
+* *Install* -- the consent page with a PKCE challenge, the callback that trades
+  the code and verifier for a token.
+* *Set up* -- with that token: an `inventory/low` webhook, an
+  `admin.product.block` with a data URL ("subscribers waiting") and a
+  "Notify now" action, a `storefront.block`, a `checkout.block` field, the app
+  proxy path `/s/{store}/apps/restock`, and a validation function uploaded
+  through the functions API.
+* *Verify* -- `Signatures` checks everything Bazaar sends: the
+  timestamped `X-Bazaar-Signature` of webhooks and block calls, the proxy's query
+  signature, and the session token of the embedded admin page. All three use
+  one signing key the app derives from its client secret.
+* *Leave* -- `app/uninstalled` drops the token, `shop/redact` everything else.
+
+[source,bash]
+----
+mvn -pl sample-app -Dcodename1.platform=backend cn1:backend   # <1>
+mvn -pl shared,backend,sample-app -Dcodename1.platform=backend test   # <2>
+----
+<1> Runs the app. Put the client id and secret from `/api/developer/apps` in
+    `sample-app/application.properties` first. Both addresses there must be
+    public https ones: Bazaar does not call a private network.
+<2> The app's own tests, and `RestockAppE2ETest` in `backend`, which installs it
+    into a test Bazaar and runs install, webhook, block data and action, proxied
+    signup, the checkout function, the embedded page and uninstall. One Backend
+    runs per process, so that test compiles the app's sources into Bazaar's test
+    build and joins the two at the HTTP layer.
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledTests=true   # <2>
+./run-e2e.sh   # <3>
+./check-template.sh   # <4>
+./run-web-e2e.sh   # <5>
+----
+<1> The server's tests, on the JVM.
+<2> The same tests again, translated to a native binary, which is how the server
+    ships.
+<3> Starts the server on the `test` profile and runs the application's tests
+    against it in the simulator: they register, shop and check out, manage the
+    store, fulfil orders, sell on the register and administer the platform, and
+    compare the screens in `screenshots/`. Pass `--native` to run them against the compiled
+    server. On Linux they then run a second time with the simulator as a desktop
+    window, where the admin console is laid out side by side under the
+    platform's own theme.
+<4> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+<5> Builds the browser version of the application, starts the server hosting
+    it, and drives it in a headless browser: the application loads from the
+    server, signs in as the demo shopper, reaches the home screen and opens its
+    live channel, then signs out and signs in as the demo admin. Needs Node with Playwright and its Chromium (`npm ci` and
+    `npx playwright install chromium` in `scripts/`). Screenshots and logs go
+    to `target/web-e2e`.
+
+`.github/workflows/bazaar.yml` runs all five, and builds the application for
+Android and iOS through `scripts/build-android-app.sh` and
+`scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/bazaar`.
+
+== The Initializr template
+
+`scripts/sync-initializr-template.py bazaar --write` copies this project into the
+Initializr's resources; without `--write` it fails when they differ, which is what
+CI runs. Change the project here, never the copies.
+
+== Licence
+
+Bazaar is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep. The same
+holds for everything Initializr writes into a generated project.

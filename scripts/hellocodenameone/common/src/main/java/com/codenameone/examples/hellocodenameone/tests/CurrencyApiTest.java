@@ -24,6 +24,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.l10n.L10NManager;
+import com.codename1.ui.Display;
 
 import java.text.NumberFormat;
 import java.util.Currency;
@@ -61,13 +62,30 @@ public class CurrencyApiTest extends BaseTest {
         assertBool(eur == Currency.getInstance("EUR"), "one instance per code");
         assertBool(Currency.getInstance(new Locale("ja", "JP")) == Currency.getInstance("JPY"), "Japan uses yen");
         assertBool(Currency.getAvailableCurrencies().contains(eur), "EUR is available");
+        // A malformed code, not merely an unknown one: Android hands
+        // java.util.Currency to ICU, which accepts ANY well-formed three-letter
+        // code ("XYZ" returns a currency there) and rejects only what is not
+        // three letters. The JDK and Codename One's own tables reject both.
         boolean threw = false;
         try {
-            Currency.getInstance("XYZ");
+            Currency.getInstance("EURO");
         } catch (IllegalArgumentException e) {
             threw = true;
         }
-        assertBool(threw, "an unknown code is rejected");
+        assertBool(threw, "a malformed code is rejected");
+        if (!onAndroid()) {
+            threw = false;
+            try {
+                Currency.getInstance("XYZ");
+            } catch (IllegalArgumentException e) {
+                threw = true;
+            }
+            assertBool(threw, "an unknown code is rejected");
+        }
+    }
+
+    private static boolean onAndroid() {
+        return "and".equals(Display.getInstance().getPlatformName());
     }
 
     private void deviceCurrency() {
@@ -93,11 +111,21 @@ public class CurrencyApiTest extends BaseTest {
                 + l10n.formatCurrency(1.25, "BHD"));
         boolean threw = false;
         try {
-            l10n.formatCurrency(1, "XYZ");
+            // Malformed for the reason given in currencyFacts: Android accepts "XYZ".
+            l10n.formatCurrency(1, "EURO");
         } catch (IllegalArgumentException e) {
             threw = true;
         }
-        assertBool(threw, "formatCurrency rejects an unknown code");
+        assertBool(threw, "formatCurrency rejects a malformed code");
+        if (!onAndroid()) {
+            threw = false;
+            try {
+                l10n.formatCurrency(1, "XYZ");
+            } catch (IllegalArgumentException e) {
+                threw = true;
+            }
+            assertBool(threw, "formatCurrency rejects an unknown code");
+        }
     }
 
     private void numberFormatTakesACurrency() {

@@ -1,0 +1,172 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.live;
+
+import com.codename1.backend.Json;
+import com.codename1.backend.WebSocketSession;
+import com.codename1.backend.annotations.Component;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The open live connections, and what is pushed down them.
+///
+/// One kind of frame, a small JSON object:
+///
+/// - `{"type":...,"id":...,"state":...}` -- something changed: an order, a
+///   payment, whatever `type` names. Sent to the accounts it concerns and the
+///   admins, who then read the thing itself from the API. The frame carries no
+///   more than that on purpose: the API is the one account of it, and a client
+///   that missed a frame is put right by its next read.
+///
+/// The connections are those of this process. Two instances of the server
+/// would each know only their own, and a change made on one would not reach a
+/// client connected to the other: running more than one needs a channel
+/// between them -- a database LISTEN/NOTIFY, a message broker -- feeding the
+/// same method.
+@Component
+public class LiveHub {
+    private final Map<String, List<WebSocketSession>> byUser =
+            new HashMap<String, List<WebSocketSession>>();
+    private final List<WebSocketSession> admins = new ArrayList<WebSocketSession>();
+
+    synchronized void add(String username, boolean admin, WebSocketSession session) {
+        List<WebSocketSession> open = byUser.get(username);
+        if (open == null) {
+            open = new ArrayList<WebSocketSession>();
+            byUser.put(username, open);
+        }
+        open.add(session);
+        if (admin) {
+            admins.add(session);
+        }
+    }
+
+    synchronized void remove(String username, WebSocketSession session) {
+        List<WebSocketSession> open = byUser.get(username);
+        if (open != null) {
+            open.remove(session);
+            if (open.isEmpty()) {
+                byUser.remove(username);
+            }
+        }
+        admins.remove(session);
+    }
+
+    private final java.util.concurrent.atomic.AtomicLong changes =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    /// How many changes were published since the server started, for the
+    /// tests: a transition that should be heard and was not shows as no step.
+    public long changes() {
+        return changes.get();
+    }
+
+    /// How many connections are open, for the tests.
+    public synchronized int connections() {
+        int total = 0;
+        for (List<WebSocketSession> open : byUser.values()) {
+            total += open.size();
+        }
+        return total;
+    }
+
+    /// Closes every connection an account has open.
+    public void drop(String username) {
+        List<WebSocketSession> open;
+        synchronized (this) {
+            open = byUser.remove(username);
+            if (open != null) {
+                admins.removeAll(open);
+            }
+        }
+        for (int iter = 0; open != null && iter < open.size(); iter++) {
+            open.get(iter).close(4403, "suspended");
+        }
+    }
+
+    /// Tells `users` and the admins that the `type` named `id` changed, and
+    /// to what `state`. They read the thing itself over REST.
+    public void changed(String type, String id, String state, List<String> users) {
+        changes.incrementAndGet();
+        Map<String, Object> frame = new LinkedHashMap<String, Object>();
+        frame.put("type", type);
+        frame.put("id", id);
+        frame.put("state", state);
+        String text = Json.write(frame);
+        List<WebSocketSession> to = new ArrayList<WebSocketSession>();
+        synchronized (this) {
+            for (int iter = 0; users != null && iter < users.size(); iter++) {
+                collect(to, users.get(iter));
+            }
+            for (int iter = 0; iter < admins.size(); iter++) {
+                if (!to.contains(admins.get(iter))) {
+                    to.add(admins.get(iter));
+                }
+            }
+        }
+        send(to, text);
+    }
+
+    /// Must be called holding the lock.
+    private void collect(List<WebSocketSession> to, String username) {
+        List<WebSocketSession> open = username == null ? null : byUser.get(username);
+        for (int iter = 0; open != null && iter < open.size(); iter++) {
+            if (!to.contains(open.get(iter))) {
+                to.add(open.get(iter));
+            }
+        }
+    }
+
+    /// Sends outside the lock: a slow client holds up its own frame, not
+    /// everyone's. One that cannot be written to is dropped; its close callback
+    /// takes it out of the maps.
+    private static void send(List<WebSocketSession> to, String text) {
+        for (int iter = 0; iter < to.size(); iter++) {
+            WebSocketSession session = to.get(iter);
+            try {
+                session.sendText(text);
+            } catch (IOException gone) {
+                // Said out loud: a dropped channel is otherwise invisible -- the
+                // app just stops hearing about its order, and a test sees only
+                // the connection end with no frame.
+                System.err.println("[live] websocket " + session.getId() + " of "
+                        + session.getAttachment() + " dropped; could not send "
+                        + frameType(text) + ": " + gone);
+                session.abort();
+            }
+        }
+    }
+
+    /// The `type` of a frame this class wrote, for a log line; never the
+    /// payload, which may carry order details.
+    static String frameType(String text) {
+        int at = text.indexOf("\"type\":\"");
+        if (at < 0) {
+            return "a frame";
+        }
+        at += 8;
+        int end = text.indexOf('"', at);
+        return end < 0 ? "a frame" : "a " + text.substring(at, end) + " frame";
+    }
+}

@@ -1,0 +1,3639 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+/*
+ * The whole look of the app.
+ *
+ * COLOURS AND SHAPE -- change these and nothing else to re-skin the app. Every
+ * rule below takes its colours from here; none names a colour of its own. Each
+ * colour has a second value for dark mode, used by the block at the end of the
+ * file.
+ */
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    /* ONE TYPE SCALE, in millimetres as a phone draws them: 2.1 caption,
+       2.5 secondary, 2.75 body, 2.9 control, 3.5 heading, 4.4 title, 7 display.
+       A desktop draws a millimetre in far fewer pixels and is read from
+       further away, so every size is a quarter larger there. */
+    device-desktop-font-scale: "1.25";
+    /* A line too long for its place ends in an ellipsis, not mid-word. */
+    endsWith3PointsBool: true;
+    /* Screens change quickly: nothing waits for an animation. */
+    transitionSpeedInt: "200";
+    /* The switch, sized from the Switch style's font. */
+    switchThumbScaleY: "1.5";
+    switchTrackScaleY: "1.8";
+    switchTrackScaleX: "3.1";
+    switchThumbInsetMM: "0.35";
+    switchTrackOffOutlineWidthMM: "0";
+    switchTrackOnOutlineWidthMM: "0";
+    switchThumbWidthScale: "1.0";
+    /* ONE ACCENT: change --brand (and its dark twin) to re-skin the app. */
+    --brand: #4f46e5;
+    --brand-pressed: #4338ca;
+    /* Lettering on the accent. */
+    --brand-contrast: #ffffff;
+    /* Neutral surfaces: the page, a recessed panel, a pressed row. */
+    --surface: #ffffff;
+    --surface-alt: #f6f7f9;
+    --surface-press: #eceef2;
+    --text: #111827;
+    --text-muted: #5b6472;
+    --line: #e5e7eb;
+    --line-strong: #d1d5db;
+    --success: #047857;
+    --warning: #b45309;
+    --danger: #c81e1e;
+    /* The pale ground a selected row and a badge sit on. */
+    --brand-tint: #eef2ff;
+    --success-tint: #e7f6ef;
+    --warning-tint: #fdf3e2;
+    --danger-tint: #fdecec;
+
+    --brand-dark: #818cf8;
+    --brand-pressed-dark: #a5b4fc;
+    --brand-contrast-dark: #0b1020;
+    --surface-dark: #0f1115;
+    --surface-alt-dark: #171a21;
+    --surface-press-dark: #232733;
+    --text-dark: #e8eaf0;
+    --text-muted-dark: #a3aab8;
+    --line-dark: #262a35;
+    --line-strong-dark: #343a48;
+    --success-dark: #34d399;
+    --warning-dark: #fbbf24;
+    --danger-dark: #f87171;
+    --brand-tint-dark: #1e1f3d;
+    --success-tint-dark: #0f2a22;
+    --warning-tint-dark: #2e2410;
+    --danger-tint-dark: #341a1d;
+
+    /* ONE RADIUS for anything card- or button-shaped, a smaller one for what
+       sits inside a card, and the sheet's. */
+    --radius: 2.4mm;
+    --radius-small: 1.6mm;
+
+    /* The shadow under a floating card, and the dimming behind a sheet. */
+    --shadow: #101828;
+    /* Under a card with square-ish corners. Black, and without a blur where it
+       is used: that is the one shadow a rounded rectangle draws for itself.
+       Any other is rendered to pictures of the card when the theme is
+       compiled, and a build that cannot render them has no card at all. */
+    --shadow-card: rgba(0, 0, 0, 0.08);
+    --scrim: #000000;
+    /* Under words laid over a picture: the storefront hero, a collection. */
+    --scrim-soft: rgba(0, 0, 0, 0.38);
+    --on-scrim: #ffffff;
+    --radius-sheet: 4mm;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+SvForm {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+SvPage {
+    background-color: var(--surface);
+    padding: 3mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* The coloured top of the welcome screen. */
+SvHero {
+    background-color: var(--brand);
+    padding: 14mm 4.4mm 8mm 4.4mm;
+    margin: 0;
+}
+
+SvHeroTitle {
+    color: var(--brand-contrast);
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    padding: 2.4mm 0 0.8mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvHeroText {
+    color: var(--brand-contrast);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvHeroIcon {
+    color: var(--brand-contrast);
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* A sheet that rises from the bottom. */
+SvCard {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 3.6mm 3.6mm 4mm 3.6mm;
+    margin: 0;
+}
+
+/* A panel that floats with a gap around it. */
+SvFloat {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 2.4mm 3.2mm 2.4mm 3.2mm;
+    margin: 2.4mm;
+}
+
+SvPanel {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.8mm 3mm 2.8mm 3mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+
+SvDivider {
+    background-color: var(--line);
+    padding: 0;
+    margin: 2mm 0 2mm 0;
+}
+
+/* -------------------------------------------------------------------- text */
+
+SvTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0.6mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvHeading {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvText {
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvLabel {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.6mm 0 1mm 0.3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvPrice {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+    text-align: right;
+    background-color: transparent;
+}
+
+/* The same, where it is the headline of a sheet: it starts where the
+   sheet's words start. */
+
+SvError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvNotice {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2mm 0 1mm 0;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+SvPrimary {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+SvPrimary.pressed {
+    background-color: var(--brand-pressed);
+}
+
+SvPrimary.disabled {
+    color: var(--text-muted);
+    background-color: var(--surface-press);
+}
+
+SvSecondary.pressed {
+    background-color: var(--surface-press);
+}
+
+/* Two secondary buttons side by side keep a gap between them; a button beside a
+   field takes the field's height and stands clear of it. */
+SvPairStart, SvPairEnd, SvFieldButton {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+}
+SvPairStart { margin: 1.6mm 1mm 0.8mm 0; }
+SvPairEnd { margin: 1.6mm 0 0.8mm 1mm; }
+/* Beside a field it is outlined like the field: the cart puts both on a recessed
+   panel, where a filled secondary button is the panel's own colour. */
+SvFieldButton { color: var(--brand); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); margin: 0 0 0 2mm; padding: 2.7mm 4mm 2.7mm 4mm; }
+SvPairStart.pressed, SvPairEnd.pressed { background-color: var(--surface-press); }
+SvFieldButton.pressed { background-color: var(--surface-press); border: 1px solid var(--line-strong); border-radius: var(--radius); }
+SvFieldButton.disabled { color: var(--line-strong); }
+
+SvDanger {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+SvDanger.pressed {
+    background-color: var(--surface-press);
+}
+
+SvLink {
+    color: var(--brand);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: center;
+    padding: 2.4mm 2mm 2.4mm 2mm;
+    margin: 0;
+}
+
+SvSecondary.disabled, SvDanger.disabled, SvLink.disabled {
+    color: var(--line-strong);
+}
+
+SvLink.pressed {
+    color: var(--brand-pressed);
+    background-color: var(--brand-tint);
+}
+
+/* Round icon buttons over content (a photo, a scanner view). */
+SvMapButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.5mm;
+    cn1-box-shadow-blur: 1.6mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    padding: 2.4mm;
+    margin: 1.2mm 2.4mm 1.2mm 2.4mm;
+}
+
+SvMapButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* The same button on a bar: flat, because nothing on a bar floats. */
+SvBarButton {
+    color: var(--text);
+    background: cn1-round-border;
+    background-color: var(--surface);
+    padding: 2.4mm;
+    margin: 0.6mm 0.6mm 0.6mm 1.2mm;
+}
+
+SvBarButton.pressed {
+    background-color: var(--surface-alt);
+}
+
+/* "Where to?" -- looks like a field, behaves like a button. */
+
+/* ------------------------------------------------------------------ fields */
+
+/* A field is a box with an outline, so it reads as a field on any ground --
+   the cart's code fields sit on a recessed panel the old fill vanished into. */
+SvField {
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+}
+
+/* The field being typed in says so. */
+SvField.selected {
+    background-color: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: var(--radius);
+}
+
+SvField.disabled {
+    color: var(--text-muted);
+    background-color: var(--surface-alt);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+SvFieldHint {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.9mm;
+    padding: 2.7mm 3mm 2.7mm 3mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------- lists */
+
+SvRow {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 2.6mm 0 2.6mm 0;
+    margin: 0;
+}
+
+SvRow.pressed {
+    background-color: var(--surface-alt);
+}
+
+SvRowIcon {
+    color: var(--text-muted);
+    padding: 0 3mm 0 0.4mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvRowTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvRowDetail {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.4mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvRowValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 2.75mm;
+    text-align: right;
+    padding: 0 0 0 2mm;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* ------------------------------------------------------------------ badges */
+
+SvBadge {
+    color: var(--text-muted);
+    background: cn1-pill-border;
+    background-color: var(--surface-alt);
+    font-family: "native:MainBold";
+    font-size: 2.05mm;
+    padding: 0.7mm 2mm 0.7mm 2mm;
+    margin: 0 0 0 2mm;
+}
+
+SvBadgeGood {
+    cn1-derive: SvBadge;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+
+SvBadgeWarn {
+    cn1-derive: SvBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+SvBadgeBad {
+    cn1-derive: SvBadge;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* ------------------------------------------------------------------- admin */
+
+SvStat {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 2.6mm 2.6mm 2.6mm;
+    margin: 0.8mm;
+}
+
+SvStatValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.9mm;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+SvStatLabel {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0.3mm 0 0 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* --------------------------------------------------------------- title bar */
+
+/* The strip the clock and the battery are drawn over. */
+StatusBar {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+}
+
+Toolbar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 0 0.6mm 0;
+    margin: 0;
+}
+
+Title {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    background-color: transparent;
+}
+
+TitleCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+
+BackCommand {
+    color: var(--text);
+    background-color: transparent;
+}
+
+/* The toolbar's overflow menu: a list whose focused row is CommandFocus.
+   Left to the native theme it drew white text on a white popup. */
+CommandList { background-color: var(--surface); padding: 0; margin: 0; }
+Command { color: var(--text); background-color: var(--surface); padding: 2.4mm 4mm 2.4mm 4mm; margin: 0; font-family: "native:MainRegular"; font-size: 3.2mm; }
+CommandFocus { color: var(--text); background-color: var(--brand-tint); padding: 2.4mm 4mm 2.4mm 4mm; margin: 0; font-family: "native:MainRegular"; font-size: 3.2mm; }
+
+/* The switch: the thumb is the colour, the track the background. */
+Switch {
+    color: #ffffff;
+    background-color: var(--line-strong);
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0.6mm 0 0.6mm 2mm;
+    margin: 0;
+}
+
+Switch.selected {
+    color: #ffffff;
+    background-color: var(--brand);
+}
+
+Switch.disabled {
+    color: var(--surface-alt);
+    background-color: var(--line);
+}
+
+/* ---------------------------------------------------------------------------
+ * SHEETS AND CHIPS.
+ */
+
+/* One short fact, in a pill under the bar. */
+SvChip {
+    color: var(--text);
+    background: cn1-pill-border;
+    background-color: var(--surface);
+    cn1-box-shadow-spread: 0.4mm;
+    cn1-box-shadow-blur: 1.4mm;
+    cn1-box-shadow-h: 0.5;
+    cn1-box-shadow-v: 0.7;
+    cn1-box-shadow-color: var(--shadow);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1.4mm 3mm 1.4mm 2.6mm;
+    margin: 1.2mm 2mm 1mm 2mm;
+}
+
+SvSheet {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 0.4mm 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+
+/* The handle of the sheet: the colour is the bar's. */
+SvGrip {
+    color: var(--line-strong);
+    background-color: transparent;
+    padding: 1.6mm 0 1.8mm 0;
+    margin: 0;
+}
+
+/* The countdown: the colour is the time left, the background the time gone. */
+
+/* Home and Work, side by side on the idle sheet. */
+
+SvAvatar {
+    color: var(--brand-contrast);
+    background: cn1-round-border;
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.3mm;
+    margin: 0 3mm 0 0;
+}
+
+/* A number plate reads as one, so it is boxed like one. */
+
+SvActions {
+    background-color: transparent;
+    padding: 0;
+    margin: 0.8mm 0 0 0;
+}
+
+/* Call, message, share: an icon with a word under it. */
+SvAction {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius);
+    font-family: "native:MainRegular";
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.8mm 0 1.8mm 0;
+    margin: 0;
+}
+
+SvAction.pressed {
+    color: var(--brand);
+    background-color: var(--surface-alt);
+}
+
+SvActionDanger {
+    cn1-derive: SvAction;
+    color: var(--danger);
+}
+
+SvActionDanger.pressed {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+/* ------------------------------------------------------ records and charts */
+
+/* A list that fills a screen: rows from edge to edge, each with the page's
+   margin inside it. */
+SvList {
+    background-color: var(--surface);
+    padding: 0 3.6mm 3.2mm 3.6mm;
+    margin: 0;
+}
+/* One line of a receipt: what, and how much. */
+SvFact {
+    background-color: transparent;
+    padding: 1.1mm 0 1.1mm 0;
+    margin: 0;
+}
+SvFactLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+SvFactValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: right;
+    padding: 0 0 0 3mm;
+    margin: 0;
+}
+/* The line the others add up to. */
+SvFactTotal {
+    cn1-derive: SvFactValue;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+}
+/* The one thing a screen is about, said large at its top. */
+/* A note to read in the flow of a page: see Ui.callout. */
+SvCallout {
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 2.4mm;
+    margin: 2.4mm 0 1mm 0;
+}
+SvCalloutIcon {
+    color: var(--warning);
+    background-color: transparent;
+    padding: 0.3mm 2.2mm 0 0;
+    margin: 0;
+}
+SvCalloutTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+SvCalloutText {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    padding: 0.4mm 0 0 0;
+    margin: 0;
+}
+
+SvBanner {
+    background-color: transparent;
+    padding: 5mm 3mm 3mm 3mm;
+    margin: 0;
+}
+SvBannerIcon {
+    color: var(--brand);
+    background: cn1-round-border;
+    background-color: var(--brand-tint);
+    padding: 3.4mm;
+    margin: 0 0 2.4mm 0;
+}
+SvBannerIconGood {
+    cn1-derive: SvBannerIcon;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+SvBannerIconWarn {
+    cn1-derive: SvBannerIcon;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+SvBannerIconBad {
+    cn1-derive: SvBannerIcon;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+SvBannerTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    text-align: center;
+    padding: 0.4mm 0 0.4mm 0;
+    margin: 0;
+}
+SvBannerText {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 0.4mm 2mm 0.4mm 2mm;
+    margin: 0;
+}
+/* The amount a receipt is for. */
+SvAmount {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 7mm;
+    text-align: center;
+    padding: 1mm 0 0.4mm 0;
+    margin: 0;
+}
+/* A group of rows under one heading. */
+SvGroup {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 0.8mm 0;
+}
+/* A chart or a breakdown, boxed with its title. */
+SvTile {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 3mm 3mm 3mm 3mm;
+    margin: 0.8mm 0.8mm 1.6mm 0.8mm;
+}
+/* A bar chart: the colour is the bars'. */
+SvChart {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 1.6mm 0 0 0;
+    margin: 0;
+}
+SvChartPeak {
+    color: var(--brand-pressed);
+    background-color: transparent;
+}
+SvChartGrid {
+    color: var(--line);
+    background-color: transparent;
+}
+SvChartAxis {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2mm;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
+}
+/* The number a chart adds up to, over the chart. */
+SvChartValue {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 4.2mm;
+    text-align: left;
+    padding: 0;
+    margin: 0;
+}
+/* A share along a track: the colour is the share, the background the track. */
+SvMeter {
+    color: var(--brand);
+    background-color: transparent;
+    padding: 0.8mm 0 1.6mm 0;
+    margin: 0;
+}
+/* Something waiting for the admin, at the top of the dashboard. */
+SvAlert {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: left;
+    padding: 2.6mm 3mm 2.6mm 3mm;
+    margin: 0.8mm;
+}
+SvAlert.pressed {
+    background-color: var(--surface-press);
+}
+
+/* ----------------------------------------------------------------- choosing */
+
+/* One of several things to pick from, of which one is picked: a kind of car,
+   a way to pay. */
+SvOption {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 0.8mm 0 0.8mm 0;
+}
+SvOption.pressed {
+    background-color: var(--surface-alt);
+}
+SvOptionPicked {
+    cn1-derive: SvOption;
+    background-color: var(--brand-tint);
+    border: 2px solid var(--brand);
+    border-radius: var(--radius);
+}
+SvOptionIcon {
+    color: var(--text);
+    background-color: transparent;
+    padding: 0 2.4mm 0 0;
+    margin: 0;
+}
+/* A payment card, drawn as one. */
+SvCardFace {
+    background-color: var(--brand);
+    border-radius: var(--radius);
+    padding: 4mm 4mm 3.4mm 4mm;
+    margin: 1mm 0 2.4mm 0;
+}
+SvCardBrand {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: right;
+    padding: 0;
+    margin: 0;
+}
+SvCardNumber {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.7mm;
+    text-align: left;
+    padding: 4.8mm 0 2.4mm 0;
+    margin: 0;
+}
+SvCardSmall {
+    color: var(--brand-contrast);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0;
+    margin: 0;
+}
+/* Two fields side by side: the space between them is theirs. */
+SvPairLeft {
+    background-color: transparent;
+    padding: 0 1.2mm 0 0;
+    margin: 0;
+}
+SvPairRight {
+    background-color: transparent;
+    padding: 0 0 0 1.2mm;
+    margin: 0;
+}
+/* A picture of a document, small, beside what it is. */
+SvThumb {
+    color: var(--text-muted);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius-small);
+    padding: 2mm;
+    margin: 0 3mm 0 0;
+}
+/* The same picture, filling the screen. */
+SvPicture {
+    background-color: var(--scrim);
+    padding: 0;
+    margin: 0;
+}
+/* How far through the steps of a form: "Step 2 of 5". */
+SvStepLabel {
+    color: var(--brand);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    text-align: left;
+    padding: 0 0 0.4mm 0;
+    margin: 0;
+}
+/* What is fixed to the foot of a form of several steps. */
+SvFooter {
+    background-color: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 1mm 3.6mm 1.6mm 3.6mm;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- the menu */
+
+/* Dimmed by the colour's own alpha. `opacity` would not do it: a style's
+   opacity fades what a component draws over its background, and the
+   background itself is filled at the background's transparency -- so an opaque
+   black with an opacity is still a black screen. */
+SvScrim {
+    background-color: rgba(0, 0, 0, 0.45);
+    padding: 0;
+    margin: 0;
+}
+
+/* Which of the three apps this is. */
+SvModeBadge {
+    color: var(--brand);
+    background: cn1-pill-border;
+    background-color: var(--brand-tint);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    text-align: center;
+    padding: 0.8mm 2.4mm 0.8mm 2.4mm;
+    margin: 2.4mm 0 0 0;
+}
+
+/* A bar across the top of a pane. */
+SvHomeBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6mm 3.6mm 0.6mm 0;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------------- settings */
+
+SvSection {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    text-align: left;
+    padding: 5mm 0 0.8mm 0;
+    margin: 0;
+}
+
+/* A few options side by side, one of them chosen. */
+SvSegments {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 0.5mm;
+    margin: 0.8mm 0 1.6mm 0;
+}
+
+SvSegment {
+    color: var(--text-muted);
+    background-color: transparent;
+    border-radius: 1.9mm;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 2mm 1.2mm 2mm 1.2mm;
+    margin: 0.3mm;
+}
+
+/* ".selected" is the FOCUSED state in a Codename One theme, not the chosen
+   one: a chosen toggle wears ".pressed". Styled like the chosen option, the
+   focused one looked chosen too, so two options of one row seemed picked. */
+SvSegment.selected {
+    color: var(--text-muted);
+    background-color: transparent;
+}
+
+/* A toggle that is on wears the pressed style, so the two say the same. */
+SvSegment.pressed {
+    color: var(--text);
+    background-color: var(--surface);
+}
+
+SvSegment.disabled {
+    color: var(--line-strong);
+}
+
+/* The outline of rows that are on their way: the colour is the bars'. */
+SvSkeleton {
+    color: var(--surface-alt);
+    background-color: transparent;
+    padding: 1mm 0 0 0;
+    margin: 0;
+}
+
+/* "Pull to refresh", over a list being pulled. */
+PullToRefresh {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 1.6mm;
+    margin: 0;
+}
+
+/* What the app says in passing, over the foot of the screen. */
+ToastBar {
+    background-color: var(--text);
+    border-radius: var(--radius);
+    padding: 2.4mm 3mm 2.4mm 3mm;
+    margin: 2.4mm 3.6mm 3.2mm 3.6mm;
+}
+
+ToastBarMessage {
+    color: var(--surface);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.5mm;
+    padding: 0;
+    margin: 0;
+}
+
+/* ------------------------------------------------- the admin console, wide */
+
+/* On a tablet on its side, a desktop or a browser the console is three
+   columns: where to go, a list, and what was picked from it. */
+SvSide {
+    background-color: var(--surface-alt);
+    border-right: 1px solid var(--line);
+    padding: 2.4mm 1.6mm 2.4mm 1.6mm;
+    margin: 0;
+}
+
+SvSideName {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.05mm;
+    padding: 0.8mm 2.4mm 0 2.4mm;
+    margin: 0;
+}
+
+SvSideDetail {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 0 2.4mm 2.4mm 2.4mm;
+    margin: 0;
+}
+
+SvSideLabel {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.15mm;
+    padding: 3.2mm 2.4mm 0.8mm 2.4mm;
+    margin: 0;
+}
+
+SvSideItem {
+    color: var(--text);
+    background-color: transparent;
+    border-radius: var(--radius-small);
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    text-align: left;
+    padding: 1.9mm 2.4mm 1.9mm 2.4mm;
+    margin: 0.2mm 0 0.2mm 0;
+}
+
+SvSideItem.pressed {
+    background-color: var(--line);
+}
+
+SvSidePicked {
+    cn1-derive: SvSideItem;
+    color: var(--brand);
+    background-color: var(--brand-tint);
+    font-family: "native:MainBold";
+}
+
+SvMaster {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+SvPaneBar {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 1.2mm 4mm 1.2mm 4mm;
+    margin: 0;
+}
+
+SvPaneTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.5mm;
+    padding: 1.6mm 0 1.6mm 0;
+    margin: 0;
+}
+
+/* The row of a list whose detail is open beside it. */
+SvRowPicked {
+    cn1-derive: SvRow;
+    background-color: var(--surface-alt);
+}
+
+/*
+ * THE DESKTOP'S OWN LOOK. On macOS, Windows and Linux, and in a desktop
+ * browser, the platform's theme is under this one (the nativeTheme=native build
+ * hint), and the admin console wears it: Layouts.dress() gives each component
+ * the SvDesk twin of its style. A twin derives from the platform's control
+ * where there is one -- a button, a field, a segmented control, a group box --
+ * and takes its colours from the palette every desktop theme declares, so the
+ * same rules are Aqua on a Mac, Fluent on Windows and Adwaita on Linux. Nothing
+ * here names the brand; the accent is the platform's.
+ *
+ * The values in SvDeskPalette are only what the compiler needs to resolve
+ * var(): each use is bound to the name, and the installed theme's own value
+ * replaces it when the app runs. They are declared outside #Constants so that
+ * they are not exported over the theme's.
+ */
+SvDeskPalette {
+    --window-bg-color: #ececec;
+    --window-bg-color-dark: #1e1e1e;
+    --view-bg-color: #ffffff;
+    --view-bg-color-dark: #1e1e1e;
+    --control-bg-color: #ffffff;
+    --control-bg-color-dark: #2c2c2c;
+    --headerbar-bg-color: #e8e8e8;
+    --headerbar-bg-color-dark: #2a2a2a;
+    --text-color: #1a1a1a;
+    --text-color-dark: #ffffff;
+    --text-secondary-color: #5d5d5d;
+    --text-secondary-color-dark: #c0c0c0;
+    --separator-color: #d8d8d8;
+    --separator-color-dark: #3a3a3a;
+    --accent-color: #007aff;
+    --accent-color-dark: #0a84ff;
+    --accent-fg-color: #ffffff;
+    --accent-fg-color-dark: #ffffff;
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+SvDeskForm { background-color: var(--window-bg-color); padding: 0; margin: 0; }
+SvDeskPage { background-color: var(--window-bg-color); padding: 3mm 5mm 4mm 5mm; margin: 0; }
+SvDeskList { background-color: var(--view-bg-color); padding: 0 3mm 2mm 3mm; margin: 0; }
+SvDeskMaster { background-color: var(--view-bg-color); border-right: 1px solid #c6c6c8; padding: 0; margin: 0; }
+SvDeskHomeBar { background-color: var(--headerbar-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 4mm 1mm 0; margin: 0; }
+SvDeskPaneBar { background-color: var(--window-bg-color); border-bottom: 1px solid #c6c6c8; padding: 1mm 5mm 1mm 5mm; margin: 0; }
+SvDeskPaneTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+SvDeskBarButton { cn1-derive: Button; padding: 1.2mm; margin: 0 2mm 0 0; }
+
+SvDeskSide { background-color: var(--headerbar-bg-color); border-right: 1px solid #c6c6c8; padding: 2.5mm 2mm 2.5mm 2mm; margin: 0; }
+SvDeskSideName { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; padding: 1mm 2.6mm 0 2.6mm; margin: 0; }
+SvDeskSideDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.25mm; padding: 0 2.6mm 2mm 2.6mm; margin: 0; }
+SvDeskSideLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.15mm; padding: 3mm 2.6mm 1mm 2.6mm; margin: 0; }
+SvDeskSideItem { color: var(--text-color); background-color: transparent; border-radius: 1.4mm; font-family: "native:MainRegular"; font-size: 2.65mm; text-align: left; padding: 1.6mm 2.6mm 1.6mm 2.6mm; margin: 0.2mm 0 0.2mm 0; }
+SvDeskSideItem.pressed { background-color: var(--separator-color); }
+SvDeskSidePicked { cn1-derive: SvDeskSideItem; color: var(--accent-fg-color); background-color: var(--accent-color); }
+
+SvDeskPrimary { cn1-derive: RaisedButton; text-align: center; margin: 2mm 0 1mm 0; }
+SvDeskSecondary { cn1-derive: Button; text-align: center; margin: 1.5mm 0 1mm 0; }
+SvDeskDanger { cn1-derive: Button; color: var(--danger); text-align: center; margin: 1.5mm 0 1mm 0; }
+SvDeskLink { cn1-derive: Link; padding: 1.6mm 0 1.6mm 0; }
+SvDeskField { cn1-derive: TextField; margin: 0; }
+SvDeskFieldHint { cn1-derive: TextHint; }
+SvDeskSegments { cn1-derive: TabsContainer; border-radius: 1.6mm; padding: 0.4mm; margin: 1mm 0 2mm 0; }
+/* Four of these share the master pane of the console, which is narrow: the
+   platform's own tab padding leaves "Cancelled" no room and it was drawn cut
+   off at both ends. */
+SvDeskSegment { cn1-derive: Tab; text-align: center; padding: 1.4mm 0.4mm 1.4mm 0.4mm; margin: 0; }
+/* Something waiting is the one thing on the console that is not the
+   platform's grey: it wears the warning tint the phone's does. */
+SvDeskAlert { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+SvDeskAlert.pressed { color: var(--warning); background-color: var(--warning-tint); border-radius: 1.6mm; font-family: "native:MainBold"; font-size: 2.6mm; text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 1mm 0 1mm 0; }
+
+SvDeskRow { background-color: transparent; border-bottom: 1px solid #d8d8d8; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+SvDeskRow.pressed { background-color: var(--separator-color); }
+SvDeskRowPicked { background-color: var(--separator-color); border-bottom: 1px solid #d8d8d8; border-radius: 1.4mm; padding: 2mm 1mm 2mm 1mm; margin: 0; }
+SvDeskRowIcon { color: var(--text-secondary-color); background-color: transparent; padding: 0 2.6mm 0 0; margin: 0; }
+SvDeskRowTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.7mm; padding: 0; margin: 0; }
+SvDeskRowDetail { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; }
+SvDeskRowValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.65mm; text-align: right; padding: 0; margin: 0; }
+
+SvDeskSection { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.8mm; text-align: left; padding: 4mm 0 1.2mm 0; margin: 0; }
+SvDeskTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0 0 2mm 0; margin: 0; }
+SvDeskHeading { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0; margin: 0; }
+SvDeskText { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.65mm; padding: 1mm 0 1mm 0; margin: 0; }
+SvDeskMuted { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0.5mm 0 0.5mm 0; margin: 0; }
+SvDeskLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 2.4mm 0 0.8mm 0; margin: 0; }
+SvDeskError { color: var(--danger); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; }
+SvDeskNotice { cn1-derive: GroupBox; color: var(--text-color); font-family: "native:MainRegular"; font-size: 2.55mm; padding: 2.4mm; margin: 2mm 0 1mm 0; }
+SvDeskPanel { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1mm 0 1mm 0; }
+SvDeskFact { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+SvDeskFactLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; padding: 0; margin: 0; }
+SvDeskFactValue { color: var(--text-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.55mm; text-align: right; padding: 0; margin: 0; }
+SvDeskFactTotal { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 2.7mm; text-align: right; padding: 0; margin: 0; }
+SvDeskAmount { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 6.4mm; text-align: center; padding: 2mm 0 1mm 0; margin: 0; }
+SvDeskBannerIcon { color: var(--text-secondary-color); background-color: transparent; padding: 6mm 0 2mm 0; margin: 0; }
+SvDeskBannerTitle { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 3.05mm; text-align: center; padding: 0; margin: 0; }
+SvDeskBannerText { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1mm 0 0 0; margin: 0; }
+
+/* The numbers and the charts have no control on any desktop: they keep their
+   shape, in a group box, in the platform's colours. */
+SvDeskTile { cn1-derive: GroupBox; padding: 3mm 3.4mm 3mm 3.4mm; margin: 1.2mm; }
+SvDeskStat { cn1-derive: GroupBox; padding: 2.6mm 3mm 2.6mm 3mm; margin: 1.2mm; }
+SvDeskStatValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0; margin: 0; }
+SvDeskStatLabel { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+SvDeskChartValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0.6mm 0 0 0; margin: 0; }
+SvDeskChartAxis { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+
+/* COMMERCE -- the storefront and the back office: product cards with a
+   photo on top, quantities, the tab bar of a phone. */
+SvProductCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0 0 2mm 0; margin: 1mm; }
+SvProductCard.pressed { background-color: var(--surface-alt); }
+SvProductPhoto { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 0 1.6mm 0; }
+SvProductName { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0 2mm 0 2mm; margin: 0; background-color: transparent; }
+SvProductPrice { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; padding: 0.6mm 2mm 0 2mm; margin: 0; background-color: transparent; }
+SvMutedSmall { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0.3mm 0; margin: 0; background-color: transparent; }
+SvMetaLine { color: var(--text); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0 0; margin: 0; background-color: transparent; }
+SvOrderRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
+SvOrderRow.pressed { background-color: var(--surface-alt); }
+SvCartLine { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
+SvStepper { background: cn1-pill-border; background-color: var(--surface-alt); padding: 0 1mm 0 1mm; margin: 1.6mm 2mm 0.8mm 0; }
+SvQuantity { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2mm 1.6mm 2mm 1.6mm; margin: 0; background-color: transparent; }
+SvSearchField { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 0.4mm 3mm 0.4mm 2.6mm; margin: 0; }
+SvSearchIcon { color: var(--text-muted); background-color: transparent; padding: 0 1.4mm 0 0; margin: 0; }
+SvSearchInput { color: var(--text); background-color: transparent; border: none; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+SvSearchHint { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+SvTabBar { background-color: var(--surface); border-top: 1px solid var(--line); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+SvTab { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
+SvTab.pressed { color: var(--text); }
+SvTabSelected { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
+SvSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
+SvSteps { padding: 2mm 0 1mm 0; margin: 0; background-color: transparent; }
+SvStep { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
+SvStepDone { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
+SvStepBar { background-color: var(--line); border-radius: 0.5mm; padding: 0; margin: 0 0 1.2mm 0; }
+SvStepBarDone { background-color: var(--brand); border-radius: 0.5mm; padding: 0; margin: 0 0 1.2mm 0; }
+SvStepText { color: var(--text); font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
+SvStepTextTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
+SvDiscount { color: var(--success); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
+
+/* ---- The shopper's storefront (common/.../shop). Colours from the tokens
+   above; the store header alone takes the merchant's accent, set in code. */
+ShopHeaderButton { color: var(--on-scrim); background: cn1-pill-border; background-color: var(--scrim-soft); padding: 1.2mm; margin: 2mm; }
+ShopHeaderButton.pressed { background: cn1-pill-border; background-color: var(--brand-pressed); }
+ShopHero { background-color: var(--surface-alt); padding: 0; margin: 0 0 2mm 0; }
+ShopHeroArt { background-color: transparent; padding: 0; margin: 0; }
+ShopHeroShade { background-color: var(--scrim-soft); padding: 0; margin: 0; }
+ShopHeroWords { background-color: transparent; padding: 3mm 3.6mm 3mm 3.6mm; margin: 0; }
+ShopHeroTitle { color: var(--on-scrim); font-family: "native:MainBold"; font-size: 5.2mm; padding: 0; margin: 0; background-color: transparent; }
+ShopHeroText { color: var(--on-scrim); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0.6mm 0 1.6mm 0; margin: 0; background-color: transparent; }
+ShopSectionTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 3mm 3mm 1.2mm 3mm; margin: 0; background-color: transparent; }
+ShopCarousel { background-color: transparent; padding: 1.2mm 1.6mm 1.2mm 1.6mm; margin: 0; }
+ShopCollection { background-color: var(--surface-alt); border-radius: var(--radius); padding: 0; margin: 0 1.2mm 0 1.2mm; }
+ShopCollection.pressed { background-color: var(--surface-press); }
+ShopCollectionArt { background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0; }
+ShopCollectionWords { background-color: var(--scrim-soft); padding: 1mm 2mm 1.2mm 2mm; margin: 0; }
+ShopCollectionTitle { color: var(--on-scrim); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopCollectionCount { color: var(--on-scrim); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0; margin: 0; background-color: transparent; }
+ShopScroller { background-color: var(--surface); padding: 0; margin: 0; }
+ShopGrid { background-color: transparent; padding: 0 1.6mm 2mm 1.6mm; margin: 0; }
+SvProductCard.selected { border: 1px solid var(--brand); }
+ShopVendor { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.2mm 2mm 0 2mm; margin: 0; background-color: transparent; }
+ShopPriceRow { background-color: transparent; padding: 0; margin: 0; }
+ShopCompareAt { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; text-decoration: line-through; padding: 0 1mm 0 1.4mm; margin: 0; background-color: transparent; }
+ShopPriceBig { color: var(--text); font-family: "native:MainBold"; font-size: 5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
+ShopRibbon { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--text-muted); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.6mm 2mm 0.6mm 2mm; margin: 1.4mm; }
+ShopSale { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--danger); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.6mm 2mm 0.6mm 2mm; margin: 1.4mm; }
+ShopBadge { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--danger); font-family: "native:MainBold"; font-size: 1.8mm; padding: 0.3mm 1mm 0.3mm 1mm; margin: 0; }
+ShopStars { background-color: transparent; padding: 0.4mm 2mm 0 2mm; margin: 0; }
+/* Stars on a page share its text edge; only a card insets them. */
+ShopStarsFlush { background-color: transparent; padding: 0.4mm 0 0 0; margin: 0; }
+ShopProductVendor { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.2mm 0 0 0; margin: 0; background-color: transparent; }
+ShopStar { color: var(--warning); background-color: transparent; padding: 0; margin: 0; }
+ShopPlaceholderArt { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 0 1.6mm 0; }
+ShopPlaceholderLine { background-color: var(--surface-alt); border-radius: 0.6mm; font-size: 2mm; padding: 0; margin: 0.6mm 2mm 0.6mm 2mm; }
+ShopPlaceholderLineShort { background-color: var(--surface-alt); border-radius: 0.6mm; font-size: 2mm; padding: 0; margin: 0.6mm 12mm 0.6mm 2mm; }
+ShopStoreRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.4mm 0 2.4mm 0; margin: 0; }
+ShopStoreRow.pressed { background-color: var(--surface-alt); }
+ShopStoreLogo { background-color: transparent; border-radius: var(--radius); padding: 0 2.4mm 0 0; margin: 0; }
+ShopSearchBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2mm 3mm 2mm 3mm; margin: 0; }
+ShopSuggestion { color: var(--text); background-color: var(--surface); border-bottom: 1px solid var(--line); text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 0; }
+ShopSuggestion.pressed { background-color: var(--surface-press); }
+ShopToolButton { color: var(--text); background-color: transparent; padding: 1.6mm; margin: 0 0 0 1mm; }
+ShopToolButton.pressed { background: cn1-pill-border; background-color: var(--surface-press); }
+ShopFilterOn { background-color: var(--brand-tint); padding: 1mm 3mm 1mm 3mm; margin: 0; }
+ShopFilterSide { background-color: var(--surface-alt); border-right: 1px solid var(--line); padding: 0; margin: 0; }
+ShopFilters { background-color: transparent; padding: 3mm; margin: 0; }
+ShopFilterTitle { color: var(--text-muted); font-family: "native:MainBold"; font-size: 2.3mm; padding: 2.4mm 0 0.8mm 0; margin: 0; background-color: transparent; }
+ShopChips { background-color: transparent; padding: 0; margin: 0; }
+/* An option chip. ONE shape in every state: a rounded border with a 1px
+   outline and the same font size, padding and margin, so nothing moves or
+   changes shape when pressed, focused (a browser focuses what was clicked:
+   that is the .selected style) or picked. Unpicked is outlined, picked is
+   filled with the accent, a value with no variant left is greyed and struck.
+   The shape is a border-radius, not cn1-pill-border: a pill image with an
+   outline on top drew square in the states that did not repeat it. */
+ShopChip, ShopChip.selected { color: var(--text); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChip.pressed { color: var(--text); background-color: var(--surface-press); border: 1px solid var(--brand); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChip.disabled { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOn, ShopChipOn.selected { color: var(--brand-contrast); background-color: var(--brand); border: 1px solid var(--brand); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOn.pressed { color: var(--brand-contrast); background-color: var(--brand-pressed); border: 1px solid var(--brand-pressed); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOut, ShopChipOut.selected, ShopChipOut.disabled { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOut.pressed { color: var(--text); background-color: var(--surface-press); border: 1px solid var(--line-strong); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopStock { color: var(--success); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
+ShopStockLow { color: var(--warning); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
+ShopStockOut { color: var(--danger); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
+ShopIconButton { color: var(--text); background-color: transparent; padding: 1.6mm; margin: 0; }
+ShopIconButton.pressed { background: cn1-pill-border; background-color: var(--surface-press); }
+/* The quantity: "Quantity" on the left, centred on the stepper's height, and
+   an outlined box holding - value + whose buttons are square, transparent in
+   every state but pressed. */
+ShopQtyRow { background-color: transparent; padding: 1.6mm 0 0.8mm 0; margin: 0; }
+ShopQtyLabel { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0 3mm 0 0; margin: 0; background-color: transparent; }
+ShopStepper { background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0; margin: 0; }
+ShopStepButton, ShopStepButton.selected { color: var(--text); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+ShopStepButton.pressed { color: var(--brand); background-color: var(--surface-press); text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+ShopStepButton.disabled { color: var(--line-strong); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+ShopStepValue { color: var(--text); background-color: transparent; border-left: 1px solid var(--line); border-right: 1px solid var(--line); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+ShopGallery { background-color: var(--surface-alt); padding: 0; margin: 0; }
+ShopGalleryImage { background-color: transparent; padding: 0; margin: 0; }
+ShopDots { background-color: transparent; padding: 0 0 1mm 0; margin: 0; }
+/* A dot is a button: its padding is the place to tap, the round fill in the
+   middle (cn1-pill-border over the padding) the dot. */
+ShopDot, ShopDot.selected, ShopDot.pressed { background: cn1-pill-border; background-color: var(--line-strong); padding: 0.9mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+ShopDotOn, ShopDotOn.selected, ShopDotOn.pressed { background: cn1-pill-border; background-color: var(--brand); padding: 0.9mm 2mm 0.9mm 2mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+ShopGalleryArrow, ShopGalleryArrow.selected { color: var(--text); background: cn1-pill-border; background-color: var(--surface); padding: 1.4mm; margin: 0 2mm 0 2mm; }
+ShopGalleryArrow.pressed { color: var(--brand); background: cn1-pill-border; background-color: var(--surface-press); padding: 1.4mm; margin: 0 2mm 0 2mm; }
+/* Discover, the follow button, the sign-in prompt and the parcel timeline. */
+ShopDiscoverHead { background-color: var(--brand-tint); padding: 4mm 3.6mm 3.6mm 3.6mm; margin: 0 0 1mm 0; }
+ShopDiscoverHeadWide { background-color: var(--brand-tint); border-radius: var(--radius); padding: 4mm 3.6mm 3.6mm 3.6mm; margin: 2.4mm 1.6mm 1mm 1.6mm; }
+ShopDiscoverTitle { color: var(--text); font-family: "native:MainBold"; font-size: 7mm; padding: 0; margin: 0; background-color: transparent; }
+ShopDiscoverText { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 1mm 0 2.4mm 0; margin: 0; background-color: transparent; }
+ShopSearchPill { color: var(--text-muted); background: cn1-pill-border; background-color: var(--surface); border: 1px solid var(--line-strong); font-family: "native:MainRegular"; font-size: 2.9mm; text-align: left; padding: 2.4mm 3.6mm 2.4mm 3.6mm; margin: 0; }
+ShopSearchPill.pressed { background-color: var(--surface-press); }
+ShopSectionHead { background-color: transparent; padding: 0; margin: 0; }
+ShopColumnStart { background-color: transparent; padding: 0 3mm 0 0; margin: 0; }
+ShopColumnEnd { background-color: transparent; padding: 0 0 0 3mm; margin: 0; }
+ShopStoreCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0 0 2mm 0; margin: 0 1.2mm 0 1.2mm; }
+ShopStoreCard.pressed { background-color: var(--surface-alt); }
+ShopStoreCardArt { background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0; }
+ShopStoreCardLogo { background-color: var(--surface); border-radius: var(--radius-small); padding: 0.4mm; margin: 0 0 1.6mm 2mm; }
+ShopStoreCardWords { background-color: transparent; padding: 1.6mm 2.4mm 1.2mm 2.4mm; margin: 0; }
+ShopStoreCardName { color: var(--text); font-family: "native:MainBold"; font-size: 3mm; padding: 0; margin: 0; background-color: transparent; }
+ShopStoreCardTag { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
+ShopFollow { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 2.4mm 0 2.4mm; }
+ShopFollow.pressed { background-color: var(--brand-pressed); }
+ShopFollowing { color: var(--brand); background: cn1-pill-border; background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 2.4mm 0 2.4mm; }
+ShopFollowing.pressed { background-color: var(--surface-press); }
+/* Beside the hero's "Shop all" (SvPrimary): its font, padding and margin, so both are one height. */
+ShopHeroFollow { color: var(--brand); background-color: var(--surface); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2.75mm 4mm 2.75mm 4mm; margin: 1.6mm 0 0.8mm 2mm; }
+ShopHeroFollow.pressed { background-color: var(--surface-press); }
+ShopHeroFollowing { color: var(--brand-contrast); background-color: var(--brand); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2.75mm 4mm 2.75mm 4mm; margin: 1.6mm 0 0.8mm 2mm; }
+ShopHeroFollowing.pressed { background-color: var(--brand-pressed); }
+ShopGate { background-color: transparent; text-align: center; padding: 8mm 2mm 4mm 2mm; margin: 0; }
+ShopGateIcon { color: var(--brand); background-color: transparent; text-align: center; padding: 0; margin: 0 0 2mm 0; }
+ShopGateTitle { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
+ShopGateText { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; text-align: center; padding: 1.6mm 2mm 4mm 2mm; margin: 0; background-color: transparent; }
+ShopParcel { background-color: var(--surface-alt); border-radius: var(--radius); padding: 1.6mm 2.4mm 2mm 2.4mm; margin: 0 0 2mm 0; }
+ShopScan { background-color: transparent; padding: 0; margin: 0; }
+ShopScanRail { background-color: transparent; padding: 0 2.4mm 0 1.6mm; margin: 0; }
+ShopScanDot { background: cn1-pill-border; background-color: var(--line-strong); padding: 0.9mm; margin: 1mm 0 0 0; }
+ShopScanDotNow { background: cn1-pill-border; background-color: var(--brand); padding: 1.1mm; margin: 0.8mm 0 0 0; }
+ShopScanLine { background-color: var(--line-strong); padding: 0 0.15mm 0 0.15mm; margin: 0.4mm 0 0 0.75mm; }
+ShopScanLineEnd { background-color: transparent; padding: 0; margin: 0; }
+ShopScanTitle { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopScanTitleNow { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopScanDetail { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 2mm 0; margin: 0; background-color: transparent; }
+ShopProductSplit { background-color: transparent; padding: 0; margin: 0; }
+ShopProductInfo { background-color: transparent; padding: 2mm 0 0 0; margin: 0; }
+ShopProductInfoSide { background-color: transparent; padding: 0 0 0 4mm; margin: 0; }
+ShopThumb { background-color: transparent; border-radius: var(--radius-small); padding: 0 2.4mm 0 0; margin: 0; }
+ShopSummary { background-color: var(--surface-alt); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
+ShopCodeRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
+ShopCheck { color: var(--brand); background-color: transparent; padding: 0; margin: 0 0 0 2mm; }
+ShopPlacedIcon { color: var(--success); background-color: transparent; padding: 6mm 0 2mm 0; margin: 0; }
+ShopOrderNumber { color: var(--text-muted); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0 0 2mm 0; margin: 0; background-color: transparent; }
+ShopCentered { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; text-align: center; padding: 0 0 3mm 0; margin: 0; background-color: transparent; }
+
+/*
+ * DARK MODE. The same rules, with the second value of each colour. A rule added
+ * above that names a colour needs its line here.
+ */
+/* ---- Merchant app ---- */
+MeRoot { background-color: var(--surface-alt); padding: 0; margin: 0; }
+MeBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
+MeTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 1mm; margin: 0; }
+MeTool { color: var(--text-muted); background-color: transparent; padding: 1.4mm; margin: 0 0.6mm 0 0.6mm; border-radius: var(--radius-small); }
+MeTool.pressed { background-color: var(--surface-press); }
+MeStore { color: var(--brand); background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.8mm; padding: 1.2mm 2.4mm 1.2mm 2.4mm; margin: 0 1.6mm 0 0; border-radius: var(--radius-small); }
+MeStore.pressed { background-color: var(--surface-press); }
+MePage { background-color: var(--surface-alt); padding: 2.4mm 3mm 3mm 3mm; margin: 0; }
+MeCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0 0 2.4mm 0; }
+MeSide { background-color: transparent; padding: 0 0 0 2.4mm; margin: 0; }
+/* Rows sit inside SvList, which already gives the page margin; a second
+   inset here pushed every thumbnail 3mm in from the heading above it. */
+MeListRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.4mm 0 2.4mm 0; margin: 0; }
+MeListRow.pressed { background-color: var(--surface-press); }
+MeRuleRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
+MeTiles { background-color: transparent; padding: 0; margin: 0 0 2.4mm 0; }
+MeTile { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0 1.2mm 1.2mm 0; }
+MeTileCaption { color: var(--text-muted); background-color: transparent; font-size: 2.6mm; padding: 0; margin: 0; }
+MeTileValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 5mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
+MeSpark { color: var(--brand); background-color: transparent; padding: 0; margin: 0.6mm 0 0 0; }
+MeFilters { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
+MeBulk { background-color: var(--brand-tint); padding: 1.2mm 3mm 1.2mm 3mm; margin: 0; }
+MeBulkText { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; padding: 1.4mm 2mm 1.4mm 0; margin: 0; }
+MeButtons { background-color: var(--surface); border-top: 1px solid var(--line); padding: 1.6mm 3.6mm 1.6mm 3.6mm; margin: 0; }
+MeTimelineRow { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+MeTimelineDot { color: var(--brand); background-color: transparent; padding: 0 1.6mm 0 0; margin: 0; }
+MeThumb { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 2mm 0 0; }
+MeGallery { background-color: transparent; padding: 0; margin: 0 0 1.6mm 0; }
+MeDrop { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 3mm; margin: 1.6mm 0 0 0; text-align: center; }
+MeLowStock { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; padding: 0; margin: 0; }
+MeSwatch { background-color: var(--brand); border: 1px solid var(--line-strong); border-radius: var(--radius-small); padding: 2.4mm; margin: 0 1.2mm 1.2mm 0; }
+MeAccentPreview { background-color: var(--brand); border-radius: var(--radius); padding: 3mm; margin: 1.6mm 0 1.6mm 0; }
+MeAccentName { color: var(--brand-contrast); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+MeAccentTagline { color: var(--brand-contrast); background-color: transparent; font-size: 2.8mm; padding: 0.6mm 0 0 0; margin: 0; }
+
+
+@media (prefers-color-scheme: dark) {
+    SvProductCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    SvProductCard.pressed { background-color: var(--surface-alt-dark); }
+    SvProductPhoto { background-color: var(--surface-alt-dark); }
+    SvProductName { color: var(--text-dark); }
+    SvProductPrice { color: var(--text-dark); }
+    SvForm { background-color: var(--surface-dark); }
+    SvPage { background-color: var(--surface-dark); }
+    SvHero { background-color: var(--brand-dark); }
+    SvHeroTitle { color: var(--brand-contrast-dark); }
+    SvHeroText { color: var(--brand-contrast-dark); }
+    SvHeroIcon { color: var(--brand-contrast-dark); }
+    SvCard { background-color: var(--surface-dark); }
+    SvFloat { background-color: var(--surface-dark); }
+    SvPanel { background-color: var(--surface-alt-dark); }
+    SvDivider { background-color: var(--line-dark); }
+    SvTitle { color: var(--text-dark); }
+    SvHeading { color: var(--text-dark); }
+    SvText { color: var(--text-dark); }
+    SvMuted { color: var(--text-muted-dark); }
+    SvLabel { color: var(--text-muted-dark); }
+    SvPrice { color: var(--text-dark); }
+    SvError { color: var(--danger-dark); }
+    SvNotice { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    SvPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
+    SvPairStart, SvPairEnd { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvPairStart.pressed, SvPairEnd.pressed { background-color: var(--surface-press-dark); }
+    SvFieldButton { color: var(--brand-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvFieldButton.pressed { background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvFieldButton.disabled { color: var(--line-strong-dark); }
+    SvDanger { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvDanger.pressed { background-color: var(--surface-press-dark); }
+    SvLink { color: var(--brand-dark); }
+    SvLink.pressed { color: var(--brand-pressed-dark); background-color: var(--brand-tint-dark); }
+    SvMapButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    SvMapButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    SvBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
+    SvBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
+    SvField { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvFieldHint { color: var(--text-muted-dark); }
+    SvRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvRow.pressed { background-color: var(--surface-alt-dark); }
+    SvRowIcon { color: var(--text-muted-dark); }
+    SvRowTitle { color: var(--text-dark); }
+    SvRowDetail { color: var(--text-muted-dark); }
+    SvRowValue { color: var(--text-dark); }
+    SvBadge { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvBadgeGood { background: cn1-pill-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    SvBadgeWarn { background: cn1-pill-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvBadgeBad { background: cn1-pill-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvStat { background-color: var(--surface-alt-dark); }
+    SvStatValue { color: var(--text-dark); }
+    SvStatLabel { color: var(--text-muted-dark); }
+    StatusBar { background-color: var(--surface-dark); }
+    Toolbar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    Title { color: var(--text-dark); }
+    TitleCommand { color: var(--text-dark); }
+    BackCommand { color: var(--text-dark); }
+    CommandList { background-color: var(--surface-alt-dark); }
+    Command { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    CommandFocus { color: var(--text-dark); background-color: var(--brand-tint-dark); }
+    SvChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSheet { background-color: var(--surface-dark); }
+    SvGrip { color: var(--line-strong-dark); }
+    SvAvatar { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvAction { color: var(--text-dark); }
+    SvAction.pressed { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    SvActionDanger { color: var(--danger-dark); }
+    SvActionDanger.pressed { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvModeBadge { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvHomeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvSection { color: var(--text-dark); }
+    SvSegments { background-color: var(--surface-alt-dark); }
+    SvSegment { color: var(--text-muted-dark); }
+    SvSegment.selected { color: var(--text-muted-dark); background-color: transparent; }
+    SvSegment.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); }
+    SvList { background-color: var(--surface-dark); }
+    SvFactLabel { color: var(--text-muted-dark); }
+    SvFactValue { color: var(--text-dark); }
+    SvFactTotal { color: var(--text-dark); }
+    SvCallout { background-color: var(--warning-tint-dark); }
+    SvCalloutIcon { color: var(--warning-dark); }
+    SvCalloutTitle { color: var(--text-dark); }
+    SvCalloutText { color: var(--text-dark); }
+    SvBannerIcon { background: cn1-round-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvBannerIconGood { background: cn1-round-border; color: var(--success-dark); background-color: var(--success-tint-dark); }
+    SvBannerIconWarn { background: cn1-round-border; color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvBannerIconBad { background: cn1-round-border; color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    SvBannerTitle { color: var(--text-dark); }
+    SvBannerText { color: var(--text-muted-dark); }
+    SvAmount { color: var(--text-dark); }
+    SvTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    SvChart { color: var(--brand-dark); }
+    SvChartPeak { color: var(--brand-pressed-dark); }
+    SvChartGrid { color: var(--line-dark); }
+    SvChartAxis { color: var(--text-muted-dark); }
+    SvChartValue { color: var(--text-dark); }
+    SvMeter { color: var(--brand-dark); }
+    SvAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvAlert.pressed { background-color: var(--surface-press-dark); }
+    SvOption { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    SvOption.pressed { background-color: var(--surface-alt-dark); }
+    SvOptionPicked { background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); border-radius: var(--radius); }
+    SvOptionIcon { color: var(--text-dark); }
+    SvCardFace { background-color: var(--brand-dark); }
+    SvCardBrand { color: var(--brand-contrast-dark); }
+    SvCardNumber { color: var(--brand-contrast-dark); }
+    SvCardSmall { color: var(--brand-contrast-dark); }
+    SvThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    SvStepLabel { color: var(--brand-dark); }
+    SvFooter { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    SvSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    SvSideName { color: var(--text-dark); }
+    SvSideDetail { color: var(--text-muted-dark); }
+    SvSideLabel { color: var(--text-muted-dark); }
+    SvSideItem { color: var(--text-dark); }
+    SvSideItem.pressed { background-color: var(--line-dark); }
+    SvSidePicked { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvMaster { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    SvPaneBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvPaneTitle { color: var(--text-dark); }
+    SvRowPicked { background-color: var(--surface-alt-dark); }
+    SvSecondary.disabled, SvDanger.disabled, SvLink.disabled { color: var(--line-strong-dark); }
+    SvField.selected { background-color: var(--surface-alt-dark); border: 1px solid var(--brand-dark); border-radius: var(--radius); }
+    SvField.disabled { color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    Switch { color: #ffffff; background-color: var(--line-strong-dark); }
+    Switch.selected { color: #ffffff; background-color: var(--brand-dark); }
+    Switch.disabled { color: var(--text-muted-dark); background-color: var(--line-dark); }
+    SvSegment.disabled { color: var(--line-strong-dark); }
+    SvSkeleton { color: var(--surface-alt-dark); }
+    PullToRefresh { color: var(--text-muted-dark); }
+    ToastBar { background-color: var(--text-dark); }
+    ToastBarMessage { color: var(--surface-dark); }
+    SvDeskForm { background-color: var(--window-bg-color-dark); }
+    SvDeskPage { background-color: var(--window-bg-color-dark); }
+    SvDeskList { background-color: var(--view-bg-color-dark); }
+    SvDeskMaster { background-color: var(--view-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    SvDeskHomeBar { background-color: var(--headerbar-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    SvDeskPaneBar { background-color: var(--window-bg-color-dark); border-bottom: 1px solid #3a3a3a; }
+    SvDeskPaneTitle { color: var(--text-color-dark); }
+    SvDeskSide { background-color: var(--headerbar-bg-color-dark); border-right: 1px solid #3a3a3a; }
+    SvDeskSideName { color: var(--text-color-dark); }
+    SvDeskSideDetail { color: var(--text-secondary-color-dark); }
+    SvDeskSideLabel { color: var(--text-secondary-color-dark); }
+    SvDeskSideItem { color: var(--text-color-dark); }
+    SvDeskSideItem.pressed { background-color: var(--separator-color-dark); }
+    SvDeskSidePicked { color: var(--accent-fg-color-dark); background-color: var(--accent-color-dark); }
+    SvDeskDanger { color: var(--danger-dark); }
+    SvDeskRow { border-bottom: 1px solid #3a3a3a; }
+    SvDeskRow.pressed { background-color: var(--separator-color-dark); }
+    SvDeskRowPicked { background-color: var(--separator-color-dark); border-bottom: 1px solid #3a3a3a; }
+    SvDeskAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvDeskAlert.pressed { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    SvDeskRowIcon { color: var(--text-secondary-color-dark); }
+    SvDeskRowTitle { color: var(--text-color-dark); }
+    SvDeskRowDetail { color: var(--text-secondary-color-dark); }
+    SvDeskRowValue { color: var(--text-color-dark); }
+    SvDeskSection { color: var(--text-color-dark); }
+    SvDeskTitle { color: var(--text-color-dark); }
+    SvDeskHeading { color: var(--text-color-dark); }
+    SvDeskText { color: var(--text-color-dark); }
+    SvDeskMuted { color: var(--text-secondary-color-dark); }
+    SvDeskLabel { color: var(--text-secondary-color-dark); }
+    SvDeskError { color: var(--danger-dark); }
+    SvDeskNotice { color: var(--text-color-dark); }
+    SvDeskFactLabel { color: var(--text-secondary-color-dark); }
+    SvDeskFactValue { color: var(--text-color-dark); }
+    SvDeskFactTotal { color: var(--text-color-dark); }
+    SvDeskAmount { color: var(--text-color-dark); }
+    SvDeskBannerIcon { color: var(--text-secondary-color-dark); }
+    SvDeskBannerTitle { color: var(--text-color-dark); }
+    SvDeskBannerText { color: var(--text-secondary-color-dark); }
+    SvDeskStatValue { color: var(--text-color-dark); }
+    SvDeskStatLabel { color: var(--text-secondary-color-dark); }
+    SvDeskChartValue { color: var(--text-color-dark); }
+    SvDeskChartAxis { color: var(--text-secondary-color-dark); }
+    SvMutedSmall { color: var(--text-muted-dark); }
+    SvMetaLine { color: var(--text-dark); }
+    SvOrderRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvOrderRow.pressed { background-color: var(--surface-alt-dark); }
+    SvCartLine { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    SvStepper { background: cn1-pill-border; background-color: var(--surface-alt-dark); }
+    SvQuantity { color: var(--text-dark); }
+    SvSearchField { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSearchIcon { color: var(--text-muted-dark); }
+    SvSearchInput { color: var(--text-dark); }
+    SvSearchHint { color: var(--text-muted-dark); }
+    SvTabBar { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    SvTab { color: var(--text-muted-dark); }
+    SvTab.pressed { color: var(--text-dark); }
+    SvTabSelected { color: var(--brand-dark); }
+    SvSheetTitle { color: var(--text-dark); }
+    SvStepBar { background-color: var(--line-dark); }
+    SvStepBarDone { background-color: var(--brand-dark); }
+    SvStepText { color: var(--text-dark); }
+    SvDiscount { color: var(--success-dark); }
+    SvTotal { color: var(--text-dark); }
+
+    ShopHeaderButton.pressed { background: cn1-pill-border; background-color: var(--brand-pressed-dark); }
+    ShopHero { background-color: var(--surface-alt-dark); }
+    ShopSectionTitle { color: var(--text-dark); }
+    ShopCollection { background-color: var(--surface-alt-dark); }
+    ShopCollection.pressed { background-color: var(--surface-press-dark); }
+    ShopScroller { background-color: var(--surface-dark); }
+    SvProductCard.selected { border: 1px solid var(--brand-dark); border-radius: var(--radius); }
+    ShopVendor { color: var(--text-muted-dark); }
+    ShopProductVendor { color: var(--text-muted-dark); }
+    ShopCompareAt { color: var(--text-muted-dark); }
+    ShopPriceBig { color: var(--text-dark); }
+    ShopRibbon { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--text-muted-dark); }
+    ShopSale { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
+    ShopBadge { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
+    ShopStar { color: var(--warning-dark); }
+    ShopPlaceholderArt { background-color: var(--surface-alt-dark); }
+    ShopPlaceholderLine { background-color: var(--surface-alt-dark); }
+    ShopPlaceholderLineShort { background-color: var(--surface-alt-dark); }
+    ShopStoreRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    ShopStoreRow.pressed { background-color: var(--surface-alt-dark); }
+    ShopSearchBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    ShopToolButton { color: var(--text-dark); }
+    ShopSuggestion { color: var(--text-dark); background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    ShopToolButton.pressed { background: cn1-pill-border; background-color: var(--surface-press-dark); }
+    ShopFilterOn { background-color: var(--brand-tint-dark); }
+    ShopFilterSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    ShopFilterTitle { color: var(--text-muted-dark); }
+    ShopChip, ShopChip.selected { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChip.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--brand-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChip.disabled { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOn, ShopChipOn.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); border: 1px solid var(--brand-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOn.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); border: 1px solid var(--brand-pressed-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOut, ShopChipOut.selected, ShopChipOut.disabled { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOut.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopStock { color: var(--success-dark); }
+    ShopStockLow { color: var(--warning-dark); }
+    ShopStockOut { color: var(--danger-dark); }
+    ShopIconButton { color: var(--text-dark); }
+    ShopIconButton.pressed { background: cn1-pill-border; background-color: var(--surface-press-dark); }
+    ShopQtyLabel { color: var(--text-dark); }
+    ShopStepper { background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); padding: 0; margin: 0; }
+    ShopStepButton, ShopStepButton.selected { color: var(--text-dark); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+    ShopStepButton.pressed { color: var(--brand-dark); background-color: var(--surface-press-dark); text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+    ShopStepButton.disabled { color: var(--line-strong-dark); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+    ShopStepValue { color: var(--text-dark); background-color: transparent; border-left: 1px solid var(--line-dark); border-right: 1px solid var(--line-dark); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
+    ShopGallery { background-color: var(--surface-alt-dark); }
+    ShopDot, ShopDot.selected, ShopDot.pressed { background: cn1-pill-border; background-color: var(--line-strong-dark); padding: 0.9mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+    ShopDotOn, ShopDotOn.selected, ShopDotOn.pressed { background: cn1-pill-border; background-color: var(--brand-dark); padding: 0.9mm 2mm 0.9mm 2mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+    ShopGalleryArrow, ShopGalleryArrow.selected { color: var(--text-dark); background: cn1-pill-border; background-color: var(--surface-dark); padding: 1.4mm; margin: 0 2mm 0 2mm; }
+    ShopGalleryArrow.pressed { color: var(--brand-dark); background: cn1-pill-border; background-color: var(--surface-press-dark); padding: 1.4mm; margin: 0 2mm 0 2mm; }
+    ShopSummary { background-color: var(--surface-alt-dark); }
+    ShopCheck { color: var(--brand-dark); }
+    ShopPlacedIcon { color: var(--success-dark); }
+    ShopOrderNumber { color: var(--text-muted-dark); }
+    ShopCentered { color: var(--text-dark); }
+    /* Merchant app */
+    MeRoot { background-color: var(--surface-alt-dark); }
+    MeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeTitle { color: var(--text-dark); }
+    MeTool { color: var(--text-muted-dark); }
+    MeTool.pressed { background-color: var(--surface-press-dark); }
+    MeStore { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    MeStore.pressed { background-color: var(--surface-press-dark); }
+    MePage { background-color: var(--surface-alt-dark); }
+    MeCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    MeListRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeListRow.pressed { background-color: var(--surface-press-dark); }
+    MeTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    MeTileCaption { color: var(--text-muted-dark); }
+    MeTileValue { color: var(--text-dark); }
+    MeSpark { color: var(--brand-dark); }
+    MeFilters { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeBulk { background-color: var(--brand-tint-dark); }
+    MeBulkText { color: var(--brand-dark); }
+    MeTimelineDot { color: var(--brand-dark); }
+    MeThumb { background-color: var(--surface-alt-dark); }
+    MeDrop { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    MeLowStock { color: var(--danger-dark); }
+    MeSwatch { border: 1px solid var(--line-strong-dark); border-radius: var(--radius-small); }
+}
+
+/* Fulfilment board (phone column lists), carrier quotes and document previews. */
+FuCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.4mm 3mm 2.4mm 3mm; margin: 0 0 1.6mm 0; }
+FuCard.pressed { background-color: var(--surface-press); }
+FuChip { color: var(--brand); background-color: var(--brand-tint); border-radius: 2mm; font-size: 2.4mm; padding: 0.4mm 1.6mm 0.4mm 1.6mm; margin: 0.6mm 1mm 0 0; }
+FuRate { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 1mm 1.6mm 1mm; margin: 0; }
+DocActions { background-color: var(--surface); border-top: 1px solid var(--line); padding: 1.6mm; margin: 0; }
+DocDrag { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.6mm 2.4mm 1.6mm 2.4mm; margin: 0 0 0 1.6mm; font-size: 2.6mm; }
+
+@media (prefers-color-scheme: dark) {
+    FuCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    FuCard.pressed { background-color: var(--surface-press-dark); }
+    FuChip { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    FuRate { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    DocActions { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    DocDrag { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+}
+
+/* Point of sale */
+
+PosRoot {
+    background-color: var(--surface-alt);
+    padding: 0;
+    margin: 0;
+}
+
+PosPage {
+    background-color: var(--surface-alt);
+    padding: 3mm;
+    margin: 0;
+}
+
+PosHeader {
+    background-color: var(--surface);
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+PosTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosMuted {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosGroup {
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 3mm 1mm 1mm 1mm;
+    margin: 0;
+}
+
+PosError {
+    color: var(--danger);
+    font-family: "native:MainRegular";
+    font-size: 3mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosAmount {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 6.4mm;
+    text-align: center;
+    padding: 1.5mm;
+    margin: 0;
+}
+
+PosPinBox {
+    background-color: var(--surface);
+    padding: 3mm;
+    margin: 2mm;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+PosPinFooter {
+    padding: 1mm 3mm 2mm 3mm;
+    margin: 0;
+}
+
+PosPinDots {
+    color: var(--brand);
+    font-size: 6mm;
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+}
+
+PosPad {
+    padding: 1mm;
+    margin: 0;
+}
+
+PosKey {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 4.6mm;
+    text-align: center;
+    padding: 2mm 2mm 2mm 2mm;
+    margin: 1mm;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+PosKey.pressed {
+    background-color: var(--surface-press);
+}
+
+PosChoice {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 3.8mm;
+    text-align: center;
+    padding: 3mm 2mm 3mm 2mm;
+    margin: 1.2mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosChoice.pressed {
+    background-color: var(--surface-press);
+}
+
+PosCashKey {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+    padding: 2.6mm 0.5mm 2.6mm 0.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosCashKey.pressed {
+    background-color: var(--surface-press);
+}
+
+PosMethod {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    text-align: center;
+    padding: 2.4mm 0.5mm 2.4mm 0.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosMethod.pressed {
+    background-color: var(--surface-press);
+}
+
+PosChoiceTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+
+PosChoiceMeta {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
+}
+
+PosPay {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 3.8mm;
+    text-align: center;
+    padding: 4mm 2mm 4mm 2mm;
+    margin: 1.2mm;
+    border-radius: var(--radius);
+}
+
+PosPay.pressed {
+    background-color: var(--brand-pressed);
+}
+
+PosPay.disabled {
+    color: var(--text-muted);
+    background-color: var(--line);
+}
+
+PosTool {
+    color: var(--text);
+    background-color: transparent;
+    font-size: 3mm;
+    padding: 2mm;
+    margin: 0.5mm;
+}
+
+PosTool.pressed {
+    background-color: var(--surface-press);
+}
+
+PosCartTool {
+    color: var(--text);
+    background-color: transparent;
+    font-size: 1.9mm;
+    text-align: center;
+    padding: 1.5mm 0 1.5mm 0;
+    margin: 0;
+    border-radius: var(--radius-small);
+}
+
+PosCartTool.pressed {
+    background-color: var(--surface-press);
+}
+
+PosField {
+    color: var(--text);
+    background-color: var(--surface);
+    font-size: 3.6mm;
+    padding: 2.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-small);
+}
+
+PosScan {
+    color: var(--text);
+    background-color: var(--surface);
+    font-size: 3.4mm;
+    padding: 0 2mm 0 2.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosScanHint {
+    color: var(--text-muted);
+    font-size: 3.4mm;
+}
+
+PosScanRow {
+    background-color: var(--surface);
+    padding: 1.5mm;
+    margin: 0;
+}
+
+PosChips {
+    background-color: var(--surface);
+    padding: 0 1.5mm 1.5mm 1.5mm;
+    margin: 0;
+}
+
+PosChip {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    font-size: 3mm;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosChipOn {
+    color: var(--brand-contrast);
+    background-color: var(--brand);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 2mm 3mm 2mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosProducts {
+    background-color: var(--surface-alt);
+    padding: 0;
+    margin: 0;
+}
+
+PosGrid {
+    padding: 1.5mm;
+    margin: 0;
+}
+
+PosTile {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 1mm;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+PosTile.pressed {
+    background-color: var(--surface-press);
+}
+
+PosTileArt {
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+
+PosTileTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 1mm 0.5mm 0 0.5mm;
+    margin: 0;
+}
+
+PosTilePrice {
+    color: var(--text);
+    font-size: 3mm;
+    padding: 0.5mm;
+    margin: 0;
+}
+
+PosTileStock {
+    color: var(--text-muted);
+    font-size: 2.4mm;
+    padding: 0 0.5mm 0 0.5mm;
+    margin: 0;
+}
+
+PosTileLow {
+    color: var(--warning);
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 0 0.5mm 0 0.5mm;
+    margin: 0;
+}
+
+PosCart {
+    background-color: var(--surface);
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--line);
+}
+
+PosCartHead {
+    background-color: var(--surface);
+    padding: 1mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+PosCartRow {
+    background-color: var(--surface);
+    padding: 2mm 2.5mm 2mm 2.5mm;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+}
+
+PosCustomerRow {
+    background-color: var(--brand-tint);
+    padding: 2mm 2.5mm 2mm 2.5mm;
+    margin: 0;
+}
+
+PosCartTitle {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosCartDetail {
+    color: var(--text-muted);
+    font-size: 2.7mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosCartDeal {
+    color: var(--success);
+    font-size: 2.7mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosStepper {
+    padding: 0;
+    margin: 0;
+}
+
+PosStep {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    padding: 2.2mm;
+    margin: 0.5mm;
+    border-radius: var(--radius-small);
+}
+
+PosStep.pressed {
+    background-color: var(--surface-press);
+}
+
+PosQty {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+    padding: 2mm 1.5mm 2mm 1.5mm;
+    margin: 0;
+}
+
+PosLineTotal {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 3.2mm;
+    text-align: right;
+    padding: 2mm 0 2mm 2mm;
+    margin: 0;
+}
+
+PosTotals {
+    background-color: var(--surface);
+    padding: 2mm 3mm 1mm 3mm;
+    margin: 0;
+    border-top: 1px solid var(--line);
+}
+
+PosTotalRow {
+    padding: 0.5mm 0 0.5mm 0;
+    margin: 0;
+}
+
+PosTotalRowLabel {
+    color: var(--text-muted);
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosTotalRowValue {
+    color: var(--text);
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosGrand {
+    padding: 1.5mm 0 1mm 0;
+    margin: 0;
+}
+
+PosGrandLabel {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosGrandValue {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.4mm;
+    padding: 0;
+    margin: 0;
+}
+
+PosPill {
+    color: var(--success);
+    background-color: var(--success-tint);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1.2mm 2.5mm 1.2mm 2.5mm;
+    margin: 0.5mm 0.5mm 0.5mm 1.5mm;
+    border-radius: var(--radius);
+}
+
+PosPillOffline {
+    color: var(--danger);
+    background-color: var(--danger-tint);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1.2mm 2.5mm 1.2mm 2.5mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosPillSyncing {
+    color: var(--warning);
+    background-color: var(--warning-tint);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+    margin: 0.5mm;
+    border-radius: var(--radius);
+}
+
+PosOutboxRow {
+    background-color: var(--surface);
+    padding: 2.5mm;
+    margin: 0 0 1mm 0;
+    border-radius: var(--radius-small);
+}
+
+PosBadgePENDING {
+    cn1-derive: SvBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+PosBadgeSYNCING {
+    cn1-derive: SvBadge;
+    color: var(--warning);
+    background-color: var(--warning-tint);
+}
+
+PosBadgeSYNCED {
+    cn1-derive: SvBadge;
+    color: var(--success);
+    background-color: var(--success-tint);
+}
+
+PosBadgeDUPLICATE {
+    cn1-derive: SvBadge;
+    color: var(--brand);
+    background-color: var(--brand-tint);
+}
+
+PosBadgeERROR {
+    cn1-derive: SvBadge;
+    color: var(--danger);
+    background-color: var(--danger-tint);
+}
+
+PosCountLabel {
+    color: var(--text);
+    font-size: 3.2mm;
+    padding: 2.5mm 1mm 2.5mm 1mm;
+    margin: 0;
+}
+
+PosQr {
+    text-align: center;
+    padding: 2mm;
+    margin: 0;
+}
+
+PosDisplay {
+    background-color: var(--surface);
+    padding: 6mm;
+    margin: 0;
+}
+
+PosDisplayStore {
+    color: var(--text-muted);
+    font-size: 4mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosDisplayLine {
+    color: var(--text);
+    font-size: 5mm;
+    padding: 1mm;
+    margin: 0;
+}
+
+PosDisplayTotal {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 9mm;
+    padding: 4mm 1mm 1mm 1mm;
+    margin: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    PosRoot {
+        background-color: var(--surface-alt-dark);
+    }
+
+    PosPage {
+        background-color: var(--surface-alt-dark);
+    }
+
+    PosHeader {
+        background-color: var(--surface-dark);
+        border-bottom: 1px solid var(--line-dark);
+    }
+
+    PosTitle {
+        color: var(--text-dark);
+    }
+
+    PosMuted {
+        color: var(--text-muted-dark);
+    }
+
+    PosGroup {
+        color: var(--text-muted-dark);
+    }
+
+    PosError {
+        color: var(--danger-dark);
+    }
+
+    PosAmount {
+        color: var(--text-dark);
+    }
+
+    PosPinBox {
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPinDots {
+        color: var(--brand-dark);
+    }
+
+    PosKey {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+    }
+
+    PosKey.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosChoice {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosChoice.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosCashKey {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosCashKey.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosMethod {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosMethod.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosChoiceTitle {
+        color: var(--text-dark);
+    }
+
+    PosChoiceMeta {
+        color: var(--text-muted-dark);
+    }
+
+    PosPay {
+        color: var(--brand-contrast-dark);
+        background-color: var(--brand-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPay.pressed {
+        background-color: var(--brand-pressed-dark);
+    }
+
+    PosPay.disabled {
+        color: var(--text-muted-dark);
+        background-color: var(--line-dark);
+    }
+
+    PosTool {
+        color: var(--text-dark);
+    }
+
+    PosTool.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosCartTool {
+        color: var(--text-dark);
+    }
+
+    PosCartTool.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosField {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius-small);
+    }
+
+    PosScan {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosScanHint {
+        color: var(--text-muted-dark);
+    }
+
+    PosScanRow {
+        background-color: var(--surface-dark);
+    }
+
+    PosChips {
+        background-color: var(--surface-dark);
+    }
+
+    PosChip {
+        color: var(--text-dark);
+        background-color: var(--surface-alt-dark);
+        border-radius: var(--radius);
+    }
+
+    PosChipOn {
+        color: var(--brand-contrast-dark);
+        background-color: var(--brand-dark);
+        border-radius: var(--radius);
+    }
+
+    PosProducts {
+        background-color: var(--surface-alt-dark);
+    }
+
+    PosTile {
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-dark);
+        border-radius: var(--radius);
+    }
+
+    PosTile.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosTileTitle {
+        color: var(--text-dark);
+    }
+
+    PosTilePrice {
+        color: var(--text-dark);
+    }
+
+    PosTileStock {
+        color: var(--text-muted-dark);
+    }
+
+    PosTileLow {
+        color: var(--warning-dark);
+    }
+
+    PosCart {
+        background-color: var(--surface-dark);
+        border-left: 1px solid var(--line-dark);
+    }
+
+    PosCartHead {
+        background-color: var(--surface-dark);
+        border-bottom: 1px solid var(--line-dark);
+    }
+
+    PosCartRow {
+        background-color: var(--surface-dark);
+        border-bottom: 1px solid var(--line-dark);
+    }
+
+    PosCustomerRow {
+        background-color: var(--brand-tint-dark);
+    }
+
+    PosCartTitle {
+        color: var(--text-dark);
+    }
+
+    PosCartDetail {
+        color: var(--text-muted-dark);
+    }
+
+    PosCartDeal {
+        color: var(--success-dark);
+    }
+
+    PosStep {
+        color: var(--text-dark);
+        background-color: var(--surface-alt-dark);
+        border-radius: var(--radius-small);
+    }
+
+    PosStep.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosQty {
+        color: var(--text-dark);
+    }
+
+    PosLineTotal {
+        color: var(--text-dark);
+    }
+
+    PosTotals {
+        background-color: var(--surface-dark);
+        border-top: 1px solid var(--line-dark);
+    }
+
+    PosTotalRowLabel {
+        color: var(--text-muted-dark);
+    }
+
+    PosTotalRowValue {
+        color: var(--text-dark);
+    }
+
+    PosGrandLabel {
+        color: var(--text-dark);
+    }
+
+    PosGrandValue {
+        color: var(--text-dark);
+    }
+
+    PosPill {
+        color: var(--success-dark);
+        background-color: var(--success-tint-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPillOffline {
+        color: var(--danger-dark);
+        background-color: var(--danger-tint-dark);
+        border-radius: var(--radius);
+    }
+
+    PosPillSyncing {
+        color: var(--warning-dark);
+        background-color: var(--warning-tint-dark);
+        border-radius: var(--radius);
+    }
+
+    PosOutboxRow {
+        background-color: var(--surface-dark);
+        border-radius: var(--radius-small);
+    }
+
+    PosBadgePENDING {
+        cn1-derive: SvBadge;
+        color: var(--warning-dark);
+        background-color: var(--warning-tint-dark);
+    }
+
+    PosBadgeSYNCING {
+        cn1-derive: SvBadge;
+        color: var(--warning-dark);
+        background-color: var(--warning-tint-dark);
+    }
+
+    PosBadgeSYNCED {
+        cn1-derive: SvBadge;
+        color: var(--success-dark);
+        background-color: var(--success-tint-dark);
+    }
+
+    PosBadgeDUPLICATE {
+        cn1-derive: SvBadge;
+        color: var(--brand-dark);
+        background-color: var(--brand-tint-dark);
+    }
+
+    PosBadgeERROR {
+        cn1-derive: SvBadge;
+        color: var(--danger-dark);
+        background-color: var(--danger-tint-dark);
+    }
+
+    PosCountLabel {
+        color: var(--text-dark);
+    }
+
+    PosDisplay {
+        background-color: var(--surface-dark);
+    }
+
+    PosDisplayStore {
+        color: var(--text-muted-dark);
+    }
+
+    PosDisplayLine {
+        color: var(--text-dark);
+    }
+
+    PosDisplayTotal {
+        color: var(--text-dark);
+    }
+}
+
+/* Merchant automations, analytics, customers, reviews, webhooks and store
+   media; shop reviews. Chart colours are read from these styles' colours. */
+MeAutoRoot { background-color: var(--surface-alt); padding: 0; margin: 0; }
+MeAutoBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1mm 2mm 1mm 2mm; margin: 0; }
+MeAutoSide { background-color: var(--surface); border-right: 1px solid var(--line); padding: 1.6mm; margin: 0; }
+MeAutoInspector { background-color: var(--surface); border-left: 1px solid var(--line); padding: 2.4mm; margin: 0; }
+MeAutoKind { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2mm; padding: 1.6mm 0 0.6mm 0; margin: 0; }
+MeAutoProblems { background-color: var(--danger-tint); padding: 1.2mm 2.4mm 1.2mm 2.4mm; margin: 0; }
+MeAutoProblem { color: var(--danger); background-color: transparent; font-size: 2.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
+MeAnalyticsHead { padding: 0 3mm 1.6mm 3mm; margin: 0; }
+MeAnalyticsRange { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
+MeCardTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0 0 1.6mm 0; margin: 0; }
+MeDeltaUp { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeDeltaDown { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeDeltaFlat { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeChartBox { background-color: var(--surface); padding: 3mm 3mm 2mm 3mm; margin: 2mm 3mm 2mm 3mm; border-radius: 3mm; }
+MeChart { color: var(--brand); background-color: var(--surface); padding: 0; margin: 0; }
+MeChartGrid { color: var(--line); }
+MeChartText { color: var(--text-muted); font-size: 1.9mm; }
+MeChartLine { color: var(--brand); }
+MeChartPrevious { color: var(--line-strong); }
+MeChartBar { color: var(--brand); }
+MeChartSlice { color: var(--brand); }
+MeChartSlice1 { color: var(--brand); }
+MeChartSlice2 { color: #0d9488; }
+MeChartSlice3 { color: #d97706; }
+MeChartSlice4 { color: #db2777; }
+MeLegend { color: var(--text); background-color: transparent; font-size: 2.1mm; padding: 0.4mm 1mm 0.4mm 0; margin: 0; }
+MeLegendValue { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.4mm 0 0.4mm 1mm; margin: 0; }
+MeSwatchDot { padding: 0; margin: 0 1mm 0 0; }
+MeFunnel { color: var(--brand); background-color: var(--surface); font-size: 2.1mm; padding: 0; margin: 0; }
+MeFunnelBox { background-color: var(--brand-tint); color: var(--brand); padding: 0; margin: 0; }
+MeMeter { color: var(--brand); background-color: var(--surface-alt); border-radius: 0.6mm; padding: 0; margin: 0.6mm 0 0 0; }
+MeBreakRow { padding: 1mm 0 1mm 0; margin: 0; border-bottom: 1px solid var(--line); }
+MeChip { color: var(--text); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: 3mm; font-size: 2.2mm; padding: 1mm 2.6mm 1mm 2.6mm; margin: 0 1.2mm 1.2mm 0; }
+MeChipOn { color: var(--brand-contrast); background-color: var(--brand); border: 1px solid var(--brand); border-radius: 3mm; font-family: "native:MainBold"; font-size: 2.2mm; padding: 1mm 2.6mm 1mm 2.6mm; margin: 0 1.2mm 1.2mm 0; }
+MeCode { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainLight"; font-size: 2mm; padding: 1.6mm; margin: 0; }
+MeMediaRow { padding: 1.2mm 0 1.2mm 0; margin: 0; border-bottom: 1px solid var(--line); }
+MeMediaThumb { color: var(--text-muted); background-color: var(--surface-alt); border-radius: var(--radius); padding: 1mm; margin: 0 2mm 0 0; }
+ShopStarPick { color: #f59e0b; background-color: transparent; padding: 0.6mm; margin: 0; }
+ShopReviewSummary { background-color: transparent; padding: 1.6mm 0 2mm 0; margin: 0; }
+ShopReviewAverage { background-color: transparent; color: var(--text); font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0 3mm 0 0; }
+ShopReviewTrack { background-color: var(--surface-alt); border-radius: 0.6mm; padding: 0; margin: 0.8mm 1.4mm 0.8mm 1.4mm; }
+ShopReviewFill { background-color: #f59e0b; border-radius: 0.6mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
+ShopReview { background-color: transparent; border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
+ShopReviewAuthor { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.8mm 0 0 0; margin: 0; background-color: transparent; }
+/* The product page's stars: one tappable row that opens the reviews. The
+   lead button is invisible; the row shows it is pressed. */
+ShopRatingRow { background-color: transparent; border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+ShopRatingRow.pressed { background-color: var(--surface-press); border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+ShopRatingLink, ShopRatingLink.selected, ShopRatingLink.pressed { background-color: transparent; padding: 0; margin: 0; }
+ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size: 2.5mm; padding: 0.4mm 0 0 2mm; margin: 0; background-color: transparent; }
+
+@media (prefers-color-scheme: dark) {
+    MeAutoRoot { background-color: var(--surface-alt-dark); }
+    MeAutoBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeAutoSide { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    MeAutoInspector { background-color: var(--surface-dark); border-left: 1px solid var(--line-dark); }
+    MeAutoKind { color: var(--text-muted-dark); }
+    MeAutoProblems { background-color: var(--danger-tint-dark); }
+    MeAutoProblem { color: var(--danger-dark); }
+    MeAnalyticsRange { color: var(--text-dark); }
+    MeCardTitle { color: var(--text-dark); }
+    MeDeltaUp { color: var(--success-dark); }
+    MeDeltaDown { color: var(--danger-dark); }
+    MeDeltaFlat { color: var(--text-muted-dark); }
+    MeChartBox { background-color: var(--surface-dark); }
+    MeChart { color: var(--brand-dark); background-color: var(--surface-dark); }
+    MeChartGrid { color: var(--line-dark); }
+    MeChartText { color: var(--text-muted-dark); }
+    MeChartLine { color: var(--brand-dark); }
+    MeChartPrevious { color: var(--line-strong-dark); }
+    MeChartBar { color: var(--brand-dark); }
+    MeChartSlice { color: var(--brand-dark); }
+    MeChartSlice1 { color: var(--brand-dark); }
+    MeChartSlice2 { color: #2dd4bf; }
+    MeChartSlice3 { color: #fbbf24; }
+    MeChartSlice4 { color: #f472b6; }
+    MeLegend { color: var(--text-dark); }
+    MeLegendValue { color: var(--text-muted-dark); }
+    MeFunnel { color: var(--brand-dark); background-color: var(--surface-dark); }
+    MeFunnelBox { background-color: var(--brand-tint-dark); color: var(--brand-dark); }
+    MeMeter { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    MeBreakRow { border-bottom: 1px solid var(--line-dark); }
+    MeChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: 3mm; }
+    MeChipOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); border: 1px solid var(--brand-dark); border-radius: 3mm; }
+    MeCode { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    MeMediaRow { border-bottom: 1px solid var(--line-dark); }
+    MeMediaThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    ShopStarPick { color: #fbbf24; }
+    ShopReviewAverage { color: var(--text-dark); }
+    ShopReviewTrack { background-color: var(--surface-alt-dark); }
+    ShopReviewFill { background-color: #fbbf24; }
+    ShopReview { background-color: transparent; border-top: 1px solid var(--line-dark); }
+    ShopReviewAuthor { color: var(--text-muted-dark); }
+    ShopRatingRow.pressed { background-color: var(--surface-press-dark); border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+    ShopRatingMore { color: var(--brand-dark); }
+    ShopDiscoverHead { background-color: var(--brand-tint-dark); }
+    ShopDiscoverHeadWide { background-color: var(--brand-tint-dark); border-radius: var(--radius); }
+    ShopDiscoverTitle { color: var(--text-dark); }
+    ShopDiscoverText { color: var(--text-muted-dark); }
+    ShopSearchPill { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    ShopSearchPill.pressed { background-color: var(--surface-press-dark); }
+    ShopStoreCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    ShopStoreCard.pressed { background-color: var(--surface-alt-dark); }
+    ShopStoreCardLogo { background-color: var(--surface-dark); }
+    ShopStoreCardName { color: var(--text-dark); }
+    ShopStoreCardTag { color: var(--text-muted-dark); }
+    ShopFollow { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopFollow.pressed { background-color: var(--brand-pressed-dark); }
+    ShopFollowing { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    ShopFollowing.pressed { background-color: var(--surface-press-dark); }
+    ShopHeroFollow { color: var(--brand-dark); background-color: var(--surface-dark); }
+    ShopHeroFollow.pressed { background-color: var(--surface-press-dark); }
+    ShopHeroFollowing { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopHeroFollowing.pressed { background-color: var(--brand-pressed-dark); }
+    ShopGateIcon { color: var(--brand-dark); background-color: transparent; }
+    ShopGateTitle { color: var(--text-dark); }
+    ShopGateText { color: var(--text-muted-dark); }
+    ShopParcel { background-color: var(--surface-alt-dark); }
+    ShopScanDot { background: cn1-pill-border; background-color: var(--line-strong-dark); }
+    ShopScanDotNow { background: cn1-pill-border; background-color: var(--brand-dark); }
+    ShopScanLine { background-color: var(--line-strong-dark); }
+    ShopScanTitle { color: var(--text-dark); }
+    ShopScanTitleNow { color: var(--text-dark); }
+    ShopScanDetail { color: var(--text-muted-dark); }
+}
+
+/* Register panels: what used to be popups opens in the register's layout,
+   a right-hand panel on a wide screen and a bottom sheet on a phone. */
+PosSheet {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 1mm 4mm 4mm 4mm;
+    margin: 0;
+}
+PosSheetTitleBar { background-color: transparent; padding: 1.6mm 0 2mm 0; margin: 0; border-bottom: 1px solid var(--line); }
+PosSheetTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
+PosSheetBackButton { color: var(--text-muted); background-color: var(--surface-alt); border-radius: 3mm; padding: 1.6mm; margin: 0; }
+PosSheetBackButton.pressed { background-color: var(--surface-press); }
+PosSheetBody { background-color: transparent; padding: 3mm 0 0 0; margin: 0; }
+PosSheetText { color: var(--text-muted); background-color: transparent; font-size: 3.4mm; padding: 0 0 3mm 0; margin: 0; }
+PosSheetLabel { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 2mm 0 0.6mm 0; margin: 0; }
+PosSheetAmount { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainBold"; font-size: 7mm; text-align: center; border-radius: var(--radius); padding: 3mm; margin: 0 0 3mm 0; }
+PosSheetActions { background-color: transparent; padding: 3mm 0 0 0; margin: 0; }
+PosPrimary { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 3.8mm; text-align: center; border-radius: var(--radius); padding: 4mm 2mm 4mm 2mm; margin: 0 0 0 1.2mm; }
+PosPrimary.pressed { background-color: var(--brand-pressed); }
+PosDanger { color: #ffffff; background-color: var(--danger); font-family: "native:MainBold"; font-size: 3.8mm; text-align: center; border-radius: var(--radius); padding: 4mm 2mm 4mm 2mm; margin: 0 0 0 1.2mm; }
+PosDanger.pressed { background-color: var(--danger-tint); color: var(--danger); }
+PosSecondary { color: var(--text); background-color: var(--surface); font-family: "native:MainBold"; font-size: 3.8mm; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 4mm 2mm 4mm 2mm; margin: 0 1.2mm 0 0; }
+PosSecondary.pressed { background-color: var(--surface-press); }
+
+@media (prefers-color-scheme: dark) {
+    PosSheet { background-color: var(--surface-dark); border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; }
+    PosSheetTitleBar { border-bottom: 1px solid var(--line-dark); }
+    PosSheetTitle { color: var(--text-dark); }
+    PosSheetBackButton { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    PosSheetBackButton.pressed { background-color: var(--surface-press-dark); }
+    PosSheetText { color: var(--text-muted-dark); }
+    PosSheetLabel { color: var(--text-muted-dark); }
+    PosSheetAmount { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PosPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PosPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    PosDanger { color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
+    PosDanger.pressed { background-color: var(--danger-tint-dark); color: var(--danger-dark); }
+    PosSecondary { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    PosSecondary.pressed { background-color: var(--surface-press-dark); }
+}
+
+/* The reports form: the same side gutter as the other merchant pages. */
+ReportsPage { background-color: transparent; padding: 0 4mm 4mm 4mm; margin: 0; }
+
+/* ==== Shopper/merchant/admin polish (simulator captures) ==== */
+ShopCardCompareAt { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; text-decoration: line-through; padding: 0 2mm 0 2mm; margin: 0; background-color: transparent; }
+ShopCardTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.1mm; text-align: left; padding: 3mm 0 0.8mm 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    ShopCardCompareAt { color: var(--text-muted-dark); }
+    ShopCardTitle { color: var(--text-dark); }
+}
+@media (prefers-color-scheme: dark) {
+    MeButtons { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+}
+/* A field given SvField without its own hint style fell back to the
+   default hint, a size larger than the text it stands in for. */
+TextHint { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2.7mm 3mm 2.7mm 3mm; margin: 0; background-color: transparent; }
+@media (prefers-color-scheme: dark) {
+    TextHint { color: var(--text-muted-dark); }
+}
+
+/* ==== POS register polish, round 2: sell screen tiles, search box, pay bar ==== */
+PosScanField { color: var(--text); background-color: transparent; font-size: 3.4mm; padding: 2.4mm 1mm 2.4mm 1.5mm; margin: 0; border: none; }
+PosScanIcon { color: var(--text-muted); background-color: transparent; padding: 0; margin: 0; }
+PosTileBody { background-color: transparent; padding: 1.5mm 2mm 2mm 2mm; margin: 0; }
+PosPayIdle { color: var(--text-muted); background-color: var(--surface); font-size: 3.2mm; text-align: center; padding: 3.2mm 2mm 3.2mm 2mm; margin: 0; border-top: 1px solid var(--line); }
+PosPayIdle.disabled { color: var(--text-muted); background-color: var(--surface); }
+@media (prefers-color-scheme: dark) {
+    PosScanField { color: var(--text-dark); background-color: transparent; }
+    PosScanIcon { color: var(--text-muted-dark); }
+    PosPayIdle { color: var(--text-muted-dark); background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    PosPayIdle.disabled { color: var(--text-muted-dark); background-color: var(--surface-dark); }
+}
+
+/* ==================================================================== */
+/* POLISH ROUND 2 -- shopper, merchant panes and admin console.          */
+/* ==================================================================== */
+/* Scroll thumbs: a thin, rounded, quiet thumb instead of the platform's
+   hard black bar, and no track at all. */
+Scroll { background-color: transparent; border: none; padding: 0; margin: 0; }
+ScrollThumb { background-color: var(--line-strong); border-radius: 1mm; padding: 0; margin: 0.4mm; }
+HorizontalScroll { background-color: transparent; border: none; padding: 0; margin: 0; }
+HorizontalScrollThumb { background-color: var(--line-strong); border-radius: 1mm; padding: 0; margin: 0.4mm; }
+@media (prefers-color-scheme: dark) {
+    ScrollThumb { background-color: var(--line-strong-dark); }
+    HorizontalScrollThumb { background-color: var(--line-strong-dark); }
+}
+/* Actions inside a card: a plain left-aligned row, no bar and no divider. */
+MeCardButtons { background-color: transparent; border: none; padding: 2mm 0 0 0; margin: 0; }
+/* The cart toast: message and its action on one line, no blank band. */
+CartToast { background-color: var(--text); border-radius: var(--radius); padding: 1.6mm 2mm 1.6mm 3mm; margin: 2.4mm 3.6mm 17mm 3.6mm; }
+CartToastText { color: var(--surface); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+CartToastAction { color: var(--brand-dark); background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    CartToast { background-color: var(--text-dark); }
+    CartToastText { color: var(--surface-dark); }
+    CartToastAction { color: var(--brand); }
+}
+/* A heading that opens a page needs no gap above it. */
+SvSectionFirst { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.1mm; text-align: left; padding: 0.6mm 0 0.8mm 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    SvSectionFirst { color: var(--text-dark); }
+}
+
+/* ---- POS polish, round 3 ------------------------------------------------ */
+/* Tile text: a tighter title, the price set apart from it, stock quieter.  */
+PosTileTitle { color: var(--text); font-family: "native:MainBold"; font-size: 2.8mm; padding: 0; margin: 0; }
+PosTilePrice { color: var(--text); font-size: 2.8mm; padding: 1mm 0 0 0; margin: 0; }
+PosTileStock { color: var(--text-muted); font-size: 2.2mm; padding: 0.5mm 0 0 0; margin: 0; }
+PosTileLow { color: var(--warning); font-family: "native:MainBold"; font-size: 2.2mm; padding: 0.5mm 0 0 0; margin: 0; }
+/* Cart tools: room between the captions so neighbours never touch. */
+PosCartTool { color: var(--text); background-color: transparent; font-size: 1.9mm; text-align: center; padding: 1.5mm 0.6mm 1.5mm 0.6mm; margin: 0; }
+/* The quantity sits on the stepper buttons' optical centre. */
+/* Chart labels and legend: the default font read as a headline. */
+MeChart { color: var(--brand); background-color: var(--surface); font-size: 2.2mm; padding: 0; margin: 0; }
+PosQty { color: var(--text); font-family: "native:MainBold"; font-size: 3.4mm; text-align: center; padding: 2.5mm 2mm 1.5mm 2mm; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    PosTileTitle { color: var(--text-dark); }
+    PosTilePrice { color: var(--text-dark); }
+    PosTileStock { color: var(--text-muted-dark); }
+    PosTileLow { color: var(--warning-dark); }
+    PosTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PosTile.pressed { background-color: var(--surface-press-dark); }
+    PosStep { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PosQty { color: var(--text-dark); }
+    PosCartTool { color: var(--text-dark); }
+    PosCartTool.pressed { background-color: var(--surface-press-dark); }
+    PosCartHead { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+}
+
+/* ---- dark4: analytics period header is a card (and its dark twin) ---- */
+MeAnalyticsHead { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.4mm 3mm 2.4mm 3mm; margin: 0 0 2.4mm 0; }
+
+@media (prefers-color-scheme: dark) {
+    MeAnalyticsHead { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+}
+/* The register's tile labels named no background, so in dark they took the
+   default label's white plate behind light text. */
+PosTileTitle, PosTilePrice, PosTileStock, PosTileLow { background-color: transparent; }
+@media (prefers-color-scheme: dark) {
+    PosTileTitle, PosTilePrice, PosTileStock, PosTileLow { background-color: transparent; }
+}
+/* ---- end dark4 ---- */
+
+/* ---- app5: merchant, shopper and admin polish, round 5 ---- */
+SvEmptyRow {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 3mm 2.6mm 2.6mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+SvEmptyRowIcon {
+    color: var(--brand);
+    background-color: var(--brand-tint);
+    border-radius: 50%;
+    padding: 1.6mm;
+    margin: 0 2.6mm 0 0;
+}
+SvStoreFacts {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 1mm 3mm 1mm 3mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+@media (prefers-color-scheme: dark) {
+    SvEmptyRow { background-color: var(--surface-alt-dark); }
+    SvEmptyRowIcon { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvStoreFacts { background-color: var(--surface-dark); }
+}
+MeSearch { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); padding: 1.4mm 2mm 1.4mm 2mm; margin: 2mm 3mm 0 3mm; }
+MeSearchBar { background-color: var(--surface); padding: 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    MeSearchBar { background-color: var(--surface-dark); }
+    MeFilters { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeFilter { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
+    MeSearch { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
+}
+MeFilter { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); font-size: 2.8mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0 1.2mm 1.2mm 0; }
+MeFilters { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 0.4mm 3mm; margin: 0; }
+/* ---- end app5 ---- */
+
+/* ==================================================================== */
+/* APP ROUND 6: dark, tablet and detail screens                         */
+/* ==================================================================== */
+SvOrgRow {
+    cn1-derive: SvRow;
+    padding: 2.6mm 3mm 2.6mm 1mm;
+}
+MeActionGrid {
+    background-color: transparent;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+}
+/* ---- REGISTER ROUND 6 -- tip keys, approval, layaways, shift, tablet ---- */
+PosTipKey {
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 2mm 0.5mm 2mm 0.5mm;
+    margin: 1mm;
+}
+PosTipKey.pressed { background-color: var(--surface-press); }
+PosTipShare {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.6mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+PosTipAmount {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 0.6mm 0 0 0;
+    margin: 0;
+}
+@media (prefers-color-scheme: dark) {
+    PosTipKey { background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    PosTipKey.pressed { background-color: var(--surface-press-dark); }
+    PosTipShare { color: var(--text-dark); }
+    PosTipAmount { color: var(--text-muted-dark); }
+}
+/* Page labels sit on the grey page: an opaque default background drew a
+   white box behind "Shift closed", a variance and each denomination. */
+PosTitle { background-color: transparent; }
+PosError { background-color: transparent; }
+PosCountLabel { background-color: transparent; }
+PosMuted { background-color: transparent; }
+/* ---- end REGISTER ROUND 6 ---- */
+
+/* TABLET ROUND 7: a merchant list beside its detail (MerchantPane.beside),
+   and secondary buttons that stay visible on a page of surface-alt, the
+   colour they were filled with, in both modes. */
+SvSecondary {
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+    margin: 1.6mm 0 0.8mm 0;
+}
+
+MeSplitList {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+MeSplitDetail {
+    background-color: var(--surface-alt);
+    padding: 0;
+    margin: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    MeSplitList { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    MeSplitDetail { background-color: var(--surface-alt-dark); }
+    SvSecondary { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvSecondary.pressed { background-color: var(--line-strong-dark); }
+}
+
+/* ---- REGISTER ROUND 8 -- approval keypad that fits a phone's sheet ---- */
+PosKeyCompact {
+    cn1-derive: PosKey;
+    font-size: 4.2mm;
+    padding: 1.2mm 1mm 1.2mm 1mm;
+    margin: 0.6mm;
+}
+PosKeyCompact.pressed { cn1-derive: PosKey.pressed; }
+PosPinDotsCompact {
+    cn1-derive: PosPinDots;
+    font-size: 5mm;
+    padding: 0.6mm;
+}
+/* ---- end REGISTER ROUND 8 ---- */
+/* REGISTER ROUND 8 -- receipt actions (icon over the word) and the note. */
+PosReceiptAction {
+    cn1-derive: PosChoice;
+    font-size: 3.2mm;
+    padding: 2.4mm 0.5mm 2.4mm 0.5mm;
+}
+PosReceiptAction.pressed { background-color: var(--surface-press); }
+PosReceiptNote {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 3.2mm;
+    text-align: center;
+    border: none;
+    padding: 1.5mm 0 1.5mm 0;
+    margin: 0;
+}
+/* ---- end REGISTER ROUND 8 (receipt) ---- */
+/* REGISTER ROUND 8 -- the layaway's main action. */
+PosLayawayPay {
+    cn1-derive: PosPrimary;
+    margin: 1.2mm;
+}
+PosLayawayPay.pressed { background-color: var(--brand-pressed); }
+/* ---- end REGISTER ROUND 8 (layaway) ---- */
+/* REGISTER ROUND 8 -- the cash count's running total: on the page, not on
+   a white strip as wide as the screen and twice the size of the counts. */
+PosCountTotal {
+    cn1-derive: PosAmount;
+    background-color: transparent;
+    border: none;
+    font-size: 5mm;
+    text-align: left;
+    padding: 3mm 3mm 0 3mm;
+    margin: 0;
+}
+/* ---- end REGISTER ROUND 8 (count) ---- */
+/* REGISTER ROUND 8 -- dark: these styles named no background, so the
+   platform's white filled them in the dark theme (white keypads, totals,
+   cart lines, tip keys and amount displays). Transparent in both modes:
+   they sit on a surface that is already themed. PosQr stays white, as a
+   code is scanned dark on light. */
+PosAmount, PosCartDeal, PosCartDetail, PosCartTitle, PosDisplayLine,
+PosDisplayStore, PosDisplayTotal, PosGrand, PosGrandLabel, PosGrandValue,
+PosGrid, PosGroup, PosLineTotal, PosPad, PosPinDots, PosPinFooter, PosQty,
+PosScanHint, PosStepper, PosTileLow, PosTilePrice, PosTileStock,
+PosTileTitle, PosTipAmount, PosTipShare, PosTotalRow, PosTotalRowLabel,
+PosTotalRowValue {
+    background-color: transparent;
+}
+@media (prefers-color-scheme: dark) {
+    PosReceiptAction.pressed, PosLayawayPay.pressed { background-color: var(--surface-press-dark); }
+    PosReceiptNote { color: var(--text-muted-dark); }
+    PosKeyCompact { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PosKeyCompact.pressed { background-color: var(--surface-press-dark); }
+    PosReceiptAction { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    PosLayawayPay { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PosCountTotal { color: var(--text-dark); background-color: transparent; }
+}
+/* ---- end REGISTER ROUND 8 (dark) ---- */
+/* APP ROUND 9: tablet checkout columns. A gutter between the address
+   column and the review, and the review as a card of its own. */
+SvCheckoutMain {
+    background-color: transparent;
+    padding: 0 3mm 0 0;
+    margin: 0;
+}
+SvCheckoutReview {
+    background-color: var(--surface-alt);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1mm 3.2mm 3.2mm 3.2mm;
+    margin: 1.2mm 0 0 3mm;
+}
+@media (prefers-color-scheme: dark) {
+    SvCheckoutReview { background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+}
+/* ---- end APP ROUND 9 ---- */
+/* REGISTER ROUND A: the variant picker (photo, option chips, Add with the
+   price), the shift goal bar, the sale-complete check and its milestone. */
+PosVpBody { background-color: transparent; padding: 2mm 0 0 0; margin: 0; }
+PosVpHero { background-color: transparent; padding: 0 0 3mm 0; margin: 0 0 1mm 0; border-bottom: 1px solid var(--line); }
+PosVpPhoto { background-color: var(--surface-alt); padding: 0; margin: 0 3.2mm 0 0; }
+PosVpFacts { background-color: transparent; padding: 1mm 0 0 0; margin: 0; }
+PosVpPrice { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0; }
+PosVpVariant { color: var(--text-muted); background-color: transparent; font-size: 3.2mm; padding: 0.8mm 0 0 0; margin: 0; }
+PosVpStock { color: var(--success); background-color: var(--success-tint); font-family: "native:MainBold"; font-size: 2.6mm; border-radius: 3mm; padding: 0.8mm 2.2mm 0.8mm 2.2mm; margin: 1.8mm 0 0 0; }
+PosVpStockLow { cn1-derive: PosVpStock; color: var(--warning); background-color: var(--warning-tint); }
+PosVpStockOut { cn1-derive: PosVpStock; color: var(--danger); background-color: var(--danger-tint); }
+PosVpGroupRow { background-color: transparent; padding: 3mm 0 1.4mm 0; margin: 0; }
+PosVpGroup { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0 2mm 0 0; margin: 0; }
+PosVpGroupValue { color: var(--text-muted); background-color: transparent; font-size: 3.2mm; padding: 0; margin: 0; }
+PosVpChips { background-color: transparent; padding: 0; margin: 0; }
+PosVpChip { color: var(--text); background-color: var(--surface); font-family: "native:MainBold"; font-size: 3.4mm; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 3mm 4.2mm 3mm 4.2mm; margin: 0 1.6mm 1.6mm 0; }
+PosVpChip.pressed { background-color: var(--surface-press); }
+PosVpChipOn { cn1-derive: PosVpChip; color: var(--brand); background-color: var(--brand-tint); border: 2px solid var(--brand); }
+PosVpChipOn.pressed { background-color: var(--brand-tint); }
+PosVpChipOnOut { cn1-derive: PosVpChip; color: var(--text-muted); background-color: var(--surface-alt); border: 2px solid var(--text-muted); }
+PosVpChipOut { cn1-derive: PosVpChip; color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); }
+PosVpChipNone { cn1-derive: PosVpChip; color: var(--line-strong); background-color: transparent; border: 1px solid var(--line); }
+PosVpQtyRow { background-color: transparent; padding: 3mm 0 1mm 0; margin: 2mm 0 0 0; border-top: 1px solid var(--line); }
+PosVpFoot { background-color: transparent; padding: 2.4mm 0 0 0; margin: 0; }
+PosVpAddAnyway { cn1-derive: PosPay; color: var(--warning); background-color: var(--warning-tint); }
+PosGoalRow { background-color: transparent; padding: 0.4mm 3mm 1.2mm 3mm; margin: 0; }
+PosGoalIcon { color: var(--brand); background-color: transparent; padding: 0 1.6mm 0 0; margin: 0; }
+PosGoalText { color: var(--text-muted); background-color: transparent; font-size: 2.5mm; padding: 0 0 0 2mm; margin: 0; }
+PosGoalTrack { color: var(--line); background-color: transparent; padding: 0; margin: 0; }
+PosGoalFill { color: var(--brand); background-color: transparent; }
+PosGoalDone { color: var(--success); background-color: transparent; }
+PosCheck { color: var(--success); background-color: var(--surface); padding: 2mm 0 1mm 0; margin: 0; }
+PosMilestone { background-color: var(--brand-tint); border-radius: var(--radius); padding: 2.6mm 3mm 3mm 3mm; margin: 1mm 0 3mm 0; }
+PosMilestoneText { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
+PosMilestoneMeta { color: var(--text-muted); background-color: transparent; font-size: 2.8mm; padding: 0.8mm 0 1.6mm 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    PosVpHero { border-bottom: 1px solid var(--line-dark); }
+    PosVpPhoto { background-color: var(--surface-alt-dark); }
+    PosVpPrice { color: var(--text-dark); }
+    PosVpVariant { color: var(--text-muted-dark); }
+    PosVpStock { color: var(--success-dark); background-color: var(--success-tint-dark); }
+    PosVpStockLow { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PosVpStockOut { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    PosVpGroup { color: var(--text-dark); }
+    PosVpGroupValue { color: var(--text-muted-dark); }
+    PosVpChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    PosVpChip.pressed { background-color: var(--surface-press-dark); }
+    PosVpChipOn { color: var(--brand-dark); background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); }
+    PosVpChipOn.pressed { background-color: var(--brand-tint-dark); }
+    PosVpChipOnOut { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 2px solid var(--text-muted-dark); }
+    PosVpChipOut { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    PosVpChipNone { color: var(--line-strong-dark); border: 1px solid var(--line-dark); }
+    PosVpQtyRow { border-top: 1px solid var(--line-dark); }
+    PosVpAddAnyway { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PosGoalIcon { color: var(--brand-dark); }
+    PosGoalText { color: var(--text-muted-dark); }
+    PosGoalTrack { color: var(--line-dark); }
+    PosGoalFill { color: var(--brand-dark); }
+    PosGoalDone { color: var(--success-dark); }
+    PosCheck { color: var(--success-dark); background-color: var(--surface-dark); }
+    PosMilestone { background-color: var(--brand-tint-dark); }
+    PosMilestoneText { color: var(--brand-dark); }
+    PosMilestoneMeta { color: var(--text-muted-dark); }
+}
+/* ---- end REGISTER ROUND A ---- */
+/* ---- MERCHANT ROUND A ---- */
+MeBreakRow { background-color: transparent; padding: 1mm 0 1.2mm 0; margin: 0; }
+MeBreakValue { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0 0 0 2mm; margin: 0; }
+MeLegendRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
+MeGoalRing { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 1mm; margin: 0; }
+MeRingHole { color: var(--surface); }
+MeGoalDone { color: var(--success); }
+MeGoalCaption { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.3mm; padding: 0.8mm 0 0 0; margin: 0; }
+MeGoalValue { color: var(--text-muted); background-color: transparent; font-size: 2mm; padding: 0.2mm 0 0 0; margin: 0; }
+MeStreak { color: #c2410c; background-color: #fff3e8; border-radius: 3mm; font-family: "native:MainBold"; font-size: 2.2mm; padding: 1mm 2.4mm 1mm 2mm; margin: 1.6mm 0 0 0; }
+MeLiveToast { background-color: var(--surface); border: 1px solid var(--brand); border-radius: 3mm; padding: 2mm 3.4mm 2mm 1.6mm; margin: 0; }
+MeLiveToastTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0; margin: 0; }
+MeLiveToastDetail { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.4mm 0 0 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    MeBreakValue { color: var(--text-muted-dark); }
+    MeGoalRing { color: var(--text-dark); }
+    MeRingHole { color: var(--surface-dark); }
+    MeGoalDone { color: var(--success-dark); }
+    MeGoalCaption { color: var(--text-dark); }
+    MeGoalValue { color: var(--text-muted-dark); }
+    MeStreak { color: #fdba74; background-color: #3a2210; }
+    MeLiveToast { background-color: var(--surface-dark); border: 1px solid var(--brand-dark); }
+    MeLiveToastTitle { color: var(--text-dark); }
+    MeLiveToastDetail { color: var(--text-muted-dark); }
+}
+/* ---- end MERCHANT ROUND A ---- */
+
+/* ---- MERCHANT ROUND B -- desktop type scale, sidebar, grids, funnel ---- */
+/* A desktop is read from further away than a phone: the same millimetres
+   came out at 10-11px. One step up for every text style the back office
+   uses (mm sizes x1.2, the large figures x1.05), desktop only. */
+@media device-desktop {
+    SvHeroTitle { font-family: "native:MainBold"; font-size: 7.35mm; }
+    SvHeroText { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvTitle { font-family: "native:MainBold"; font-size: 4.62mm; }
+    SvHeading { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvText { font-family: "native:MainRegular"; font-size: 3.30mm; }
+    SvMuted { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvLabel { font-family: "native:MainBold"; font-size: 2.52mm; }
+    SvPrice { font-family: "native:MainBold"; font-size: 4.62mm; }
+    SvError { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvNotice { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvPrimary { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvSecondary { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvPairStart { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvPairEnd { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvFieldButton { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvDanger { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvLink { font-family: "native:MainBold"; font-size: 3.30mm; }
+    SvField { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvFieldHint { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvRowTitle { font-family: "native:MainBold"; font-size: 3.30mm; }
+    SvRowDetail { font-family: "native:MainRegular"; font-size: 2.88mm; }
+    SvRowValue { font-family: "native:MainBold"; font-size: 3.30mm; }
+    SvBadge { font-family: "native:MainBold"; font-size: 2.46mm; }
+    SvStatValue { font-family: "native:MainBold"; font-size: 4.68mm; }
+    SvStatLabel { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvChip { font-family: "native:MainBold"; font-size: 2.88mm; }
+    SvAvatar { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvAction { font-family: "native:MainRegular"; font-size: 2.64mm; }
+    SvFactLabel { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvFactValue { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvFactTotal { font-family: "native:MainBold"; font-size: 3.96mm; }
+    SvCalloutTitle { font-family: "native:MainBold"; font-size: 3.00mm; }
+    SvCalloutText { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvBannerTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvBannerText { font-family: "native:MainRegular"; font-size: 3.12mm; }
+    SvAmount { font-family: "native:MainBold"; font-size: 7.35mm; }
+    SvChartAxis { font-family: "native:MainRegular"; font-size: 2.40mm; }
+    SvChartValue { font-family: "native:MainBold"; font-size: 4.41mm; }
+    SvAlert { font-family: "native:MainBold"; font-size: 3.12mm; }
+    SvCardBrand { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvCardNumber { font-family: "native:MainBold"; font-size: 4.44mm; }
+    SvCardSmall { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvStepLabel { font-family: "native:MainBold"; font-size: 2.64mm; }
+    SvModeBadge { font-family: "native:MainBold"; font-size: 2.52mm; }
+    SvSection { font-family: "native:MainBold"; font-size: 3.72mm; }
+    SvSegment { font-family: "native:MainBold"; font-size: 2.76mm; }
+    ToastBarMessage { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvSideName { font-family: "native:MainBold"; font-size: 3.66mm; }
+    SvSideDetail { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvSideLabel { font-family: "native:MainBold"; font-size: 2.58mm; }
+    SvSideItem { font-family: "native:MainRegular"; font-size: 3.36mm; }
+    SvPaneTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvDeskPaneTitle { font-family: "native:MainBold"; font-size: 3.84mm; }
+    SvDeskSideName { font-family: "native:MainBold"; font-size: 3.24mm; }
+    SvDeskSideDetail { font-family: "native:MainRegular"; font-size: 2.70mm; }
+    SvDeskSideLabel { font-family: "native:MainBold"; font-size: 2.58mm; }
+    SvDeskSideItem { font-family: "native:MainRegular"; font-size: 3.18mm; }
+    SvDeskAlert { font-family: "native:MainBold"; font-size: 3.12mm; }
+    SvDeskAlert.pressed { font-family: "native:MainBold"; font-size: 3.12mm; }
+    SvDeskRowTitle { font-family: "native:MainRegular"; font-size: 3.24mm; }
+    SvDeskRowDetail { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvDeskRowValue { font-family: "native:MainBold"; font-size: 3.18mm; }
+    SvDeskSection { font-family: "native:MainBold"; font-size: 3.36mm; }
+    SvDeskTitle { font-family: "native:MainBold"; font-size: 4.62mm; }
+    SvDeskHeading { font-family: "native:MainBold"; font-size: 3.84mm; }
+    SvDeskText { font-family: "native:MainRegular"; font-size: 3.18mm; }
+    SvDeskMuted { font-family: "native:MainRegular"; font-size: 2.88mm; }
+    SvDeskLabel { font-family: "native:MainRegular"; font-size: 2.88mm; }
+    SvDeskError { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvDeskNotice { font-family: "native:MainRegular"; font-size: 3.06mm; }
+    SvDeskFactLabel { font-family: "native:MainRegular"; font-size: 3.06mm; }
+    SvDeskFactValue { font-family: "native:MainRegular"; font-size: 3.06mm; }
+    SvDeskFactTotal { font-family: "native:MainBold"; font-size: 3.24mm; }
+    SvDeskAmount { font-family: "native:MainBold"; font-size: 6.72mm; }
+    SvDeskBannerTitle { font-family: "native:MainBold"; font-size: 3.66mm; }
+    SvDeskBannerText { font-family: "native:MainRegular"; font-size: 3.00mm; }
+    SvDeskStatValue { font-family: "native:MainBold"; font-size: 4.51mm; }
+    SvDeskStatLabel { font-family: "native:MainRegular"; font-size: 2.76mm; }
+    SvDeskChartValue { font-family: "native:MainBold"; font-size: 4.51mm; }
+    SvDeskChartAxis { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvProductName { font-family: "native:MainRegular"; font-size: 3.30mm; }
+    SvProductPrice { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvMutedSmall { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvMetaLine { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvQuantity { font-family: "native:MainBold"; font-size: 3.48mm; }
+    SvSearchField { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvSearchInput { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvSearchHint { font-family: "native:MainRegular"; font-size: 3.48mm; }
+    SvTab { font-family: "native:MainRegular"; font-size: 2.46mm; }
+    SvTabSelected { font-family: "native:MainBold"; font-size: 2.46mm; }
+    SvSheetTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    SvStepText { font-family: "native:MainBold"; font-size: 2.52mm; }
+    SvStepTextTodo { font-family: "native:MainRegular"; font-size: 2.52mm; }
+    SvDiscount { font-family: "native:MainRegular"; font-size: 3.30mm; }
+    SvTotal { font-family: "native:MainBold"; font-size: 4.20mm; }
+    MeTitle { font-family: "native:MainBold"; font-size: 4.20mm; }
+    MeStore { font-family: "native:MainBold"; font-size: 3.36mm; }
+    MeTileValue { font-family: "native:MainBold"; font-size: 5.25mm; }
+    MeAccentName { font-family: "native:MainBold"; font-size: 4.20mm; }
+    MeAutoKind { font-family: "native:MainBold"; font-size: 2.40mm; }
+    MeAnalyticsRange { font-family: "native:MainBold"; font-size: 4.08mm; }
+    MeCardTitle { font-family: "native:MainBold"; font-size: 3.12mm; }
+    MeDeltaUp { font-family: "native:MainBold"; font-size: 2.52mm; }
+    MeDeltaDown { font-family: "native:MainBold"; font-size: 2.52mm; }
+    MeChipOn { font-family: "native:MainBold"; font-size: 2.64mm; }
+    MeCode { font-family: "native:MainLight"; font-size: 2.40mm; }
+    SvSectionFirst { font-family: "native:MainBold"; font-size: 3.72mm; }
+    MeGoalRing { font-family: "native:MainBold"; font-size: 4.08mm; }
+    MeGoalCaption { font-family: "native:MainBold"; font-size: 2.76mm; }
+    MeStreak { font-family: "native:MainBold"; font-size: 2.64mm; }
+    MeLiveToastTitle { font-family: "native:MainBold"; font-size: 3.12mm; }
+}
+
+SvSideList { background-color: transparent; padding: 0 0 2mm 0; margin: 0; }
+/* A group's entries under its lead (Shell.openGroup). */
+SvSideSub { background-color: transparent; padding: 0 0 0 5mm; margin: 0; }
+
+/* Grid headers read like the cards' own captions, not a tinted band. */
+DataGrid { background-color: transparent; border: none; padding: 0; margin: 0; }
+DataGridHeader { color: var(--text-muted); background-color: var(--surface-alt); border-bottom: 1px solid var(--line); font-family: "native:MainBold"; font-size: 2.2mm; padding: 1.4mm 2mm 1.4mm 2mm; margin: 0; }
+DataGridRow { color: var(--text); background-color: var(--surface); font-family: "native:MainRegular"; font-size: 2.45mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0; }
+DataGridRowAlt { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.45mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0; }
+DataGridLine { color: var(--line); background-color: var(--line); }
+
+/* The conversion funnel as labelled bars (AnalyticsPane.funnel). */
+MeFunnelRow { background-color: transparent; padding: 1mm 0 1.2mm 0; margin: 0; }
+MeFunnelLabel { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.4mm; padding: 0 0 0.6mm 0; margin: 0; }
+MeFunnelValue { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.3mm; padding: 0 0 0.6mm 0; margin: 0; }
+
+@media device-desktop {
+    DataGridHeader { font-family: "native:MainBold"; font-size: 2.6mm; }
+    DataGridRow { font-family: "native:MainRegular"; font-size: 2.95mm; }
+    DataGridRowAlt { font-family: "native:MainRegular"; font-size: 2.95mm; }
+    MeFunnelLabel { font-family: "native:MainRegular"; font-size: 2.9mm; }
+    MeFunnelValue { font-family: "native:MainBold"; font-size: 2.75mm; }
+}
+
+@media (prefers-color-scheme: dark) {
+    DataGridHeader { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border-bottom: 1px solid var(--line-dark); }
+    DataGridRow { color: var(--text-dark); background-color: var(--surface-dark); }
+    DataGridRowAlt { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    DataGridLine { color: var(--line-dark); background-color: var(--line-dark); }
+    MeFunnelLabel { color: var(--text-dark); }
+    MeFunnelValue { color: var(--text-muted-dark); }
+}
+/* ---- end MERCHANT ROUND B ---- */
+/* ---- SHOPPER ROUND A: order tracking, rewards, motion ---- */
+ShopTrackHero { background-color: var(--brand-tint); border-radius: var(--radius); padding: 3mm 3mm 1mm 3mm; margin: 1mm 0 2mm 0; }
+ShopTrackTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.6mm; padding: 0; margin: 0; }
+ShopTrackTitleDone { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 4.6mm; padding: 0; margin: 0; }
+ShopTrackSub { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.6mm 0 0 0; margin: 0; }
+ShopRoute { background-color: transparent; padding: 0; margin: 1mm 0 0 0; }
+ShopRouteLine { color: var(--line-strong); background-color: transparent; }
+ShopRouteDone { color: var(--brand); background-color: transparent; }
+ShopRouteMarker { color: var(--brand-contrast); background-color: var(--brand); }
+ShopTrackSteps { background-color: var(--surface-alt); border-radius: var(--radius); padding: 2.4mm 2.4mm 0.6mm 2.4mm; margin: 0 0 2mm 0; }
+ShopTrackStep { background-color: transparent; padding: 0; margin: 0; }
+ShopTrackTick { color: var(--brand); background-color: transparent; padding: 0; margin: 0; }
+ShopTrackTickNow { color: var(--brand); background-color: transparent; padding: 0; margin: 0; }
+ShopTrackTickTodo { color: var(--line-strong); background-color: transparent; padding: 0; margin: 0; }
+ShopTrackLine { background-color: var(--line-strong); padding: 0 0.15mm 0 0.15mm; margin: 0.4mm 0 0.4mm 1.7mm; }
+ShopTrackLineDone { background-color: var(--brand); padding: 0 0.2mm 0 0.2mm; margin: 0.4mm 0 0.4mm 1.65mm; }
+ShopTrackTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0.6mm 0 2.6mm 0; margin: 0; background-color: transparent; }
+ShopBanner { color: var(--brand); background-color: var(--surface); }
+ShopBannerTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.75mm; }
+ShopBannerText { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; }
+ShopBurst { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; }
+ShopRewards { background-color: var(--surface-alt); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
+ShopRewardsWords { background-color: transparent; padding: 1.4mm 0 0 3mm; margin: 0; }
+ShopRewardsTier { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0; margin: 0; }
+ShopRewardsPoints { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 5.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
+ShopRewardsNext { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0; margin: 0; }
+ShopRing { background-color: var(--surface-alt); padding: 0; margin: 0; }
+ShopRingTrack { color: var(--line); background-color: transparent; }
+ShopRingFill { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.8mm; }
+ShopBadges { background-color: transparent; padding: 2.4mm 0 0 0; margin: 0; }
+ShopBadgeTile { background-color: transparent; padding: 0 0.6mm 0 0.6mm; margin: 0; }
+ShopBadgeOn { color: var(--warning); background-color: transparent; padding: 0; margin: 0; }
+ShopBadgeOff { color: var(--line-strong); background-color: transparent; padding: 0; margin: 0; }
+ShopBadgeName { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 0.6mm 0 0 0; margin: 0; }
+ShopBadgeHint { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 1.9mm; text-align: center; padding: 0; margin: 0; }
+ShopRewardsPlaced { background-color: var(--warning-tint); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
+ShopPointsIcon { color: var(--warning); background-color: transparent; padding: 0 3mm 0 0; margin: 0; }
+ShopPointsEarned { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.6mm; padding: 0; margin: 0; }
+ShopPointsNote { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopReveal { background-color: var(--surface); border-radius: var(--radius); padding: 2.6mm; margin: 2.4mm 0 0 0; }
+ShopRevealKicker { color: var(--warning); background-color: transparent; font-family: "native:MainBold"; font-size: 2mm; padding: 0 0 0 2.4mm; margin: 0; }
+ShopRevealTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0 0 0 2.4mm; margin: 0; }
+ShopRevealText { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0 0 0 2.4mm; margin: 0; }
+ShopDrop { background-color: var(--brand-tint); border-radius: var(--radius); padding: 2.4mm; margin: 2mm 3mm 0 3mm; }
+ShopDropPhoto { background-color: transparent; border-radius: var(--radius-small); padding: 0; margin: 0; }
+ShopDropWords { background-color: transparent; padding: 0.6mm 0 0 3mm; margin: 0; }
+ShopDropKicker { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0; margin: 0; }
+ShopDropTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopDropPrice { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopDropStreak { color: #c2410c; background-color: transparent; font-family: "native:MainBold"; font-size: 2.2mm; padding: 1mm 0 0 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    ShopTrackHero { background-color: var(--brand-tint-dark); }
+    ShopTrackTitle { color: var(--text-dark); }
+    ShopTrackTitleDone { color: var(--success-dark); }
+    ShopTrackSub { color: var(--text-muted-dark); }
+    ShopRouteLine { color: var(--line-strong-dark); }
+    ShopRouteDone { color: var(--brand-dark); }
+    ShopRouteMarker { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopTrackSteps { background-color: var(--surface-alt-dark); }
+    ShopTrackTick { color: var(--brand-dark); }
+    ShopTrackTickNow { color: var(--brand-dark); }
+    ShopTrackTickTodo { color: var(--line-strong-dark); }
+    ShopTrackLine { background-color: var(--line-strong-dark); }
+    ShopTrackLineDone { background-color: var(--brand-dark); }
+    ShopTrackTodo { color: var(--text-muted-dark); }
+    ShopBanner { color: var(--brand-dark); background-color: var(--surface-press-dark); }
+    ShopBannerTitle { color: var(--text-dark); }
+    ShopBannerText { color: var(--text-muted-dark); }
+    ShopBurst { color: var(--warning-dark); }
+    ShopRewards { background-color: var(--surface-alt-dark); }
+    ShopRewardsTier { color: var(--brand-dark); }
+    ShopRewardsPoints { color: var(--text-dark); }
+    ShopRewardsNext { color: var(--text-muted-dark); }
+    ShopRing { background-color: var(--surface-alt-dark); }
+    ShopRingTrack { color: var(--line-dark); }
+    ShopRingFill { color: var(--brand-dark); }
+    ShopBadgeOn { color: var(--warning-dark); }
+    ShopBadgeOff { color: var(--line-strong-dark); }
+    ShopBadgeName { color: var(--text-dark); }
+    ShopBadgeHint { color: var(--text-muted-dark); }
+    ShopRewardsPlaced { background-color: var(--warning-tint-dark); }
+    ShopPointsIcon { color: var(--warning-dark); }
+    ShopPointsEarned { color: var(--text-dark); }
+    ShopPointsNote { color: var(--text-muted-dark); }
+    ShopReveal { background-color: var(--surface-dark); }
+    ShopRevealKicker { color: var(--warning-dark); }
+    ShopRevealTitle { color: var(--text-dark); }
+    ShopRevealText { color: var(--text-muted-dark); }
+    ShopDrop { background-color: var(--brand-tint-dark); }
+    ShopDropKicker { color: var(--brand-dark); }
+    ShopDropTitle { color: var(--text-dark); }
+    ShopDropPrice { color: var(--text-dark); }
+    ShopDropStreak { color: #fdba74; }
+}
+/* ---- end SHOPPER ROUND A ---- */
+
+/* ---- POLISH ROUND C: register picker and tiles, goal row, dashboard goals, channel donut ---- */
+/* The goal row shares the scan row's and chips' surface: transparent, it
+   showed the form's own background as a strip between them in dark. */
+PosGoalRow { background-color: var(--surface); }
+MeStreakIcon { color: #ea580c; background-color: transparent; padding: 0; margin: 0; }
+MeStreakValue { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.2mm; padding: 0; margin: 0; }
+MeGoalNext { color: var(--text-muted); background-color: var(--surface-alt); border-radius: 3mm; font-size: 2.2mm; padding: 1mm 2.6mm 1mm 2mm; margin: 1mm 0 0 0; }
+MeLegendWide { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0 0 0 3mm; border-bottom: 1px solid var(--line); }
+MeLegendName { color: var(--text); background-color: transparent; font-size: 2.6mm; padding: 0 1mm 0 0; margin: 0; }
+MeLegendShare { color: var(--text-muted); background-color: transparent; font-size: 2.4mm; padding: 0 0 0 1mm; margin: 0; }
+PosMilestone { padding: 3.4mm 3.4mm 3.6mm 3.4mm; margin: 1mm 0 3mm 0; border: 1px solid var(--brand); }
+PosMilestoneText { font-size: 3.8mm; }
+@media (prefers-color-scheme: dark) {
+    PosGoalRow { background-color: var(--surface-dark); }
+    MeStreakIcon { color: #fb923c; }
+    MeStreakValue { color: var(--text-dark); }
+    MeGoalNext { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    MeLegendWide { border-bottom: 1px solid var(--line-dark); }
+    MeLegendName { color: var(--text-dark); }
+    MeLegendShare { color: var(--text-muted-dark); }
+    PosMilestone { border: 1px solid var(--brand-dark); }
+}
+/* POLISH ROUND C (desktop dark): the desktop sidebar drew its native light
+   chrome in a dark window, half its entries pale text on pale grey. In dark
+   it takes the app's own dark surface and text instead. */
+@media (prefers-color-scheme: dark) {
+    SvDeskSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
+    SvDeskSideName { color: var(--text-dark); }
+    SvDeskSideDetail { color: var(--text-muted-dark); }
+    SvDeskSideLabel { color: var(--text-muted-dark); }
+    SvDeskSideItem { color: var(--text-dark); }
+    SvDeskSideItem.pressed { background-color: var(--line-dark); }
+    SvSide { background-color: var(--surface-alt-dark); }
+}
+/* ---- end POLISH ROUND C ---- */
+
+/* ---- POLISH ROUND D: milestone card, goal text, sheet scrim ---- */
+/* A full border declared after the radius drew the milestone card square;
+   the radius has to come after it to round the border with the fill. */
+PosMilestone { border: 1px solid var(--brand); border-radius: var(--radius); }
+PosGoalText { padding: 0 1mm 0 2mm; }
+@media (prefers-color-scheme: dark) {
+    PosMilestone { border: 1px solid var(--brand-dark); border-radius: var(--radius); }
+}
+/* The dim under a sheet or dialog: 40% black, so the screen behind reads as
+   the same screen, set back, in light and dark alike. */
+#Constants {
+    tintColor: "66000000";
+}
+/* ---- end POLISH ROUND D ---- */
+/* ---- SHOPPER ROUND B: tracking steps, rewards units, badge hints ---- */
+ShopTrackWords { background-color: transparent; padding: 0.5mm 0 2.4mm 0; margin: 0; }
+ShopTrackStepDone { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopTrackStepNow { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopTrackStepTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopTrackDetail { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
+ShopTrackEta { color: var(--brand); font-family: "native:MainBold"; font-size: 2.2mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
+ShopTrackLink { background-color: transparent; padding: 0; margin: 0; }
+ShopRewardsTierB { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 3.6mm; padding: 0; margin: 0; }
+ShopRewardsNextB { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.8mm 0 0 0; margin: 0; }
+ShopRewardsSpent { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+ShopRewardsBalance { background-color: var(--surface); border-radius: 2mm; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 2.4mm 0 1mm 0; }
+ShopRewardsBalanceLabel { color: var(--text); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.8mm 0 0 0; margin: 0; }
+ShopRewardsBalancePts { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0.4mm 0 0 0; margin: 0; }
+ShopBadgeCount { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 1.9mm; text-align: center; padding: 0.3mm 0 0 0; margin: 0; }
+ShopStoreMonogram { color: #ffffff; background-color: #4f46e5; border: 0.6mm solid #ffffff; border-radius: var(--radius-small); font-family: "native:MainBold"; font-size: 3.6mm; text-align: center; padding: 0; margin: 0 0 1.6mm 2mm; }
+@media (prefers-color-scheme: dark) {
+    ShopTrackStepDone { color: var(--text-dark); }
+    ShopTrackStepNow { color: var(--text-dark); }
+    ShopTrackStepTodo { color: var(--text-muted-dark); }
+    ShopTrackDetail { color: var(--text-muted-dark); }
+    ShopTrackEta { color: var(--brand-dark); }
+    ShopRewardsTierB { color: var(--brand-dark); }
+    ShopRewardsNextB { color: var(--text-dark); }
+    ShopRewardsSpent { color: var(--text-muted-dark); }
+    ShopRewardsBalance { background-color: var(--surface-dark); }
+    ShopRewardsBalanceLabel { color: var(--text-dark); }
+    ShopRewardsBalancePts { color: var(--text-dark); }
+    ShopBadgeCount { color: var(--brand-dark); }
+}
+/* ---- end SHOPPER ROUND B ---- */
+/* ---- POLISH ROUND E: variant chips ---- */
+/* The dark variant chips redeclared a full border after the radius they
+   inherit, and a border declared after a radius draws square (see the
+   milestone card in POLISH ROUND D). The derived light ones set their border
+   after cn1-derive the same way. Every chip states its radius after its
+   border here, in both modes. */
+PosVpChip { border: 1px solid var(--line-strong); border-radius: var(--radius); }
+PosVpChipOn { border: 2px solid var(--brand); border-radius: var(--radius); }
+PosVpChipOnOut { border: 2px solid var(--text-muted); border-radius: var(--radius); }
+PosVpChipOut { border: 1px solid var(--line); border-radius: var(--radius); }
+PosVpChipNone { border: 1px solid var(--line); border-radius: var(--radius); }
+@media (prefers-color-scheme: dark) {
+    PosVpChip { border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    PosVpChipOn { border: 2px solid var(--brand-dark); border-radius: var(--radius); }
+    PosVpChipOnOut { border: 2px solid var(--text-muted-dark); border-radius: var(--radius); }
+    PosVpChipOut { border: 1px solid var(--line-dark); border-radius: var(--radius); }
+    PosVpChipNone { border: 1px solid var(--line-dark); border-radius: var(--radius); }
+}
+/* ---- end POLISH ROUND E ---- */
+/* ---- POLISH ROUND F: register panel bounds ---- */
+/* The bold native face paints a little wider than it measures, so a bold
+   label sized to its text lost its last letter ("Sale complet", "today's
+   goa") and the grand total sat on the panel edge. A hair of padding on the
+   right gives the paint room. */
+PosMilestoneText { padding: 0 1mm 0 0; }
+PosGrand { padding: 1.5mm 1mm 1mm 0; }
+@media (prefers-color-scheme: dark) {
+    PosMilestoneText { padding: 0 1mm 0 0; }
+    PosGrand { padding: 1.5mm 1mm 1mm 0; }
+}
+/* ---- end POLISH ROUND F ---- */
+/* ---- POLISH ROUND G: merchant assistant chips and answers ---- */
+/* The suggestion row: the MeChip buttons wrap with their own margins; the
+   row only insets them from the pane's edges. */
+AsChips { background-color: transparent; padding: 2mm 3mm 0.8mm 3mm; margin: 0; }
+/* An answer is the avatar beside the text bubble; the row itself is bare. */
+AsBubbleRow { background-color: transparent; padding: 0; margin: 1mm 3mm 1mm 3mm; }
+AsBubbleText { color: var(--text); background-color: var(--surface); border: 1px solid var(--line); border-radius: 3mm; padding: 2.4mm 3.2mm 2.4mm 3.2mm; margin: 0; font-size: 2.8mm; }
+AsAvatar { color: var(--brand); background-color: var(--brand-tint); border-radius: 3mm; padding: 1.2mm; margin: 0 1.6mm 0 0; text-align: center; }
+@media (prefers-color-scheme: dark) {
+    AsBubbleText { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: 3mm; }
+    AsAvatar { color: var(--brand-dark); background-color: var(--brand-tint-dark); border-radius: 3mm; }
+}
+/* ---- end POLISH ROUND G ---- */
