@@ -1,0 +1,73 @@
+/* The storefront's floating chat (chat.js). Every colour is a theme
+   variable, so the store's palette, accent and corner radius carry over. */
+.chat{position:fixed;inset-inline-end:20px;bottom:20px;z-index:40;font-size:.95rem}
+.chat svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.chat-bubble{position:relative;display:grid;place-items:center;width:58px;height:58px;margin-inline-start:auto;border:0;border-radius:50%;background:var(--accent);color:#fff;cursor:pointer;box-shadow:0 8px 24px #0003,0 2px 6px #0002;transition:transform .15s}
+.chat-bubble:hover{transform:scale(1.05)}
+.chat-bubble:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.chat-bubble svg{width:26px;height:26px}
+.chat-bubble .i-close,.chat.is-open .chat-bubble .i-open{display:none}
+.chat.is-open .chat-bubble .i-close{display:block}
+.chat-badge{position:absolute;top:-2px;inset-inline-end:-2px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#d93025;color:#fff;font:700 .75rem/22px system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px var(--bg)}
+.chat-badge[hidden]{display:none}
+.chat-panel{position:absolute;inset-inline-end:0;bottom:72px;display:flex;flex-direction:column;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 120px));background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:calc(var(--radius,10px) + 8px);box-shadow:0 18px 48px #0004;overflow:hidden;animation:chat-in .18s ease-out}
+.chat-panel[hidden]{display:none}
+@keyframes chat-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.chat-panel{animation:none}.chat-bubble{transition:none}}
+.chat-head{display:flex;align-items:center;gap:10px;padding:14px 12px 14px 16px;background:var(--accent);color:#fff}
+.chat-avatar{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:50%;background:#ffffff33;font-weight:700;font-size:1.05rem}
+.chat-who{flex:1;min-width:0}
+.chat-who h2{margin:0;font-size:1rem;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-status{display:flex;align-items:center;gap:6px;margin:2px 0 0;font-size:.8rem;opacity:.92}
+.chat-dot{width:8px;height:8px;border-radius:50%;background:#ffffff80;flex:none}
+.chat.is-online .chat-dot{background:#34d058;box-shadow:0 0 0 2px #ffffff40}
+.chat-icon{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:50%;background:none;color:inherit;cursor:pointer}
+.chat-icon:hover,.chat-icon:focus-visible{background:#ffffff26;outline:none}
+.chat-icon[hidden]{display:none}
+.chat-log{flex:1;list-style:none;margin:0;padding:16px 14px 8px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;background:var(--soft)}
+.chat-msg{max-width:82%;display:flex;flex-direction:column}
+.chat-msg p{margin:0;padding:9px 13px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4}
+.chat-msg.them{align-self:flex-start}
+.chat-msg.them p{background:var(--bg);border:1px solid var(--line);border-end-start-radius:6px}
+.chat-msg.me{align-self:flex-end;align-items:flex-end}
+.chat-msg.me p{background:var(--accent);color:#fff;border-end-end-radius:6px}
+.chat-msg.is-sending p{opacity:.65}
+.chat-msg.is-failed p{background:#c0362c}
+.chat-meta{display:inline-flex;align-items:center;gap:4px;margin:3px 6px 4px;font-size:.72rem;color:var(--muted)}
+.chat-tick svg{width:15px;height:15px;stroke-width:2.2}
+.chat-tick.read{color:var(--accent)}
+.chat-greet p{background:var(--bg);border:1px solid var(--line)}
+.chat-note{align-self:center;max-width:90%;margin:6px 0;padding:4px 10px;border-radius:999px;background:var(--bg);color:var(--muted);font-size:.8rem;text-align:center}
+.chat-typing{display:flex;align-items:center;gap:8px;margin:0;padding:4px 16px 6px;background:var(--soft);color:var(--muted);font-size:.8rem}
+.chat-typing[hidden]{display:none}
+.chat-dots{display:inline-flex;gap:3px}
+.chat-dots i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:chat-dot 1.2s infinite ease-in-out}
+.chat-dots i:nth-child(2){animation-delay:.15s}
+.chat-dots i:nth-child(3){animation-delay:.3s}
+@keyframes chat-dot{0%,80%,100%{opacity:.3;transform:none}40%{opacity:1;transform:translateY(-3px)}}
+.chat-email{padding:10px 14px;border-top:1px solid var(--line);background:var(--bg);font-size:.82rem;color:var(--muted)}
+.chat-email[hidden]{display:none}
+.chat-email label{display:block;margin-bottom:6px}
+.chat-email-row{display:flex;gap:6px}
+.chat-email input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.chat-email button{padding:7px 12px;border:0;border-radius:8px;background:var(--soft);color:var(--ink);font:600 .82rem system-ui,sans-serif;cursor:pointer}
+.chat-form{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--bg)}
+.chat-form textarea{flex:1;min-height:40px;max-height:120px;resize:none;padding:9px 12px;border:1px solid var(--line);border-radius:20px;background:var(--soft);color:var(--ink);font:inherit;line-height:1.4}
+.chat-form textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.chat-send{display:grid;place-items:center;flex:none;width:40px;height:40px;border:0;border-radius:50%;background:var(--accent);color:#fff;cursor:pointer}
+.chat-send svg{width:18px;height:18px}
+[dir=rtl] .chat-send svg{transform:scaleX(-1)}
+.chat-call{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px;background:#111;color:#fff}
+.chat-call[hidden]{display:none}
+.chat-remote{width:100%;max-height:200px;border-radius:12px;background:#000;display:none}
+.chat-local{position:absolute;top:22px;inset-inline-end:22px;width:84px;border-radius:8px;background:#222;display:none}
+.chat.is-video .chat-remote,.chat.is-video .chat-local{display:block}
+.chat-call-t{margin:0;font-weight:600}
+.chat-call-do{display:flex;gap:8px;margin:0}
+.chat-call-do button{padding:7px 16px;border:0;border-radius:999px;background:#ffffff26;color:#fff;font:600 .85rem system-ui,sans-serif;cursor:pointer}
+.chat-call-do button[aria-pressed=true]{background:#fff;color:#111}
+.chat-call-do .chat-end{background:#d93025}
+.chat.is-down .chat-dot{background:#f9ab00}
+/* The cookie banner sits along the bottom too: lift the chat above it. */
+body:has(.consent:not([hidden])) .chat{bottom:150px}
+@media (max-width:540px){.chat{inset-inline-end:16px;bottom:16px}.chat-panel{position:fixed;inset:auto 8px 84px;width:auto;height:min(560px,calc(100vh - 100px))}body:has(.consent:not([hidden])) .chat{bottom:220px}}

@@ -1,0 +1,169 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.shop;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.codenameone.examples.bazaar.api.CartDto;
+import com.codenameone.examples.bazaar.api.FulfillmentSummaryDto;
+import com.codenameone.examples.bazaar.api.OptionDto;
+import com.codenameone.examples.bazaar.api.OrderDto;
+import com.codenameone.examples.bazaar.api.StockDto;
+import com.codenameone.examples.bazaar.api.VariantDto;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+/// Variants, the cart estimate, order steps and the search query, built from
+/// DTOs directly. Nothing here opens a display.
+class ShopRulesTest {
+    private static VariantDto variant(String id, String o1, String o2, int available) {
+        return new VariantDto(id, "p", o1 + " / " + o2, o1, o2, null, null, null, 1000, 0, 0, 0,
+                true, true, false, 0, available,
+                Arrays.asList(new StockDto("l1", "Downtown", available), new StockDto("l2", "Mall", 1)),
+                false, "", "", 0L, "", 0, "");
+    }
+
+    private static final List<OptionDto> OPTIONS = Arrays.asList(
+            new OptionDto("o1", "Size", Arrays.asList("S", "M"), 0),
+            new OptionDto("o2", "Colour", Arrays.asList("Red", "Blue"), 1));
+
+    @Test
+    void optionsResolveToAVariant() {
+        List<VariantDto> vs = Arrays.asList(variant("a", "S", "Red", 0), variant("b", "S", "Blue", 3),
+                variant("c", "M", "Red", 9));
+        String[] chosen = Variants.initial(OPTIONS, vs);
+        assertEquals("S", chosen[0]);
+        assertEquals("Blue", chosen[1]);
+        assertEquals("b", Variants.resolve(OPTIONS, vs, chosen).id());
+        assertNull(Variants.resolve(OPTIONS, vs, new String[] {"M", "Blue", null}));
+        assertFalse(Variants.possible(OPTIONS, vs, chosen, 1, "Red"));
+        assertTrue(Variants.possible(OPTIONS, vs, new String[] {"M", "Blue", null}, 1, "Red"));
+        assertEquals("Downtown", Variants.bestStock(vs.get(2)).locationName());
+        assertTrue(Variants.low(new StockDto("l", "x", 3)));
+        assertFalse(Variants.low(new StockDto("l", "x", 6)));
+    }
+
+    /// The phone checkout reviewed $102.96 (free shipping over $75) and placed
+    /// $108.95 (standard, $5.99): Standard was tapped and the review, still
+    /// the free rate's quote, could be placed before it was priced again.
+    /// A review may be placed only with the rate its total was priced with.
+    @org.junit.jupiter.api.Test
+    void reviewIsPlacedOnlyWithTheRateItWasPricedWith() {
+        CartDto free = cart("free75", 0, false, 0);
+        assertFalse(Estimate.agrees(free, "standard"));
+        assertTrue(Estimate.agrees(free, "free75"));
+        assertFalse(Estimate.agrees(null, "free75"));
+        assertFalse(Estimate.agrees(cart(null, 0, false, 0), "standard"));
+        CartDto standard = cart("standard", 599, false, 0);
+        assertEquals(standard.totalCents(), totalOf(standard));
+    }
+
+    private static long totalOf(CartDto cart) {
+        long total = -1;
+        for (Estimate.Row row : Estimate.rows(cart)) {
+            if (row.kind == Estimate.TOTAL) {
+                total = row.cents;
+            }
+        }
+        return total;
+    }
+
+    private static CartDto cart(String rate, long shipping, boolean inclusive, long gift) {
+        return new CartDto("c", "s", null, "USD", Collections.emptyList(), "SAVE", "GC", 5000, 500,
+                shipping, 400, inclusive, 4900 + shipping, gift, 4900 + shipping - gift, false,
+                null, null, rate, null, true, false, 0, 0);
+    }
+
+    private static String captions(CartDto cart) {
+        StringBuilder out = new StringBuilder();
+        for (Estimate.Row row : Estimate.rows(cart)) {
+            out.append(row.caption).append(row.note == null ? "" : "(" + row.note + ")").append(';');
+        }
+        return out.toString();
+    }
+
+    @Test
+    void estimateRows() {
+        assertEquals("Subtotal;Discount;Shipping(At checkout);Tax;Total;",
+                captions(cart(null, 0, false, 0)));
+        assertEquals("Subtotal;Discount;Shipping(Free);Tax included;Total;Gift card;Due now;",
+                captions(cart("r1", 0, true, 1000)));
+        CartDto c = cart("r1", 0, true, 0);
+        CartDto credited = new CartDto(c.id(), c.storeId(), c.token(), c.currency(), c.lines(),
+                c.discountCode(), c.giftCardCode(), c.subtotalCents(), c.discountCents(),
+                c.shippingCents(), c.taxCents(), c.taxInclusive(), c.totalCents(), 0,
+                c.totalCents() - 300, c.freeShipping(), c.discounts(),
+                c.shippingOptions(), c.shippingRateId(), c.problems(), c.shippingRequired(), true, 300,
+                900);
+        assertEquals("Subtotal;Discount;Shipping(Free);Tax included;Total;Store credit;Due now;",
+                captions(credited));
+        List<Estimate.Row> rows = Estimate.rows(cart("r1", 700, false, 0));
+        assertEquals(-500, rows.get(1).cents);
+        assertEquals(Estimate.SAVING, rows.get(1).kind);
+        assertEquals(700, rows.get(2).cents);
+    }
+
+    private static OrderDto order(String status, String financial, String fulfilment,
+            String... parcels) {
+        FulfillmentSummaryDto[] f = new FulfillmentSummaryDto[parcels.length];
+        for (int iter = 0; iter < parcels.length; iter++) {
+            f[iter] = new FulfillmentSummaryDto("f" + iter, parcels[iter], null, null, 0);
+        }
+        return new OrderDto("o", "s", 7, "online", status, financial, fulfilment, "u", "e", 0, 0, 0,
+                0, 0, 0, "USD", null, null, null, null, null, null, 0, null, null, null, null,
+                Arrays.asList(f), 0, null);
+    }
+
+    @Test
+    void orderSteps() {
+        assertEquals(1, OrderSteps.reached(order("OPEN", "PENDING", "UNFULFILLED")));
+        assertEquals(2, OrderSteps.reached(order("OPEN", "AUTHORIZED", "UNFULFILLED")));
+        assertEquals(3, OrderSteps.reached(order("OPEN", "PAID", "UNFULFILLED", "SHIPPED")));
+        assertEquals(4, OrderSteps.reached(order("OPEN", "PAID", "FULFILLED", "DELIVERED")));
+        assertEquals(0, OrderSteps.reached(order("CANCELLED", "PAID", "UNFULFILLED")));
+        assertTrue(OrderSteps.cancellable(order("OPEN", "AUTHORIZED", "UNFULFILLED")));
+        assertFalse(OrderSteps.cancellable(order("OPEN", "AUTHORIZED", "UNFULFILLED", "IN_TRANSIT")));
+        assertFalse(OrderSteps.cancellable(order("CANCELLED", "PAID", "UNFULFILLED")));
+        assertEquals("Cancelled", OrderSteps.label(order("CANCELLED", "PAID", "UNFULFILLED")));
+        assertEquals("Shipped", OrderSteps.label(order("OPEN", "PAID", "PARTIAL")));
+    }
+
+    @Test
+    void searchQueryParams() {
+        SearchQuery q = new SearchQuery();
+        assertNull(q.sortParam());
+        assertNull(q.words());
+        q.q = "  mug ";
+        assertEquals("mug", q.words());
+        assertEquals("relevance", q.sortParam());
+        q.type = "Mug";
+        q.min = 500;
+        assertEquals(2, q.active());
+        assertEquals("500", q.minParam());
+        assertNull(q.maxParam());
+        q.clearFilters();
+        assertEquals(0, q.active());
+        assertEquals("mug", q.words());
+    }
+}

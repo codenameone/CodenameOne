@@ -1,0 +1,19 @@
+FROM docker.io/library/eclipse-temurin:17
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    xvfb xauth libxtst6 libxi6 libxrender1 libxext6 libgtk-3-0 fonts-dejavu fonts-roboto maven curl ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+# The desktop look draws native: fonts in the platform's UI face, which on
+# Linux is Cantarell or Adwaita Sans; neither is in this image, so Java fell
+# back to its Dialog font, fontconfig's "sans-serif", which was DejaVu Sans:
+# wide, thin and nothing like the phone build. Roboto (Apache 2.0, from
+# fonts-roboto above) is the face the phone build uses, so it is made the
+# sans-serif here and under the two desktop names. Only the capture image
+# changes; a real Linux desktop keeps its own UI font, as a native app should.
+RUN mkdir -p /etc/fonts/conf.d \
+ && printf '%s\n' '<?xml version="1.0"?>' '<!DOCTYPE fontconfig SYSTEM "fonts.dtd">' '<fontconfig>' \
+    '<alias binding="strong"><family>sans-serif</family><prefer><family>Roboto</family></prefer></alias>' \
+    '<alias binding="strong"><family>Cantarell</family><prefer><family>Roboto</family></prefer></alias>' \
+    '<alias binding="strong"><family>Adwaita Sans</family><prefer><family>Roboto</family></prefer></alias>' \
+    '</fontconfig>' >/etc/fonts/conf.d/01-bazaar-roboto.conf \
+ && fc-cache -f >/dev/null && fc-match sans-serif

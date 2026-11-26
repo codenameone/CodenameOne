@@ -1,0 +1,290 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.web;
+
+import com.codename1.backend.HttpServer;
+import com.codename1.backend.security.SecurityExchange;
+import com.codenameone.examples.bazaar.api.MarketDto;
+import com.codenameone.examples.bazaar.domain.Store;
+import com.codenameone.examples.bazaar.market.Locales;
+import com.codenameone.examples.bazaar.market.Markets;
+import com.codenameone.examples.bazaar.market.Translations;
+import com.codenameone.examples.bazaar.web.slots.Slots;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/// Which market and language a storefront page is drawn for.
+///
+/// The market comes from `?market=<code>` -- an address of its own, so a
+/// shared cache keeps one copy per market and search engines see each as an
+/// alternate (`hreflang`, in Link headers since compiled views take only
+/// static hrefs) -- or else from the `market` cookie a shopper's earlier pick
+/// left, which makes that copy private ([Slots#PERSONAL]). With neither the
+/// store's own prices show, and the page is the shared default.
+///
+/// The language is the market's locale, or else the best of the visitor's
+/// `Accept-Language` that the store has translations for; a page translated
+/// that way says `Vary: Accept-Language`.
+public final class StorefrontMarkets {
+    public static final String COOKIE = "market";
+    /// The exchange attribute holding the extra Link header values.
+    public static final String LINKS = "bazaar.market.links";
+    /// The exchange attribute naming the request header the page varies on.
+    public static final String VARY = "bazaar.market.vary";
+
+    private StorefrontMarkets() {
+    }
+
+    /// The market code the query names, or null.
+    public static String query(HttpServer.Request request) {
+        String q;
+        try {
+            q = request.param(COOKIE);
+        } catch (RuntimeException malformed) {
+            q = null;
+        }
+        return code(q);
+    }
+
+    /// The market code of the visitor's cookie, or null.
+    public static String cookie(HttpServer.Request request) {
+        return request == null ? null : code(request.getCookie(COOKIE));
+    }
+
+    static String code(String c) {
+        if (c == null || c.length() == 0 || c.length() > 16) {
+            return null;
+        }
+        for (int iter = 0; iter < c.length(); iter++) {
+            char ch = c.charAt(iter);
+            if (!(ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9' || ch == '-')) {
+                return null;
+            }
+        }
+        return c;
+    }
+
+    static final String CHOICE = "bazaar.market.choice";
+
+    /// The interface language this request's storefront page resolved
+    /// ([#choose]), or null when no storefront page chose one. The checkout
+    /// records it on the order, so its mail speaks the language the shopper
+    /// read the store in.
+    public static String chosenUi() {
+        SecurityExchange ex = SecurityExchange.current();
+        Object made = ex == null ? null : ex.getAttribute(CHOICE);
+        return made instanceof Choice ? ((Choice) made).ui : null;
+    }
+
+    /// What a product page needs: the pricer (or null), the locale (or null).
+    public static final class Choice {
+        String storeId;
+        public Markets.Pricer pricer;
+        public String locale;
+        /// The interface language ([StoreText#LANGUAGES]).
+        public String ui = "en";
+        /// Each choice, its `url` the market code ([MarketChoice]; empty for the
+        /// store's own prices).
+        public final List<LinkView> picker = new ArrayList<LinkView>();
+        /// The market the visitor's country suggests ([GeoCountry]), offered in a
+        /// banner and never applied; null when there is none.
+        public LinkView suggested;
+        List<MarketDto> all = new ArrayList<MarketDto>();
+        boolean chose;
+        boolean geoAsked;
+    }
+
+    /// Chooses for `path` (no query) at `store`, and records the headers.
+    public static Choice choose(Store store, String path, HttpServer.Request request,
+            Markets markets, Translations translations, SiteUrls urls) throws IOException {
+        return choose(store, path, request, markets, translations, urls, null);
+    }
+
+    /// [#choose] that also suggests a market from the visitor's country when
+    /// `geo` knows it, the shopper chose nothing (no query, no cookie) and the
+    /// visitor is not a crawler. A page with a suggestion is private
+    /// ([Slots#PERSONAL]); its prices, address and canonical are unchanged.
+    public static Choice choose(Store store, String path, HttpServer.Request request,
+            Markets markets, Translations translations, SiteUrls urls, GeoCountry geo)
+            throws IOException {
+        SecurityExchange ex = SecurityExchange.current();
+        // Once per request: the page body and the menus every page carries
+        // ask the same question, and the headers are recorded once.
+        Object made = ex == null ? null : ex.getAttribute(CHOICE);
+        if (made instanceof Choice && store.getId().equals(((Choice) made).storeId)) {
+            // The page's frame may have asked first, without the visitor's country.
+            suggest((Choice) made, geo, request, path, ex);
+            return (Choice) made;
+        }
+        Choice c = new Choice();
+        c.storeId = store.getId();
+        if (ex != null) {
+            ex.setAttribute(CHOICE, c);
+        }
+        String code = query(request);
+        boolean fromCookie = false;
+        if (code == null) {
+            code = cookie(request);
+            fromCookie = code != null;
+        }
+        c.pricer = markets.pricer(store, code);
+        if (c.pricer != null && fromCookie && ex != null) {
+            ex.setAttribute(Slots.PERSONAL, "1");
+        }
+        List<MarketDto> all = markets.active(store.getId());
+        boolean chose = code != null;
+        StringBuilder links = new StringBuilder();
+        String current = c.pricer == null ? null : c.pricer.market().getCode();
+        c.picker.add(new LinkView(store.getCurrency() + " (store prices)", "", current == null));
+        for (int iter = 0; iter < all.size(); iter++) {
+            MarketDto m = all.get(iter);
+            String href = path + "?market=" + SiteUrls.encode(m.code());
+            // The picker posts the code ([MarketChoice]); the address is the alternate.
+            c.picker.add(new LinkView(m.name() + " (" + m.currency() + ")", m.code(),
+                    m.code().equals(current)));
+            String lang = Locales.orNull(m.locale());
+            if (lang != null) {
+                if (links.length() > 0) {
+                    links.append(", ");
+                }
+                links.append('<').append(urls.absolute(request, href))
+                        .append(">; rel=\"alternate\"; hreflang=\"").append(lang).append('"');
+            }
+        }
+        // Each interface language is an address of its own too (`?lang=`),
+        // so a crawler finds every translation without a cookie; a language
+        // a market already stands for keeps the market's address.
+        for (int iter = 0; iter < StoreText.LANGUAGES.length; iter++) {
+            String l = StoreText.LANGUAGES[iter];
+            if (links.indexOf("hreflang=\"" + l + "\"") >= 0
+                    || links.indexOf("hreflang=\"" + l + "-") >= 0) {
+                continue;
+            }
+            if (links.length() > 0) {
+                links.append(", ");
+            }
+            links.append('<').append(urls.absolute(request, path + "?lang=" + l))
+                    .append(">; rel=\"alternate\"; hreflang=\"").append(l).append('"');
+        }
+        links.append(", <").append(urls.absolute(request, path))
+                .append(">; rel=\"alternate\"; hreflang=\"x-default\"");
+        if (ex != null) {
+            ex.setAttribute(LINKS, links.toString());
+        }
+        // The content language: the shopper's explicit choice (`?lang=`, an
+        // address of its own that the hreflang alternates name, else the
+        // `lang` cookie), then the market's, then the browser's -- each
+        // resolved to a locale the store translated into, so `de` finds
+        // `de-CH`. The interface language below follows the same choice.
+        String explicit = StoreText.chosen(request);
+        String marketLocale = c.pricer == null ? null
+                : Locales.orNull(c.pricer.market().getLocale());
+        if (explicit != null) {
+            if (marketLocale != null && Locales.language(marketLocale).equals(explicit)) {
+                c.locale = marketLocale;
+            } else {
+                List<String> one = new ArrayList<String>();
+                one.add(explicit);
+                c.locale = translations.pick(store.getId(), one);
+            }
+        } else {
+            c.locale = marketLocale;
+        }
+        // A language the shopper chose and the store never translated into
+        // shows the originals, not some third language.
+        if (c.locale == null && explicit == null) {
+            List<String> wanted = Locales.accepted(request.getHeader("Accept-Language"));
+            c.locale = wanted.isEmpty() ? null : translations.pick(store.getId(), wanted);
+            StoreText.vary(ex, "Accept-Language");
+        }
+        // The interface text: the shopper's explicit choice (`?lang=`, an
+        // address of its own; else the `lang` cookie, which makes the copy
+        // private), then the content language when the app ships text for
+        // it, then the visitor's best (StoreText). Without `?lang=` the page
+        // varies by the cookie; a market whose locale has no interface text
+        // falls back on the header, so that page varies by it as well.
+        String asked = StoreText.query(request);
+        String spoken = c.locale == null ? null : Locales.language(c.locale);
+        if (asked != null) {
+            c.ui = asked;
+        } else {
+            StoreText.vary(ex, "Cookie");
+            String kept = StoreText.cookie(request);
+            if (kept != null) {
+                c.ui = kept;
+                if (ex != null) {
+                    ex.setAttribute(Slots.PERSONAL, "1");
+                }
+            } else if (spoken != null && StoreText.supported(spoken)) {
+                c.ui = spoken;
+            } else {
+                c.ui = StoreText.pick(null, Locales.accepted(request.getHeader("Accept-Language")));
+                StoreText.vary(ex, "Accept-Language");
+            }
+        }
+        c.all = all;
+        c.chose = chose;
+        suggest(c, geo, request, path, ex);
+        c.picker.set(0, new LinkView(store.getCurrency() + " ("
+                + StoreText.table(c.ui).get("storePrices") + ")", "", current == null));
+        return c;
+    }
+
+    /// Fills [Choice#suggested] once `geo` is known (see [#choose]).
+    private static void suggest(Choice c, GeoCountry geo, HttpServer.Request request,
+            String path, SecurityExchange ex) {
+        if (geo == null || c.geoAsked || c.chose || request == null
+                || GeoCountry.crawler(request.getHeader("User-Agent"))) {
+            return;
+        }
+        c.geoAsked = true;
+        c.suggested = suggest(c.all, geo.country(request), path, c.ui);
+        if (c.suggested != null && ex != null) {
+            ex.setAttribute(Slots.PERSONAL, "1");
+        }
+    }
+
+    /// The first active market selling to `country`, as a label and the code
+    /// [MarketChoice] posts, or null.
+    static LinkView suggest(List<MarketDto> all, String country, String path, String ui) {
+        if (country == null) {
+            return null;
+        }
+        for (int iter = 0; iter < all.size(); iter++) {
+            MarketDto m = all.get(iter);
+            List<String> cs = m.countries();
+            for (int at = 0; cs != null && at < cs.size(); at++) {
+                if (country.equalsIgnoreCase(cs.get(at))) {
+                    return new LinkView(StoreText.format(StoreText.table(ui), "geoNote",
+                            country, m.name(), m.currency()),
+                            m.code(), false);
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The translated value of `field`, or `original`.
+    public static String text(Map<String, String> fields, String field, String original) {
+        String v = fields == null ? null : fields.get(field);
+        return v == null || v.length() == 0 ? original : v;
+    }
+}

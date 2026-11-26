@@ -1,0 +1,16 @@
+<!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
+<!-- cn1:model form com.codenameone.examples.bazaar.web.auth.SignUpView -->
+<!doctype html>
+<html th:attr="lang=${shell.lang},dir=${shell.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<body class="auth"><main id="main" class="auth-card" tabindex="-1"><a class="brand" href="/">Bazaar</a>
+<h1 th:text="${shell.heading}">Create an account</h1>
+<p class="toast bad" role="alert" th:unless="${form.problem.empty}" th:text="${form.problem}">Wrong</p>
+<form method="post" action="/auth/signup" class="stack">
+<input type="hidden" name="_ft" th:value="${form.fillToken}"><div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+<label for="email" th:text="${shell.t['email']}">Email</label><input id="email" name="email" type="email" autocomplete="email" required autofocus th:value="${form.email}">
+<label for="displayName" th:text="${shell.t['yourName']}">Your name</label><input id="displayName" name="displayName" autocomplete="name" th:value="${form.displayName}">
+<label for="phone" th:text="${shell.t['phone']}">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" required th:value="${form.phone}">
+<label for="password" th:text="${shell.t['password']}">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required>
+<label for="confirm" th:text="${shell.t['passwordAgain']}">Password again</label><input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="10" required>
+<button class="button" type="submit" th:text="${shell.t['createAccountButton']}">Create account</button></form>
+<p class="muted"><span th:text="${shell.t['haveAccount']}">Already have an account?</span> <a href="/auth/signin" th:text="${shell.t['signIn']}">Sign in</a></p></main></body></html>

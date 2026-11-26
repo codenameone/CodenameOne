@@ -1,0 +1,21 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model pay com.codenameone.examples.bazaar.web.PayView -->
+<!doctype html>
+<html th:attr="lang=${page.lang},dir=${page.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap confirm" id="main"><h1><span th:text="${page.t['pay.title'] + ' #'}">Your order #</span><span th:text="${pay.number}">1</span></h1>
+<p class="status" th:if="${pay.paid}" role="status" th:text="${page.t['pay.done']}">Paid. Thank you, a receipt is on its way.</p>
+<p th:unless="${pay.paid}"><span th:text="${page.t['pay.intro']}">Prepared for you by</span> <strong th:text="${pay.storeName}">Store</strong><th:block th:unless="${pay.email.empty}"> - <span th:text="${pay.email}">you@example.com</span></th:block></p>
+<table class="lines"><thead><tr><th th:text="${page.t['item']}">Item</th><th th:text="${page.t['quantity']}">Quantity</th><th th:text="${page.t['total']}">Total</th></tr></thead><tbody>
+<tr th:each="l : ${pay.lines}"><td><span th:text="${l.title}">Item</span> <span class="variant" th:unless="${l.variant.empty}" th:text="${l.variant}">Variant</span> <span class="badge" th:if="${l.backordered}" th:text="${page.t['backordered']}">Ships when back in stock</span> <span class="unit" th:text="${l.unit}">$1</span></td><td th:text="${l.quantity}">1</td><td th:text="${l.total}">$1</td></tr></tbody></table>
+<dl class="totals"><dt th:text="${page.t['subtotal']}">Subtotal</dt><dd th:text="${pay.subtotal}">$1</dd><dt th:unless="${pay.discount.empty}" th:text="${page.t['discount']}">Discount</dt><dd th:unless="${pay.discount.empty}" th:text="${pay.discount}">-$1</dd><dt th:text="${page.t['shipping']}">Shipping</dt><dd th:text="${pay.shipping}">$1</dd><dt th:text="${page.t['tax']}">Tax</dt><dd th:text="${pay.tax}">$0</dd><dt th:text="${page.t['total']}">Total</dt><dd class="total" th:text="${pay.total}">$1</dd><dt th:unless="${pay.paid}" th:text="${page.t['toPay']}">To pay</dt><dd th:unless="${pay.paid}" th:text="${pay.due}">$1</dd></dl>
+<form th:unless="${pay.paid}" method="post" th:action="${pay.action}" novalidate><fieldset><legend th:text="${page.t['payment']}">Payment</legend>
+<p th:unless="${pay.typedCards}" th:text="${page.t['pay.noCards']}">This shop cannot take a card here. Contact the shop to pay.</p>
+<div th:if="${pay.typedCards}">
+<div class="field"><label for="pay-name" th:text="${page.t['pay.cardName']}">Name on card</label><input id="pay-name" name="name" autocomplete="cc-name"></div>
+<div class="field"><label for="card-number" th:text="${page.t['cardNumber']}">Card number</label><input id="card-number" name="cardNumber" inputmode="numeric" autocomplete="cc-number" th:attr="aria-invalid=${!pay.cardError.empty},aria-describedby=${pay.cardError.empty ? 'card-hint' : 'card-error card-hint'}"><p class="meta" id="card-hint" th:text="${page.t['cardHint']}">Test mode: 4242 4242 4242 4242 pays.</p></div>
+<div class="row2"><div class="field"><label for="card-expiry" th:text="${page.t['expiry']}">Expiry (MM/YY)</label><input id="card-expiry" name="cardExpiry" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY"></div>
+<div class="field"><label for="card-cvc" th:text="${page.t['cvc']}">Security code</label><input id="card-cvc" name="cardCvc" inputmode="numeric" autocomplete="cc-csc"></div></div>
+<p class="err" id="card-error" role="alert" th:unless="${pay.cardError.empty}" th:text="${pay.cardError}">Error</p>
+<button class="button checkout" type="submit" th:text="${page.t['pay.now'] + ' ' + pay.due}">Pay</button></div></fieldset></form>
+<p><a th:href="${pay.storeUrl}" th:text="${page.t['keepShopping']}">Keep shopping</a></p></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>
