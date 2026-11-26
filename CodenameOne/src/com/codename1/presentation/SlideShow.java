@@ -420,7 +420,8 @@ public class SlideShow extends Container {
         Object[] base = saved instanceof Object[] ? (Object[]) saved : null;
         int[] now = {s.getPaddingTop(), s.getPaddingBottom(), s.getPaddingLeftNoRTL(),
             s.getPaddingRightNoRTL()};
-        if (base == null || base[2] != s.getFont() || !samePadding((int[]) base[3], now)) {
+        // Identity on purpose: the font this method wrote last time, not an equal one.
+        if (base == null || base[2] != s.getFont() || !samePadding((int[]) base[3], now)) { // NOPMD CompareObjectsWithEquals
             base = new Object[] {s.getFont(), now, null, null};
         } else if (base[4] instanceof Float
                 && Math.abs(((Float) base[4]).floatValue() - ratio) < 0.005f) {
