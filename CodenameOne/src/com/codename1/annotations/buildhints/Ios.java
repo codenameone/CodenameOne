@@ -200,9 +200,10 @@ public @interface Ios {
 
     /// Which Xcode the build server compiles with.
     ///
-    /// Unset lets the server choose: it prefers its own default and falls back
-    /// to the newest Xcode it carries, so a server that hasn't been re-imaged
-    /// keeps building. Naming one opts out of that fallback -- a version the
+    /// Unset lets the server choose: the newest Xcode 27 release it carries.
+    /// It never picks a newer major than its default on its own -- a newer
+    /// Xcode is opted into by naming it here. Naming one also opts out of the
+    /// default -- `26` keeps the previous toolchain, and a version the
     /// server doesn't have fails the build rather than substituting a toolchain
     /// nobody asked for, which would archive against an unintended SDK with
     /// nothing in the log to say so.
