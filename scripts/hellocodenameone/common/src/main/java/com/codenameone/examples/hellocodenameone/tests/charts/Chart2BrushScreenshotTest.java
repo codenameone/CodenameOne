@@ -24,6 +24,7 @@ package com.codenameone.examples.hellocodenameone.tests.charts;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
+import com.codename1.ui.util.UITimer;
 import com.codename1.ui.chart.Chart;
 import com.codename1.ui.chart.ChartContext;
 
@@ -38,7 +39,7 @@ public class Chart2BrushScreenshotTest extends AbstractChart2ScreenshotTest {
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         super.registerReadyCallback(parent, new Runnable() {
             @Override
             public void run() {
@@ -56,7 +57,10 @@ public class Chart2BrushScreenshotTest extends AbstractChart2ScreenshotTest {
                 c.pointerDragged(new int[]{(from + to) / 2}, new int[]{y});
                 c.pointerDragged(new int[]{to}, new int[]{y});
                 c.repaint();
-                run.run();
+                // Capture after that repaint lands, never in the same callback: the capture used
+                // to beat it, so every port's golden was harvested without the band this test
+                // exists to show, and a run where the paint won failed as a mismatch.
+                UITimer.timer(500, false, parent, run);
             }
         });
     }
