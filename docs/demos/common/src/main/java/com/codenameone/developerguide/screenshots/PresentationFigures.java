@@ -26,6 +26,7 @@ import com.codename1.presentation.Presentation;
 import com.codename1.presentation.SlideShow;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.geom.Dimension;
 import com.codenameone.developerguide.presentation.PresentationSnippets;
 
@@ -75,10 +76,14 @@ public final class PresentationFigures {
         public Form build() {
             Form f = scene.build(new PresentationSnippets());
             if (kind != Kind.EDITOR) {
-                // A slide show letterboxes the slide in black inside whatever it is given;
-                // photographed in a portrait phone that was two black bands taller than
-                // the slide. Ask for the slide's own shape so the crop stops at its edge.
+                // A slide show letterboxes the slide in black inside whatever it is given.
+                // In the snippet's BorderLayout.CENTER it is stretched to the whole portrait
+                // phone and the slide sits in the middle of it, while the figure is cropped
+                // to the show's preferred height from its top -- three identical pictures
+                // of black backdrop. NORTH gives the show exactly the slide's own shape.
                 Component show = f.getContentPane().getComponentAt(0);
+                f.getContentPane().removeComponent(show);
+                f.add(BorderLayout.NORTH, show);
                 int w = FigureDevice.ANDROID.width();
                 float wide = kind == Kind.PRESENTER ? 0.64f : 1f;
                 show.setPreferredSize(new Dimension(w, Math.round(w * wide
