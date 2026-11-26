@@ -46,11 +46,24 @@ public final class ZipParts {
     private ZipParts() {
     }
 
-    /// Reads every file entry. Names lose a leading slash.
+    /// Reads every file entry under the `MAX_TOTAL` budget. Names lose a leading slash.
     public static Map<String, byte[]> read(InputStream in, String kind) throws IOException {
+        return read(in, kind, MAX_TOTAL);
+    }
+
+    /// Reads every file entry under a budget of the caller's own, for a format whose
+    /// packages legitimately carry more, such as design files full of bitmaps. Names lose a
+    /// leading slash.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the package
+    /// - `kind`: what the package is, for error messages
+    /// - `maxTotal`: the most bytes the entries may unpack to, together
+    public static Map<String, byte[]> read(InputStream in, String kind, long maxTotal) throws IOException {
         ZipInputStream zip = new ZipInputStream(in);
         Map<String, byte[]> parts = new HashMap<String, byte[]>();
-        long left = MAX_TOTAL;
+        long left = maxTotal;
         int entries = 0;
         byte[] buffer = new byte[8192];
         try {
@@ -70,7 +83,7 @@ public final class ZipParts {
                 for (int n = zip.read(buffer); n > 0; n = zip.read(buffer)) {
                     left -= n;
                     if (left < 0) {
-                        throw new IOException("The " + kind + " unpacks to more than " + MAX_TOTAL
+                        throw new IOException("The " + kind + " unpacks to more than " + maxTotal
                                 + " bytes");
                     }
                     out.write(buffer, 0, n);

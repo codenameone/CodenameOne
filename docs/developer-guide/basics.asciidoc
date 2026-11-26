@@ -466,7 +466,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 .TableLayout constraints can be used to create elaborate UI's
 image::img/generated/table-layout-constraints.png[TableLayout constraints can be used to create elaborate UI's,scaledwidth=20%]
 
-===== TextMode Layout
+===== TextModeLayout
 
 `TextModeLayout` is a unique layout manager. It acts like `TableLayout` on Android and like `BoxLayout.Y_AXIS` in other platforms. Internally it delegates to one of these two layout managers so in a sense it doesn't have as much functionality of its own.
 
