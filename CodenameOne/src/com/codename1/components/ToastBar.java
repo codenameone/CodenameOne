@@ -115,6 +115,11 @@ import static com.codename1.ui.ComponentSelector.$;
 /// Status with a multi-line message:
 ///
 /// ![A status message that wraps over several lines](https://www.codenameone.com/developer-guide/img/components-statusbar-multiline.png)
+///
+/// #### See also
+///
+/// - [EmptyState]: a persistent message, with an optional retry action, for a
+///   screen that loaded nothing.
 public final class ToastBar {
 
     /// The default timeout for info/error messages
@@ -171,7 +176,7 @@ public final class ToastBar {
 
     /// Gets reference to the singleton StatusBar instance
     ///
-    /// The singleton shows on whichever `com.codename1.ui.Form` is current, including
+    /// The singleton shows on whichever [com.codename1.ui.Form] is current, including
     /// while a desktop window has the focus. To toast on a window use
     /// `#getForTopLevel(com.codename1.ui.TopLevelContainer)`, which is what the static
     /// helpers on this class do.
@@ -183,7 +188,7 @@ public final class ToastBar {
     ///
     /// The singleton follows whichever `Form` is current, which is the behaviour every
     /// existing application relies on, so a `Form` or null still gets it. A
-    /// `com.codename1.ui.Window` gets its own instance instead, cached on the window
+    /// [com.codename1.ui.Window] gets its own instance instead, cached on the window
     /// and dying with it -- a settable host on the singleton would have meant one
     /// window silently redirecting another surface's toasts.
     ///
@@ -257,7 +262,7 @@ public final class ToastBar {
     ///
     /// - `msg`: the message
     ///
-    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    /// - `icon`: the material icon to show from [com.codename1.ui.FontImage]
     ///
     /// - `timeout`: the timeout value in milliseconds
     ///
@@ -285,7 +290,7 @@ public final class ToastBar {
     ///
     /// - `msg`: the message
     ///
-    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    /// - `icon`: the material icon to show from [com.codename1.ui.FontImage]
     ///
     /// - `timeout`: the timeout value in milliseconds
     ///
@@ -302,7 +307,7 @@ public final class ToastBar {
     ///
     /// - `msg`: the message
     ///
-    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    /// - `icon`: the material icon to show from [com.codename1.ui.FontImage]
     ///
     /// - `listener`: the action to perform when the ToastBar is tapped
     ///
@@ -317,7 +322,7 @@ public final class ToastBar {
     ///
     /// #### Parameters
     ///
-    /// - `icon`: the material icon to show from `com.codename1.ui.FontImage`
+    /// - `icon`: the material icon to show from [com.codename1.ui.FontImage]
     ///
     /// - `msg`: the message
     ///

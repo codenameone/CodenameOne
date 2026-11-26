@@ -29,6 +29,9 @@ There are two ways to bring an Android app over. Pick by what the user has:
 | `Spinner` | `Picker` (string list) | Do **not** use `ComboBox`. |
 | `ProgressBar` (determinate) | `Slider` (set max, `setEditable(false)`) | |
 | `ProgressBar` (indeterminate) | `InfiniteProgress` | |
+| Shimmer / skeleton loading (`ShimmerFrameLayout`) | `Skeleton` | `Skeleton.rows(n)` in place of the list while it loads. |
+| `ViewPager2` + `TabLayout` dots | `Carousel`, or `Tabs` + `PageIndicator` | `setAutoPlay(ms)` for a banner rotator. |
+| `TapTargetView` / showcase overlays | `CoachMarks` | `showOnce(key)` for first-launch tours. |
 | `FloatingActionButton` | `com.codename1.components.FloatingActionButton` | `createFAB(char icon).bindFabToContainer(...)`. |
 | `Dialog` / `AlertDialog` | `Dialog.show(...)` | |
 | `Toast` | `ToastBar.showMessage(...)` | |
