@@ -1075,6 +1075,9 @@ public class IOSNative {
     native String getLongMonthName(long time);
     native String getShortMonthName(long time);
     native String getCurrencySymbol();
+    native String getCurrencyCode();
+    native String formatCurrencyCode(double d, String currencyCode);
+    native String getCurrencySymbolForCode(String currencyCode);
     
     native void scanQRCode();
     native void scanBarCode();

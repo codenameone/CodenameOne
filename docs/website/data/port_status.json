@@ -626,6 +626,8 @@
         "AppReviewDialogScreenshotTest",
         "CenteredDialogTitleScreenshotTest",
         "CenteredInteractionDialogTitleScreenshotTest",
+        "CoachMarksScreenshotTest",
+        "LoadingPlaceholdersScreenshotTest",
         "DialogThemeScreenshotTest",
         "FloatingActionButtonThemeScreenshotTest",
         "SpanLabelThemeScreenshotTest"
@@ -846,6 +848,15 @@
       "description": "Checks that text, HTML, image and file representations survive a copy/paste round trip through the system clipboard.",
       "tests": [
         "ClipboardRoundTripTest"
+      ]
+    },
+    {
+      "id": "currency",
+      "category": "Application runtime",
+      "name": "Currencies",
+      "description": "ISO 4217 currencies through java.util.Currency, and amounts formatted in any currency for the user's locale.",
+      "tests": [
+        "CurrencyApiTest"
       ]
     },
     {
@@ -1850,6 +1861,14 @@
     {
       "pattern": "CenteredInteractionDialogTitle*",
       "test": "CenteredInteractionDialogTitleScreenshotTest"
+    },
+    {
+      "pattern": "CoachMarks*",
+      "test": "CoachMarksScreenshotTest"
+    },
+    {
+      "pattern": "LoadingPlaceholders*",
+      "test": "LoadingPlaceholdersScreenshotTest"
     },
     {
       "pattern": "AppReviewDialog",

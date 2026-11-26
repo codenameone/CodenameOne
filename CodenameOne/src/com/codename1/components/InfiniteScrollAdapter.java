@@ -34,7 +34,7 @@ import com.codename1.ui.layouts.FlowLayout;
 /// running out of data), this effectively works by showing an infinite progress
 /// indicator when reaching scroll end then allowing code to fetch additional components.
 ///
-/// **Warning:** If you call `com.codename1.ui.Container#removeAll()`  on the container to which an InfiniteScrollAdapter is
+/// **Warning:** If you call [com.codename1.ui.Container#removeAll()]  on the container to which an InfiniteScrollAdapter is
 /// installed, it will disable the infinite scrolling behavior.  You can re-enable infinite scrolling by calling `com.codename1.ui.Component[], boolean)`
 /// again.
 ///
@@ -95,6 +95,11 @@ import com.codename1.ui.layouts.FlowLayout;
 ///     }
 /// }
 /// ```
+///
+/// #### See also
+///
+/// - [Skeleton#rows(int)]: placeholder rows to show while the first page loads.
+/// - [EmptyState]: what to show when the first fetch returns nothing or fails.
 public final class InfiniteScrollAdapter {
     private final Component ip;
     private final InfiniteProgress progress;

@@ -658,6 +658,13 @@ public final class LinuxNative {
      */
     public static native String formatLocalTime(long millis, int what);
 
+    /**
+     * The environment locale's monetary conventions, in the six-line form
+     * {@code com.codename1.impl.LocaleCurrencyFormat} reads; null when the
+     * locale cannot be opened.
+     */
+    public static native String localeCurrency();
+
     /* ---------------------------------------------------------- crypto */
 
     /** Fills {@code out} with fresh entropy; false when the platform RNG failed. */

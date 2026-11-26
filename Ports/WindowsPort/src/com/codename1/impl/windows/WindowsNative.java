@@ -685,6 +685,13 @@ public final class WindowsNative {
 
     public static native String storageDir();
 
+    /**
+     * The user locale's monetary conventions, in the six-line form
+     * {@code com.codename1.impl.LocaleCurrencyFormat} reads; null when Windows
+     * does not answer.
+     */
+    public static native String localeCurrency();
+
     /** Directory of the running executable; resources are resolved relative to it. */
     public static native String executableDir();
 
