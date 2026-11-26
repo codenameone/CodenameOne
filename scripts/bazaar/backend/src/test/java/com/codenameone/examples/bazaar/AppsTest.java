@@ -346,7 +346,15 @@ class AppsTest {
         assertTrue(apps.sendShopRedacts(later) >= 1);
         assertEquals(0, apps.sendShopRedacts(later));
         webhooks.deliverDue(later);
-        assertEquals(1, to(rec, Webhooks.SHOP_REDACT).size());
+        // Count this store's only: the sweep also redacts the apps other tests
+        // uninstalled, and the compiled runner shares one database between them.
+        int redacts = 0;
+        for (String[] sent : to(rec, Webhooks.SHOP_REDACT)) {
+            if (sent[2].contains(s.storeId)) {
+                redacts++;
+            }
+        }
+        assertEquals(1, redacts);
         Map audited = db.queryOne("SELECT COUNT(*) AS n FROM audit_event WHERE store_id = ? "
                 + "AND action = 'APP_UNINSTALLED'", new Object[] {s.storeId});
         assertEquals(1L, Rows.number(audited.get("n")));
