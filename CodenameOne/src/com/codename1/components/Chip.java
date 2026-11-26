@@ -36,6 +36,8 @@ import com.codename1.ui.util.EventDispatcher;
 /// A small rounded label for a tag, a filter or a choice: Material's input,
 /// filter and choice chips.
 ///
+/// ![Selectable, removable and plain chips](https://www.codenameone.com/developer-guide/img/generated/components-chip.png)
+///
 /// ```java
 /// // filter chips: tap to toggle
 /// Container filters = FlowLayout.encloseIn(

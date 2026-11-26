@@ -38,6 +38,8 @@ import java.util.List;
 /// A vertical list of events joined by a line: order tracking ("Placed",
 /// "Packed", "Out for delivery"), an activity feed or a history.
 ///
+/// ![An order timeline with done, current and pending steps](https://www.codenameone.com/developer-guide/img/generated/components-activity-timeline.png)
+///
 /// ```java
 /// ActivityTimeline order = new ActivityTimeline();
 /// order.addStep("Order placed", "We received your order", "9:02", ActivityTimeline.DONE);

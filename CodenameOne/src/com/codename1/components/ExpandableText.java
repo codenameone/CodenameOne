@@ -35,6 +35,8 @@ import com.codename1.ui.plaf.Style;
 /// link that expands it in place and a "Show less" link that collapses it
 /// again.
 ///
+/// ![A collapsed paragraph with a More link](https://www.codenameone.com/developer-guide/img/generated/components-expandable-text.png)
+///
 /// ```java
 /// ExpandableText about = new ExpandableText(longDescription, 3);
 /// form.add(about);

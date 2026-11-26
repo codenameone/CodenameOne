@@ -38,6 +38,8 @@ import java.util.List;
 /// A text field that turns each entry into a removable `Chip`: a tag input,
 /// a recipient field or a list of keywords.
 ///
+/// ![A recipient field holding three chips](https://www.codenameone.com/developer-guide/img/generated/components-chip-input.png)
+///
 /// ```java
 /// ChipInput tags = new ChipInput();
 /// tags.setHint("Add a tag");

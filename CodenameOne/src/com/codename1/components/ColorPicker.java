@@ -42,6 +42,8 @@ import com.codename1.ui.util.EventDispatcher;
 /// swatch and the hex value of the result, and optionally a row of preset
 /// swatches.
 ///
+/// ![The color picker with its saturation area, hue strip and presets](https://www.codenameone.com/developer-guide/img/generated/components-color-picker.png)
+///
 /// ```java
 /// ColorPicker picker = new ColorPicker(0x3b82f6);
 /// picker.setPresets(0xef4444, 0xf59e0b, 0x10b981, 0x3b82f6, 0x8b5cf6);

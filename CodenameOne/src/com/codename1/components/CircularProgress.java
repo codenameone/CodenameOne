@@ -35,6 +35,8 @@ import com.codename1.ui.plaf.Style;
 /// percentage (or any short text) in the middle -- a "percent indicator",
 /// "progress ring" or "donut" progress.
 ///
+/// ![Circular progress rings with and without a label](https://www.codenameone.com/developer-guide/img/generated/components-circular-progress.png)
+///
 /// ```java
 /// CircularProgress upload = new CircularProgress();
 /// upload.setProgress(40);

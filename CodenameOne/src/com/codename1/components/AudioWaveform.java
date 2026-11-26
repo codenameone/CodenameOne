@@ -34,6 +34,8 @@ import com.codename1.ui.util.EventDispatcher;
 /// The bars of an audio clip's loudness, with the played part in the accent
 /// colour: the waveform of a voice message, a recording or a podcast scrubber.
 ///
+/// ![A voice message waveform, partly played](https://www.codenameone.com/developer-guide/img/generated/components-audio-waveform.png)
+///
 /// ```java
 /// AudioWaveform wave = new AudioWaveform(AudioWaveform.levelsFromPcm(samples, 48));
 /// wave.addActionListener(e -> player.setTime(

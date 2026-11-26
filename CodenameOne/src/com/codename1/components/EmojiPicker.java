@@ -47,6 +47,8 @@ import java.util.List;
 /// An emoji keyboard: a grid of emoji by category, with a search field and a
 /// row of recently used ones.
 ///
+/// ![The emoji picker with its search field and category tabs](https://www.codenameone.com/developer-guide/img/generated/components-emoji-picker.png)
+///
 /// ```java
 /// TextField message = new TextField();
 /// EmojiPicker emoji = new EmojiPicker();

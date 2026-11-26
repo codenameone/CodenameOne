@@ -35,6 +35,8 @@ import com.codename1.ui.util.EventDispatcher;
 /// A slider with two thumbs that selects a range, such as a price filter or
 /// a time window.
 ///
+/// ![A price range slider with both thumbs](https://www.codenameone.com/developer-guide/img/generated/components-range-slider.png)
+///
 /// ```java
 /// RangeSlider price = new RangeSlider(0, 500, 50, 300);
 /// price.setStep(10);

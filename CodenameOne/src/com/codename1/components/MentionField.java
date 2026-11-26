@@ -39,6 +39,8 @@ import java.util.List;
 /// A text field that suggests people (or tags, or channels) as the user types
 /// an `@` mention, and completes the name when one is tapped.
 ///
+/// ![A text field suggesting names after an at sign](https://www.codenameone.com/developer-guide/img/generated/components-mention-field.png)
+///
 /// ```java
 /// MentionField comment = new MentionField();
 /// comment.setCandidates("Ada Lovelace", "Alan Turing", "Grace Hopper");

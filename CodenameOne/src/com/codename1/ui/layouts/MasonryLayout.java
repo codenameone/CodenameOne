@@ -32,6 +32,8 @@ import com.codename1.ui.plaf.Style;
 /// whichever column is shortest so far: a masonry, staggered or Pinterest-style
 /// grid, where tiles keep their own heights and the columns do not line up.
 ///
+/// ![Tiles of different heights packed into two columns](https://www.codenameone.com/developer-guide/img/generated/components-masonry-layout.png)
+///
 /// ```java
 /// Container feed = new Container(new MasonryLayout(2));
 /// for (Photo p : photos) {
