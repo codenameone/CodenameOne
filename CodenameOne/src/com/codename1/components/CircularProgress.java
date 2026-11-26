@@ -38,9 +38,11 @@ import com.codename1.ui.plaf.Style;
 /// ![Circular progress rings with and without a label](https://www.codenameone.com/developer-guide/img/generated/components-circular-progress.png)
 ///
 /// ```java
+/// Form form = new Form("Upload", BoxLayout.y());
 /// CircularProgress upload = new CircularProgress();
 /// upload.setProgress(40);
 /// form.add(FlowLayout.encloseCenter(upload));
+/// form.show();
 /// // later
 /// upload.setProgress(85);
 /// upload.setText("3 of 4");   // instead of "85%"

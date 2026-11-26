@@ -38,8 +38,13 @@ import com.codename1.ui.plaf.Style;
 /// ![A collapsed paragraph with a More link](https://www.codenameone.com/developer-guide/img/generated/components-expandable-text.png)
 ///
 /// ```java
+/// Form form = new Form("About", BoxLayout.y());
+/// String longDescription = "A long paragraph of product details that runs well past "
+///         + "three lines on a phone screen, so only its start shows until the user "
+///         + "taps the link to read the rest of it.";
 /// ExpandableText about = new ExpandableText(longDescription, 3);
 /// form.add(about);
+/// form.show();
 /// ```
 ///
 /// The link appears only when the text needs more lines than the limit at the

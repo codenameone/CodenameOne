@@ -42,12 +42,14 @@ import java.util.List;
 /// ![A text field suggesting names after an at sign](https://www.codenameone.com/developer-guide/img/generated/components-mention-field.png)
 ///
 /// ```java
+/// Form form = new Form("Comment", BoxLayout.y());
 /// MentionField comment = new MentionField();
 /// comment.setCandidates("Ada Lovelace", "Alan Turing", "Grace Hopper");
 /// comment.getTextField().setHint("Write a comment");
 /// form.add(comment);
+/// form.show();
 /// // later
-/// List<String> notify = comment.getMentions();
+/// java.util.List<String> notify = comment.getMentions();
 /// ```
 ///
 /// The suggestions show under the field, in the layout, while the word at the

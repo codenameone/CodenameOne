@@ -45,10 +45,17 @@ import com.codename1.ui.util.EventDispatcher;
 /// ![The color picker with its saturation area, hue strip and presets](https://www.codenameone.com/developer-guide/img/generated/components-color-picker.png)
 ///
 /// ```java
+/// Form form = new Form("Accent color", BoxLayout.y());
+/// Label preview = new Label("Preview");
+/// preview.getAllStyles().setBgTransparency(255);
 /// ColorPicker picker = new ColorPicker(0x3b82f6);
 /// picker.setPresets(0xef4444, 0xf59e0b, 0x10b981, 0x3b82f6, 0x8b5cf6);
-/// picker.addActionListener(e -> preview.getAllStyles().setBgColor(picker.getColor()));
-/// form.add(picker);
+/// picker.addActionListener(e -> {
+///     preview.getAllStyles().setBgColor(picker.getColor());
+///     preview.repaint();
+/// });
+/// form.addAll(picker, preview);
+/// form.show();
 ///
 /// // or ask in a dialog; null when the user cancels
 /// Integer chosen = ColorPicker.showDialog("Highlight", 0xffcc00);

@@ -38,12 +38,14 @@ import com.codename1.ui.util.EventDispatcher;
 /// ![A price range slider with both thumbs](https://www.codenameone.com/developer-guide/img/generated/components-range-slider.png)
 ///
 /// ```java
+/// Form form = new Form("Filters", BoxLayout.y());
 /// RangeSlider price = new RangeSlider(0, 500, 50, 300);
 /// price.setStep(10);
 /// Label shown = new Label("$50 - $300");
 /// price.addActionListener(e -> shown.setText(
 ///         "$" + price.getLowerValue() + " - $" + price.getUpperValue()));
 /// form.add(price).add(shown);
+/// form.show();
 /// ```
 ///
 /// Dragging moves whichever thumb is nearer the touch; the thumbs never cross.

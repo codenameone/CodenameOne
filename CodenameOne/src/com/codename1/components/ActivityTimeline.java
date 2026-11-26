@@ -41,12 +41,14 @@ import java.util.List;
 /// ![An order timeline with done, current and pending steps](https://www.codenameone.com/developer-guide/img/generated/components-activity-timeline.png)
 ///
 /// ```java
+/// Form form = new Form("Order", BoxLayout.y());
 /// ActivityTimeline order = new ActivityTimeline();
 /// order.addStep("Order placed", "We received your order", "9:02", ActivityTimeline.DONE);
 /// order.addStep("Preparing", "The kitchen is on it", "9:05", ActivityTimeline.DONE);
 /// order.addStep("On the way", "Dana is 6 minutes away", "9:21", ActivityTimeline.CURRENT);
 /// order.addStep("Delivered", null, null, ActivityTimeline.PENDING);
 /// form.add(order);
+/// form.show();
 /// ```
 ///
 /// A step is `#DONE`, `#CURRENT` or `#PENDING`. Done steps and the line up to

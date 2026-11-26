@@ -35,11 +35,16 @@ import com.codename1.ui.plaf.Style;
 /// ![Tiles of different heights packed into two columns](https://www.codenameone.com/developer-guide/img/generated/components-masonry-layout.png)
 ///
 /// ```java
+/// Form form = new Form("Gallery", new BorderLayout());
 /// Container feed = new Container(new MasonryLayout(2));
-/// for (Photo p : photos) {
-///     feed.add(new ScaleImageLabel(p.image()));   // tiles of any height
+/// int[] heights = {240, 160, 300, 200, 180, 260};
+/// for (int h : heights) {
+///     // stands in for a downloaded photo
+///     feed.add(new ScaleImageLabel(Image.createImage(200, h, 0xff90caf9)));
 /// }
 /// feed.setScrollableY(true);
+/// form.add(BorderLayout.CENTER, feed);
+/// form.show();
 /// ```
 ///
 /// Each component is as wide as its column and as tall as it prefers at that

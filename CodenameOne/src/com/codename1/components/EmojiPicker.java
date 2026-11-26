@@ -50,13 +50,16 @@ import java.util.List;
 /// ![The emoji picker with its search field and category tabs](https://www.codenameone.com/developer-guide/img/generated/components-emoji-picker.png)
 ///
 /// ```java
+/// Form form = new Form("Message", new BorderLayout());
 /// TextField message = new TextField();
 /// EmojiPicker emoji = new EmojiPicker();
 /// emoji.bindTo(message);                 // inserts at the cursor
+/// form.add(BorderLayout.NORTH, message);
 /// form.add(BorderLayout.SOUTH, emoji);
+/// form.show();
 ///
 /// // or handle the choice yourself
-/// emoji.addActionListener(e -> send(emoji.getSelectedEmoji()));
+/// emoji.addActionListener(e -> Log.p("Picked " + emoji.getSelectedEmoji()));
 /// ```
 ///
 /// Tabs along the top switch category; the search field matches emoji names.

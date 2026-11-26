@@ -37,12 +37,20 @@ import com.codename1.ui.util.EventDispatcher;
 /// ![A voice message waveform, partly played](https://www.codenameone.com/developer-guide/img/generated/components-audio-waveform.png)
 ///
 /// ```java
+/// Form form = new Form("Voice message", BoxLayout.y());
+/// // 16-bit samples, normally decoded from the recording
+/// short[] samples = new short[4800];
+/// for (int i = 0; i < samples.length; i++) {
+///     samples[i] = (short) (Math.sin(i / 40.0) * 12000 * Math.sin(i / 900.0));
+/// }
 /// AudioWaveform wave = new AudioWaveform(AudioWaveform.levelsFromPcm(samples, 48));
-/// wave.addActionListener(e -> player.setTime(
-///         (int) (wave.getProgress() * player.getDuration())));
-/// // as playback advances, unless the user's finger is on it
+/// wave.addActionListener(e -> Log.p("Seek to " + wave.getProgress()));
+/// form.add(wave);
+/// form.show();
+/// // as playback advances (a Media's getTime() / getDuration()),
+/// // unless the user's finger is on it
 /// if (!wave.isSeeking()) {
-///     wave.setProgress(player.getTime() / (float) player.getDuration());
+///     wave.setProgress(0.25f);
 /// }
 /// ```
 ///

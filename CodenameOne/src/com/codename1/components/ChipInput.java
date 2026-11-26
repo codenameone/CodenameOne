@@ -41,12 +41,14 @@ import java.util.List;
 /// ![A recipient field holding three chips](https://www.codenameone.com/developer-guide/img/generated/components-chip-input.png)
 ///
 /// ```java
+/// Form form = new Form("Tags", BoxLayout.y());
 /// ChipInput tags = new ChipInput();
 /// tags.setHint("Add a tag");
 /// tags.addValue("design");
 /// tags.addValue("mobile");
 /// tags.addActionListener(e -> Log.p("Tags: " + tags.getValues()));
 /// form.add(tags);
+/// form.show();
 /// ```
 ///
 /// An entry becomes a chip when the user presses Done or types a separator
