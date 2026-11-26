@@ -24,12 +24,10 @@ package com.codename1.wordprocessing;
 
 import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.Display;
-import com.codename1.ui.EncodedImage;
 import com.codename1.spellcheck.ProofIssue;
 import com.codename1.spellcheck.Proofreader;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
 import com.codename1.ui.ScrollSurface;
 import com.codename1.ui.TextInputClient;
 import com.codename1.ui.TextInputConfig;
@@ -138,7 +136,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
     private final ScreenMeasurer screenFonts = new ScreenMeasurer();
     /// While painting: whether the item being painted ends its line.
     private boolean paintLastOnLine = true;
-    private final Map<String, Image> images = new HashMap<String, Image>();
+    private LayoutPainter painter;
+    private boolean chromeless;
+    private float fixedScale;
     private final EventDispatcher caretListeners = new EventDispatcher();
     private int gapPx;
     private Runnable viewportListener;
@@ -445,6 +445,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
     ///
     /// the scale
     public float getScale() {
+        if (fixedScale > 0) {
+            return fixedScale;
+        }
         float natural = Display.getInstance().convertToPixels(254f) / 720f;
         float s = natural;
         int w = getWidth();
@@ -457,7 +460,44 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
         return Math.max(0.05f, s * zoom);
     }
 
+    /// Shows the pages with nothing around them: no desk, no page edge and no white page,
+    /// one page directly under the other with no gap. A view laid over a slide uses this to
+    /// edit a text box in place, over the shape's own fill.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: true for no chrome
+    public void setChromeless(boolean value) {
+        chromeless = value;
+        repaint();
+    }
+
+    /// True when the view shows its pages without chrome.
+    ///
+    /// #### Returns
+    ///
+    /// true without chrome
+    public boolean isChromeless() {
+        return chromeless;
+    }
+
+    /// Pins the scale, in pixels per point, overriding fit-to-width and zoom; zero or less
+    /// returns to them. A view laid over another painting of the same text uses this so both
+    /// put every word in the same place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: pixels per point, or 0
+    public void setFixedScale(float value) {
+        fixedScale = value;
+        setShouldCalcPreferredSize(true);
+        repaint();
+    }
+
     private int gap() {
+        if (chromeless) {
+            return 0;
+        }
         if (gapPx == 0) {
             gapPx = Math.max(4, Display.getInstance().convertToPixels(3f));
         }
@@ -523,6 +563,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
     }
 
     private int pageLeft(int page) {
+        if (chromeless) {
+            return 0;
+        }
         return Math.max(gap(), (getContentWidth() - pageWidthPx(page)) / 2);
     }
 
@@ -622,12 +665,14 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
             paintOrder = new ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, paintOrder);
         }
-        // null when the platform cannot tell
-        g.setColor(Boolean.TRUE.equals(Display.getInstance().isDarkMode()) ? DESK_DARK : DESK);
-        // the whole viewport, not just the pages' extent: a short document leaves the rest of
-        // it otherwise showing whatever is behind the view
-        g.fillRect(x, y, Math.max(getContentWidth(), getOffsetX() + getWidth()),
-                Math.max(getContentHeight(), getOffsetY() + getHeight()));
+        if (!chromeless) {
+            // null when the platform cannot tell
+            g.setColor(Boolean.TRUE.equals(Display.getInstance().isDarkMode()) ? DESK_DARK : DESK);
+            // the whole viewport, not just the pages' extent: a short document leaves the rest of
+            // it otherwise showing whatever is behind the view
+            g.fillRect(x, y, Math.max(getContentWidth(), getOffsetX() + getWidth()),
+                    Math.max(getContentHeight(), getOffsetY() + getHeight()));
+        }
         DocumentLayout l = getLayout();
         float scale = getScale();
         int clipY = g.getClipY();
@@ -643,10 +688,12 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
             if (top > clipY + clipH || top + ph < clipY) {
                 continue;
             }
-            g.setColor(PAGE_EDGE);
-            g.fillRect(left + 1, top + 1, pw + 1, ph + 1);
-            g.setColor(0xffffff);
-            g.fillRect(left, top, pw, ph);
+            if (!chromeless) {
+                g.setColor(PAGE_EDGE);
+                g.fillRect(left + 1, top + 1, pw + 1, ph + 1);
+                g.setColor(0xffffff);
+                g.fillRect(left, top, pw, ph);
+            }
             List<LayoutItem> items = l.getPage(p).getItems();
             for (int i = 0; i < items.size(); i++) {
                 LayoutItem it = items.get(i);
@@ -725,22 +772,16 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
     }
 
     private void paintPicture(Graphics g, Picture p, int x, int y, int w, int h) {
-        String key = p.id + ":" + p.dataLength() + ":" + p.hashCode();
-        Image img = images.get(key);
-        if (img == null && !images.containsKey(key) && !p.isLinked()) {
-            try {
-                img = EncodedImage.create(p.data());
-            } catch (RuntimeException e) {
-                img = null;
-            }
-            images.put(key, img);
+        painter().paintPicture(g, p, x, y, w, h);
+    }
+
+    /// The painter of the current layout's measurer, made again when the measurer changes.
+    private LayoutPainter painter() {
+        Measurer m = getLayout().getMeasurer();
+        if (painter == null || painter.getMeasurer() != m) { //NOPMD CompareObjectsWithEquals - a different measurer instance, not an equal one
+            painter = new LayoutPainter(m);
         }
-        if (img != null) {
-            g.drawImage(img, x, y, w, h);
-        } else {
-            g.setColor(PAGE_EDGE);
-            g.drawRect(x, y, w - 1, h - 1);
-        }
+        return painter;
     }
 
     private void paintText(Graphics g, LayoutItem it, int x, int baseline, float scale) {
@@ -812,67 +853,12 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
         }
     }
 
-    /// Where the first `chars` characters of an item end, in pixels from its left edge, by
-    /// the measurer the page was laid out with.
     private int offset(LayoutItem it, int chars, float scale) {
-        return chars <= 0 ? 0 : Math.round(getLayout().getMeasurer().width(it.text.substring(0, chars),
-                it.style) * scale);
+        return painter().offset(it, chars, scale);
     }
 
-    /// Draws an item a word at a time, each where the layout put it. The font drawn at a
-    /// whole pixel size is never exactly the one measured, and drawn in one piece the
-    /// difference would add up along the run and over the next one; this way it stays
-    /// inside the space after each word.
     private void drawWords(Graphics g, LayoutItem it, int x, int y, float scale) {
-        String s = it.text;
-        int n = s.length();
-        int start = 0;
-        while (start < n) {
-            while (start < n && s.charAt(start) == ' ') {
-                start++;
-            }
-            if (start >= n) {
-                break;
-            }
-            int end = s.indexOf(' ', start);
-            if (end < 0) {
-                end = n;
-            }
-            int at = x + offset(it, start, scale);
-            int box = x + offset(it, end, scale) - at;
-            String word = s.substring(start, end);
-            if (repeated(word) || ScreenMeasurer.isMonospace(it.style)) {
-                // a tab leader: every dot at its own measured place, so a run of them cannot
-                // drift into the text after the tab
-                // drift into the text after the tab; monospaced text the same way, each
-                // character centred in its cell of the grid
-                for (int k = start; k < end; k++) {
-                    String c = s.substring(k, k + 1);
-                    int cx = x + offset(it, k, scale);
-                    int cell = x + offset(it, k + 1, scale) - cx;
-                    g.drawString(c, cx + (cell - g.getFont().stringWidth(c)) / 2, y);
-                }
-            } else {
-                // the font is drawn at a whole pixel size, so a word is a little wider or
-                // narrower than the box it was measured into: centring it splits the
-                // difference between the gaps on either side instead of piling it on one
-                g.drawString(word, at + (box - g.getFont().stringWidth(word)) / 2, y);
-            }
-            start = end;
-        }
-    }
-
-    private static boolean repeated(String word) {
-        if (word.length() < 3) {
-            return false;
-        }
-        char c = word.charAt(0);
-        for (int i = 1; i < word.length(); i++) {
-            if (word.charAt(i) != c) {
-                return false;
-            }
-        }
-        return true;
+        painter().drawWords(g, it, x, y, scale);
     }
 
     private void paintComments(Graphics g, LayoutItem it, float scale, int x, int y, int h) {
@@ -926,11 +912,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
     }
 
     private static String rtrim(String s) {
-        int end = s.length();
-        while (end > 0 && s.charAt(end - 1) == ' ') {
-            end--;
-        }
-        return s.substring(0, end);
+        return LayoutPainter.rtrim(s);
     }
 
     /// The platform font text of a style is drawn in, at a pixel size.

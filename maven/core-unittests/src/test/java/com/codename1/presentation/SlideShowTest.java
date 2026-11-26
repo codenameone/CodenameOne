@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.presentation;
+
+import com.codename1.junit.UITestBase;
+import com.codename1.ui.Form;
+import com.codename1.ui.layouts.BorderLayout;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/// Navigating a slide show.
+class SlideShowTest extends UITestBase {
+    @Test
+    void clicksPlayBuildsThenAdvanceAndSkipHiddenSlides() {
+        SlideShow show = new SlideShow(Decks.everything());
+        Form f = new Form("Show", new BorderLayout());
+        f.add(BorderLayout.CENTER, show);
+        f.show();
+        assertEquals(0, show.getSlideIndex());
+        assertTrue(show.next());
+        assertEquals(0, show.getSlideIndex(), "the first click plays the build");
+        assertEquals(1, show.getBuildStep());
+        assertTrue(show.next());
+        assertEquals(1, show.getSlideIndex());
+        assertFalse(show.next(), "slide 3 is hidden, so slide 2 is the last");
+        assertTrue(show.previous());
+        assertEquals(0, show.getSlideIndex());
+        assertEquals(1, show.getBuildStep(), "going back shows the slide fully built");
+        show.setPresenterMode(true);
+        f.revalidate();
+        show.goTo(2);
+        assertEquals(2, show.getSlideIndex());
+    }
+
+    @Test
+    void liveChartsAreComponents() {
+        Presentation p = Decks.everything();
+        SlideShow show = new SlideShow(p);
+        Form f = new Form("Show", new BorderLayout());
+        f.add(BorderLayout.CENTER, show);
+        f.show();
+        show.goTo(1);
+        assertEquals(1, show.getComponentCount());
+        assertTrue(show.getComponentAt(0) instanceof com.codename1.ui.chart.Chart);
+        show.setLiveCharts(false);
+        assertEquals(0, show.getComponentCount());
+    }
+}

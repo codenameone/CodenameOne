@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.wordprocessing;
+package com.codename1.impl.office;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,19 +35,19 @@ import java.util.zip.ZipInputStream;
 /// The parts of a package can come in any order -- Word writes the body before the styles it
 /// uses -- so a reader needs them all before it can interpret any. A compressed entry can
 /// unpack to a thousand times its size, so both the total and the number of entries are capped.
-final class ZipParts {
+public final class ZipParts {
     /// The most bytes a package may unpack to: every part is held in memory at once, and
     /// buffering one briefly needs twice its size, so this has to fit a phone.
-    static final long MAX_TOTAL = 64L * 1024 * 1024;
+    public static final long MAX_TOTAL = 64L * 1024 * 1024;
 
     /// The most entries a package may have.
-    static final int MAX_ENTRIES = 20000;
+    public static final int MAX_ENTRIES = 20000;
 
     private ZipParts() {
     }
 
     /// Reads every file entry. Names lose a leading slash.
-    static Map<String, byte[]> read(InputStream in, String kind) throws IOException {
+    public static Map<String, byte[]> read(InputStream in, String kind) throws IOException {
         ZipInputStream zip = new ZipInputStream(in);
         Map<String, byte[]> parts = new HashMap<String, byte[]>();
         long left = MAX_TOTAL;
@@ -96,7 +96,7 @@ final class ZipParts {
     }
 
     /// Resolves a relationship target against the directory of the part that names it.
-    static String resolve(String base, String target) {
+    public static String resolve(String base, String target) {
         if (target.startsWith("/")) {
             return target.substring(1);
         }
