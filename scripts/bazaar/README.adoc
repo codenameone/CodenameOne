@@ -60,6 +60,10 @@ To see it running first, the two commands under <<Running it>> are all it takes.
   `src/main/resources/db/migration`, and the same server runs on SQLite,
   PostgreSQL, MySQL and MariaDB.
 
+| `sample-app`
+| Restock Alerts, a third-party app for the app platform: a separate server
+  that knows nothing of Bazaar's code. See <<sample-app>>.
+
 |===
 
 There are no platform modules: `common` builds the application for the
@@ -152,6 +156,42 @@ the implementor's guide lists what a real deployment connects instead.
 database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
 address, or the path of a SQLite file. Every setting is also read from the
 environment in upper case with `_` for every dot (`BAZAAR_SMS_TWILIO_TOKEN`).
+
+[[sample-app]]
+== A sample third-party app
+
+`sample-app` is what a developer outside the project would write against
+Bazaar's app platform: its own Codename One Backend, talking to Bazaar only over
+HTTP and plain JSON. Shoppers leave an e-mail address for a sold-out product;
+the merchant tells them all at once when it is back. `RestockAlerts` is the
+whole app and reads top to bottom in the order a store meets it:
+
+* *Install* -- the consent page with a PKCE challenge, the callback that trades
+  the code and verifier for a token.
+* *Set up* -- with that token: an `inventory/low` webhook, an
+  `admin.product.block` with a data URL ("subscribers waiting") and a
+  "Notify now" action, a `storefront.block`, a `checkout.block` field, the app
+  proxy path `/s/{store}/apps/restock`, and a validation function uploaded
+  through the functions API.
+* *Verify* -- `Signatures` checks everything Bazaar sends: the
+  `X-Bazaar-Signature` of webhooks and block calls, the proxy's query
+  signature, and the session token of the embedded admin page. All three use
+  one signing key the app derives from its client secret.
+* *Leave* -- `app/uninstalled` drops the token, `shop/redact` everything else.
+
+[source,bash]
+----
+mvn -pl sample-app -Dcodename1.platform=backend cn1:backend   # <1>
+mvn -pl shared,backend,sample-app -Dcodename1.platform=backend test   # <2>
+----
+<1> Runs the app. Put the client id and secret from `/api/developer/apps` in
+    `sample-app/application.properties` first. Both addresses there must be
+    public https ones: Bazaar does not call a private network.
+<2> The app's own tests, and `RestockAppE2ETest` in `backend`, which installs it
+    into a test Bazaar and runs install, webhook, block data and action, proxied
+    signup, the checkout function, the embedded page and uninstall. One Backend
+    runs per process, so that test compiles the app's sources into Bazaar's test
+    build and joins the two at the HTTP layer.
 
 == Tests
 

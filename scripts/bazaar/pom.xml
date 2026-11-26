@@ -267,6 +267,7 @@
       </activation>
       <modules>
         <module>backend</module>
+        <module>sample-app</module>
       </modules>
     </profile>
     <profile>

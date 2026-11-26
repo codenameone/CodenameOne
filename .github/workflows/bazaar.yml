@@ -134,7 +134,9 @@ jobs:
       - name: Run the server tests on the JVM and compiled
         working-directory: scripts/bazaar
         run: |
-          mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          # sample-app is the third-party app sample; its own tests run on the
+          # JVM, and RestockAppE2ETest in backend drives it end to end.
+          mvn -B -Dcodename1.platform=backend -pl shared,backend,sample-app test \
             -Dcn1.backend.compiledTests=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:
@@ -159,7 +161,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: bazaar-backend-tests
-          path: scripts/bazaar/backend/target/surefire-reports/**
+          path: |
+            scripts/bazaar/backend/target/surefire-reports/**
+            scripts/bazaar/sample-app/target/surefire-reports/**
           if-no-files-found: warn
           retention-days: 14
 
