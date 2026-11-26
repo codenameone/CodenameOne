@@ -41,11 +41,11 @@ The computer icon at the top left of the editor opens the pairing screen. From a
 include::../demos/common/src/main/snippets/developer-guide/device-runtime.sh[tag=device-runtime-push,indent=0]
 ----
 
-These are goals of the Codename One Maven plugin, so they work the same way on every operating system. The first time, the command prints a six-digit code; type it on the device and press *Pair*. After that, the computer is remembered and later sends start the program at once.
+These are goals of the Codename One Maven plugin, and tasks of its Gradle plugin (`cn1Push`, `cn1PushStop`), so they work the same way on every operating system. The first time, the command prints a six-digit code; type it on the device and press *Pair*. After that, the computer is remembered and later sends start the program at once.
 
 image::img/device-runtime-pushed.png[A program sent from the computer, with its Stop button,scaledwidth=30%]
 
-A received program can be stopped three ways: the floating *Stop* button, *Stop the program* on the pairing screen, or `mvn cn1:push-stop` from the computer. *View and edit source* shows everything that runs, and *Edit* saves the received program as a project in the editor, where you can change it and run it again.
+A received program can be stopped three ways: the floating *Stop* button, *Stop the program* on the pairing screen, or `mvn cn1:push-stop` (Gradle: `cn1PushStop`) from the computer. *View and edit source* shows everything that runs, and *Edit* saves the received program as a project in the editor, where you can change it and run it again.
 
 Only a paired computer can send or stop a program. *Unpair all computers* on the pairing screen revokes every pairing.
 
@@ -470,7 +470,7 @@ The listener speaks two protocol versions and they exist for different situation
 
 Protocol *v1* is an unauthenticated push, accepted only over loopback and only by the JavaSE simulator. Android apps share the TCP loopback namespace, so on a real device any local app could otherwise dial the runtime over 127.0.0.1 and get an unpaired bundle run -- loopback is no longer treated as authentication there. That leaves v1 to the one case where the runtime and the pusher live in the same process (the simulator), where possession is the authentication by construction.
 
-Protocol *v3* pairs first, then authenticates every connection. It's what `DevicePush` speaks -- and `cn1-push.sh` delegates to `DevicePush` too, so pushes from the shell helper are v3 as well: same `adb reverse` transport as before, same first-use pairing dialog and Approve prompt as a Wi-Fi push. A third copy of the derivation in a script would only drift from the two that have to agree, and putting the flow behind the same entry point keeps them from doing so.
+Protocol *v3* pairs first, then authenticates every connection. It's what `DevicePush` speaks, and `DevicePush` is the one entry point: the Maven goals, the Gradle tasks and the repository's own test scripts all fork it, so there is no second copy of the derivation to drift from the device's.
 
 Pairing is two round trips. The IDE prints a six-digit code and sends its peer id and a friendly name; the device asks a human to type the code, replies with its own device id and a fresh 32-byte challenge, and both ends then derive the same 256-bit secret from `(code, peerId, deviceId)` -- 20,000 iterations of HMAC-SHA-256, which is what makes grinding the six digits cost something. The computer answers the challenge under that secret and the device stores it only on a match. The secret is never transmitted, in either direction, at any point.
 

@@ -61,7 +61,7 @@ public final class AboutForm extends Form {
                 + "appear for class names and keywords as you type.");
         section("Running from a computer (optional)",
                 "Developers can also send a program from their own computer with the Codename One "
-                + "Maven plugin (mvn cn1:push). Tap the computer icon (top left) for the pairing "
+                + "Maven or Gradle plugin (mvn cn1:push, gradle cn1Push). Tap the computer icon (top left) for the pairing "
                 + "screen. A computer must be paired with a code shown on the computer before it "
                 + "can send anything, and the source of a received program is shown and saved as a "
                 + "project you can edit.");

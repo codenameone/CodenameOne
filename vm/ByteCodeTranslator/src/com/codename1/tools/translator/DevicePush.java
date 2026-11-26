@@ -131,7 +131,8 @@ public final class DevicePush {
     }
 
     public static void main(String[] args) throws Exception {
-        File classes = new File("target/classes");
+        // Repeatable: Gradle compiles Kotlin into a directory of its own.
+        List<File> classDirs = new ArrayList<File>();
         // Sources accumulate: a Kotlin project has classes under both
         // `src/main/java` and `src/main/kotlin`, and the bundle needs every
         // root so `SourceFile` attributes -- `MyApp.kt` for a Kotlin class --
@@ -146,7 +147,7 @@ public final class DevicePush {
         for (int i = 0; i < args.length; i++) {
             String a = args[i];
             if ("--classes".equals(a)) {
-                classes = new File(args[++i]);
+                classDirs.add(new File(args[++i]));
             } else if ("--source".equals(a)) {
                 sources.add(new File(args[++i]));
             } else if ("--main".equals(a)) {
@@ -189,12 +190,21 @@ public final class DevicePush {
                 // one root passes each explicitly.
                 sources.add(new File("src/main/java"));
             }
-            if (!classes.isDirectory()) {
-                System.err.println("no compiled classes at " + classes.getAbsolutePath()
+            if (classDirs.isEmpty()) {
+                classDirs.add(new File("target/classes"));
+            }
+            List<File> present = new ArrayList<File>();
+            for (File dir : classDirs) {
+                if (dir.isDirectory()) {
+                    present.add(dir);
+                }
+            }
+            if (present.isEmpty()) {
+                System.err.println("no compiled classes at " + classDirs.get(0).getAbsolutePath()
                         + " -- build the project first");
                 System.exit(2);
             }
-            bundle = buildBundle(classes, sources, mainClass);
+            bundle = buildBundle(present, sources, mainClass);
         }
         System.out.println(frame == FRAME_STOP ? "stopping the device's program"
                 : "bundle " + bundle.length + " bytes");
@@ -233,13 +243,15 @@ public final class DevicePush {
 
     // ------------------------------------------------------------ the bundle
 
-    private static byte[] buildBundle(File classesDir, List<File> sourceRoots, String mainClass)
+    private static byte[] buildBundle(List<File> classDirs, List<File> sourceRoots, String mainClass)
             throws Exception {
         InterpBundleWriter w = new InterpBundleWriter();
         List<File> classes = new ArrayList<File>();
-        collect(classesDir, classes);
+        for (File dir : classDirs) {
+            collect(dir, classes);
+        }
         if (classes.isEmpty()) {
-            throw new IllegalStateException("no .class files under " + classesDir);
+            throw new IllegalStateException("no .class files under " + classDirs);
         }
         for (File f : classes) {
             InterpBundleFiles.addClassFile(w, f);

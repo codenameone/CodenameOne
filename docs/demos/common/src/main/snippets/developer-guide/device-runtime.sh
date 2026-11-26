@@ -10,4 +10,9 @@ mvn compile cn1:push                              # the iOS simulator, or a phon
 mvn compile cn1:push -Dcn1.push.lan               # a phone or tablet on the same Wi-Fi
 mvn compile cn1:push -Dcn1.push.device=192.168.1.50
 mvn cn1:push-stop -Dcn1.push.lan                  # stop what the device is running
+
+# Gradle: the same properties, passed with -P
+./gradlew cn1Push
+./gradlew cn1Push -Pcn1.push.lan
+./gradlew cn1PushStop -Pcn1.push.lan
 // end::device-runtime-push[]
