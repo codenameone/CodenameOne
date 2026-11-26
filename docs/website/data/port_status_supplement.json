@@ -768,6 +768,62 @@
           ]
         }
       ]
+    },
+    {
+      "test": "PickersAndInputsScreenshotTest",
+      "reason": "The pickers and inputs baseline is a phone-sized screen of range sliders, chips, a chip input and a color picker. The watch form factor has no comparable layout to capture.",
+      "platform_support": "RangeSlider, Chip, ChipInput and ColorPicker have no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the screen in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-layout-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "ProgressAndMediaScreenshotTest",
+      "reason": "The progress and media baseline is a phone-sized screen of circular progress rings, a waveform, expandable text and a timeline. The watch form factor has no comparable layout to capture.",
+      "platform_support": "CircularProgress, AudioWaveform, ExpandableText and ActivityTimeline have no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the screen in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-layout-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "MasonryGridScreenshotTest",
+      "reason": "The masonry baseline is a phone-width grid of tiles packed into columns. The watch form factor has no comparable layout to capture.",
+      "platform_support": "MasonryLayout has no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the screen in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-layout-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "EmojiAndMentionScreenshotTest",
+      "reason": "The emoji and mention baseline is a phone-sized emoji picker and mention field. The watch form factor has no comparable layout to capture.",
+      "platform_support": "EmojiPicker and MentionField have no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the screen in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-layout-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
     }
   ],
   "features": [
