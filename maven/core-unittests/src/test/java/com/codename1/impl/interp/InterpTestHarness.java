@@ -93,15 +93,11 @@ final class InterpTestHarness {
         // source information is refused, since the user has to be able to read
         // what runs.
         //
-        // -XDstringConcat=inline is not optional. From JDK 9 onwards javac
-        // compiles `"a" + b` to an invokedynamic against StringConcatFactory,
-        // and ParparVM has no runtime invokedynamic at all -- the translator
-        // desugars it at build time. A pushed bundle has no such pass, so the
-        // push pipeline compiles concatenation the old way, to StringBuilder.
-        // This is the same flag the real pipeline uses; the harness passes it
-        // so the corpus is compiled exactly as pushed code will be.
+        // No -XDstringConcat=inline, on purpose: javac's default (an
+        // invokedynamic against StringConcatFactory) is what a Java 9+ project
+        // pushes, and InterpLambdaDesugar must rewrite it.
         int rc = javac.run(null, null, null,
-                "-g", "-nowarn", "-XDstringConcat=inline",
+                "-g", "-nowarn",
                 "-d", dir.toString(), src.toString());
         if (rc != 0) {
             throw new IllegalStateException("fixture did not compile");

@@ -1,4 +1,4 @@
-# CN1 Device Runtime — privacy
+# Codename One Instant — privacy
 
 The short version: this app collects nothing, sends nothing anywhere, and talks
 only to a computer you have explicitly paired it with.

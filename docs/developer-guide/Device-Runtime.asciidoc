@@ -18,7 +18,7 @@ Anything that depends on app identity. Bundle id, icons, splash screens, URL sch
 
 == Using the app
 
-The Codename One Device Runtime app has two halves: an editor on the device, and a receiver for programs sent from your computer. Neither needs a build server, a certificate or a cable.
+The Codename One Instant app has two halves: an editor on the device, and a receiver for programs sent from your computer. Neither needs a build server, a certificate or a cable.
 
 === The on-device editor
 
@@ -269,13 +269,11 @@ If a platform can't produce a peer for a type, `InterpObjectFactory.canExtend` r
 
 These are the ones that will actually bite you.
 
-=== String concatenation must be compiled inline
+=== Lambdas and string concatenation
 
-From JDK 9 onwards `javac` compiles `"a" + b` into an `invokedynamic` against `StringConcatFactory`. ParparVM has no runtime `invokedynamic` -- the translator desugars it at build time, and a pushed bundle gets no such pass.
+Neither target has a runtime `invokedynamic`, so the bundle writer rewrites the ones `javac` emits before anything reaches the device, and pushed code needs no compiler flag at any Java level. String concatenation compiled by JDK 9 or later (an `invokedynamic` against `StringConcatFactory`) becomes the `StringBuilder` chain `javac` produces for Java 8. Any `invokedynamic` the writer doesn't recognise is rejected with the bootstrap method named, rather than producing something that fails obscurely on the device.
 
-Compile pushed code with `-XDstringConcat=inline` when the project targets Java 9 or later: add it to the `maven-compiler-plugin` `compilerArgs` of the module you push. A project at source level 8 needs nothing. The bundle writer rejects any `invokedynamic` it doesn't recognise, naming the bootstrap method, rather than producing something that fails obscurely on the device.
-
-Lambdas and method references are handled without a flag. `InterpLambdaDesugar` rewrites each site into the class `LambdaMetafactory` would have spun -- captures in fields, the single abstract method forwarding to the lambda body, the call site becoming a plain static call -- so lambdas, method references, constructor references and bound receivers all work. The generated class inherits the source file of the class that contained the lambda, which is both true and required, since the runtime won't execute a class whose source it can't show.
+`InterpLambdaDesugar` rewrites each site into the class `LambdaMetafactory` would have spun -- captures in fields, the single abstract method forwarding to the lambda body, the call site becoming a plain static call -- so lambdas, method references, constructor references and bound receivers all work. The generated class inherits the source file of the class that contained the lambda, which is both true and required, since the runtime won't execute a class whose source it can't show.
 
 === The API on the device isn't the API on your machine
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Privacy manifest for the Codename One Device Runtime app. Resources are
+  Privacy manifest for the Codename One Instant app. Resources are
   copied to the bundle root, which is where App Store Connect looks for it.
   The app tracks nothing and collects nothing; the required-reason APIs below
   are what the framework itself reads: preferences (pairings, settings), file

@@ -288,8 +288,9 @@ programs pushed from a desktop, interpreted rather than compiled. See
   the budget expire once and stay expired, killing every later callback -- i.e.
   every button press -- with "ran without yielding".
 - **Lambdas and method references are desugared** by `InterpLambdaDesugar` when
-  the bundle is written; neither target can spin a class at run time. String
-  concatenation needs `-XDstringConcat=inline` (cn1-push.sh passes it).
+  the bundle is written; neither target can spin a class at run time. Java 9+
+  string concatenation (`StringConcatFactory`) is rewritten to `StringBuilder`
+  the same way, so pushed code needs no compiler flag.
 - **A linker must dispatch on the receiver's class, not the call site's owner.**
   `list.add(x)` compiles to a call naming `java.util.List`; resolving from there
   finds `AbstractList.add`, whose body throws `UnsupportedOperationException`.

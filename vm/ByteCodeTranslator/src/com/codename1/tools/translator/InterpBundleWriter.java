@@ -969,8 +969,8 @@ public class InterpBundleWriter {
                 break;
             }
             case AbstractInsnNode.INVOKE_DYNAMIC_INSN: {
-                // Lambdas and method references are gone by now --
-                // InterpLambdaDesugar rewrote them into real classes before
+                // Lambdas, method references and string concatenation are
+                // gone by now -- InterpLambdaDesugar rewrote them before
                 // encoding started. Anything still here is a bootstrap this
                 // build does not implement, and there is no runtime
                 // invokedynamic to fall back on, so say which one it is.
@@ -978,10 +978,9 @@ public class InterpBundleWriter {
                 throw new IllegalStateException(
                         "invokedynamic against " + indy.bsm.getOwner() + "." + indy.bsm.getName()
                                 + " reached the bundle writer, and neither target has a runtime "
-                                + "invokedynamic. String concatenation is handled by compiling "
-                                + "pushed code with -XDstringConcat=inline; lambdas and method "
-                                + "references are desugared by InterpLambdaDesugar. This is "
-                                + "neither.");
+                                + "invokedynamic. Lambdas, method references and string "
+                                + "concatenation are desugared by InterpLambdaDesugar. This is "
+                                + "none of them.");
             }
             default:
                 throw new IllegalStateException("unhandled instruction type " + insn.getType()

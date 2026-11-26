@@ -19,7 +19,6 @@
 # simulator. There is deliberately no discovery protocol: physical access to the
 # device is the pairing.
 #
-# -XDstringConcat=inline is not optional -- see the note where it is used.
 
 set -euo pipefail
 
@@ -124,10 +123,7 @@ else
     SOURCE_ROOT="$SOURCE"
     echo "$SOURCE" > "$WORK/sources.txt"
 fi
-# The device has no runtime invokedynamic: ParparVM desugars it at build time
-# and a pushed bundle gets no such pass. From JDK 9 javac turns "a" + b into an
-# indy against StringConcatFactory, so it has to be compiled the old way.
-"$JDK/bin/javac" -g -nowarn -XDstringConcat=inline \
+"$JDK/bin/javac" -g -nowarn \
     -cp "$CORE_JAR" -d "$WORK/classes" @"$WORK/sources.txt"
 
 echo "building bundle"

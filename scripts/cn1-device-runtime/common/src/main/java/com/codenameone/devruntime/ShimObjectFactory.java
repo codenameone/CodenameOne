@@ -96,7 +96,7 @@ public class ShimObjectFactory implements InterpObjectFactory {
                 throw new UnsupportedOperationException(
                         "no generated shim for " + hostSuperclassName.replace('/', '.')
                         + "; regenerate the shims with scripts/generate-interp-shims.sh and rebuild "
-                        + "the device runtime app");
+                        + "Codename One Instant");
             }
             return peer;
         }
@@ -114,7 +114,7 @@ public class ShimObjectFactory implements InterpObjectFactory {
             throw new UnsupportedOperationException(
                     "no generated shim implementing " + hostInterfaceNames[0].replace('/', '.')
                     + "; regenerate the shims with scripts/generate-interp-shims.sh and rebuild "
-                    + "the device runtime app");
+                    + "Codename One Instant");
         }
         return peer;
     }

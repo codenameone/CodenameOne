@@ -38,7 +38,7 @@ public final class AboutForm extends Form {
         setScrollableY(true);
         getToolbar().setBackCommand("", Toolbar.BackCommandPolicy.AS_ARROW, e -> previous.showBack());
 
-        Label name = new Label(Display.getInstance().getProperty("AppName", "CN1 Device Runtime"));
+        Label name = new Label(Display.getInstance().getProperty("AppName", "Codename One Instant"));
         name.getAllStyles().setFont(com.codename1.ui.Font.createSystemFont(
                 com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_BOLD,
                 com.codename1.ui.Font.SIZE_LARGE));

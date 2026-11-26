@@ -77,6 +77,7 @@ final class InterpLambdaDesugar {
         }
         for (ClassNode cn : classes) {
             int counter = 0;
+            List<MethodNode> concatHelpers = new ArrayList<MethodNode>();
             for (MethodNode mn : cn.methods) {
                 if (mn.instructions == null) {
                     continue;
@@ -96,13 +97,116 @@ final class InterpLambdaDesugar {
                             // The captured values are already on the stack in
                             // the order the factory takes them, so replacing the
                             // instruction in place is the whole rewrite.
+                        } else if (isStringConcat(indy)) {
+                            MethodNode helper = concatHelper(cn, indy,
+                                    cn.methods.size() + concatHelpers.size());
+                            concatHelpers.add(helper);
+                            mn.instructions.set(insn, new MethodInsnNode(Opcodes.INVOKESTATIC,
+                                    cn.name, helper.name, helper.desc, false));
                         }
                     }
                     insn = next;
                 }
             }
+            cn.methods.addAll(concatHelpers);
         }
         return generated;
+    }
+
+    private static final String CONCAT_FACTORY = "java/lang/invoke/StringConcatFactory";
+
+    /// Java 9+ string concatenation: javac's default since JDK 9 (JEP 280).
+    private static boolean isStringConcat(InvokeDynamicInsnNode indy) {
+        return CONCAT_FACTORY.equals(indy.bsm.getOwner())
+                && ("makeConcatWithConstants".equals(indy.bsm.getName())
+                    || "makeConcat".equals(indy.bsm.getName()));
+    }
+
+    /**
+     * Builds a static method on the owner that does what the concat
+     * bootstrap would: a StringBuilder appending each operand in recipe order.
+     *
+     * <p>This is exactly what javac emits under {@code -XDstringConcat=inline},
+     * so a project compiled for Java 9 or later needs no special flag to be
+     * pushed. The operands are already on the stack in the order the method
+     * takes them, so the call site is a one-instruction substitution, as for a
+     * lambda. In a recipe, U+0001 is the next operand and U+0002 the next
+     * bootstrap constant; constants are folded into the literal text here,
+     * as {@code String.valueOf} would render them at run time.</p>
+     */
+    private static MethodNode concatHelper(ClassNode owner, InvokeDynamicInsnNode indy, int index) {
+        Type[] args = Type.getArgumentTypes(indy.desc);
+        String recipe;
+        if ("makeConcatWithConstants".equals(indy.bsm.getName())) {
+            recipe = (String) indy.bsmArgs[0];
+        } else {
+            StringBuilder all = new StringBuilder();
+            for (int i = 0; i < args.length; i++) {
+                all.append('\u0001');
+            }
+            recipe = all.toString();
+        }
+        String name = "cn1$interpConcat$" + index;
+        MethodNode mn = new MethodNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC
+                | Opcodes.ACC_SYNTHETIC, name, indy.desc);
+        InsnList il = mn.instructions;
+        il.add(new TypeInsnNode(Opcodes.NEW, "java/lang/StringBuilder"));
+        il.add(new InsnNode(Opcodes.DUP));
+        il.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder",
+                "<init>", "()V", false));
+        int arg = 0;
+        int local = 0;
+        int constant = 1;
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < recipe.length(); i++) {
+            char c = recipe.charAt(i);
+            if (c == '\u0001') {
+                appendLiteral(il, text);
+                Type t = args[arg++];
+                il.add(new VarInsnNode(t.getOpcode(Opcodes.ILOAD), local));
+                local += t.getSize();
+                il.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                        "append", "(" + appendType(t) + ")Ljava/lang/StringBuilder;", false));
+            } else if (c == '\u0002') {
+                text.append(String.valueOf(indy.bsmArgs[constant++]));
+            } else {
+                text.append(c);
+            }
+        }
+        appendLiteral(il, text);
+        il.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                "toString", "()Ljava/lang/String;", false));
+        il.add(new InsnNode(Opcodes.ARETURN));
+        mn.maxStack = 4;
+        mn.maxLocals = local;
+        return mn;
+    }
+
+    private static void appendLiteral(InsnList il, StringBuilder text) {
+        if (text.length() == 0) {
+            return;
+        }
+        il.add(new LdcInsnNode(text.toString()));
+        il.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder",
+                "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false));
+        text.setLength(0);
+    }
+
+    /// The StringBuilder.append overload javac's inline strategy picks.
+    private static String appendType(Type t) {
+        switch (t.getSort()) {
+            case Type.BOOLEAN: return "Z";
+            case Type.CHAR: return "C";
+            case Type.BYTE:
+            case Type.SHORT:
+            case Type.INT: return "I";
+            case Type.LONG: return "J";
+            case Type.FLOAT: return "F";
+            case Type.DOUBLE: return "D";
+            default:
+                return "Ljava/lang/String;".equals(t.getDescriptor())
+                        ? "Ljava/lang/String;" : "Ljava/lang/Object;";
+        }
     }
 
     private static boolean isLambda(InvokeDynamicInsnNode indy) {

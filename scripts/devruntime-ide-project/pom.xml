@@ -71,19 +71,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
-                <configuration>
-                    <compilerArgs>
-                        <!--
-                          Not optional. From JDK 9 javac turns "a" + b into an
-                          invokedynamic against StringConcatFactory, and neither
-                          mobile target has a runtime invokedynamic to resolve
-                          it with. Lambdas are handled for you — they are
-                          rewritten into real classes when the bundle is built
-                          — but this one has to be a compiler flag.
-                        -->
-                        <arg>-XDstringConcat=inline</arg>
-                    </compilerArgs>
-                </configuration>
             </plugin>
         </plugins>
     </build>
