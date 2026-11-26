@@ -215,10 +215,7 @@ Each broker has its own details:
 +
 [source,properties]
 ----
-spring.kafka.bootstrap-servers=pkc-xxxxx.eu-west-1.aws.confluent.cloud:9092
-spring.kafka.security.protocol=SASL_SSL
-spring.kafka.properties.sasl.mechanism=PLAIN
-spring.kafka.properties.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="<api key>" password="<api secret>";
+include::../demos/backend/src/main/resources/application-confluent.properties[tag=backend-kafka-sasl]
 ----
 +
 Only the `username` and `password` of the JAAS line are read; the
