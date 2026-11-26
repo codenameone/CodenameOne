@@ -166,7 +166,10 @@ public class MasonryLayout extends Layout {
         int natural = columns * widest + (columns - 1) * gap;
         // The height is measured at the width the container really has once
         // it has one, since tiles are as tall as they are at their column width.
-        int actual = parent.getWidth() - parent.getSideGap() - s.getHorizontalPadding();
+        // Not getSideGap(): on a scrollable container it asks for the scroll
+        // size, which is this preferred size, and recursed until the stack ran
+        // out (the iOS screenshot suite). The scrollbar gap is layout's concern.
+        int actual = parent.getWidth() - s.getHorizontalPadding();
         int width = actual > 0 ? actual : natural;
         return new Dimension(natural + s.getHorizontalPadding(),
                 place(parent, 0, 0, width, false) + s.getVerticalPadding());
@@ -185,8 +188,11 @@ public class MasonryLayout extends Layout {
     /// The height of a tile at a given width. The component is given that width
     /// first, so text wraps to it; an image label that scales its image is
     /// scaled to it keeping its aspect ratio.
-    private static int heightAt(Component c, int w) {
-        if (c.getWidth() != w) {
+    private static int heightAt(Component c, int w, boolean apply) {
+        // Measuring never changes a tile: a tile marked dirty marks this
+        // container dirty, from inside the measurement of this container.
+        // Layout gives it its width; until then its current size is the answer.
+        if (apply && c.getWidth() != w) {
             c.setWidth(w);
             if (c instanceof Container) {
                 // A card's text sits in its children; lay them out at the new
@@ -243,7 +249,7 @@ public class MasonryLayout extends Layout {
             }
             Style cs = c.getStyle();
             int w = Math.max(0, colWidth - cs.getHorizontalMargins());
-            int h = heightAt(c, w);
+            int h = heightAt(c, w, apply);
             int y = heights[col] == 0 ? 0 : heights[col] + gap;
             if (apply) {
                 int x = col * (colWidth + gap);

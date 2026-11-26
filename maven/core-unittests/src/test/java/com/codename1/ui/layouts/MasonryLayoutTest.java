@@ -154,4 +154,29 @@ class MasonryLayoutTest extends UITestBase {
         assertEquals(200, seen[0]);
         assertEquals(50, card.getHeight());
     }
+
+    @FormTest
+    void scrollableGridInAFormLaysOutWithoutRecursing() {
+        // The screenshot suite's shape: a scrollable masonry grid in the center
+        // of a BorderLayout form. Measuring it once mutated the tiles, which
+        // marked the grid dirty from inside its own layout.
+        com.codename1.ui.Form f = new com.codename1.ui.Form("Grid", new BorderLayout());
+        Container grid = new Container(new MasonryLayout(2));
+        grid.setScrollableY(true);
+        for (int i = 0; i < 8; i++) {
+            Label tile = new Label("Tile " + i);
+            tile.setPreferredH(100 + 30 * i);
+            grid.add(tile);
+        }
+        f.add(BorderLayout.CENTER, grid);
+        f.show();
+        for (int i = 0; i < 5; i++) {
+            f.revalidate();
+        }
+        int w = grid.getComponentAt(0).getWidth();
+        assertTrue(w > 0 && w < grid.getWidth(), "tiles get a column width, not " + w);
+        f.setWidth(f.getWidth() / 2);
+        f.revalidate();
+        assertTrue(grid.getComponentAt(0).getWidth() < w, "a narrower form narrows the columns");
+    }
 }
