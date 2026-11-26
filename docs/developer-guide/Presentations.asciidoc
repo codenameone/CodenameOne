@@ -9,7 +9,7 @@ writes them back, on every platform and with no native code.
 .A slide of charts, played by `SlideShow`
 image::img/generated/slides-charts.png["A slide titled Charts with a column chart, a line chart, a doughnut and a stacked area chart of revenue by quarter for two regions",scaledwidth=70%]
 
-It is the third of the office packages, beside `com.codename1.spreadsheet` and
+It's the third of the office packages, beside `com.codename1.spreadsheet` and
 `com.codename1.wordprocessing`, and it shares their parts rather than
 repeating them. The text in a slide is word processor text: paragraphs, runs
 and styles from `com.codename1.wordprocessing`, laid out by `DocumentLayout`
@@ -39,7 +39,7 @@ only; open one and save it as `.pptx` to keep editing it elsewhere.
 include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tag=slides-convert,indent=0]
 ----
 
-A reader never drops content without a word. Whatever it cannot convert, such
+A reader never drops content without a word. Whatever it can't convert, such
 as an embedded video or an effect the model has no counterpart for, is named in
 `getWarnings()`, and the rest of the slide still loads.
 
@@ -79,7 +79,7 @@ image::img/generated/slides-shapes.png["A slide titled Shapes and fills with an 
 ==== Charts
 
 A `ChartElement` holds the numbers, not a picture of them. On screen it becomes
-a live `Chart`, which animates in when its slide appears; in a PDF it is drawn
+a live `Chart`, which animates in when its slide appears; in a PDF it's drawn
 by the same chart code, so the two look alike. PowerPoint and LibreOffice files
 keep their charts as data too, so the numbers stay editable after a round
 trip.
@@ -126,11 +126,11 @@ Moving forward first plays the slide's builds, a click at a time, and then
 the transition into the next slide: fade, push, cover, uncover, wipe or zoom,
 from any side. A build makes an element appear, fade, fly in, zoom or wipe in,
 fade out again or pulse for emphasis. Builds that start with the previous one
-or after it play together as one step, and a slide whose first build does not
+or after it play together as one step, and a slide whose first build doesn't
 wait for a click plays it as soon as the slide appears.
 
 Transitions and builds are painted by `SlideAnimation` from a progress value,
-so any frame can be drawn on its own. That is how a thumbnail can show a slide
+so any frame can be drawn on its own. That's how a thumbnail can show a slide
 halfway through its builds, and how the screenshot tests check every frame:
 
 [source,java]

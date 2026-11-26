@@ -36,7 +36,7 @@ image::img/generated/art-load.png["A landscape drawn from SVG: a blue gradient s
 Each format arranges its layers differently. A PSD is a flat list in which marker records open
 and close groups; Sketch spreads pages and symbol masters across several JSON files; Figma nests
 frames inside canvases; SVG refers to gradients, masks and reusable shapes by id. The readers
-turn all of them into the same tree, so everything after loading works without knowing the source.
+turn them all into the same tree, so everything after loading works without knowing the source.
 
 .How each format's structure maps onto an ArtDocument
 image::img/art-document-tree.svg["Four boxes for PSD, Sketch, Figma and SVG, each showing how the format nests layers, with arrows into one ArtDocument tree of group, shape, text, raster and adjustment nodes",scaledwidth=95%]
@@ -47,7 +47,7 @@ that follow it, and a Figma `isMask` node masks the siblings above it. In the tr
 the same thing, a node set as another node's mask, so the editor and the writers treat them
 alike.
 
-Rendering is done in software by `ArtRenderer`. That is slower than drawing a
+Rendering is done in software by `ArtRenderer`. That's slower than drawing a
 `GeneratedSVGImage`, but it means a document has the same pixels on iOS, Android, the
 desktop and the web, with every blend mode and effect. Render once at the size you need and
 keep the `Image`.
@@ -72,7 +72,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/art/ArtSni
 image::img/generated/art-effects.png["A purple to cyan card with a soft shadow, a yellow bevelled circle with a glow, and a red rectangle in multiply mode that darkens the card and the circle where it overlaps them",scaledwidth=70%]
 
 Every node is drawn in the same order of steps. Knowing it explains most surprises, such as why
-a shadow follows a mask's shape or why an adjustment layer changes only what is below it:
+a shadow follows a mask's shape or why an adjustment layer changes only what's below it:
 
 .The steps that draw one node
 image::img/art-render-pipeline.svg["Five steps in a row: content, clip path, mask, effects, composite; below, how pass-through and isolated groups differ and how adjustment nodes act on the canvas",scaledwidth=95%]
@@ -89,14 +89,14 @@ add, change and remove them.
 Geometry is treated the same way. Sketch's subtract, intersect and difference operations keep
 exactly the region they describe, and SVG text on a path follows its path.
 
-Formats that cannot hold an effect get it baked in. A PSD written from a document keeps
+Formats that can't hold an effect get it baked in. A PSD written from a document keeps
 groups and blend modes as Photoshop layers; a node with effects becomes a rendered layer,
 and an adjustment is applied to the pixels below it.
 
 === Import notes
 
-What a reader cannot represent is recorded on the document instead of being dropped
-silently. Read `ArtDocument.getNotes()` after a load to tell users what changed:
+What a reader can't represent is recorded on the document instead of being
+dropped. Read `ArtDocument.getNotes()` after a load to tell users what changed:
 
 [source,java]
 ----
@@ -121,7 +121,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/art/ArtSni
 ----
 
 `fetch` requests the file with its geometry, then downloads the image fills it uses.
-Images are fetched over HTTPS only, and the token is not sent with them. Call `setOAuth(true)`
+Images are fetched over HTTPS only, and the token isn't sent with them. Call `setOAuth(true)`
 for an OAuth access token instead of a personal access token. To read a file you
 downloaded yourself, use `FigmaReader.read(json, images)`; `FigmaReader.imageRefs` lists the
 image references the JSON needs.
