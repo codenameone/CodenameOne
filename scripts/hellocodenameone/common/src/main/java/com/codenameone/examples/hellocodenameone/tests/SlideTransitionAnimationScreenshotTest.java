@@ -40,7 +40,7 @@ public class SlideTransitionAnimationScreenshotTest extends AbstractAnimationScr
     @Override
     public boolean runTest() throws Exception {
         if (CN.isWatch()) {
-            System.out.println("CN1SS:INFO:test=SlideTransitionAnimation status=SKIPPED reason=slides-on-watch");
+            System.out.println("CN1SS:INFO:test=SlideTransitionAnimationScreenshotTest status=SKIPPED reason=slides-on-watch");
             done();
             return true;
         }

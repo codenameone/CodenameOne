@@ -40,7 +40,7 @@ public class SlideBuildAnimationScreenshotTest extends AbstractAnimationScreensh
     @Override
     public boolean runTest() throws Exception {
         if (CN.isWatch()) {
-            System.out.println("CN1SS:INFO:test=SlideBuildAnimation status=SKIPPED reason=slides-on-watch");
+            System.out.println("CN1SS:INFO:test=SlideBuildAnimationScreenshotTest status=SKIPPED reason=slides-on-watch");
             done();
             return true;
         }
