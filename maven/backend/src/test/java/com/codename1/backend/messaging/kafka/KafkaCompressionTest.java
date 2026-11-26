@@ -337,4 +337,22 @@ class KafkaCompressionTest {
         assertEquals(12, KafkaConnection.records(onlyMarker.toByteArray(), 11, out, null));
         assertEquals(0, out.size());
     }
+
+    @Test
+    @DisplayName("A fetch that inflates past its budget stops at a batch the next fetch resumes from")
+    void fetchInflateBudget() throws IOException {
+        ByteArrayOutputStream set = new ByteArrayOutputStream();
+        for (int b = 0; b < 4; b++) {
+            List<byte[]> values = new ArrayList<byte[]>();
+            values.add(new byte[100000]);
+            set.write(batch(b, 4, -1, false, false, values));
+        }
+        List<KafkaConnection.Record> out = new ArrayList<KafkaConnection.Record>();
+        long next = KafkaConnection.records(set.toByteArray(), 0, out, null, 250000);
+        assertEquals(2, out.size());
+        assertEquals(2, next);
+        out.clear();
+        assertEquals(1, KafkaConnection.records(set.toByteArray(), 0, out, null, 10));
+        assertEquals(1, out.size());
+    }
 }

@@ -198,6 +198,11 @@ final class KafkaSasl {
             if (error != null) {
                 throw new Refused("Kafka refused SCRAM: " + error);
             }
+            if (field(serverFirst, 'm') != null) {
+                // RFC 5802 5.1: an unknown mandatory extension fails the exchange.
+                throw new Refused("Kafka's SCRAM message asks for an extension this "
+                        + "client does not support");
+            }
             String nonce = field(serverFirst, 'r');
             String saltText = field(serverFirst, 's');
             String iterText = field(serverFirst, 'i');

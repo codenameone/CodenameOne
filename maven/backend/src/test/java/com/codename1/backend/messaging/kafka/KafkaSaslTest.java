@@ -125,4 +125,46 @@ class KafkaSaslTest {
         assertTrue(json.contains("\"x-amz-expires\":\"900\""), json);
         assertTrue(json.matches(".*\"x-amz-signature\":\"[0-9a-f]{64}\".*"), json);
     }
+
+    @Test
+    @DisplayName("SCRAM refuses a mandatory extension it does not know")
+    void scramMandatoryExtension() {
+        KafkaSasl.Scram s = new KafkaSasl.Scram(Crypto.SHA256, "u", "p", "abc");
+        assertThrows(IOException.class, () -> s.clientFinal("m=ext,r=abcdef,s=QUJD,i=4096"));
+    }
+
+    @Test
+    @DisplayName("A JAAS option is not found inside another option's quoted value")
+    void jaasQuotedTrap() {
+        String jaas = "M required password=\"a username=x\" username=\"real\";";
+        assertEquals("real", KafkaTransport.jaasOption(jaas, "username"));
+        assertEquals("a username=x", KafkaTransport.jaasOption(jaas, "password"));
+    }
+
+    @Test
+    @DisplayName("The JAAS login module implies the mechanism; SCRAM without one is refused")
+    void mechanismFromJaas() throws IOException {
+        assertEquals(KafkaSasl.PLAIN, KafkaTransport.mechanismOf(
+                "org.apache.kafka.common.security.plain.PlainLoginModule required;"));
+        assertEquals(KafkaSasl.AWS_MSK_IAM, KafkaTransport.mechanismOf(
+                "software.amazon.msk.auth.iam.IAMLoginModule required;"));
+        assertThrows(IOException.class, () -> KafkaTransport.mechanismOf(
+                "org.apache.kafka.common.security.scram.ScramLoginModule required;"));
+        assertNull(KafkaTransport.mechanismOf("com.example.Custom required;"));
+    }
+
+    @Test
+    @DisplayName("An @ in the URL path is not a user name, and redaction keeps the path")
+    void urlAuthority() throws Exception {
+        java.util.Properties p = new java.util.Properties();
+        com.codename1.backend.Config c = com.codename1.backend.Config.of(p, "dev");
+        KafkaTransport t = new KafkaTransport("kafka://broker:9092/x@y",
+                com.codename1.backend.messaging.RetryPolicy.of(c), c);
+        java.lang.reflect.Field f = KafkaTransport.class.getDeclaredField("sasl");
+        f.setAccessible(true);
+        assertNull(f.get(t));
+        t.close();
+        assertEquals("kafka://***@h:1/a@b", KafkaTransport.redact("kafka://u:secret@h:1/a@b"));
+        assertEquals("kafka://h:1/a@b", KafkaTransport.redact("kafka://h:1/a@b"));
+    }
 }

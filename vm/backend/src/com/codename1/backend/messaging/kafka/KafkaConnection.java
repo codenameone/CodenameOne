@@ -252,9 +252,20 @@ final class KafkaConnection {
     /// empty and already-read batches too, so a fetch position always moves
     /// even when no record of the application's was in them -- or `from`
     /// when the set held no whole batch
+    /// How many decompressed bytes one fetch may hold before the remaining
+    /// batches are left for the next fetch. A single batch may still reach
+    /// `ByteSink.LIMIT`, so one record batch is always readable.
+    static final long FETCH_INFLATE_LIMIT = 128L * 1024 * 1024;
+
     static long records(byte[] set, long from, List<Record> out, long[][] aborted)
             throws IOException {
+        return records(set, from, out, aborted, FETCH_INFLATE_LIMIT);
+    }
+
+    static long records(byte[] set, long from, List<Record> out, long[][] aborted,
+                        long inflateLimit) throws IOException {
         long next = from;
+        long inflated = 0;
         Aborts aborts = aborted == null ? null : new Aborts(aborted);
         In in = new In(set);
         while (in.remaining() >= 12) {
@@ -273,6 +284,7 @@ final class KafkaConnection {
             batch.int32();
             int attributes = batch.int16();
             int lastDelta = batch.int32();
+            long prior = next;
             next = Math.max(next, base + lastDelta + 1);
             batch.int64();
             batch.int64();
@@ -294,7 +306,15 @@ final class KafkaConnection {
             if (control) {
                 continue;
             }
-            In records = new In(decompress(attributes & 7, batch.take(batch.remaining())));
+            byte[] plain = decompress(attributes & 7, batch.take(batch.remaining()));
+            inflated += plain.length;
+            if (inflated > inflateLimit && !out.isEmpty()) {
+                // The rest waits for the next fetch, which starts at this batch:
+                // a fetch of many small batches that each inflate to the batch
+                // limit must not hold all of them at once.
+                return prior;
+            }
+            In records = new In(plain);
             for (int i = 0; i < count; i++) {
                 int size = records.varint();
                 In r = new In(records.take(size));

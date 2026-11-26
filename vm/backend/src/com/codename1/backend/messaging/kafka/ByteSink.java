@@ -33,7 +33,7 @@ import java.io.IOException;
 final class ByteSink {
     /// The most one batch may decompress to. A fetch is capped at 4 MiB, so
     /// anything near this is a decompression bomb rather than a batch.
-    static final int LIMIT = 256 * 1024 * 1024;
+    static final int LIMIT = 64 * 1024 * 1024;
 
     private byte[] data;
     private int length;

@@ -169,7 +169,7 @@ public final class KafkaTransport extends PollingTransport {
         if (!"kafka".equalsIgnoreCase(s) && !"kafkas".equalsIgnoreCase(s)) {
             throw new IOException("Not a Kafka URL: " + redact(url));
         }
-        String rest = url.substring(scheme + 3);
+        String rest = authority(url.substring(scheme + 3));
         String user = null;
         String password = null;
         int at = rest.lastIndexOf('@');
@@ -256,6 +256,9 @@ public final class KafkaTransport extends PollingTransport {
             user = urlUser;
             password = urlPassword;
         }
+        if (mechanism == null && jaas != null) {
+            mechanism = mechanismOf(jaas);
+        }
         if (mechanism == null) {
             if (user == null && !saslProtocol) {
                 return null;
@@ -269,14 +272,70 @@ public final class KafkaTransport extends PollingTransport {
     /// The value of `name="..."` (or `name=value`) in a JAAS configuration
     /// line, with `\` escapes undone; null when it is not there.
     static String jaasOption(String jaas, String name) {
-        int at = jaas.indexOf(name);
-        while (at >= 0) {
-            int p = skipSpaces(jaas, at + name.length());
-            boolean starts = at == 0 || !Character.isLetterOrDigit(jaas.charAt(at - 1));
-            if (starts && p < jaas.length() && jaas.charAt(p) == '=') {
-                return jaasValue(jaas, skipSpaces(jaas, p + 1));
+        // Walked option by option, so a quoted value that happens to contain
+        // `username=` is never mistaken for the option itself.
+        int p = 0;
+        int n = jaas.length();
+        while (p < n) {
+            p = skipSpaces(jaas, p);
+            int start = p;
+            while (p < n && jaas.charAt(p) != '=' && jaas.charAt(p) != ' '
+                    && jaas.charAt(p) != ';' && jaas.charAt(p) != '"') {
+                p++;
             }
-            at = jaas.indexOf(name, at + name.length());
+            String word = jaas.substring(start, p);
+            int eq = skipSpaces(jaas, p);
+            if (eq < n && jaas.charAt(eq) == '=') {
+                int v = skipSpaces(jaas, eq + 1);
+                if (word.equals(name)) {
+                    return jaasValue(jaas, v);
+                }
+                p = skipValue(jaas, v);
+            } else if (p < n && jaas.charAt(p) == '"') {
+                p = skipValue(jaas, p);
+            } else if (p == start) {
+                p++;
+            }
+        }
+        return null;
+    }
+
+    /// The index just past the option value starting at `from`.
+    private static int skipValue(String jaas, int from) {
+        int p = from;
+        if (p < jaas.length() && jaas.charAt(p) == '"') {
+            for (p++; p < jaas.length() && jaas.charAt(p) != '"'; p++) {
+                if (jaas.charAt(p) == '\\') {
+                    p++;
+                }
+            }
+            return p + 1;
+        }
+        while (p < jaas.length() && jaas.charAt(p) != ' ' && jaas.charAt(p) != ';') {
+            p++;
+        }
+        return p;
+    }
+
+    /// The mechanism the JAAS line's login module implies, as the Java client
+    /// would need `sasl.mechanism` to say: a SCRAM module never means PLAIN,
+    /// which would send its password in the clear. Null when it implies none.
+    static String mechanismOf(String jaas) throws IOException {
+        int end = 0;
+        while (end < jaas.length() && jaas.charAt(end) != ' ') {
+            end++;
+        }
+        String module = jaas.substring(0, end);
+        if (module.endsWith(".PlainLoginModule")) {
+            return KafkaSasl.PLAIN;
+        }
+        if (module.endsWith(".IAMLoginModule")) {
+            return KafkaSasl.AWS_MSK_IAM;
+        }
+        if (module.endsWith(".ScramLoginModule")) {
+            throw new IOException("A SCRAM JAAS configuration needs the mechanism set: "
+                    + "spring.kafka.properties.sasl.mechanism (or "
+                    + "cn1.messaging.kafka.sasl.mechanism) to SCRAM-SHA-256 or SCRAM-SHA-512");
         }
         return null;
     }
@@ -311,12 +370,30 @@ public final class KafkaTransport extends PollingTransport {
         return v.toString();
     }
 
+    /// The authority of the URL text after `://`: everything before the
+    /// first `/`, `?` or `#`. An `@` in a path is not a user name.
+    private static String authority(String rest) {
+        int end = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                end = i;
+                break;
+            }
+        }
+        return rest.substring(0, end);
+    }
+
     /// `url` without the password it may carry.
-    private static String redact(String url) {
+    static String redact(String url) {
         int scheme = url.indexOf("://");
-        int at = url.lastIndexOf('@');
-        return scheme >= 0 && at > scheme ? url.substring(0, scheme + 3) + "***@"
-                + url.substring(at + 1) : url;
+        if (scheme < 0) {
+            return url;
+        }
+        String auth = authority(url.substring(scheme + 3));
+        int at = auth.lastIndexOf('@');
+        return at < 0 ? url : url.substring(0, scheme + 3) + "***@"
+                + url.substring(scheme + 3 + at + 1);
     }
 
     @Override
