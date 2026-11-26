@@ -100,7 +100,7 @@ node rearranges the diagram instead of overlapping it.
 include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tags=slides-imports;slides-diagrams,indent=0]
 ----
 
-.A process, an organisation chart and a table
+.A process, an organization chart and a table
 image::img/generated/slides-diagrams.png["A slide titled Diagrams with four steps from Plan to Ship, a hierarchy from CEO down to Engineering and Operations, and a table of weeks per stage",scaledwidth=70%]
 
 The slides go into a presentation in order:

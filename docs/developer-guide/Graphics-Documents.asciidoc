@@ -20,8 +20,8 @@ them back.
 
 === Loading and rendering
 
-`ArtFormats.read` detects the format from the content, so a file name is never needed. Here an SVG
-that arrived as text becomes an image:
+`ArtFormats.read` detects the format from the content, so a file name is never needed. The example below
+turns an SVG that arrived as text into an image:
 
 [source,java]
 ----
@@ -128,7 +128,7 @@ image references the JSON needs.
 
 === Editing
 
-`ArtModel` wraps a document for editing. Every change goes through it, so it can be undone,
+`ArtModel` wraps a document for editing. Every change goes through it so it can be undone,
 and listeners hear about it:
 
 [source,java]
@@ -142,7 +142,7 @@ copy of its raster first: `node.setImage(node.getImage().copy())`.
 
 === The editor
 
-`ArtEditor` is a ready-made drawing editor: an `ArtView` with a tool bar, a layers panel and
+`ArtEditor` is a ready-made drawing editor: an `ArtView` with a toolbar, a layers panel and
 an inspector.
 
 [source,java]
@@ -151,7 +151,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/art/ArtSni
 ----
 
 .The editor with a shape selected
-image::img/generated/art-editor.png["The drawing editor: a tool bar of drawing tools and colors, a canvas with a selected yellow circle above a green hill, and the layers and properties panels on the right",scaledwidth=70%]
+image::img/generated/art-editor.png["The drawing editor: a toolbar of drawing tools and colors, a canvas with a selected yellow circle above a green hill, and the layers and properties panels on the right",scaledwidth=70%]
 
 Its tools select, move and resize; pan; draw rectangles, ellipses, lines, Bezier paths and
 freehand strokes; paint and erase pixels; place text; pick colors; and fill shapes or pixel
