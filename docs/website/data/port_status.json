@@ -514,6 +514,15 @@
       ]
     },
     {
+      "id": "graphics-documents",
+      "category": "Rich components",
+      "name": "Graphics documents and drawing editor",
+      "description": "Reads an SVG at run time and shows it in the drawing editor: a gradient, a filter drop shadow, a multiply blend and text on a path, drawn by the software renderer, with the tool bar and the layers and properties panels, in light and dark themes.",
+      "tests": [
+        "ArtEditorScreenshotTest"
+      ]
+    },
+    {
       "id": "presentations",
       "category": "Rich components",
       "name": "Presentations",
@@ -1797,6 +1806,10 @@
     {
       "pattern": "DocumentReview*",
       "test": "DocumentReviewScreenshotTest"
+    },
+    {
+      "pattern": "ArtEditor*",
+      "test": "ArtEditorScreenshotTest"
     },
     {
       "pattern": "DocumentFormats*",

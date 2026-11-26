@@ -60,7 +60,7 @@ final class OdpReader {
         "fo:padding", "fo:padding-left", "fo:padding-top", "fo:padding-right",
         "fo:padding-bottom", "fo:wrap-option", "draw:auto-grow-height", "style:shrink-to-fit",
         "fo:clip", "presentation:background-visible",
-        "presentation:background-objects-visible","presentation:transition-type",
+        "presentation:background-objects-visible", "presentation:transition-type",
         "presentation:duration", "presentation:transition-speed", "smil:type",
         "smil:subtype", "smil:direction", "smil:dur", "presentation:visibility",
         "fo:text-align", "fo:margin-left", "fo:margin-right", "fo:text-indent",
@@ -309,7 +309,7 @@ final class OdpReader {
                 styleElement(x, n);
             } else if ("gradient".equals(n)) {
                 gradients.put(x.attr("draw:name"), new String[] {x.attr("draw:start-color"),
-                    x.attr("draw:end-color"), x.attr("draw:angle"), x.attr("draw:style")});
+                        x.attr("draw:end-color"), x.attr("draw:angle"), x.attr("draw:style")});
                 x.skipElement();
             } else if ("fill-image".equals(n)) {
                 fillImages.put(x.attr("draw:name"), x.attr("xlink:href"));
@@ -392,7 +392,7 @@ final class OdpReader {
         } else if ("page-layout".equals(kind)) {
             if (name != null) {
                 layouts.put(name, new float[] {len(s.props.get("fo:page-width"), 0),
-                    len(s.props.get("fo:page-height"), 0)});
+                        len(s.props.get("fo:page-height"), 0)});
             }
         } else if (name != null) {
             styles.put(name, s);
@@ -446,7 +446,7 @@ final class OdpReader {
                 x.skipElement();
             } else if (cls != null) {
                 m.boxes.put(cls, new float[] {len(x.attr("svg:x"), 0), len(x.attr("svg:y"), 0),
-                    len(x.attr("svg:width"), 0), len(x.attr("svg:height"), 0)});
+                        len(x.attr("svg:width"), 0), len(x.attr("svg:height"), 0)});
                 String ps = x.attr("presentation:style-name");
                 if (ps != null) {
                     m.boxStyles.put(cls, ps);

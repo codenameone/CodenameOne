@@ -312,7 +312,7 @@ public final class PngDecoder {
     }
 
     /// Inflates zlib data, stopping after `limit` bytes.
-    static byte[] inflate(byte[] data, int limit) throws IOException {
+    public static byte[] inflate(byte[] data, int limit) throws IOException {
         InputStream in = new InflaterInputStream(new ByteArrayInputStream(data));
         ByteArrayOutputStream bo = new ByteArrayOutputStream(data.length * 3 + 64);
         byte[] buf = new byte[8192];

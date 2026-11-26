@@ -854,6 +854,20 @@
       ]
     },
     {
+      "test": "ArtEditorScreenshotTest",
+      "reason": "This baseline is the drawing editor: a tool bar, a document canvas and the layers and properties panels side by side, sized for a phone, tablet or desktop. A watch screen cannot fit the editor's panels legibly, so the test captures nothing on watchOS rather than baseline an unusable crop.",
+      "platform_support": "The graphics documents API (com.codename1.art) is part of core and compiles and runs on watchOS, including reading and rendering documents; only this editor screenshot does not apply to the watch form factor.",
+      "verification": "Every phone, tablet, TV, desktop and browser leg renders the editor in both light and dark themes and compares it against stored goldens; the readers, writers, renderer and model are also covered by core unit tests.",
+      "reason_codes": [
+        {
+          "prefix": "editor-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "PickersAndInputsScreenshotTest",
       "reason": "The pickers and inputs baseline is a phone-sized screen of range sliders, chips, a chip input and a color picker. The watch form factor has no comparable layout to capture.",
       "platform_support": "RangeSlider, Chip, ChipInput and ColorPicker have no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",

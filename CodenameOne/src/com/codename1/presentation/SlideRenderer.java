@@ -544,7 +544,7 @@ public class SlideRenderer {
                         Math.round(clip[3] * scale));
             }
             stack.add(new Object[] {before, Float.valueOf(alpha), Boolean.valueOf(clip != null),
-                Boolean.valueOf(transformed)});
+                    Boolean.valueOf(transformed)});
             alpha *= a;
         }
 

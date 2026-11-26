@@ -43,8 +43,9 @@ public final class GuideFigures {
         FigureVariant[] kanban = KanbanFigures.variants();
         FigureVariant[] charts = ChartFigures.variants();
         FigureVariant[] secureKeyboard = SecureKeyboardFigures.variants();
+        FigureVariant[] art = ArtFigures.variants();
         FigureVariant[] slides = PresentationFigures.variants();
-        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban, charts, secureKeyboard, slides};
+        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban, charts, secureKeyboard, art, slides};
         int count = 0;
         for (FigureVariant[] part : parts) {
             count += part.length;

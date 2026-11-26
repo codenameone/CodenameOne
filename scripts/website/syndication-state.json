@@ -3574,6 +3574,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-26T01:01:11+00:00"
+      },
+      "devto": {
+        "id": 5125265,
+        "url": "https://dev.to/codenameone/run-an-llm-and-whisper-on-the-phone-with-no-server-bill-d2m",
+        "syndicated_at": "2026-11-26T14:04:34+00:00"
       }
     }
   }
