@@ -56,6 +56,7 @@ public final class MerchantSections {
     public static final String INBOX = "inbox";
     public static final String LISTINGS = "listings";
     public static final String CHANNELS = "channels";
+    public static final String APPS = "apps";
 
     /// The sidebar's order, each group in one run behind its lead (see
     /// [Sections#order]).
@@ -66,7 +67,7 @@ public final class MerchantSections {
         CAMPAIGNS, JOURNEYS, PROMOTIONS, Sections.DISCOUNTS, Sections.AUTOMATIONS,
         Sections.ANALYTICS, REPORTS, FORECAST,
         Sections.POS, LISTINGS, CHANNELS,
-        Sections.SETTINGS, SHIPPING, TAXES, PERMISSIONS, COMMISSIONS, ASSISTANT
+        Sections.SETTINGS, SHIPPING, TAXES, PERMISSIONS, COMMISSIONS, APPS, ASSISTANT
     };
 
     private static boolean installed;
@@ -144,6 +145,8 @@ public final class MerchantSections {
                 FontImage.MATERIAL_VIEW_MODULE, ListingsPane::new));
         Sections.register(Nav.MERCHANT, new Section(CHANNELS, "Channels", channels,
                 FontImage.MATERIAL_SYNC, ChannelsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(APPS, "Apps", manage,
+                FontImage.MATERIAL_EXTENSION, AppsPane::new));
         Sections.order(Nav.MERCHANT, ORDER);
     }
 }

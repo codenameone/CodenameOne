@@ -245,7 +245,8 @@ class MerchantIdorTest {
         "POST /sso-providers", "DELETE /sso-providers/{providerId}",
         "GET /api-keys", "POST /api-keys", "DELETE /api-keys/{keyId}",
         "GET /apps", "POST /apps/consent", "POST /apps/authorize",
-        "DELETE /apps/{installationId}",
+        "DELETE /apps/{installationId}", "POST /app-reviews", "GET /app-charges",
+        "POST /app-charges/{chargeId}/decision",
         "GET /bulk-jobs", "POST /bulk-jobs", "GET /bulk-jobs/{jobId}",
         "GET /bulk-jobs/{jobId}/result.jsonl",
         "GET /tax-settings", "POST /tax-settings", "GET /tax-overrides", "POST /tax-overrides",
@@ -296,7 +297,7 @@ class MerchantIdorTest {
         {"metafields", "metafield_def"}, {"metaobject-types", "metaobject_type"},
         {"metaobjects", "metaobject_entry"}, {"channels", "sales_channel"},
         {"sso-providers", "sso_provider"}, {"api-keys", "store_api_key"},
-        {"apps", "app_installation"},
+        {"apps", "app_installation"}, {"app-charges", "app_charge"},
         {"bulk-jobs", "bulk_job"}, {"tax-overrides", "tax_override"},
     };
 

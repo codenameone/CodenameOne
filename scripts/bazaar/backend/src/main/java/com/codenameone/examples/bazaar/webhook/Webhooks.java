@@ -85,10 +85,13 @@ public class Webhooks {
     public static final String CUSTOMERS_REDACT = "customers/redact";
     /// Sent to an app 48 hours after a store removed it: delete the store's data.
     public static final String SHOP_REDACT = "shop/redact";
+    /// Sent to an app when one of its charges changes status (`AppBilling`).
+    public static final String APP_SUBSCRIPTIONS_UPDATE = "app_subscriptions/update";
     /// The topics every installed app is subscribed to whether it asks or not:
     /// no app and no member of staff can subscribe to or remove them.
     public static final List<String> MANDATORY = Collections.unmodifiableList(Arrays.asList(
-            APP_UNINSTALLED, CUSTOMERS_DATA_REQUEST, CUSTOMERS_REDACT, SHOP_REDACT));
+            APP_UNINSTALLED, CUSTOMERS_DATA_REQUEST, CUSTOMERS_REDACT, SHOP_REDACT,
+            APP_SUBSCRIPTIONS_UPDATE));
 
     private static final int BATCH = 50;
 

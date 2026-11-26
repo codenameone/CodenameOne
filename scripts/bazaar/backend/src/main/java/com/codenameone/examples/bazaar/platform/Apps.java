@@ -99,11 +99,13 @@ public class Apps {
     private final StoreRepository stores;
     private final Webhooks webhooks;
     private final AuditEventRepository audits;
+    private final AppBilling billing;
     private final ApiKeyGenerator tokens = new ApiKeyGenerator(StoreApiKeys.APP_TOKEN_PREFIX);
 
     public Apps(DataSource db, StoreAccess access, StoreRepository stores, Webhooks webhooks,
-            AuditEventRepository audits) {
+            AuditEventRepository audits, AppBilling billing) {
         this.db = db;
+        this.billing = billing;
         this.access = access;
         this.stores = stores;
         this.webhooks = webhooks;
@@ -525,6 +527,9 @@ public class Apps {
                     + "WHERE id = ?", new Object[] {UNINSTALLED, Long.valueOf(now),
                         Long.valueOf(now + SHOP_REDACT_MILLIS), installationId});
             webhooks.appDeactivate(installationId);
+            // Its recurring and pending charges end with it, each sent to the
+            // app as app_subscriptions/update before app/uninstalled.
+            billing.cancelAll(installationId, username);
             Map<String, Object> payload = new LinkedHashMap<String, Object>();
             payload.put("store_id", storeId);
             payload.put("app_id", Rows.text(inst.get("app_id")));

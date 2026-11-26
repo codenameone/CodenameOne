@@ -22,6 +22,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.Nav;
+import com.codenameone.examples.bazaar.ui.Section;
 import com.codenameone.examples.bazaar.ui.Sections;
 import com.codenameone.examples.bazaar.ui.Shell;
 
@@ -31,6 +32,9 @@ import com.codenameone.examples.bazaar.ui.Shell;
 /// Everything here is behind `/api/admin`, which the server opens to the
 /// `admin` role and to nobody else. That is where the protection is.
 public final class AdminSections {
+    /// The app listings review queue.
+    public static final String APP_LISTINGS = "app-listings";
+
     private AdminSections() {
     }
 
@@ -55,6 +59,13 @@ public final class AdminSections {
             PaymentsForm.show(panes);
             return panes.host();
         });
+        Sections.register(Nav.ADMIN, new Section(APP_LISTINGS, "App listings", "",
+                FontImage.MATERIAL_EXTENSION, () -> {
+                    EmbeddedPanes panes = new EmbeddedPanes(FontImage.MATERIAL_EXTENSION,
+                            "Select a listing", "Pick a listing from the list to review it here.");
+                    AppListingsForm.show(panes);
+                    return panes.host();
+                }));
     }
 
     private static Container overview() {

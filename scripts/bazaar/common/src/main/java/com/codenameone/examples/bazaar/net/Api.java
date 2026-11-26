@@ -21,6 +21,8 @@ package com.codenameone.examples.bazaar.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.bazaar.api.AccountApi;
 import com.codenameone.examples.bazaar.api.AdminApi;
+import com.codenameone.examples.bazaar.api.AppApi;
+import com.codenameone.examples.bazaar.api.AppStoreApi;
 import com.codenameone.examples.bazaar.api.CartApi;
 import com.codenameone.examples.bazaar.api.CatalogApi;
 import com.codenameone.examples.bazaar.api.CheckoutApi;
@@ -77,6 +79,8 @@ import com.codenameone.examples.bazaar.api.TwoFactorApi;
 public final class Api {
     private static AccountApi account;
     private static AdminApi admin;
+    private static AppApi apps;
+    private static AppStoreApi appStore;
     private static PaymentApi payments;
     private static StoreApi stores;
     private static com.codenameone.examples.bazaar.api.ContentApi content;
@@ -141,6 +145,8 @@ public final class Api {
     static void connect(String baseUrl) {
         account = RestClients.create(AccountApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
+        apps = RestClients.create(AppApi.class, baseUrl);
+        appStore = RestClients.create(AppStoreApi.class, baseUrl);
         payments = RestClients.create(PaymentApi.class, baseUrl);
         stores = RestClients.create(StoreApi.class, baseUrl);
         content = RestClients.create(com.codenameone.examples.bazaar.api.ContentApi.class,
@@ -202,6 +208,16 @@ public final class Api {
 
     public static AdminApi admin() {
         return admin;
+    }
+
+    /// Installed apps and their consent.
+    public static AppApi apps() {
+        return apps;
+    }
+
+    /// The app directory, reviews and app charges.
+    public static AppStoreApi appStore() {
+        return appStore;
     }
 
     public static PaymentApi payments() {
