@@ -111,13 +111,13 @@ scopes apply to the API keys an owner creates by hand.
 | Scope | Grants
 | `read_products`, `write_products` | Products and variants; `productCreate` and `productUpdate`
 | `read_orders` | Orders and their lines
-| `write_orders` | Accepted in a grant; no route of the API asks for it
+| `write_orders` | An order's note and tags, and cancelling an order; `orderUpdate`, `orderCancel`
 | `read_customers`, `write_customers` | Customers; `customerUpdate`
 | `read_inventory`, `write_inventory` | Stock levels; `inventoryAdjust`
 | `read_discounts`, `write_discounts` | Discounts; `discountCreate`
 | `read_fulfillments`, `write_fulfillments` | An order's fulfillments; `fulfillmentCreate`
 | `read_metafields`, `write_metafields` | Metafield values; definitions and values in the app's own namespace
-| `read_analytics` | Accepted in a grant; no route of the API asks for it
+| `read_analytics` | Sales by day and best-selling products; the `analytics` query
 | `write_functions` | Uploading checkout functions
 | `write_extensions` | Uploading UI extensions and the storefront proxy
 |===
@@ -161,6 +161,8 @@ The REST routes are under `/api/v1/stores/{storeId}`:
 | `GET products`, `GET products/{productId}` | `read_products`
 | `POST products`, `PUT products/{productId}` | `write_products`
 | `GET orders`, `GET orders/{orderId}` | `read_orders`
+| `PUT orders/{orderId}`, `POST orders/{orderId}/cancel` | `write_orders`
+| `GET analytics?from=&to=` | `read_analytics`
 | `GET orders/{orderId}/fulfillments` | `read_fulfillments`
 | `POST orders/{orderId}/fulfillments` | `write_fulfillments`
 | `GET inventory`, `POST inventory/adjustments` | `read_inventory`, `write_inventory`
@@ -187,7 +189,8 @@ include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[
 
 The query fields are `products`, `orders`, `customers` and `discounts` (each
 with `first`), `inventoryLevels` (`first`, `locationId`, `productId`) and
-`fulfillments` (`orderId`). The mutations are the writes of the REST routes:
+`fulfillments` (`orderId`) and `analytics` (`from`, `to`). The mutations are
+the writes of the REST routes:
 
 [source,graphql]
 ----
@@ -203,7 +206,31 @@ include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[
 | `fulfillmentCreate` | `write_fulfillments` | `orders/fulfilled` when the order is
 | `metafieldsSet` | `write_metafields` | none
 | `customerUpdate` | `write_customers` | none
+| `orderUpdate` | `write_orders` | none
+| `orderCancel` | `write_orders` | `orders/cancelled`
 |===
+
+`orderUpdate` (and `PUT orders/{orderId}`) sets an order's `note` and `tags`,
+the tags as a list of words; a member left out keeps its value. `orderCancel`
+(and `POST orders/{orderId}/cancel`) cancels an order by the dashboard's rules:
+only an open order nothing of which has shipped, any other answers 409. Its
+stock goes back, a card hold is released or a captured payment refunded, and
+gift cards and store credit get their money back. Money that went back to a
+card can't be rolled back, so `orderCancel` must be the only field of its
+mutation; beside another field the request answers 400 and nothing runs.
+
+`analytics` (and `GET analytics`) answers a store's sales from `from` to
+`to`, both dates written `yyyy-MM-dd` and both included, as days of the
+store's own time zone: the counted orders, gross and net sales, discounts,
+refunds and the average order, one point per day under `daily`, and the
+bestsellers under `topProducts`, counted as the dashboard counts them. Without
+dates it answers the last 30 days up to today; a range is at most 400 days. Money is in minor units of the
+store's `currency`, and `timeZone` names the zone the days were cut in.
+
+[source,graphql]
+----
+include::../demos/common/src/main/snippets/developer-guide/extending-bazaar.txt[tag=extending-bazaar-orders-analytics,indent=0]
+----
 
 Every field of an operation is checked before any of it runs: a field the
 token may not use answers 403 with an `ACCESS_DENIED` error, and nothing is read

@@ -225,6 +225,17 @@ final class SettingsPane extends MerchantPane {
         checkout.setName("settings-checkout");
         page.add(checkout);
 
+        Ui.section(page, "Time zone and domain");
+        Container where = new Container(BoxLayout.y());
+        where.setUIID("MeCard");
+        where.add(Ui.tap(Ui.row(FontImage.MATERIAL_SCHEDULE, "Time zone",
+                "When the store's days start and end", null),
+                "settings-time-zone", e -> new TimeZonePage(this).show()));
+        where.add(Ui.tap(Ui.row(FontImage.MATERIAL_LANGUAGE, "Custom domain",
+                "Serve the store at an address of your own", null),
+                "settings-domain", e -> new DomainPage(this).show()));
+        page.add(where);
+
         Ui.section(page, "Webhooks");
         Container hooks = new Container(BoxLayout.y());
         hooks.setUIID("MeCard");

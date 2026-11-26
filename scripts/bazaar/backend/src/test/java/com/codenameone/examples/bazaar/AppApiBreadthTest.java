@@ -168,6 +168,8 @@ class AppApiBreadthTest {
             {"fulfillmentCreate(orderId: \"o\", input: {})", "write_fulfillments"},
             {"metafieldsSet(metafields: [])", "write_metafields"},
             {"customerUpdate(id: \"c\", input: {})", "write_customers"},
+            {"orderUpdate(id: \"o\", input: {note: \"x\"})", "write_orders"},
+            {"orderCancel(id: \"o\")", "write_orders"},
         };
         for (int iter = 0; iter < denied.length; iter++) {
             // Each beside an allowed productCreate: neither runs.
@@ -181,11 +183,17 @@ class AppApiBreadthTest {
                 s.storeId), "no partial writes");
         // Reads are held to their scopes too.
         assertEquals("ACCESS_DENIED", code(gql(s, t, "{ customers { id } }", null)));
+        assertEquals("ACCESS_DENIED", code(gql(s, t, "{ analytics { orders } }", null)));
         assertEquals(200, gql(s, t, "{ inventoryLevels { sku available } }", null).getStatus());
         // And the REST twins.
         assertEquals(403, Rest.statusOf(mvc, Rest.body(bearer(post(v1(s) + "/discounts"), t),
                 "{\"code\":\"X\"}")));
         assertEquals(403, Rest.statusOf(mvc, bearer(get(v1(s) + "/customers"), t)));
+        assertEquals(403, Rest.statusOf(mvc, bearer(get(v1(s) + "/analytics"), t)));
+        assertEquals(403, Rest.statusOf(mvc, Rest.body(bearer(put(v1(s) + "/orders/o"), t),
+                "{\"note\":\"x\"}")));
+        assertEquals(403, Rest.statusOf(mvc, Rest.body(bearer(post(v1(s) + "/orders/o/cancel"),
+                t), "{}")));
         assertEquals(403, Rest.statusOf(mvc, Rest.body(bearer(post(v1(s)
                 + "/inventory/adjustments"), t), "{\"variantId\":\"" + s.variantId
                 + "\",\"delta\":1}")));
@@ -261,6 +269,74 @@ class AppApiBreadthTest {
                 "{\"note\":\"Again\"}"));
         assertEquals("Again", back.get("note"));
         assertEquals("[api]", String.valueOf(back.get("tags")), "tags kept");
+    }
+
+    @Test
+    void ordersAreTaggedAndCancelledAndAnalyticsReadByStoreDate() throws Exception {
+        Webhooks.RecordingTransport rec = new Webhooks.RecordingTransport();
+        webhooks.useTransport(rec);
+        Shop s = shop("brd-orders");
+        OrderDto kept = s.buy(People.customer(accounts, "brd-ord-a"), 1);
+        OrderDto gone = s.buy(People.customer(accounts, "brd-ord-b"), 2);
+        String t = install(s, "orderapp", "write_orders", "read_analytics");
+        Rest.json(mvc, Rest.body(bearer(post(v1(s) + "/webhooks"), t),
+                "{\"topic\":\"orders/cancelled\",\"url\":\"https://app.example/c\"}"));
+
+        Map upd = (Map) data(gql(s, t, "mutation { orderUpdate(id: \"" + kept.id()
+                + "\", input: {note: \"Gift wrap\", tags: [\"vip\", \"gift\"]}) { note tags } }",
+                null)).get("orderUpdate");
+        assertEquals("Gift wrap", upd.get("note"));
+        assertEquals("vip, gift", upd.get("tags"));
+        Map rest = Rest.json(mvc, Rest.body(bearer(put(v1(s) + "/orders/" + kept.id()), t),
+                "{\"note\":\"Leave at door\"}"));
+        assertEquals("Leave at door", rest.get("note"));
+        assertEquals("vip, gift", rest.get("tags"), "tags not given are kept");
+
+        // A cancel beside another field is refused before either runs.
+        MockResponse mixed = gql(s, t, "mutation { a: orderUpdate(id: \"" + gone.id()
+                + "\", input: {note: \"never\"}) { note } b: orderCancel(id: \"" + gone.id()
+                + "\") { status } }", null);
+        assertEquals(400, mixed.getStatus(), mixed.getContentAsString());
+        Map still = Rest.json(mvc, bearer(get(v1(s) + "/orders/" + gone.id()), t));
+        assertTrue(!"never".equals(still.get("note")), "nothing was written");
+        assertEquals("OPEN", still.get("status"));
+
+        Map cancelled = (Map) data(gql(s, t, "mutation { orderCancel(id: \"" + gone.id()
+                + "\") { id status } }", null)).get("orderCancel");
+        assertEquals("CANCELLED", cancelled.get("status"));
+        assertEquals(409, Rest.statusOf(mvc, Rest.body(bearer(post(v1(s) + "/orders/"
+                + gone.id() + "/cancel"), t), "{}")), "a cancelled order is not open");
+        webhooks.deliver();
+        boolean announced = false;
+        for (String[] sent : rec.sent()) {
+            announced |= sent[1].contains("X-Bazaar-Topic: orders/cancelled\n")
+                    && sent[2].contains(gone.id());
+        }
+        assertTrue(announced, "orders/cancelled went out");
+
+        // Yesterday and today in the store's zone (UTC: it never picked one)
+        // hold the order kept, whichever side of midnight the run is on.
+        long now = System.currentTimeMillis();
+        String today = Days.iso(now);
+        String yesterday = Days.iso(now - Days.MILLIS);
+        Map a = Rest.json(mvc, bearer(get(v1(s) + "/analytics?from=" + yesterday + "&to="
+                + today), t));
+        assertEquals("UTC", a.get("timeZone"));
+        assertEquals(yesterday, a.get("from"));
+        assertEquals(1, Rest.number(a, "orders"), "the cancelled order does not count");
+        assertEquals(2, ((List) a.get("daily")).size());
+        assertTrue(Rest.number(a, "grossSalesCents") > 0);
+        Map viaGql = (Map) data(gql(s, t, "{ analytics(from: \"" + yesterday + "\", to: \""
+                + today + "\") { orders topProducts { title quantity } } }", null))
+                .get("analytics");
+        assertEquals(1, Rest.number(viaGql, "orders"));
+        assertEquals(1, ((List) viaGql.get("topProducts")).size());
+        Map month = Rest.json(mvc, bearer(get(v1(s) + "/analytics"), t));
+        assertEquals(30, ((List) month.get("daily")).size(), "the last 30 days by default");
+        assertEquals(400, Rest.statusOf(mvc, bearer(get(v1(s) + "/analytics?from=2026-13-01"),
+                t)));
+        assertEquals(400, Rest.statusOf(mvc, bearer(get(v1(s)
+                + "/analytics?from=2026-05-02&to=2026-05-01"), t)));
     }
 
     @Test

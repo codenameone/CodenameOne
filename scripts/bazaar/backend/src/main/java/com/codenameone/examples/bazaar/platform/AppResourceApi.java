@@ -44,6 +44,9 @@ import java.util.Map;
 /// | `POST orders/{id}/fulfillments` | `write_fulfillments` |
 /// | `GET customers`, `GET customers/{id}` | `read_customers` |
 /// | `PUT customers/{id}` (members given replace) | `write_customers` |
+/// | `PUT orders/{id}` (`note`, `tags`; members given replace) | `write_orders` |
+/// | `POST orders/{id}/cancel` | `write_orders` |
+/// | `GET analytics?from=&to=` (store dates, `yyyy-MM-dd`) | `read_analytics` |
 @RestController
 public class AppResourceApi {
     private static final String BASE = "/api/v1/stores/{storeId}";
@@ -167,5 +170,31 @@ public class AppResourceApi {
             @PathVariable("customerId") String customerId, HttpServer.Request request)
             throws Exception {
         return write(storeId, "customerUpdate", args(body(request), "id", customerId));
+    }
+
+    // -------------------------------------------------------------- orders
+
+    @PutMapping(BASE + "/orders/{orderId}")
+    public HttpServer.Response updateOrder(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId, HttpServer.Request request)
+            throws Exception {
+        return write(storeId, "orderUpdate", args(body(request), "id", orderId));
+    }
+
+    @PostMapping(BASE + "/orders/{orderId}/cancel")
+    public HttpServer.Response cancelOrder(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId) throws Exception {
+        StoreApiKeys.Key k = keys.require(storeId, StoreApiKeys.WRITE_ORDERS);
+        return json(resources.cancelOrder(k, orderId));
+    }
+
+    // ----------------------------------------------------------- analytics
+
+    @GetMapping(BASE + "/analytics")
+    public HttpServer.Response analytics(@PathVariable("storeId") String storeId,
+            @RequestParam(value = "from", required = false) String from,
+            @RequestParam(value = "to", required = false) String to) throws Exception {
+        keys.require(storeId, StoreApiKeys.READ_ANALYTICS);
+        return json(resources.analytics(storeId, from, to));
     }
 }

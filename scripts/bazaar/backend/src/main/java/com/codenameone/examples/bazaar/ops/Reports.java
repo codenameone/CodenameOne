@@ -83,18 +83,8 @@ public class Reports {
 
     /// `yyyy-MM-dd` as the first millisecond of that day (UTC); -1 if not a date.
     static long millisOf(String iso) {
-        if (!Days.isIso(iso)) {
-            return -1;
-        }
-        long y = Long.parseLong(iso.substring(0, 4));
-        long m = Long.parseLong(iso.substring(5, 7));
-        long d = Long.parseLong(iso.substring(8, 10));
-        y -= m <= 2 ? 1 : 0;
-        long era = (y >= 0 ? y : y - 399) / 400;
-        long yoe = y - era * 400;
-        long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return (era * 146097 + doe - 719468) * Days.MILLIS;
+        long day = Days.numberOf(iso);
+        return day == Long.MIN_VALUE ? -1 : day * Days.MILLIS;
     }
 
     /// The month index (`year * 12 + month - 1`) of a moment.

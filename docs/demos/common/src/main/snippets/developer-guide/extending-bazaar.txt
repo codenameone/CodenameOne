@@ -51,6 +51,17 @@ mutation { discountCreate(input: {code: "APP10", title: "Ten",
     kind: "PERCENT", amount: 10, active: true}) { id code } }
 // end::extending-bazaar-graphql-mutation[]
 
+// tag::extending-bazaar-orders-analytics[]
+mutation { orderUpdate(id: "<orderId>",
+    input: {note: "Gift wrap", tags: ["vip", "gift"]}) { note tags } }
+
+mutation { orderCancel(id: "<orderId>") { id status } }
+
+{ analytics(from: "2026-11-01", to: "2026-11-30") {
+    orders netSalesCents daily { label orders salesCents }
+    topProducts { title quantity salesCents } } }
+// end::extending-bazaar-orders-analytics[]
+
 // tag::extending-bazaar-webhook-subscribe[]
 POST /api/v1/stores/<storeId>/webhooks
 {"topic": "inventory/low", "url": "https://restock.example/restock/webhooks"}

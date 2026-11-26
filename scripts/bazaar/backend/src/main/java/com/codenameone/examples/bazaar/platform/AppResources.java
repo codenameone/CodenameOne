@@ -22,13 +22,17 @@ import com.codename1.backend.Json;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codenameone.examples.bazaar.Days;
+import com.codenameone.examples.bazaar.analytics.Analytics;
 import com.codenameone.examples.bazaar.api.AdjustDto;
+import com.codenameone.examples.bazaar.api.AnalyticsDto;
 import com.codenameone.examples.bazaar.api.CustomerDto;
 import com.codenameone.examples.bazaar.api.CustomerEditDto;
 import com.codenameone.examples.bazaar.api.DiscountDto;
 import com.codenameone.examples.bazaar.api.LevelDto;
 import com.codenameone.examples.bazaar.api.MetafieldValueDto;
 import com.codenameone.examples.bazaar.api.NewFulfillmentDto;
+import com.codenameone.examples.bazaar.api.OrderNoteDto;
 import com.codenameone.examples.bazaar.api.ProductDto;
 import com.codenameone.examples.bazaar.catalog.Catalog;
 import com.codenameone.examples.bazaar.content.Metafields;
@@ -37,6 +41,7 @@ import com.codenameone.examples.bazaar.domain.Store;
 import com.codenameone.examples.bazaar.events.StoreEvents;
 import com.codenameone.examples.bazaar.fulfil.Fulfillments;
 import com.codenameone.examples.bazaar.inventory.Stock;
+import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.rates.RateSettings;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 
@@ -64,6 +69,16 @@ import java.util.Map;
 /// | `fulfillmentCreate` | `write_fulfillments` | `orders/fulfilled` when the order is |
 /// | `metafieldsSet` | `write_metafields`, an app's own namespace | none |
 /// | `customerUpdate` | `write_customers` | none |
+/// | `orderUpdate` (note and tags) | `write_orders` | none |
+/// | `orderCancel` | `write_orders` | `orders/cancelled` |
+///
+/// `orderCancel` runs alone ([#cancelOrder]): cancelling releases stock and
+/// gives money back at the payment processor, which no rollback can take
+/// back, so it is never one field of a batch that could still fail after it.
+///
+/// The one read beside the resources is [#analytics], the store's sales by
+/// day and its best sellers over a range of the store's own dates
+/// (`read_analytics`).
 @Component
 public class AppResources {
     private final StoreRepository stores;
@@ -75,10 +90,12 @@ public class AppResources {
     private final Metafields metafields;
     private final StoreEvents events;
     private final Apps apps;
+    private final Orders orders;
+    private final Analytics analytics;
 
     public AppResources(StoreRepository stores, Catalog catalog, Stock stock, RateSettings rates,
             Fulfillments fulfillments, Customers customers, Metafields metafields,
-            StoreEvents events, Apps apps) {
+            StoreEvents events, Apps apps, Orders orders, Analytics analytics) {
         this.stores = stores;
         this.catalog = catalog;
         this.stock = stock;
@@ -88,7 +105,12 @@ public class AppResources {
         this.metafields = metafields;
         this.events = events;
         this.apps = apps;
+        this.orders = orders;
+        this.analytics = analytics;
     }
+
+    /// The mutation that must be the only field of its operation.
+    public static final String ORDER_CANCEL = "orderCancel";
 
     /// What a write leaves for [#afterWrites]: the products changed and the
     /// stock levels adjusted.
@@ -116,6 +138,9 @@ public class AppResources {
         }
         if ("customerUpdate".equals(name)) {
             return StoreApiKeys.WRITE_CUSTOMERS;
+        }
+        if ("orderUpdate".equals(name) || ORDER_CANCEL.equals(name)) {
+            return StoreApiKeys.WRITE_ORDERS;
         }
         return null;
     }
@@ -185,7 +210,69 @@ public class AppResources {
         return customers.detail(owner(storeId), storeId, customerId).customer();
     }
 
+    /// The store's sales from `from` to `to`, both `yyyy-MM-dd` and both
+    /// included, as days of the store's own time zone: the last 30 days up
+    /// to today when neither is given. Answers the totals, one point per day
+    /// and the best-selling products, as the dashboard's analytics count
+    /// them ([Analytics]).
+    public Map<String, Object> analytics(String storeId, String from, String to)
+            throws IOException {
+        Store store = stores.findById(storeId);
+        if (store == null) {
+            throw new ResponseStatusException(404, "No such store");
+        }
+        String zone = Days.isZone(store.getTimeZone()) ? store.getTimeZone() : Days.UTC;
+        long[] days = dayRange(from, to, Days.localNumber(zone, System.currentTimeMillis()));
+        AnalyticsDto a = analytics.dashboard(store.getOwnerUsername(), storeId,
+                Days.localDayStart(zone, days[0]), Days.localDayStart(zone, days[1] + 1));
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        out.put("from", Days.iso(days[0] * Days.MILLIS));
+        out.put("to", Days.iso(days[1] * Days.MILLIS));
+        out.put("timeZone", zone);
+        out.put("currency", a.currency());
+        out.put("orders", Integer.valueOf(a.current().orders()));
+        out.put("grossSalesCents", Long.valueOf(a.current().grossSalesCents()));
+        out.put("discountsCents", Long.valueOf(a.current().discountsCents()));
+        out.put("refundsCents", Long.valueOf(a.current().refundsCents()));
+        out.put("netSalesCents", Long.valueOf(a.current().netSalesCents()));
+        out.put("averageOrderCents", Long.valueOf(a.current().averageOrderCents()));
+        out.put("daily", a.daily());
+        out.put("topProducts", a.topProducts());
+        return out;
+    }
+
+    /// The first and last day numbers of `[from, to]`, dates in `yyyy-MM-dd`
+    /// that each default: `to` to `today`, `from` to 29 days before `to`.
+    static long[] dayRange(String from, String to, long today) {
+        long last = blank(to) ? today : Days.numberOf(to);
+        long first = blank(from) ? last - 29 : Days.numberOf(from);
+        if (first == Long.MIN_VALUE || last == Long.MIN_VALUE) {
+            throw new ResponseStatusException(400, "A date is written yyyy-MM-dd");
+        }
+        if (first > last) {
+            throw new ResponseStatusException(400, "The range ends before it starts");
+        }
+        return new long[] {first, last};
+    }
+
+    private static boolean blank(String text) {
+        return text == null || text.trim().length() == 0;
+    }
+
     // ------------------------------------------------------------- writes
+
+    /// Cancels an order nothing of which has shipped, by the dashboard's
+    /// rules ([Orders#cancelOrder]): its stock goes back, a card hold is let
+    /// go or a captured payment refunded, and `orders/cancelled` goes out.
+    /// Not inside a transaction of this class's, for the reason above.
+    public Object cancelOrder(StoreApiKeys.Key k, String orderId) throws IOException {
+        if (orderId == null || orderId.length() == 0) {
+            throw new ResponseStatusException(400, "Say which one (id)");
+        }
+        Object done = orders.cancel(owner(k.storeId), k.storeId, orderId);
+        audit(k, "APP_ORDER_CANCELLED", orderId);
+        return done;
+    }
 
     /// Runs one mutation; `args` are its GraphQL arguments, or the REST
     /// route's body under `input` and its path ids.
@@ -265,6 +352,21 @@ public class AppResources {
             audit(k, "APP_CUSTOMER_UPDATED", id);
             return saved;
         }
+        if ("orderUpdate".equals(name)) {
+            String id = text(args, "id");
+            if (!(input instanceof Map)) {
+                throw new ResponseStatusException(400, "The input is an object");
+            }
+            Map in = (Map) input;
+            Object done = orders.note(owner(storeId), storeId, id, new OrderNoteDto(
+                    optionalText(in.get("note")), tagsOf(in.get("tags"))));
+            audit(k, "APP_ORDER_UPDATED", id);
+            return done;
+        }
+        if (ORDER_CANCEL.equals(name)) {
+            throw new ResponseStatusException(400, "orderCancel runs as the only field of its "
+                    + "mutation");
+        }
         throw new ResponseStatusException(400, "No mutation " + name);
     }
 
@@ -296,6 +398,41 @@ public class AppResources {
         for (int iter = 0; iter < w.levels.size(); iter++) {
             events.stockAdjusted(storeId, w.levels.get(iter));
         }
+    }
+
+    /// A note's text, null when it is not given (left as it is).
+    private static String optionalText(Object v) {
+        if (v == null) {
+            return null;
+        }
+        if (!(v instanceof String)) {
+            throw new ResponseStatusException(400, "A note is text");
+        }
+        return (String) v;
+    }
+
+    /// An order's tags as the order keeps them, comma separated: given as a
+    /// list of words or as that text already. Null when not given.
+    static String tagsOf(Object v) {
+        if (v == null || v instanceof String) {
+            return (String) v;
+        }
+        if (!(v instanceof List)) {
+            throw new ResponseStatusException(400, "Tags are a list of words");
+        }
+        StringBuilder out = new StringBuilder();
+        List list = (List) v;
+        for (int iter = 0; iter < list.size(); iter++) {
+            Object tag = list.get(iter);
+            if (!(tag instanceof String)) {
+                throw new ResponseStatusException(400, "Tags are a list of words");
+            }
+            String t = ((String) tag).trim();
+            if (t.length() > 0) {
+                out.append(out.length() == 0 ? "" : ", ").append(t);
+            }
+        }
+        return out.toString();
     }
 
     private static String text(Map<String, Object> args, String name) {

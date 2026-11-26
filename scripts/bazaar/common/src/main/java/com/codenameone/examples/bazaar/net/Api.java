@@ -69,6 +69,8 @@ import com.codenameone.examples.bazaar.api.OpsApi;
 import com.codenameone.examples.bazaar.api.ChannelsApi;
 import com.codenameone.examples.bazaar.api.DigitalApi;
 import com.codenameone.examples.bazaar.api.TwoFactorApi;
+import com.codenameone.examples.bazaar.api.DomainApi;
+import com.codenameone.examples.bazaar.api.StoreClockApi;
 
 /// The server, as the app calls it.
 ///
@@ -131,6 +133,8 @@ public final class Api {
     private static ChannelsApi channels;
     private static DigitalApi digital;
     private static TwoFactorApi twoFactor;
+    private static StoreClockApi storeClock;
+    private static DomainApi domains;
     private static com.codenameone.examples.bazaar.api.AppExtensionApi extensions;
 
     private Api() {
@@ -203,6 +207,8 @@ public final class Api {
         channels = RestClients.create(ChannelsApi.class, baseUrl);
         digital = RestClients.create(DigitalApi.class, baseUrl);
         twoFactor = RestClients.create(TwoFactorApi.class, baseUrl);
+        storeClock = RestClients.create(StoreClockApi.class, baseUrl);
+        domains = RestClients.create(DomainApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -432,6 +438,16 @@ public final class Api {
 
     public static TwoFactorApi twoFactor() {
         return twoFactor;
+    }
+
+    /// The store's time zone.
+    public static StoreClockApi storeClock() {
+        return storeClock;
+    }
+
+    /// The store's custom domain: claim, proof and verification.
+    public static DomainApi domains() {
+        return domains;
     }
 
     public static LoyaltyApi loyalty() {

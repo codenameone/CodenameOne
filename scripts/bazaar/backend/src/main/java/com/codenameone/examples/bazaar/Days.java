@@ -205,6 +205,24 @@ public final class Days {
         return localDayStart(zone, localNumber(zone, millis));
     }
 
+    /// The number of the day `yyyy-MM-dd` names (whole days since the epoch,
+    /// as [#number] counts them), or `Long.MIN_VALUE` for text that is not a
+    /// date ([#isIso]).
+    public static long numberOf(String iso) {
+        if (!isIso(iso)) {
+            return Long.MIN_VALUE;
+        }
+        long y = Long.parseLong(iso.substring(0, 4));
+        long m = Long.parseLong(iso.substring(5, 7));
+        long d = Long.parseLong(iso.substring(8, 10));
+        y -= m <= 2 ? 1 : 0;
+        long era = (y >= 0 ? y : y - 399) / 400;
+        long yoe = y - era * 400;
+        long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
+    }
+
     /// Whether `text` is a date written `yyyy-MM-dd`, with a month and a day
     /// that could exist.
     public static boolean isIso(String text) {

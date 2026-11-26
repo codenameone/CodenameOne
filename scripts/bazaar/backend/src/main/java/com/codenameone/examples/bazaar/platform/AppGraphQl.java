@@ -40,12 +40,15 @@ import java.util.Map;
 /// | `inventoryLevels` | `read_inventory` | `first`, `locationId`, `productId` |
 /// | `discounts` | `read_discounts` | `first` |
 /// | `fulfillments` | `read_fulfillments` | `orderId` |
+/// | `analytics` | `read_analytics` | `from`, `to` (store dates, `yyyy-MM-dd`) |
 ///
 /// The mutations and their scopes are [AppResources]'s. Every field of the
 /// operation is checked before any runs: one the token may not use answers
 /// 403 with an `ACCESS_DENIED` error and nothing is read or written. The
 /// fields of a mutation then run in one transaction, so a failing one rolls
 /// back the rest, and the webhooks go out only after it committed.
+/// `orderCancel` is the exception: it must be the mutation's only field
+/// ([AppResources#cancelOrder]).
 @RestController
 public class AppGraphQl {
     /// The `extensions.code` of a field the token's scopes do not cover.
@@ -81,6 +84,9 @@ public class AppGraphQl {
         if ("fulfillments".equals(name)) {
             return StoreApiKeys.READ_FULFILLMENTS;
         }
+        if ("analytics".equals(name)) {
+            return StoreApiKeys.READ_ANALYTICS;
+        }
         return null;
     }
 
@@ -111,9 +117,10 @@ public class AppGraphQl {
             if (scope == null) {
                 return answer(400, MiniGraphQl.error("Unknown field " + f.name + (op.mutation
                         ? "; the mutations are productCreate, productUpdate, inventoryAdjust, "
-                        + "discountCreate, fulfillmentCreate, metafieldsSet and customerUpdate"
+                        + "discountCreate, fulfillmentCreate, metafieldsSet, customerUpdate, "
+                        + "orderUpdate and orderCancel"
                         : "; the root has products, orders, customers, inventoryLevels, "
-                        + "discounts and fulfillments")));
+                        + "discounts, fulfillments and analytics")));
             }
             boolean appOnly = "metafieldsSet".equals(f.name) && k.appId == null;
             if (appOnly || !StoreApiKeys.has(k.scopes, scope)) {
@@ -122,9 +129,22 @@ public class AppGraphQl {
                         + scope + " for " + f.name, ACCESS_DENIED));
             }
         }
+        if (op.mutation && fields.size() > 1) {
+            for (int iter = 0; iter < fields.size(); iter++) {
+                if (AppResources.ORDER_CANCEL.equals(fields.get(iter).name)) {
+                    return answer(400, MiniGraphQl.error("orderCancel runs as the only field "
+                            + "of its mutation"));
+                }
+            }
+        }
         Map<String, Object> data;
         try {
-            if (op.mutation) {
+            if (op.mutation && AppResources.ORDER_CANCEL.equals(fields.get(0).name)) {
+                MiniGraphQl.Field f = fields.get(0);
+                data = new LinkedHashMap<String, Object>();
+                data.put(f.alias, MiniGraphQl.project(Json.parse(Json.write(
+                        resources.cancelOrder(k, f.stringArg("id")))), f));
+            } else if (op.mutation) {
                 AppResources.Writes w = new AppResources.Writes();
                 Map<String, Object> raw = resources.writeAll(k, fields, w);
                 resources.afterWrites(storeId, w);
@@ -170,6 +190,9 @@ public class AppGraphQl {
         }
         if ("discounts".equals(f.name)) {
             return firstOf(resources.discounts(storeId), first);
+        }
+        if ("analytics".equals(f.name)) {
+            return resources.analytics(storeId, f.stringArg("from"), f.stringArg("to"));
         }
         return resources.fulfillmentsOf(storeId, f.stringArg("orderId"));
     }

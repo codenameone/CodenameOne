@@ -292,10 +292,13 @@ over an amount, pickup or local delivery. Tax rates are set per country and
 region. The settings hold the store's name, description, logo and banner,
 locations, staff and their roles, and the registers.
 
-*Time zone.* A store counts its days in UTC until it's given a time zone, an
-IANA name such as `Europe/Paris`, saved through the store's API
-(`/api/merchant/stores/{storeId}/time-zone`). Analytics, reports and "today"
-then start and end the day at the store's midnight.
+*Time zone.* A store counts its days in UTC until it's given a time zone.
+Settings > Time zone in the app lists the common zones, each by its city, its
+area and its IANA name such as `Europe/Paris`; pick one and tap Save time
+zone. A zone saved some other way, through the store's API
+(`/api/merchant/stores/{storeId}/time-zone`), shows at the top of the list.
+Analytics, reports and "today" then start and end the day at the store's
+midnight.
 
 Settings > Two-factor sign-in in the app turns on authenticator codes for the
 account: scan the QR code, enter a code, and keep the recovery codes it shows
@@ -498,7 +501,11 @@ as a file at `/.well-known/bazaar-verify/<token>` on the domain or as a DNS TXT
 record `bazaar-verify=<token>` on `_bazaar-verify.<domain>`. A check through the
 store's API (`/api/merchant/stores/{storeId}/domain/verify`) then confirms it,
 and from then on that address serves the store at its root. A domain another
-store has proved can't be claimed. The header has a globe menu for the
+store has proved can't be claimed. The app does the same under Settings >
+Custom domain: type the domain and tap Claim domain, and the page shows its
+status, the token, the address for the file and the TXT record to add. Verify
+now looks for the token at once and the status turns to Verified when it's
+found; Remove domain gives the address up. The header has a globe menu for the
 language (English, Spanish, French, German and Hebrew, each named in its own
 language) and, when the store sells in more than one market, a market menu
 beside it. A shopper who picks a market sees prices in that market's currency
