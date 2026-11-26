@@ -29,6 +29,34 @@
       ]
     },
     {
+      "test": "CoachMarksScreenshotTest",
+      "reason": "The coach marks baseline is a phone-sized tour overlay pointing at phone-layout targets. The watch form factor has no comparable layout to capture.",
+      "platform_support": "CoachMarks has no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the tour in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-overlay-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "LoadingPlaceholdersScreenshotTest",
+      "reason": "The loading placeholders baseline is a phone-sized screen of skeletons, carousel and empty state. The watch form factor has no comparable layout to capture.",
+      "platform_support": "Skeleton, Carousel, PageIndicator and EmptyState have no watchOS-specific restriction; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the screen in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-layout-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "CenteredDialogTitleScreenshotTest",
       "reason": "The centered dialog title baseline is a phone-sized dialog. The watch form factor lays dialogs out differently and has no comparable phone dialog to capture.",
       "platform_support": "Dialogs and centered titles work on watchOS; only this phone-geometry baseline does not apply there.",
