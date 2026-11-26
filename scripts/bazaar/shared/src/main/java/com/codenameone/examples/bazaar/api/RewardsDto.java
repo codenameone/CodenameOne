@@ -28,7 +28,8 @@ import com.codename1.annotations.Mapped;
 /// (`storeName`; `qualifying` reached of `qualifying + toNextTier`). The
 /// counts feed the badges. `orderPoints` is what the loyalty ledger credited
 /// for the order asked about (0 without one, or before it is credited), and
-/// `orderBalance` the balance at that order's store.
+/// `orderBalance` the balance at that order's store. `currency` is that best
+/// store's, the one `qualifying` and `toNextTier` are counted in.
 @Mapped
 public record RewardsDto(
         long points,
@@ -45,5 +46,6 @@ public record RewardsDto(
         long orderPoints,
         String storeName,
         java.util.List<StoreBalanceDto> balances,
-        long orderBalance) {
+        long orderBalance,
+        String currency) {
 }

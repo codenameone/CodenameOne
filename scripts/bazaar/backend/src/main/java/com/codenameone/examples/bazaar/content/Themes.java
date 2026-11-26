@@ -48,7 +48,7 @@ import java.util.List;
 /// reaches CSS.
 ///
 /// A preview is a signed address ([#previewToken]): the store and an expiry
-/// signed with a key only this process holds, so it can be shared with a
+/// signed with a key from `web.security.FormKeys`, so it can be shared with a
 /// colleague for an hour and cannot be forged for another store. The page
 /// it opens reads the stored draft, never values from the address.
 @Component
@@ -76,12 +76,12 @@ public class Themes {
     private final StoreAccess access;
     private final String key;
 
-    public Themes(StoreThemeRepository rows, PhotoRepository photos, StoreAccess access)
-            throws IOException {
+    public Themes(StoreThemeRepository rows, PhotoRepository photos, StoreAccess access,
+            com.codenameone.examples.bazaar.web.security.FormKeys keys) throws IOException {
         this.rows = rows;
         this.photos = photos;
         this.access = access;
-        this.key = Tokens.token();
+        this.key = keys.key(com.codenameone.examples.bazaar.web.security.FormKeys.THEME_PREVIEW);
     }
 
     /// The theme `status` (LIVE, or DRAFT -- which starts as the live one).

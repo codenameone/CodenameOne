@@ -60,6 +60,10 @@ import java.util.List;
 ///   with no header -- or no request at all, as for an order placed from a
 ///   job or a test -- the rule adds nothing.
 ///
+/// - **An outside provider** ([RiskProvider], `bazaar.risk.provider`): its
+///   score, 0 to 100, is added as points, with its reasons. One it cannot
+///   reach adds nothing and says so.
+///
 /// 60 points or more is HIGH and the order is HELD: fulfilment refuses it
 /// ([RiskHolds#requireReleased]) until a manager approves it or cancels it
 /// (the order's own cancel, which voids the hold on the card and releases the
@@ -85,17 +89,51 @@ public class Fraud {
     private final StoreAccess access;
     private final String countryHeader;
     private final FraudRuleRepository rules;
+    private RiskProvider provider;
 
     public Fraud(OrderRiskRepository risks, CheckoutFailureRepository failures,
             StoreOrderRepository orders, Orders orderService, StoreAccess access, Config config,
-            FraudRuleRepository rules) throws IOException {
+            FraudRuleRepository rules, RiskProvider provider) throws IOException {
         this.rules = rules;
+        this.provider = provider;
         this.risks = risks;
         this.failures = failures;
         this.orders = orders;
         this.orderService = orderService;
         this.access = access;
         this.countryHeader = config.get("bazaar.risk.country-header", "CF-IPCountry");
+    }
+
+    /// Replaces the outside provider; for tests.
+    public void useProvider(RiskProvider provider) {
+        this.provider = provider == null ? RiskProvider.NONE : provider;
+    }
+
+    /// Adds what `provider` said (`signal`, or null) to `s`.
+    static void add(Score s, String provider, RiskProvider.Signal signal) {
+        if (signal == null) {
+            return;
+        }
+        String reasons = "";
+        for (int iter = 0; iter < signal.reasons.size(); iter++) {
+            reasons += (iter == 0 ? ": " : "; ") + signal.reasons.get(iter);
+        }
+        if (signal.score > 0 || reasons.length() > 0) {
+            s.add(signal.score, provider + " risk score " + signal.score + reasons);
+        }
+    }
+
+    /// The provider's view of `order`, asked outside any transaction.
+    RiskProvider.Signal external(StoreOrder order) {
+        RiskProvider p = provider;
+        if (p == null || p == RiskProvider.NONE) {
+            return null;
+        }
+        try {
+            return p.assess(order, clientCountry());
+        } catch (IOException | RuntimeException down) {
+            return new RiskProvider.Signal(0).reason("not reached (" + down.getMessage() + ")");
+        }
     }
 
     /// What the rules found about one order: points and their reasons.
@@ -181,8 +219,24 @@ public class Fraud {
     }
 
     /// Scores a just-placed order and records the result; a HIGH one is held.
-    @Transactional(rollbackFor = IOException.class)
+    /// The outside provider is asked first, before the transaction opens.
     public OrderRisk assess(String orderId, String username) throws IOException {
+        StoreOrder placed = load(orderId);
+        if (placed == null) {
+            return null;
+        }
+        return record(orderId, username, external(placed));
+    }
+
+    @Transactional(readOnly = true)
+    private StoreOrder load(String orderId) throws IOException {
+        StoreOrder order = orders.findById(orderId);
+        return order == null || risks.findByOrderId(orderId) != null ? null : order;
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private OrderRisk record(String orderId, String username, RiskProvider.Signal signal)
+            throws IOException {
         StoreOrder order = orders.findById(orderId);
         if (order == null || risks.findByOrderId(orderId) != null) {
             return null;
@@ -201,6 +255,7 @@ public class Fraud {
                 .countByStoreIdAndUsernameAndCreatedAtGreaterThanEqual(order.getStoreId(),
                         username, Instant.ofEpochMilli(now - HOUR));
         Score s = score(order, history, failed, clientCountry(), now);
+        add(s, provider == null ? "none" : provider.name(), signal);
         OrderRisk r = new OrderRisk();
         r.setId(Ids.next());
         r.setStoreId(order.getStoreId());

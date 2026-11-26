@@ -58,6 +58,13 @@ final class RewardsView {
     private RewardsView() {
     }
 
+    /// `minor` units of the programme's store currency, as `ops.Amounts` writes
+    /// them (dollars when the server named none).
+    static String amount(long minor, String currency) {
+        return com.codenameone.examples.bazaar.ops.Amounts.format(minor,
+                currency == null || currency.length() != 3 ? "USD" : currency);
+    }
+
     private static String points(long n) {
         return Lang.tr("{0} pts", String.valueOf(n));
     }
@@ -97,10 +104,10 @@ final class RewardsView {
         boolean hasNext = r.nextTierName() != null && r.nextTierName().length() > 0
                 && r.toNextTier() > 0;
         words.add(Ui.text(hasNext
-                ? Lang.tr("Spend {0} more to reach {1}", Money.whole(r.toNextTier() + 99),
+                ? Lang.tr("Spend {0} more to reach {1}", amount(r.toNextTier(), r.currency()),
                         r.nextTierName())
                 : Lang.tr("Top tier: every perk is yours"), "ShopRewardsNextB"));
-        words.add(Ui.plain(Lang.tr("{0} spent this year", Money.whole(r.qualifying())),
+        words.add(Ui.plain(Lang.tr("{0} spent this year", amount(r.qualifying(), r.currency())),
                 "ShopRewardsSpent"));
         top.add(BorderLayout.CENTER, words);
         card.add(top);

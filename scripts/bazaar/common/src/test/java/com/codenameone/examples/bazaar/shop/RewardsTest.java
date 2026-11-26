@@ -53,7 +53,8 @@ class RewardsTest {
                     new com.codenameone.examples.bazaar.api.StoreBalanceDto("a", "Northwind", 120,
                         "Silver"),
                     new com.codenameone.examples.bazaar.api.StoreBalanceDto("b", "Fennel", 40, ""),
-                    new com.codenameone.examples.bazaar.api.StoreBalanceDto("c", "Kiln", 2, "")), 120);
+                    new com.codenameone.examples.bazaar.api.StoreBalanceDto("c", "Kiln", 2, "")), 120,
+                "EUR");
         assertFalse(Rewards.badges(dto)[Rewards.REVIEWER]);
         assertEquals(42, Rewards.otherPoints(dto), "the best store is shown apart");
         assertEquals(0, Rewards.otherPoints(null));
@@ -124,5 +125,15 @@ class RewardsTest {
                 TrackStages.DELIVERED));
         assertNull(TrackStages.banner(TrackStages.SHIPPED, TrackStages.SHIPPED));
         assertNull(TrackStages.banner(TrackStages.SHIPPED, TrackStages.CANCELLED));
+    }
+
+    @Test
+    void rewardsAmountsUseTheStoreCurrency() {
+        assertEquals(com.codenameone.examples.bazaar.ops.Amounts.format(1250, "EUR"),
+                RewardsView.amount(1250, "EUR"));
+        assertEquals(com.codenameone.examples.bazaar.ops.Amounts.format(1250, "JPY"),
+                RewardsView.amount(1250, "JPY"));
+        assertEquals(com.codenameone.examples.bazaar.ops.Amounts.format(1250, "USD"),
+                RewardsView.amount(1250, ""));
     }
 }

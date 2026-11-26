@@ -66,6 +66,37 @@ public class CheckoutForm {
     public String f7 = "";
     public String f8 = "";
     public String f9 = "";
+    /// The installed apps' checkout fields (`checkout.block`), in their order.
+    public String a0 = "";
+    public String a1 = "";
+    public String a2 = "";
+    public String a3 = "";
+    public String a4 = "";
+    public String a5 = "";
+    public String a6 = "";
+    public String a7 = "";
+    public String a8 = "";
+    public String a9 = "";
+
+    /// How many app fields the form carries.
+    public static final int APP_FIELDS = 10;
+
+    /// The answer to app field `n`.
+    public String app(int n) {
+        switch (n) {
+            case 0: return a0;
+            case 1: return a1;
+            case 2: return a2;
+            case 3: return a3;
+            case 4: return a4;
+            case 5: return a5;
+            case 6: return a6;
+            case 7: return a7;
+            case 8: return a8;
+            case 9: return a9;
+            default: return "";
+        }
+    }
 
     /// The answer to field `n`.
     public String field(int n) {

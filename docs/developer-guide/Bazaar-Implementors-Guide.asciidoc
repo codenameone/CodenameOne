@@ -694,7 +694,30 @@ No single signal holds an order. The merchant's own rules (`fraud_rule`,
 migration V180, `RiskApi` `fraud-rules`) run in the same `Fraud.assess`: a
 HOLD match holds the order like a high score, a CANCEL match cancels it with
 `Orders.cancelOrder`. The per-hour rule counts the signed-in customer, since
-orders keep no client IP. Manual tenders online are two rows of
+orders keep no client IP. An outside risk service plugs in as a
+`risk.RiskProvider` (`bazaar.risk.provider`, none by default): its score is
+added to the points and its reasons are listed with the others, so a high
+score holds the order for review. A provider that cannot be reached adds
+nothing and never blocks checkout.
+
+A custom domain is served, and named in canonical links and the sitemap, only
+once the store proves it owns it (`web.DomainVerification`, `DomainApi`).
+Claiming a domain issues a token, published either as a file at
+`/.well-known/bazaar-verify/<token>` on the domain or as a TXT record
+`bazaar-verify=<token>` on `_bazaar-verify.<domain>`, looked up over
+DNS-over-HTTPS (`bazaar.domains.doh-url`). A domain another store has proved
+cannot be claimed.
+
+The bot guard's and the theme preview's signing keys derive from one secret,
+`bazaar.forms.signing-key` (`BAZAAR_FORMS_SIGNING_KEY`, at least 32
+characters), given the same on every server. Without it each process makes a
+random key and logs a `[config]` warning on a development profile, an error
+on any other.
+
+A company whose VAT id VIES confirmed, buying from a store with an EU home
+country for delivery to another member state, is reverse charged
+(`taxes.ReverseCharge`): the order carries no VAT, records the VAT id as its
+exemption, and the invoice prints the reverse-charge note. Manual tenders online are two rows of
 `PaymentTypes` (`cod`, `bank_transfer`) that open no processor intent: the
 order is placed PENDING and `Orders.markPaid` settles it. `dispute.Disputes` takes the processor's signed,
 idempotent webhook events and moves a dispute from needs-response through review
@@ -978,8 +1001,7 @@ business contracts for. Plan for these before taking real orders:
 
 * *Custom domain DNS and TLS.* Bazaar only matches the `Host` header. Pointing a
   merchant's DNS at the server, issuing and renewing its certificate and
-  terminating TLS for it are the operator's job, as is proving the merchant owns
-  the domain before it's saved.
+  terminating TLS for it are the operator's job.
 
 * *A real payment service provider.* The Stripe provider has to be tried against
   a test account before it handles money, and a deployment may need another
@@ -1019,8 +1041,6 @@ business contracts for. Plan for these before taking real orders:
   Bank's daily reference rates with `bazaar.fx.reporting.provider=ecb`. A
   production platform would take rates from its payment processor or a paid
   feed with intraday rates and an audit trail.
-* *Tax for B2B orders.* Quotes and B2B orders are priced net of tax. Reverse-charge
-  and per-company tax treatment need the tax engine above.
 * *Three-decimal currencies at Stripe.* Amounts in a three-decimal currency
   such as BHD are sent to Stripe as stored; Stripe asks for those to end in 0,
   and Bazaar does not round a charge away from the order's total.
@@ -1067,8 +1087,3 @@ business contracts for. Plan for these before taking real orders:
   shopper either way. Staff messages (the low-stock mail, automation pushes to
   staff) follow the staff member's account language, else English; the
   store's own address gets English.
-* *Fraud scoring.* The fraud rules are a fixed point table. A store with real
-  volume would add the payment provider's risk signals or a fraud service.
-* *Form signing keys.* The bot guard's and the theme preview's signing keys are
-  held per process, so a restart invalidates open forms and preview links, and
-  several servers behind a load balancer need a shared key.

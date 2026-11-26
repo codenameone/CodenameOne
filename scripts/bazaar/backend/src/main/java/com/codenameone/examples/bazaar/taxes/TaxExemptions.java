@@ -65,9 +65,11 @@ public class TaxExemptions {
     private final OrderExemptionRepository uses;
     private final StoreOrderRepository orders;
     private final StoreAccess access;
+    private final ReverseCharge reverseCharge;
 
     public TaxExemptions(TaxExemptionRepository exemptions, OrderExemptionRepository uses,
-            StoreOrderRepository orders, StoreAccess access) {
+            StoreOrderRepository orders, StoreAccess access, ReverseCharge reverseCharge) {
+        this.reverseCharge = reverseCharge;
         this.exemptions = exemptions;
         this.uses = uses;
         this.orders = orders;
@@ -176,6 +178,8 @@ public class TaxExemptions {
 
     /// The certificate exempting `username` at an address in `country` and
     /// `region`, or null. Only the checkout asks, for a signed-in shopper.
+    /// Without a certificate, a company buyer's EU reverse charge
+    /// ([ReverseCharge]) exempts the same way.
     @Transactional(readOnly = true)
     public String certificateFor(String storeId, String username, String country, String region,
             Instant now) throws IOException {
@@ -198,7 +202,7 @@ public class TaxExemptions {
                 }
             }
         }
-        return null;
+        return reverseCharge.certificateFor(storeId, username, c);
     }
 
     /// Whether `entry` (`US`, `US-NY`) covers an address in `country`/`region`.

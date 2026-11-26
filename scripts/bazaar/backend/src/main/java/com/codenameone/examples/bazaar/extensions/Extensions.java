@@ -727,6 +727,47 @@ public class Extensions {
         return out;
     }
 
+    /// One field of a checkout block, as the server-rendered checkout draws
+    /// it: `id` is what [#checkoutAnswers] reads the answer under.
+    public static final class FormField {
+        public final String id;
+        public final String label;
+        public final String kind;
+        public final boolean required;
+        public final List<String> options;
+
+        FormField(String id, String label, String kind, boolean required,
+                List<String> options) {
+            this.id = id;
+            this.label = label;
+            this.kind = kind;
+            this.required = required;
+            this.options = options;
+        }
+    }
+
+    /// The fields of `storeId`'s checkout blocks, in the order
+    /// [#checkoutAnswers] checks them, labelled with the app's name.
+    public List<FormField> checkoutFields(String storeId) throws IOException {
+        List<Ext> all = active(storeId, Blocks.CHECKOUT_BLOCK);
+        List<FormField> out = new ArrayList<FormField>();
+        for (int iter = 0; iter < all.size(); iter++) {
+            Ext e = all.get(iter);
+            Blocks.Node root = tree(e);
+            if (root == null) {
+                continue;
+            }
+            List<Blocks.Node> fields = Blocks.fields(root);
+            for (int f = 0; f < fields.size(); f++) {
+                Blocks.Node field = fields.get(f);
+                out.add(new FormField(FIELD_PREFIX + e.id + ":" + field.key,
+                        Codes.cut(e.appName + ": " + field.text, 120), field.kind,
+                        field.required, new ArrayList<String>(field.items)));
+            }
+        }
+        return out;
+    }
+
     private static String answerOf(List<FieldAnswerDto> given, String id) {
         for (int iter = 0; given != null && iter < given.size(); iter++) {
             FieldAnswerDto g = given.get(iter);

@@ -125,11 +125,12 @@ public class SiteUrls {
             return null;
         }
         com.codenameone.examples.bazaar.domain.Store store = stores.findByHandle(handle);
-        if (store == null || store.getCustomDomain() == null) {
+        String own = served(store);
+        if (own == null) {
             return null;
         }
         String rest = path.substring(end);
-        String site = "https://" + store.getCustomDomain();
+        String site = "https://" + own;
         if (rest.length() == 0 || rest.charAt(0) == '?') {
             return site + "/" + rest;
         }
@@ -157,8 +158,18 @@ public class SiteUrls {
             return null;
         }
         com.codenameone.examples.bazaar.domain.Store store = stores.findByCustomDomain(domain);
-        return store == null || !com.codenameone.examples.bazaar.store.Stores.ACTIVE.equals(
+        return served(store) == null
+                || !com.codenameone.examples.bazaar.store.Stores.ACTIVE.equals(
                 store.getStatus()) ? null : store.getHandle();
+    }
+
+    /// `store`'s custom domain once its ownership is proved
+    /// (`web.DomainVerification`), else null. An unproved domain is neither
+    /// served nor named in links, so claiming somebody else's domain does
+    /// nothing.
+    public static String served(com.codenameone.examples.bazaar.domain.Store store) {
+        return store == null || store.getCustomDomain() == null
+                || store.getDomainVerifiedAt() <= 0 ? null : store.getCustomDomain();
     }
 
     /// `raw` as a custom domain: trimmed, ASCII lower case, without a

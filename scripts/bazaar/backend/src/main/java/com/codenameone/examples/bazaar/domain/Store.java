@@ -97,6 +97,17 @@ public class Store {
     @Column(type = "VARCHAR(253)")
     private String customDomain;
 
+    /// The token the store publishes to prove it owns [#getCustomDomain]:
+    /// a file at `/.well-known/bazaar-verify/<token>` or a DNS TXT record
+    /// `bazaar-verify=<token>`. A new one with every new domain.
+    @Column(nullable = false, type = "VARCHAR(64)")
+    private String domainToken = "";
+
+    /// When the domain was proved, epoch milliseconds; 0 until then. Only a
+    /// proved domain is served or used in links.
+    @Column(nullable = false)
+    private long domainVerifiedAt;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
@@ -289,5 +300,21 @@ public class Store {
     public void setCustomDomain(String customDomain) {
         this.customDomain = customDomain == null || customDomain.length() == 0 ? null
                 : customDomain;
+    }
+
+    public String getDomainToken() {
+        return domainToken;
+    }
+
+    public void setDomainToken(String domainToken) {
+        this.domainToken = domainToken == null ? "" : domainToken;
+    }
+
+    public long getDomainVerifiedAt() {
+        return domainVerifiedAt;
+    }
+
+    public void setDomainVerifiedAt(long domainVerifiedAt) {
+        this.domainVerifiedAt = domainVerifiedAt;
     }
 }

@@ -393,6 +393,11 @@ final class ProductForm {
         }
         priceRow.setUIID("ShopPriceRow");
         info.add(priceRow);
+        // Installed apps' storefront blocks placed under the price.
+        if (ShopState.store() != null) {
+            info.add(com.codenameone.examples.bazaar.ui.AppBlocks.storefront(
+                    ShopState.store().handle(), "product-below-price"));
+        }
         options.removeAll();
         info.add(options);
         info.add(stock);

@@ -32,15 +32,15 @@ import java.io.IOException;
 /// - **A honeypot.** The form carries a `website` field people never see
 ///   (`.hp`, off screen and out of the tab order); a form filler fills it.
 /// - **Timing.** The page carries `_ft`, the time it was drawn signed with a
-///   key only this process knows ([#issue]). A post without it, with a
+///   key from [FormKeys] ([#issue]). A post without it, with a
 ///   forged one, sooner than `bazaar.bot.min-fill-ms` (1.5 seconds) after
 ///   the page, or later than six hours, is refused: a script that posts
 ///   without loading the page, or the instant it loads, fails.
 /// - **The throttle**, which the chains already apply to both posts.
 ///
 /// A refused post answers 400 with a page saying to try again; nothing is
-/// signed in or charged. The key is per process, so a form left open over a
-/// restart is refused once and works when the page is reloaded.
+/// signed in or charged. The key comes from the configuration, so a form
+/// left open over a restart, or posted to another server, still passes.
 @Component
 public class BotGuard {
     public static final String TOKEN = "_ft";
@@ -50,8 +50,8 @@ public class BotGuard {
     private final String key;
     private long minFillMillis;
 
-    public BotGuard(Config config) throws IOException {
-        this.key = Tokens.token();
+    public BotGuard(Config config, FormKeys keys) throws IOException {
+        this.key = keys.key(FormKeys.BOT_GUARD);
         this.minFillMillis = parse(config.get("bazaar.bot.min-fill-ms", "1500"));
     }
 

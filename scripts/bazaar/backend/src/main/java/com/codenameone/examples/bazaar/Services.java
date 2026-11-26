@@ -148,6 +148,37 @@ public class Services {
         return "none".equalsIgnoreCase(kind) ? VatRegistry.NONE : new ViesRegistry(address);
     }
 
+    /// `bazaar.risk.provider` names the outside risk service whose score
+    /// [com.codenameone.examples.bazaar.risk.Fraud] adds to its rules'. The
+    /// sample ships `none`, the default; a deployment implements
+    /// [com.codenameone.examples.bazaar.risk.RiskProvider] over its payment
+    /// processor's risk data or a fraud service and returns it here. An unknown
+    /// name is a configuration error: every order then records that the
+    /// service was not reached, and the rules alone decide.
+    @Bean
+    public com.codenameone.examples.bazaar.risk.RiskProvider riskProvider(
+            @Value("${bazaar.risk.provider:}") String chosen) {
+        final String kind = chosen.trim();
+        if (kind.length() == 0 || "none".equalsIgnoreCase(kind)) {
+            return com.codenameone.examples.bazaar.risk.RiskProvider.NONE;
+        }
+        final String problem = "bazaar.risk.provider is '" + kind + "', which this server "
+                + "does not have; orders are scored by the store's rules alone";
+        System.err.println("[config] " + problem);
+        return new com.codenameone.examples.bazaar.risk.RiskProvider() {
+            @Override
+            public String name() {
+                return kind;
+            }
+
+            @Override
+            public Signal assess(com.codenameone.examples.bazaar.domain.StoreOrder order,
+                    String clientCountry) throws IOException {
+                throw new IOException(problem);
+            }
+        };
+    }
+
     // tag::bazaar-payment-choice[]
     /// `bazaar.payments.provider` is one of:
     ///

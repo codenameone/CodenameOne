@@ -137,7 +137,7 @@ public class StorefrontFiles {
         String own = urls.storeForHost(request);
         for (int s = 0; s < active.size(); s++) {
             Store store = active.get(s);
-            if (own != null ? !own.equals(store.getHandle()) : store.getCustomDomain() != null) {
+            if (own != null ? !own.equals(store.getHandle()) : SiteUrls.served(store) != null) {
                 continue;
             }
             if (store.getStorefrontPassword().length() > 0) {

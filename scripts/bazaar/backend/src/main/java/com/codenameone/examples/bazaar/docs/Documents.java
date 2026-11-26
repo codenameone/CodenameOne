@@ -100,6 +100,10 @@ public class Documents {
     private final com.codenameone.examples.bazaar.repository.ReturnRequestRepository returns;
     private final com.codenameone.examples.bazaar.repository.ReturnLineRepository returnLines;
 
+    /// The exemption an order was placed under; set by the container.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
+
     public Documents(StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, LocationRepository locations, VariantRepository variants,
             ProductRepository products, PurchaseOrderRepository purchaseOrders,
@@ -185,6 +189,12 @@ public class Documents {
                 {"Refunded", "-" + Sheet.money(o.getRefundedCents(), cur)},
                 {"Net", Sheet.money(o.getTotalCents() - o.getRefundedCents(), cur)},
             }, false);
+        }
+        String vat = com.codenameone.examples.bazaar.taxes.ReverseCharge.vatIdOf(
+                exemptions == null ? null : exemptions.certificateOf(orderId));
+        if (vat != null) {
+            sheet.space(6).text(com.codenameone.examples.bazaar.taxes.ReverseCharge.NOTE
+                    + " Customer VAT number " + vat + ".");
         }
         sheet.space(6).heading(paymentLine(o));
         String link = payLink(orderId);

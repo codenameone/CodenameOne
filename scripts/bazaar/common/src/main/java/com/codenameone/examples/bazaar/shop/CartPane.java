@@ -240,6 +240,11 @@ final class CartPane extends ShopPane {
         // page with 5mm above it, which left a hole inside the card.
         box.add(Ui.label("Summary", "ShopCardTitle"));
         rows(box, cart);
+        // Installed apps' storefront blocks placed under the total.
+        if (ShopState.store() != null) {
+            box.add(com.codenameone.examples.bazaar.ui.AppBlocks.storefront(
+                    ShopState.store().handle(), "cart-below-total"));
+        }
         box.add(Ui.primary("Checkout", "checkout", e -> checkout()));
         return box;
     }

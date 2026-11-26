@@ -401,6 +401,14 @@ class ExtensionsTest {
                 + "\"wrap\",\"label\":\"Wrap\",\"kind\":\"select\",\"options\":[\"Red\","
                 + "\"Blue\"]}]}}");
         String prefix = "app:" + e.get("id") + ":";
+        // The server-rendered checkout draws the same fields, under the ids
+        // the checkout reads back.
+        List<com.codenameone.examples.bazaar.extensions.Extensions.FormField> form =
+                extensions.checkoutFields(s.storeId);
+        assertEquals(2, form.size());
+        assertEquals(prefix + "note", form.get(0).id);
+        assertEquals("gifting: Gift note", form.get(0).label);
+        assertEquals(java.util.Arrays.asList("Red", "Blue"), form.get(1).options);
         List<FieldAnswerDto> bad = new ArrayList<FieldAnswerDto>();
         bad.add(new FieldAnswerDto(prefix + "wrap", "Green"));
         assertThrows(ResponseStatusException.class,

@@ -148,7 +148,7 @@ class StoreSiteTest {
     @Test
     void aCustomDomainServesItsStoreAtTheRoot() throws Exception {
         Shop s = shop("ss-cd");
-        db.execute("UPDATE store SET custom_domain = ? WHERE id = ?",
+        db.execute("UPDATE store SET custom_domain = ?, domain_verified_at = 1 WHERE id = ?",
                 new Object[] {"shop.ss-cd.example", s.storeId});
         String host = "Shop.SS-CD.example:443";
         MockResponse product = onHost(host, "/products/ss-cd-mug");

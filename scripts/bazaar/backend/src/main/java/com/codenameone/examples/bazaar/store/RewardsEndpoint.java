@@ -84,7 +84,7 @@ public class RewardsEndpoint implements RewardsApiServer {
     public RewardsDto rewards(String username, String orderId) throws IOException {
         if (username == null || username.length() == 0) {
             return new RewardsDto(0, 0, "", "", 0, 0, 0, 0, 0, 0, 0, 0, "",
-                    new ArrayList<StoreBalanceDto>(), 0);
+                    new ArrayList<StoreBalanceDto>(), 0, "");
         }
         // The badges count what the shopper bought, cancelled orders aside.
         List<StoreOrder> all = orders.findByUsernameOrderByCreatedAtDesc(username);
@@ -110,6 +110,7 @@ public class RewardsEndpoint implements RewardsApiServer {
         List<LoyaltyMember> mine = members.findByUsername(username);
         List<StoreBalanceDto> balances = new ArrayList<StoreBalanceDto>();
         LoyaltyMemberDto best = null;
+        String bestCurrency = "";
         int bestAt = -1;
         for (int iter = 0; iter < mine.size(); iter++) {
             LoyaltyMemberDto d = loyalty.dto(mine.get(iter));
@@ -119,6 +120,7 @@ public class RewardsEndpoint implements RewardsApiServer {
                     d.tierName() == null ? "" : d.tierName()));
             if (best == null || d.qualifying() > best.qualifying()) {
                 best = d;
+                bestCurrency = s == null ? "" : s.getCurrency();
                 bestAt = balances.size() - 1;
             }
         }
@@ -164,6 +166,7 @@ public class RewardsEndpoint implements RewardsApiServer {
                 best == null ? 0 : best.qualifying(), best == null ? 0 : best.toNextTier(),
                 placed, delivered, reviews.findByUsernameOrderByCreatedAtDesc(username).size(),
                 boughtFrom.size(), wishlists.findByUsernameOrderByCreatedAtDesc(username).size(),
-                orderPoints, top == null ? "" : top.storeName(), balances, orderBalance);
+                orderPoints, top == null ? "" : top.storeName(), balances, orderBalance,
+                bestCurrency);
     }
 }

@@ -773,6 +773,28 @@ public class CheckoutPages {
             }
             view.fields.add(fv);
         }
+        // The installed apps' checkout fields follow the store's own, as `a0`..
+        // in the order the checkout reads them back ([#answers]).
+        List<com.codenameone.examples.bazaar.extensions.Extensions.FormField> apps =
+                appFields(store);
+        for (int iter = 0; iter < apps.size(); iter++) {
+            com.codenameone.examples.bazaar.extensions.Extensions.FormField d = apps.get(iter);
+            CheckoutView.Field fv = new CheckoutView.Field();
+            fv.name = "a" + iter;
+            fv.label = d.label;
+            fv.kind = d.kind;
+            fv.checkbox = com.codenameone.examples.bazaar.ops.Blocks.KIND_CHECKBOX.equals(d.kind);
+            fv.select = com.codenameone.examples.bazaar.ops.Blocks.KIND_SELECT.equals(d.kind);
+            fv.text = !fv.checkbox && !fv.select;
+            fv.required = d.required;
+            fv.value = f.app(iter);
+            fv.checked = fv.value.length() > 0;
+            for (int c = 0; c < d.options.size(); c++) {
+                fv.choices.add(new CheckoutView.Option(d.options.get(c), d.options.get(c), "",
+                        d.options.get(c).equals(fv.value)));
+            }
+            view.fields.add(fv);
+        }
         if (dto != null && dto.dueCents() > 0) {
             List<com.codenameone.examples.bazaar.api.PaymentTypeDto> types =
                     com.codenameone.examples.bazaar.pay.PaymentTypes.offered(s.methods(),
@@ -809,8 +831,27 @@ public class CheckoutPages {
             out.add(new com.codenameone.examples.bazaar.api.FieldAnswerDto(fields.get(iter).id(),
                     f.field(iter)));
         }
+        List<com.codenameone.examples.bazaar.extensions.Extensions.FormField> apps =
+                appFields(store);
+        for (int iter = 0; iter < apps.size(); iter++) {
+            out.add(new com.codenameone.examples.bazaar.api.FieldAnswerDto(apps.get(iter).id,
+                    f.app(iter)));
+        }
         return out;
     }
+
+    /// The installed apps' checkout fields the form has room for.
+    private List<com.codenameone.examples.bazaar.extensions.Extensions.FormField> appFields(
+            Store store) throws IOException {
+        List<com.codenameone.examples.bazaar.extensions.Extensions.FormField> all =
+                extensions.checkoutFields(store.getId());
+        return all.size() > CheckoutForm.APP_FIELDS
+                ? all.subList(0, CheckoutForm.APP_FIELDS) : all;
+    }
+
+    /// The installed apps' checkout blocks; set by the container.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.extensions.Extensions extensions;
 
     /// A payment pending order's two simulated outcomes (the simulated
     /// processor only): `approve` pays it, `decline` fails it, each through
@@ -888,6 +929,16 @@ public class CheckoutPages {
         f.f7 = cut(f.f7, 500);
         f.f8 = cut(f.f8, 500);
         f.f9 = cut(f.f9, 500);
+        f.a0 = cut(f.a0, 500);
+        f.a1 = cut(f.a1, 500);
+        f.a2 = cut(f.a2, 500);
+        f.a3 = cut(f.a3, 500);
+        f.a4 = cut(f.a4, 500);
+        f.a5 = cut(f.a5, 500);
+        f.a6 = cut(f.a6, 500);
+        f.a7 = cut(f.a7, 500);
+        f.a8 = cut(f.a8, 500);
+        f.a9 = cut(f.a9, 500);
         return f;
     }
 
