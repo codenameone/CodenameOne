@@ -30,8 +30,10 @@ import java.util.Locale;
 /// Snippets for currencies, included by the developer guide's localization
 /// section.
 public class CurrencySnippets {
-    String priceLabel(double amount, String priceCurrency) {
+    String priceLabel() {
         // tag::currency-l10n[]
+        double amount = 19.99;
+        String priceCurrency = "EUR";
         L10NManager l10n = L10NManager.getInstance();
         String userCurrency = l10n.getCurrencyCode();     // "USD" for a user in the US
         String price = l10n.formatCurrency(amount, priceCurrency);
@@ -40,8 +42,9 @@ public class CurrencySnippets {
         return userCurrency + " " + price + " " + symbol;
     }
 
-    String javaCurrency(long minorUnits) {
+    String javaCurrency() {
         // tag::currency-java[]
+        long minorUnits = 1999;                           // 19.99 in cents
         Currency yen = Currency.getInstance("JPY");
         int digits = yen.getDefaultFractionDigits();       // 0: no sen in prices
         Currency local = Currency.getInstance(new Locale("de", "DE")); // EUR

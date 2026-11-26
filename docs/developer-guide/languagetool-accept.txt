@@ -946,3 +946,6 @@ Linode
 Nominatim
 Planetiler
 Geofabrik
+Xposed
+EdXposed
+Shamiko
