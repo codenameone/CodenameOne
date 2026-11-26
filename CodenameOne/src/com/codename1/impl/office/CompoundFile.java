@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.wordprocessing;
+package com.codename1.impl.office;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -30,7 +30,7 @@ import java.util.Map;
 /// Reader for the Compound File Binary format (MS-CFB, versions 3 and 4) that holds a `.doc`:
 /// the FAT, DIFAT, directory and mini stream are decoded and every stream returned by its
 /// `/`-separated path. Hostile input only ever yields an `IOException`.
-final class CompoundFile {
+public final class CompoundFile {
     private static final int NOSTREAM = -1;
     private static final byte[] MAGIC = {
             (byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
@@ -38,7 +38,7 @@ final class CompoundFile {
     private CompoundFile() {
     }
 
-    static boolean hasSignature(byte[] d) {
+    public static boolean hasSignature(byte[] d) {
         if (d == null || d.length < 8) {
             return false;
         }
@@ -59,7 +59,7 @@ final class CompoundFile {
     }
 
     /// Reads every stream of a CFB file into a map keyed by `/`-separated path.
-    static Map<String, byte[]> read(byte[] d) throws IOException {
+    public static Map<String, byte[]> read(byte[] d) throws IOException {
         if (!hasSignature(d) || d.length < 512) {
             throw new IOException("Not a compound file");
         }

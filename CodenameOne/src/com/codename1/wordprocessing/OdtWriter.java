@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.impl.office.OdfText;
 import com.codename1.util.StringUtil;
 import com.codename1.io.zip.ZipArchiveOutputStream;
 
@@ -367,37 +368,9 @@ final class OdtWriter {
     }
 
     private static void textStyle(StringBuilder b, String name, TextStyle s) {
-        b.append("<style:style style:name=\"").append(name).append("\" style:family=\"text\">")
-                .append("<style:text-properties fo:font-family=\"");
-        String font = s.font;
-        if ("Serif".equals(font)) {
-            font = "Times New Roman";
-        } else if ("SansSerif".equals(font)) {
-            font = "Arial";
-        } else if ("Monospace".equals(font)) {
-            font = "Courier New";
-        }
-        DocxWriter.esc(b, font.indexOf(' ') >= 0 ? "'" + font + "'" : font);
-        b.append("\" fo:font-size=\"").append(pt(s.size)).append("\" fo:color=\"#")
-                .append(Ids.hex(s.color)).append("\" fo:font-weight=\"")
-                .append(s.bold ? "bold" : "normal").append("\" fo:font-style=\"")
-                .append(s.italic ? "italic" : "normal").append('"');
-        if (s.underline) {
-            b.append(" style:text-underline-style=\"solid\" style:text-underline-width=\"auto\"")
-                    .append(" style:text-underline-color=\"font-color\"");
-        }
-        if (s.strike) {
-            b.append(" style:text-line-through-style=\"solid\"");
-        }
-        if (s.background != TextStyle.NO_BACKGROUND) {
-            b.append(" fo:background-color=\"#").append(Ids.hex(s.background)).append('"');
-        }
-        if (TextStyle.SUPERSCRIPT.equals(s.script)) {
-            b.append(" style:text-position=\"super 58%\"");
-        } else if (TextStyle.SUBSCRIPT.equals(s.script)) {
-            b.append(" style:text-position=\"sub 58%\"");
-        }
-        b.append("/></style:style>");
+        b.append("<style:style style:name=\"").append(name).append("\" style:family=\"text\">");
+        OdfText.textProperties(b, s);
+        b.append("</style:style>");
     }
 
     private String textStyleName(TextStyle s) {

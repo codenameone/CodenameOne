@@ -21,3 +21,6 @@ Plausible
 PostHog
 Piwik
 Sepolia
+Xposed
+EdXposed
+Shamiko

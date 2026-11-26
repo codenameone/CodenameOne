@@ -22,6 +22,7 @@
  */
 package com.codename1.wordprocessing;
 
+import com.codename1.impl.office.CompoundFile;
 import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.util.ArrayList;
