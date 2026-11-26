@@ -70,7 +70,7 @@ does:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tag=slides-shapes,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tags=slides-imports;slides-shapes,indent=0]
 ----
 
 .Preset shapes with gradient fills, a dashed outline and an arrow
@@ -86,7 +86,7 @@ trip.
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tag=slides-charts,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tags=slides-imports;slides-charts,indent=0]
 ----
 
 ==== Diagrams and tables
@@ -97,7 +97,7 @@ node rearranges the diagram instead of overlapping it.
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tag=slides-diagrams,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tags=slides-imports;slides-diagrams,indent=0]
 ----
 
 .A process, an organisation chart and a table
@@ -135,9 +135,7 @@ halfway through its builds, and how the screenshot tests check every frame:
 
 [source,java]
 ----
-long elapsed = 400;
-Map<String, SlideRenderer.ElementState> states = SlideAnimation.states(slide, 0, elapsed);
-renderer.paint(g, deck, slide, x, y, scale, states);
+include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tag=slides-frame,indent=0]
 ----
 
 ==== Presenter mode
@@ -177,7 +175,7 @@ or text edit is a single undo step. Your own commands use the same model:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tag=slides-model,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/presentation/PresentationSnippets.java[tags=slides-imports;slides-model,indent=0]
 ----
 
 === PDF and pictures

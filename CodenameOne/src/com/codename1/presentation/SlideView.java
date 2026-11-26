@@ -58,10 +58,12 @@ import java.util.List;
 /// `PresentationModel`, so `getModel().undo()` undoes it.
 ///
 /// ```java
-/// PresentationModel model = new PresentationModel(Presentation.read(bytes));
-/// SlideView editor = new SlideView(model);
-/// form.add(BorderLayout.CENTER, editor);
-/// editor.addShape("roundRect");
+/// void edit(Form form, byte[] bytes) throws IOException {
+///     PresentationModel model = new PresentationModel(Presentation.read(bytes));
+///     SlideView editor = new SlideView(model);
+///     form.add(BorderLayout.CENTER, editor);
+///     editor.addShape("roundRect");
+/// }
 /// ```
 public class SlideView extends Container {
     private static final int DESK = 0xe4e7eb;
@@ -864,6 +866,10 @@ public class SlideView extends Container {
                     g.fillRect(x, y, tw, th);
                     g.setAlpha(was);
                 }
+                // in the strip's own font: the renderer leaves the graphics on whatever
+                // scaled slide font it used last, which after a slide of small table
+                // text drew the number a pixel high
+                g.setFont(getStyle().getFont());
                 g.setColor(0x6b7280);
                 g.drawString(String.valueOf(i + 1), getX() + 2, y);
             }
