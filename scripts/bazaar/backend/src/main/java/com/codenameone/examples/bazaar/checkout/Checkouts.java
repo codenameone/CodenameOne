@@ -107,6 +107,9 @@ public class Checkouts {
 
     @com.codename1.backend.annotations.Autowired
     private com.codenameone.examples.bazaar.functions.CheckoutFunctions functions;
+    /// The keys' lifetime, fingerprint and in-flight lock.
+    @com.codename1.backend.annotations.Autowired
+    private IdempotencyKeys keys;
 
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
@@ -228,15 +231,36 @@ public class Checkouts {
         }
         String key = headerKey != null && headerKey.trim().length() > 0 ? headerKey.trim()
                 : req.idempotencyKey();
-        String clientId;
-        if (key != null && key.trim().length() > 0) {
-            clientId = clientId(username, key.trim());
+        if (key == null || key.trim().length() == 0) {
+            return placeOnce(username, storeId, req, given, card, pricer, via, Ids.next());
+        }
+        String clientId = clientId(username, key.trim());
+        if (!keys.begin(clientId, IdempotencyKeys.fingerprint(storeId, req),
+                System.currentTimeMillis())) {
             OrderDto again = existing(clientId);
             if (again != null) {
                 return again;
             }
-        } else {
-            clientId = Ids.next();
+        }
+        boolean placed = false;
+        try {
+            OrderDto out = placeOnce(username, storeId, req, given, card, pricer, via, clientId);
+            keys.finish(clientId, out.id());
+            placed = true;
+            return out;
+        } finally {
+            if (!placed) {
+                keys.forget(clientId);
+            }
+        }
+    }
+
+    private OrderDto placeOnce(String username, String storeId, PlaceOrderDto req, Cart given,
+            Payments.OneOffCard card, Markets.Pricer pricer, Via via, String clientId)
+            throws IOException {
+        OrderDto before = existing(clientId);
+        if (before != null) {
+            return before;
         }
         Cart cart = given != null ? given : carts.cart(storeId, username, null);
         AddressDto address = req.address();
@@ -446,9 +470,9 @@ public class Checkouts {
                 } else {
                     reference = card != null
                             ? payments.authorizeCard(orderId, username, card, charge,
-                                chargeCurrency)
+                                chargeCurrency, true)
                             : payments.authorize(orderId, username, method, charge,
-                                chargeCurrency);
+                                chargeCurrency, true);
                 }
             } catch (IOException | RuntimeException failed) {
                 // The fraud score counts refused payments; the order itself is erased.
@@ -459,6 +483,9 @@ public class Checkouts {
             }
         }
         StoreOrder done = finish(orderId, quote, due, reference, username, pending);
+        // The order holds its payment now; a crash before this line leaves
+        // the journal row for PaymentRecovery.
+        payments.dropAttempt(orderId);
         if (rate > 0) {
             done = presentment(orderId, chargeCurrency, presentmentTotal, rate,
                     pricer.source());
@@ -473,6 +500,38 @@ public class Checkouts {
         orders.publish(done);
         storeEvents.orderPlaced(orderId);
         return orders.detailOf(orderId);
+    }
+
+    /// Finishes an order whose hold the processor gave and the payment table
+    /// recorded, but which a crash stopped before [#place] wrote it down:
+    /// what [com.codenameone.examples.bazaar.pay.PaymentRecovery] calls.
+    /// Answers false when the order is not waiting for that.
+    public boolean completeRecovered(String orderId, String reference) throws IOException {
+        StoreOrder order = orderRows.findById(orderId);
+        if (order == null || !Orders.PENDING.equals(order.getFinancial())
+                || !Orders.OPEN.equals(order.getStatus())) {
+            return false;
+        }
+        long due = order.getTotalCents() + order.getTipCents() - giftCards.spentOn(orderId)
+                - storeCredit.spentOn(orderId);
+        StoreOrder done = finish(orderId, null, due, reference, order.getUsername(), false);
+        orders.event(orderId, "PAYMENT_RECOVERED",
+                "Payment found by reconciliation after an interrupted checkout", "processor");
+        orders.publish(done);
+        storeEvents.orderPlaced(orderId);
+        return true;
+    }
+
+    /// Takes back an order whose payment never reached the payment table: its
+    /// stock, gift card, store credit and discount uses go back and it is
+    /// deleted, as a declined checkout leaves it.
+    public void abandonRecovered(String orderId) throws IOException {
+        StoreOrder order = orderRows.findById(orderId);
+        if (order == null || !Orders.PENDING.equals(order.getFinancial())) {
+            return;
+        }
+        undoDiscounts(orderId);
+        orders.abandonUnpaid(orderId, "processor");
     }
 
     /// The order `username` already placed with idempotency key `key`, or

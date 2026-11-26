@@ -23,8 +23,18 @@ package com.codenameone.examples.bazaar;
 /// The charts and the earnings are by day, and a day has to mean the same on
 /// SQLite, PostgreSQL and MySQL, whose date functions agree on nothing. So the
 /// tables hold milliseconds since the epoch, and the arithmetic is done here.
-/// UTC throughout: a service in one city would shift by that city's offset.
+/// UTC unless asked otherwise: a service in one city would shift by that
+/// city's offset. A store keeps an IANA time zone (`Store.timeZone`), and the
+/// `local` methods below count its days and hours in that zone, daylight
+/// saving included, so an evening sale lands on that evening's bar.
 public final class Days {
+    /// The zone a store has until its merchant picks one.
+    public static final String UTC = "UTC";
+    private static final long HOUR = 3600000L;
+    /// The areas an IANA zone name starts with. The class library cannot list
+    /// the zones it knows, so a name is checked by its shape and its area.
+    private static final String[] AREAS = {"Africa", "America", "Antarctica", "Arctic", "Asia",
+        "Atlantic", "Australia", "Europe", "Indian", "Pacific", "Etc"};
     public static final long MILLIS = 86400000L;
 
     private Days() {
@@ -86,6 +96,113 @@ public final class Days {
             out.append('0');
         }
         return out.append(day).toString();
+    }
+
+    /// Whether `zone` is "UTC" or an IANA zone name such as
+    /// `America/New_York`: an area this class knows, then one or two segments
+    /// of letters, digits, `_`, `-` and `+`. Nothing else ever reaches
+    /// `TimeZone`, so a typo is refused here instead of read as GMT.
+    public static boolean isZone(String zone) {
+        if (zone == null || zone.length() == 0 || zone.length() > 64) {
+            return false;
+        }
+        if (UTC.equals(zone)) {
+            return true;
+        }
+        int slash = zone.indexOf('/');
+        if (slash <= 0 || slash == zone.length() - 1) {
+            return false;
+        }
+        String area = zone.substring(0, slash);
+        boolean known = false;
+        for (int iter = 0; iter < AREAS.length && !known; iter++) {
+            known = AREAS[iter].equals(area);
+        }
+        if (!known) {
+            return false;
+        }
+        char last = '/';
+        int slashes = 0;
+        for (int iter = slash + 1; iter < zone.length(); iter++) {
+            char c = zone.charAt(iter);
+            boolean ok = c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+                    || c == '_' || c == '-' || c == '+';
+            if (c == '/') {
+                slashes++;
+                ok = last != '/' && iter < zone.length() - 1 && slashes < 2;
+            }
+            if (!ok) {
+                return false;
+            }
+            last = c;
+        }
+        return true;
+    }
+
+    /// How far `zone` is ahead of UTC at the instant `millis`, daylight saving
+    /// included: what a wall clock there adds to UTC. An empty or unknown
+    /// zone is UTC.
+    ///
+    /// The class library's `TimeZone` answers an offset for calendar fields in
+    /// local standard time only, so the instant is first moved by the zone's
+    /// standard offset and taken apart here by the same arithmetic as [#iso].
+    public static int offset(String zone, long millis) {
+        if (zone == null || zone.length() == 0 || UTC.equals(zone) || !isZone(zone)) {
+            return 0;
+        }
+        java.util.TimeZone tz = java.util.TimeZone.getTimeZone(zone);
+        int raw = tz.getRawOffset();
+        long standard = millis + raw;
+        long day = floorDay(standard);
+        int ofDay = (int) (standard - day * MILLIS);
+        long z = day + 719468L;
+        long era = (z >= 0 ? z : z - 146096L) / 146097L;
+        long dayOfEra = z - era * 146097L;
+        long yearOfEra = (dayOfEra - dayOfEra / 1460L + dayOfEra / 36524L - dayOfEra / 146096L)
+                / 365L;
+        long dayOfYear = dayOfEra - (365L * yearOfEra + yearOfEra / 4L - yearOfEra / 100L);
+        long shifted = (5L * dayOfYear + 2L) / 153L;
+        int dom = (int) (dayOfYear - (153L * shifted + 2L) / 5L + 1L);
+        int month = (int) (shifted < 10L ? shifted + 3L : shifted - 9L);
+        int year = (int) (yearOfEra + era * 400L + (month <= 2 ? 1L : 0L));
+        // 1970-01-01 was a Thursday; Calendar counts Sunday as 1.
+        int dow = (int) (((day + 4) % 7 + 7) % 7) + 1;
+        return tz.getOffset(1, year, month - 1, dom, dow, ofDay);
+    }
+
+    private static long floorDay(long millis) {
+        long d = millis / MILLIS;
+        return millis < 0 && d * MILLIS != millis ? d - 1 : d;
+    }
+
+    /// The number of the day `millis` falls in on a wall clock in `zone`.
+    public static long localNumber(String zone, long millis) {
+        return floorDay(millis + offset(zone, millis));
+    }
+
+    /// The hour, 0 to 23, that a wall clock in `zone` shows at `millis`.
+    public static int localHour(String zone, long millis) {
+        long local = millis + offset(zone, millis);
+        return (int) ((local - floorDay(local) * MILLIS) / HOUR);
+    }
+
+    /// The date `millis` falls on in `zone`, `yyyy-MM-dd`.
+    public static String localIso(String zone, long millis) {
+        return iso(localNumber(zone, millis) * MILLIS);
+    }
+
+    /// The instant local midnight begins day number `day` in `zone`. The
+    /// offset is asked twice, at the first guess and again at the answer, so a
+    /// day that starts on either side of a daylight saving change is right.
+    public static long localDayStart(String zone, long day) {
+        long wall = day * MILLIS;
+        long guess = wall - offset(zone, wall);
+        return wall - offset(zone, guess);
+    }
+
+    /// The instant the local day `millis` falls in began, in `zone`.
+    public static long localStart(String zone, long millis) {
+        return localDayStart(zone, localNumber(zone, millis));
     }
 
     /// Whether `text` is a date written `yyyy-MM-dd`, with a month and a day

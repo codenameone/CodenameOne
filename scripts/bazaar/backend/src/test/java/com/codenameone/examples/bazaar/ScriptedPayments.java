@@ -43,6 +43,9 @@ final class ScriptedPayments extends SimulatedPayments {
     /// The tokens of the cards detached, in order.
     final List<String> detached = new ArrayList<String>();
 
+    /// The references of the holds released, in order.
+    final List<String> released = new ArrayList<String>();
+
     /// Back to a processor that does what the simulated one does.
     void reset() {
         keys.clear();
@@ -50,6 +53,12 @@ final class ScriptedPayments extends SimulatedPayments {
         refundFailures.clear();
         detachFails = false;
         detached.clear();
+        released.clear();
+    }
+
+    @Override
+    public void release(String reference) {
+        released.add(reference);
     }
 
     @Override

@@ -1390,6 +1390,32 @@ public class Orders {
         events.insert(e);
     }
 
+    /// Gives back what an order that was never paid took, from its own rows,
+    /// and deletes it, as a declined checkout does: the reserved stock, the
+    /// gift card's and the store credit's money. For [PaymentRecovery], which
+    /// has no quote to go by; the discount uses are the checkout's to undo.
+    public void abandonUnpaid(String orderId, String actor) throws IOException {
+        StoreOrder order = orders.findById(orderId);
+        if (order == null) {
+            return;
+        }
+        List<OrderLine> rows = lines.findByOrderId(orderId);
+        for (int iter = 0; iter < rows.size(); iter++) {
+            OrderLine line = rows.get(iter);
+            if (line.getLocationId().length() > 0 && line.getQuantity() > 0) {
+                inventory.release(order.getStoreId(), line.getVariantId(), line.getLocationId(),
+                        line.getQuantity(), orderId, actor);
+            }
+        }
+        String card = giftCards.cardOf(orderId);
+        long onCard = giftCards.spentOn(orderId);
+        if (card != null && onCard > 0) {
+            giftCards.credit(card, orderId, onCard, "Payment not completed");
+        }
+        storeCredit.restore(orderId, Long.MAX_VALUE);
+        erase(orderId);
+    }
+
     /// Deletes an order that never went through (its card was declined), so
     /// a retry with the same key can place it again.
     @Transactional(rollbackFor = IOException.class)

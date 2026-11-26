@@ -104,7 +104,32 @@ public class Reports {
     }
 
     /// A spec cleaned and checked: known ids, a range of at most [#MAX_DAYS].
+    /// The instant local midnight begins the date `iso` in `zone`, or -1 for
+    /// a date that is not written `yyyy-MM-dd`.
+    static long localMillisOf(String zone, String iso) {
+        long utc = millisOf(iso);
+        return utc < 0 ? -1 : Days.localDayStart(zone, utc / Days.MILLIS);
+    }
+
+    /// The instant local midnight ends the date `iso` in `zone`.
+    static long localEndOf(String zone, String iso) {
+        return Days.localDayStart(zone, millisOf(iso) / Days.MILLIS + 1);
+    }
+
+    /// The zone the store's report dates are in.
+    private String zone(String storeId) throws IOException {
+        Map r = db.queryOne("SELECT time_zone FROM store WHERE id = ?", new Object[] {storeId});
+        String zone = r == null ? "" : Rows.text(r.get("time_zone"));
+        return Days.isZone(zone) ? zone : Days.UTC;
+    }
+
     static ReportSpecDto clean(ReportSpecDto s, long now) {
+        return clean(s, now, Days.UTC);
+    }
+
+    /// A spec checked and filled in; with no dates, the 30 days up to today
+    /// on a wall clock in `zone`.
+    static ReportSpecDto clean(ReportSpecDto s, long now, String zone) {
         if (s == null) {
             throw new ResponseStatusException(400, "Nothing to report");
         }
@@ -136,7 +161,7 @@ public class Reports {
         if (metrics.length() == 0) {
             metrics.append("sales");
         }
-        long to = s.to() == null || s.to().length() == 0 ? Days.start(now) + Days.MILLIS
+        long to = s.to() == null || s.to().length() == 0 ? (Days.localNumber(zone, now) + 1) * Days.MILLIS
                 : millisOf(s.to()) + Days.MILLIS;
         long from = s.from() == null || s.from().length() == 0 ? to - 30 * Days.MILLIS
                 : millisOf(s.from());
@@ -166,8 +191,12 @@ public class Reports {
         long tips;
     }
 
-    private String key(String dim, Map o, Map attr, String product, Map<String, String> locs) {
-        long at = created(o.get("created_at"));
+    private String key(String dim, Map o, Map attr, String product, Map<String, String> locs,
+            String zone) {
+        // The order's moment on the store's wall clock, so its day, week and
+        // month are the merchant's.
+        long placed = created(o.get("created_at"));
+        long at = placed + Days.offset(zone, placed);
         if ("day".equals(dim)) {
             return Days.iso(at);
         }
@@ -202,7 +231,7 @@ public class Reports {
     @Transactional(readOnly = true)
     public ReportDto run(String username, String storeId, ReportSpecDto wanted) throws IOException {
         access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
-        ReportSpecDto s = clean(wanted, System.currentTimeMillis());
+        ReportSpecDto s = clean(wanted, System.currentTimeMillis(), zone(storeId));
         return report(storeId, s);
     }
 
@@ -263,8 +292,9 @@ public class Reports {
     }
 
     ReportDto report(String storeId, ReportSpecDto s) throws IOException {
-        long from = millisOf(s.from());
-        long to = millisOf(s.to()) + Days.MILLIS;
+        String zone = zone(storeId);
+        long from = localMillisOf(zone, s.from());
+        long to = localEndOf(zone, s.to());
         Map currency = db.queryOne("SELECT currency FROM store WHERE id = ?", new Object[] {storeId});
         String cur = currency == null ? "USD" : Rows.text(currency.get("currency"));
         List orders = db.query("SELECT id, created_at, channel, location_id, subtotal_cents, "
@@ -315,7 +345,7 @@ public class Reports {
             if (s.channel().length() > 0 && !s.channel().equals(Rows.text(o.get("channel")))) {
                 continue;
             }
-            if (s.source().length() > 0 && !s.source().equals(key("source", o, attr, "", locs))) {
+            if (s.source().length() > 0 && !s.source().equals(key("source", o, attr, "", locs, zone))) {
                 continue;
             }
             String customer = Rows.text(o.get("customer_id"));
@@ -340,7 +370,7 @@ public class Reports {
                     long q = Rows.number(line.get("quantity"));
                     long sales = lineSales[li] - shares[li];
                     add(accs, order, s, o, attr, Rows.text(line.get("title")), locs, id, customer,
-                            sales, q);
+                            sales, q, zone);
                 }
             } else {
                 long units = 0;
@@ -348,7 +378,7 @@ public class Reports {
                     units += Rows.number(mine.get(li).get("quantity"));
                 }
                 long sales = gross - merchRefund;
-                add(accs, order, s, o, attr, "", locs, id, customer, sales, units);
+                add(accs, order, s, o, attr, "", locs, id, customer, sales, units, zone);
             }
         }
         List<String> metrics = new ArrayList<String>();
@@ -398,9 +428,10 @@ public class Reports {
 
     private void add(Map<String, Acc> accs, List<String> order, ReportSpecDto s, Map o, Map attr,
             String product, Map<String, String> locs, String orderId, String customer, long sales,
-            long units) {
-        String k1 = key(s.dimension(), o, attr, product, locs);
-        String k2 = s.dimension2().length() == 0 ? null : key(s.dimension2(), o, attr, product, locs);
+            long units, String zone) {
+        String k1 = key(s.dimension(), o, attr, product, locs, zone);
+        String k2 = s.dimension2().length() == 0 ? null
+                : key(s.dimension2(), o, attr, product, locs, zone);
         String k = k2 == null ? k1 : k1 + "\t" + k2;
         Acc acc = accs.get(k);
         if (acc == null) {
@@ -570,7 +601,8 @@ public class Reports {
     public List<CohortRowDto> cohorts(String username, String storeId) throws IOException {
         access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
         long now = System.currentTimeMillis();
-        int nowMonth = month(now);
+        String zone = zone(storeId);
+        int nowMonth = month(now + Days.offset(zone, now));
         // Every order of the last two years: older cohorts are not shown.
         long since = now - 2 * 366 * Days.MILLIS;
         List rows = db.query("SELECT customer_id, email, created_at FROM store_order WHERE store_id = ? "
@@ -583,7 +615,8 @@ public class Reports {
             Map r = (Map) rows.get(iter);
             String c = Rows.text(r.get("customer_id"));
             customers[iter] = c.length() > 0 ? c : Rows.text(r.get("email"));
-            months[iter] = month(created(r.get("created_at")));
+            long placed = created(r.get("created_at"));
+            months[iter] = month(placed + Days.offset(zone, placed));
         }
         List<Cohorts.Row> grid = Cohorts.grid(customers, months, nowMonth, COHORT_MONTHS);
         List<CohortRowDto> out = new ArrayList<CohortRowDto>();
@@ -605,10 +638,11 @@ public class Reports {
     public List<AttributionDto> attribution(String username, String storeId, String fromIso,
             String toIso) throws IOException {
         access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
+        String zone = zone(storeId);
         ReportSpecDto s = clean(new ReportSpecDto("", "source", "", "sales", "", "", fromIso, toIso),
-                System.currentTimeMillis());
-        long from = millisOf(s.from());
-        long to = millisOf(s.to()) + Days.MILLIS;
+                System.currentTimeMillis(), zone);
+        long from = localMillisOf(zone, s.from());
+        long to = localEndOf(zone, s.to());
         List rows = db.query("SELECT o.id, o.subtotal_cents, o.discount_cents, o.refunded_cents, "
                 + "a.first_source, a.first_medium, a.last_source, a.last_medium FROM store_order o "
                 + "LEFT JOIN attribution a ON a.subject_id = o.id AND a.subject_kind = 'ORDER' "
@@ -668,10 +702,11 @@ public class Reports {
     public ProfitLossDto profitLoss(String username, String storeId, String fromIso,
             String toIso) throws IOException {
         access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
+        String zone = zone(storeId);
         ReportSpecDto s = clean(new ReportSpecDto("", "day", "", "sales", "", "", fromIso, toIso),
-                System.currentTimeMillis());
-        Object[] args = {storeId, Long.valueOf(millisOf(s.from())),
-            Long.valueOf(millisOf(s.to()) + Days.MILLIS)};
+                System.currentTimeMillis(), zone);
+        Object[] args = {storeId, Long.valueOf(localMillisOf(zone, s.from())),
+            Long.valueOf(localEndOf(zone, s.to()))};
         String where = " WHERE o.store_id = ? AND o.created_at >= ? AND o.created_at < ? AND "
                 + "o.status <> 'CANCELLED' AND (o.channel <> 'DRAFT' OR o.location_id <> '')";
         List rows = db.query("SELECT o.subtotal_cents, o.discount_cents, o.refunded_cents, "

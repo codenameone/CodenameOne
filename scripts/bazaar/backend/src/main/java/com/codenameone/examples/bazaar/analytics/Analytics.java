@@ -79,7 +79,8 @@ import java.util.Set;
 /// - Funnel: carts, carts that reached checkout (they carry an email or a
 ///   signed-in shopper), online orders, online orders fulfilled.
 ///
-/// Days and hours are UTC. Everything is added up in memory from the rows,
+/// Days and hours are the store's own, in its time zone (`Store.timeZone`,
+/// UTC until the merchant picks one). Everything is added up in memory from the rows,
 /// as the admin's statistics are.
 @Component
 public class Analytics {
@@ -135,8 +136,8 @@ public class Analytics {
         KpiDto current = kpis(d, now, p[0], p[1]);
         KpiDto previous = kpis(d, before, p[2], p[0]);
         Map<String, List<OrderLine>> byOrder = lines(now);
-        return new AnalyticsDto(p[0], p[1], p[2], current, previous, daily(now, p[0], p[1]),
-                hourly(now), byChannel(now), byLocation(storeId, now), topProducts(now, byOrder),
+        return new AnalyticsDto(p[0], p[1], p[2], current, previous, daily(now, p[0], p[1], store.getTimeZone()),
+                hourly(now, store.getTimeZone()), byChannel(now), byLocation(storeId, now), topProducts(now, byOrder),
                 topVariants(now, byOrder), topCustomers(now), discounts(now),
                 inventory(storeId, byOrder), funnel(d, now, p[0], p[1]), store.getCurrency());
     }
@@ -401,12 +402,19 @@ public class Analytics {
     }
 
     static List<SeriesPointDto> daily(List<StoreOrder> period, long from, long to) {
-        long first = Days.number(from);
-        int days = (int) (Days.number(to - 1) - first + 1);
+        return daily(period, from, to, Days.UTC);
+    }
+
+    /// One point per day of `[from, to)` on a wall clock in `zone`.
+    public static List<SeriesPointDto> daily(List<StoreOrder> period, long from, long to,
+            String zone) {
+        long first = Days.localNumber(zone, from);
+        int days = (int) (Days.localNumber(zone, to - 1) - first + 1);
         int[] count = new int[days];
         long[] cents = new long[days];
         for (int iter = 0; iter < period.size(); iter++) {
-            int day = (int) (Days.number(period.get(iter).getCreatedAt().toEpochMilli()) - first);
+            int day = (int) (Days.localNumber(zone, period.get(iter).getCreatedAt().toEpochMilli())
+                    - first);
             if (day >= 0 && day < days) {
                 count[day]++;
                 cents[day] += sales(period.get(iter));
@@ -421,10 +429,15 @@ public class Analytics {
     }
 
     static List<SeriesPointDto> hourly(List<StoreOrder> period) {
+        return hourly(period, Days.UTC);
+    }
+
+    /// Sales by the hour a wall clock in `zone` showed when they were placed.
+    public static List<SeriesPointDto> hourly(List<StoreOrder> period, String zone) {
         int[] count = new int[24];
         long[] cents = new long[24];
         for (int iter = 0; iter < period.size(); iter++) {
-            int h = (int) (period.get(iter).getCreatedAt().toEpochMilli() % Days.MILLIS / 3600000L);
+            int h = Days.localHour(zone, period.get(iter).getCreatedAt().toEpochMilli());
             count[h]++;
             cents[h] += sales(period.get(iter));
         }

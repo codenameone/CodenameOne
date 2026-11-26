@@ -353,6 +353,58 @@ public class StripePayments implements PaymentProvider {
                 + URLEncoder.encode(refundReference, "UTF-8"), null, null), "status"));
     }
 
+    /// The PaymentIntents created in the window that hold or took money
+    /// (`requires_capture`, `processing`, `succeeded`), a page of 100 at a
+    /// time, for the daily reconciliation. Stripe's `created` is in seconds.
+    @Override
+    public List<ProcessorCharge> charges(long fromMillis, long toMillis) throws IOException {
+        List<ProcessorCharge> out = new ArrayList<ProcessorCharge>();
+        String after = "";
+        for (int page = 0; page < 100; page++) {
+            String path = "/v1/payment_intents?limit=100&created%5Bgte%5D=" + (fromMillis / 1000L)
+                    + "&created%5Blt%5D=" + ((toMillis + 999L) / 1000L)
+                    + (after.length() == 0 ? "" : "&starting_after="
+                        + URLEncoder.encode(after, "UTF-8"));
+            Map answer = ask("GET", path, null, null);
+            Object data = answer.get("data");
+            if (!(data instanceof List)) {
+                break;
+            }
+            List rows = (List) data;
+            for (int iter = 0; iter < rows.size(); iter++) {
+                if (!(rows.get(iter) instanceof Map)) {
+                    continue;
+                }
+                Map row = (Map) rows.get(iter);
+                after = text(row, "id");
+                String status = text(row, "status");
+                if (!INTENT_HELD.equals(status) && !INTENT_PROCESSING.equals(status)
+                        && !INTENT_SUCCEEDED.equals(status)) {
+                    continue;
+                }
+                ProcessorCharge c = new ProcessorCharge();
+                c.reference = after;
+                c.amountCents = number(row, "amount");
+                c.currency = upperAscii(text(row, "currency"));
+                c.createdAt = number(row, "created") * 1000L;
+                out.add(c);
+            }
+            if (!Boolean.TRUE.equals(answer.get("has_more")) || rows.isEmpty()) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    private static String upperAscii(String text) {
+        StringBuilder b = new StringBuilder(text.length());
+        for (int iter = 0; iter < text.length(); iter++) {
+            char c = text.charAt(iter);
+            b.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return b.toString();
+    }
+
     /// Stripe's five refund states as three. `requires_action` waits on the
     /// cardholder like `pending` waits on the bank, and `canceled` returned no
     /// more money than `failed` did. A state this does not know is taken as

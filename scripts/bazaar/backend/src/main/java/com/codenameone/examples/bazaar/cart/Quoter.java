@@ -306,7 +306,7 @@ public class Quoter {
         int weight = PriceLine.weight(priceLines);
         long cheapest = 0;
         ShippingCalculator.CarrierQuotes live = hasAddress
-                ? carrierQuotes(cart, all, address) : null;
+                ? carrierQuotes(cart, all, address, quote.lines) : null;
         Map<String, String> profileOf = hasAddress && ships ? profiles(cart.getStoreId())
                 : new HashMap<String, String>();
         if (hasAddress && ships) {
@@ -522,7 +522,7 @@ public class Quoter {
     /// carrier is asked at most once per quote and only when the address's
     /// zone has a CARRIER rate.
     private ShippingCalculator.CarrierQuotes carrierQuotes(Cart cart, List<Location> all,
-            AddressDto address) {
+            AddressDto address, List<Quote.Line> lines) {
         Location origin = null;
         for (int iter = 0; iter < all.size() && origin == null; iter++) {
             Location l = all.get(iter);
@@ -541,8 +541,17 @@ public class Quoter {
                     Geo.isPoint(address.lat(), address.lng()) ? address.lat() : 0,
                     Geo.isPoint(address.lat(), address.lng()) ? address.lng() : 0,
                     address.postal(), address.region(), address.country());
-        final String cartKey = cart.getId() == null || cart.getId().length() == 0
-                ? cart.getStoreId() : cart.getId();
+        // Keyed by the cart and a hash of what is in it, so a changed cart is
+        // quoted afresh even at the same weight.
+        StringBuilder contents = new StringBuilder();
+        for (int iter = 0; iter < lines.size(); iter++) {
+            Quote.Line line = lines.get(iter);
+            contents.append(line.variant.getId()).append('x').append(line.price.quantity)
+                    .append(';');
+        }
+        final String cartKey = (cart.getId() == null || cart.getId().length() == 0
+                ? cart.getStoreId() : cart.getId()) + "#"
+                + Integer.toHexString(contents.toString().hashCode());
         return (rate, weightGrams) -> carrierRates.quotes(cartKey, weightGrams, from, to);
     }
 

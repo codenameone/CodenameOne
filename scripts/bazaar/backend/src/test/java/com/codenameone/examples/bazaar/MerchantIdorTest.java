@@ -231,6 +231,7 @@ class MerchantIdorTest {
         "POST /orders/{orderId}/archive", "POST /orders/{orderId}/unarchive",
         "GET /archived-orders", "POST /bulk-orders", "GET /order-settings",
         "POST /order-settings", "GET /checkout-settings", "POST /checkout-settings",
+        "GET /time-zone", "POST /time-zone",
         "GET /checkout-settings/payment-types",
         "POST /drafts/{orderId}/pay-link", "GET /templates",
         "POST /templates", "POST /templates/reset", "POST /templates/preview",

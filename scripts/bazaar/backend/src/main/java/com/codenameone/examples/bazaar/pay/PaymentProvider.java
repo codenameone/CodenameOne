@@ -149,6 +149,23 @@ public interface PaymentProvider {
     }
     // end::bazaar-payment-intents[]
 
+    /// Every payment the processor took or holds that was created in
+    /// `[fromMillis, toMillis)`, for the daily reconciliation
+    /// ([PaymentRecovery#reconcileDay]). Null when this processor cannot list
+    /// its payments; the report then says so instead of guessing.
+    default java.util.List<ProcessorCharge> charges(long fromMillis, long toMillis)
+            throws IOException {
+        return null;
+    }
+
+    /// One payment as the processor records it.
+    final class ProcessorCharge {
+        public String reference = "";
+        public long amountCents;
+        public String currency = "";
+        public long createdAt;
+    }
+
     /// Waiting for the shopper to pay.
     String INTENT_OPEN = "requires_payment_method";
     /// Paid by a card or wallet and held, waiting for [#capture].

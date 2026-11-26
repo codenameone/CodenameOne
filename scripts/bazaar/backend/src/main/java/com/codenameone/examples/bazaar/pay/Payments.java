@@ -93,6 +93,10 @@ public class Payments {
     private final PaymentRepository payments;
     private final ProfileRepository profiles;
     private final PaymentProvider provider;
+    /// The attempt journal ([PaymentRecovery]); a field, so the constructor
+    /// stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codename1.backend.DataSource db;
 
     public Payments(PaymentMethodRepository cards, PaymentSetupRepository setups,
             PaymentCustomerRepository customers, PaymentRepository payments,
@@ -483,6 +487,14 @@ public class Payments {
     /// - `ResponseStatusException` 402: when the card was refused
     public String authorize(String orderId, String username, String methodId, long amountCents,
             String currency) throws IOException {
+        return authorize(orderId, username, methodId, amountCents, currency, false);
+    }
+
+    /// [#authorize], and with `journaled` the hold is first written down as an
+    /// attempt ([PaymentRecovery]): checkout does this, so a hold a crash
+    /// leaves behind before the order records it is found and settled.
+    public String authorize(String orderId, String username, String methodId, long amountCents,
+            String currency, boolean journaled) throws IOException {
         if (amountCents < 0) {
             throw new ResponseStatusException(400, "That is not an amount");
         }
@@ -497,11 +509,18 @@ public class Payments {
             if (references == null) {
                 throw new ResponseStatusException(402, "The card is no longer on the account");
             }
+            String key = authorizeKey(orderId, references[1], amountCents);
+            if (journaled) {
+                recordAttempt(orderId, username, key, references[0], references[1], amountCents,
+                        currency);
+            }
             try {
-                reference = cut(provider.authorize(authorizeKey(orderId, references[1], amountCents),
+                reference = cut(provider.authorize(key,
                         references[0], references[1],
                         amountCents, currency, "Bazaar order"), 64);
             } catch (PaymentDeclinedException declined) {
+                // Refused outright: nothing is held, nothing to recover.
+                dropAttempt(orderId);
                 throw new ResponseStatusException(402, declined.getMessage());
             } catch (IOException unknown) {
                 throw unavailable("card check", unknown);
@@ -511,6 +530,26 @@ public class Payments {
         return reference;
     }
     // end::bazaar-authorize[]
+
+    /// Writes down a hold about to be asked for, before the request leaves:
+    /// should the server stop before the order records the answer, the row is
+    /// what [PaymentRecovery] finds. Its own statement, so it stands whatever
+    /// happens after.
+    private void recordAttempt(String orderId, String username, String key, String customer,
+            String token, long amountCents, String currency) throws IOException {
+        db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {orderId});
+        db.execute("INSERT INTO payment_attempt (order_id, username, idem_key, customer, token, "
+                + "amount_cents, currency, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                new Object[] {orderId, username == null ? "" : username, key,
+                    customer == null ? "" : customer, token == null ? "" : token,
+                    Long.valueOf(amountCents), currency == null ? "" : currency,
+                    PaymentRecovery.STARTED, Long.valueOf(System.currentTimeMillis())});
+    }
+
+    /// The order recorded its hold, or nothing was held: the attempt is over.
+    public void dropAttempt(String orderId) throws IOException {
+        db.execute("DELETE FROM payment_attempt WHERE order_id = ?", new Object[] {orderId});
+    }
 
     /// A card typed into the web checkout for this one order, checked with
     /// the processor and saved to no account: what a guest pays with. The
@@ -569,16 +608,27 @@ public class Payments {
     /// payment, keyed by the order as every payment is.
     public String authorizeCard(String orderId, String payer, OneOffCard card, long amountCents,
             String currency) throws IOException {
+        return authorizeCard(orderId, payer, card, amountCents, currency, false);
+    }
+
+    /// [#authorizeCard], journaled as [#authorize] is when `journaled`.
+    public String authorizeCard(String orderId, String payer, OneOffCard card, long amountCents,
+            String currency, boolean journaled) throws IOException {
         Payment kept = payment(orderId);
         if (kept != null) {
             return kept.getProviderRef();
         }
         String reference;
+        String key = authorizeKey(orderId, card.token, amountCents);
+        if (journaled) {
+            recordAttempt(orderId, payer, key, card.customer, card.token, amountCents, currency);
+        }
         try {
-            reference = cut(provider.authorize(authorizeKey(orderId, card.token, amountCents),
+            reference = cut(provider.authorize(key,
                     card.customer, card.token,
                     amountCents, currency, "Bazaar order"), 64);
         } catch (PaymentDeclinedException declined) {
+            dropAttempt(orderId);
             throw new ResponseStatusException(402, declined.getMessage());
         } catch (IOException unknown) {
             throw unavailable("card check", unknown);
@@ -960,6 +1010,11 @@ public class Payments {
             Payment row = payments.findById(orderId);
             row.setPaidAt(Instant.now());
             }
+    }
+
+    /// The payment recorded for `orderId`, or null.
+    public Payment paymentOf(String orderId) {
+        return payment(orderId);
     }
 
     @Transactional(readOnly = true)

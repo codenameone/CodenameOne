@@ -454,7 +454,14 @@ public class EasyPostCarrier implements CarrierProvider {
     }
 
     static final class WebTransport implements Transport {
+        /// The longest a checkout waits for a rate quote: past it the
+        /// request fails, and [CarrierRates] falls back to the table rate.
+        static final int REQUEST_TIMEOUT_MILLIS = 8000;
+        static final int CONNECT_TIMEOUT_MILLIS = 3000;
         private final String key;
+        private final com.codename1.backend.WebClient client = new com.codename1.backend.WebClient()
+                .setConnectTimeoutMillis(CONNECT_TIMEOUT_MILLIS)
+                .setRequestTimeoutMillis(REQUEST_TIMEOUT_MILLIS);
 
         WebTransport(String key) {
             this.key = key;
@@ -467,7 +474,7 @@ public class EasyPostCarrier implements CarrierProvider {
             if (json != null) {
                 headers.add("Content-Type: application/json");
             }
-            Web.Result r = Web.request(method, API + path, headers,
+            Web.Result r = client.request(method, API + path, headers,
                     json == null ? null : json.getBytes("UTF-8"));
             return new Reply(r.getStatus(), r.getBodyAsString());
         }

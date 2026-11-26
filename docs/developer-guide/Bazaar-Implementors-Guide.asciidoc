@@ -263,6 +263,32 @@ Wallets, pay-later and bank methods use the same provider:
   `tip_cents` beside the total, so tax and discounts never see it, and is
   charged with the order. Answers are kept per order with the label as it read
   when the order was placed.
+* *Idempotency keys* live for 24 hours (`IdempotencyKeys`), as long as Stripe
+  keeps its own. The key is stored with a fingerprint of the request that first
+  used it. The same request again answers the order it placed. The same key
+  with a different address, delivery, payment or note is refused with 422, and
+  with 409 while the first request is still running. A request that fails gives
+  its key back, so a retry after a decline starts clean. An hourly sweep forgets
+  expired keys. The order keeps its key, so a repeat after a key expires still
+  answers that order.
+* *Holds a crash left behind* (`PaymentRecovery`). Checkout writes a
+  `payment_attempt` row before it asks the processor for a hold, and deletes it
+  once the order records the hold. A job every five minutes takes rows older
+  than fifteen minutes. If the payment table has the hold and the order is
+  still waiting, it completes the order. If no payment was recorded, it asks
+  the processor for the hold again under the same idempotency key, which
+  answers the first hold, releases it, and gives the order's stock, gift card,
+  store credit and discount uses back.
+* *Daily reconciliation.* Once a day `PaymentRecovery.reconcileDay` lists the
+  processor's payments of the previous UTC day (`PaymentProvider.charges`) and
+  matches them by reference to the payment table. It keeps the counts in
+  `payment_reconciliation`: matched, at the processor only, recorded here only,
+  or with a different amount, with the references that differ.
+* *The store's time zone* (`StoreClock`, `/api/merchant/stores/{id}/time-zone`)
+  is an IANA zone, `UTC` until the merchant picks one. Analytics' daily and
+  hourly series, reports, their default date range and the cohorts count days
+  and hours on the store's wall clock (`Days.localNumber`), daylight saving
+  included.
 
 === Who may call what
 
@@ -960,9 +986,10 @@ flat handling fee on top. The REST quote, `Checkouts` and the web checkout share
 this path. An option's id is the rate id, `~`, and the service code; placing an
 order prices the chosen id again on the server, so a client names a rate and
 never an amount, and an id the address wasn't offered is refused. Quotes are
-cached for ten minutes per cart, weight, origin and address, so the form does
-not call the carrier per keystroke. When the carrier fails or isn't
-configured, the rate offers its fallback price if it has one, and otherwise
+cached for ten minutes per cart, its contents, weight, origin and address, so
+the form does not call the carrier per keystroke. EasyPost's requests give up
+after eight seconds (three to connect), so a slow carrier costs a checkout that
+long and no more. When the carrier fails, times out or isn't configured, the rate offers its fallback price if it has one, and otherwise
 nothing, while the zone's other rates stand: a carrier outage never blocks
 checkout. The simulated carrier's rates are deterministic, and it refuses
 postal code `00000` so the fallback can be seen in development.
@@ -1006,24 +1033,14 @@ business contracts for. Plan for these before taking real orders:
 * *A real payment service provider.* The Stripe provider has to be tried against
   a test account before it handles money, and a deployment may need another
   provider, wallets or local payment methods behind the same `PaymentProvider`.
-* *Reconciliation with the processor.* A refund or capture whose answer was lost
-  is left for staff to settle. A product reconciles such answers against the
-  processor's records and finishes or reverses the operation itself.
-* *Crash recovery.* An operation interrupted by a server crash between the claim
-  and the processor's answer stays claimed. A product resumes or rolls back such
-  operations.
-* *Idempotency key lifetime.* Stripe forgets an idempotency key after 24 hours, so
-  a retry after a longer outage is a new request; reconcile before retrying.
-* *A store time zone.* Analytics and reports bucket days and hours in UTC
-  (`Analytics.daily`, `Analytics.hourly`, `Days`). A store far from UTC sees
-  evening sales on the next day's bar until each store keeps a time zone and
-  the buckets follow it.
+* *Settling lost answers after checkout.* A refund or capture whose answer was
+  lost is left for staff to settle, and so is a capture, void or refund that a
+  server crash interrupted between its claim and the processor's answer. A
+  product finishes or reverses such operations itself, as `PaymentRecovery`
+  does for checkout's holds.
 * *A tax engine.* The tax rates are a table the merchant edits. Real sales tax and
   VAT depend on the product category, the destination, thresholds per
   jurisdiction and filing obligations, which a tax service tracks.
-* *Carrier rates at checkout.* Checkout still charges the merchant's own
-  shipping table. The live rates of a carrier account reach the back office's
-  label screen only.
 * *PCI scope.* Keep card entry on the provider's hosted page or SDK so card data
   never touches the app or the server, and confirm the deployment's
   self-assessment with the provider.

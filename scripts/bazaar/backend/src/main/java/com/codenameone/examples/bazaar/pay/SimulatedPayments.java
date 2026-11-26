@@ -135,8 +135,41 @@ public class SimulatedPayments implements PaymentProvider {
         }
         // A charge says how its refund is to go, as the card did: the refund
         // has only the charge to go by.
-        return (token.startsWith(SLOW_REFUND_TOKEN) ? SLOW_REFUND_CHARGE
+        String reference = (token.startsWith(SLOW_REFUND_TOKEN) ? SLOW_REFUND_CHARGE
                 : token.startsWith(LOST_REFUND_TOKEN) ? LOST_REFUND_CHARGE : "sim_ch_") + key;
+        remember(reference, amountCents, currency);
+        return reference;
+    }
+
+    /// What this processor took, by reference, for [#charges]: the same key
+    /// asked again is the same payment, as at a real processor.
+    private final java.util.LinkedHashMap<String, ProcessorCharge> taken =
+            new java.util.LinkedHashMap<String, ProcessorCharge>();
+
+    private synchronized void remember(String reference, long amountCents, String currency) {
+        if (taken.containsKey(reference)) {
+            return;
+        }
+        if (taken.size() >= 20000) {
+            taken.remove(taken.keySet().iterator().next());
+        }
+        ProcessorCharge c = new ProcessorCharge();
+        c.reference = reference;
+        c.amountCents = amountCents;
+        c.currency = currency == null ? "" : currency;
+        c.createdAt = System.currentTimeMillis();
+        taken.put(reference, c);
+    }
+
+    @Override
+    public synchronized java.util.List<ProcessorCharge> charges(long fromMillis, long toMillis) {
+        java.util.List<ProcessorCharge> out = new java.util.ArrayList<ProcessorCharge>();
+        for (ProcessorCharge c : taken.values()) {
+            if (c.createdAt >= fromMillis && c.createdAt < toMillis) {
+                out.add(c);
+            }
+        }
+        return out;
     }
 
     /// A hold is a charge that has not been taken yet, and its reference

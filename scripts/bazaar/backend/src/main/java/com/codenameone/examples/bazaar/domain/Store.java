@@ -82,6 +82,11 @@ public class Store {
     @Column(nullable = false, type = "TEXT")
     private String policies = "";
 
+    /// The IANA zone the store's days and hours are counted in
+    /// (`America/New_York`); `UTC` until the merchant picks one.
+    @Column(nullable = false, type = "VARCHAR(64)")
+    private String timeZone = "UTC";
+
     /// Search synonym groups, one group a line, words split by commas: a
     /// search for any word of a group also finds the others.
     @Column(nullable = false, type = "VARCHAR(2000)")
@@ -251,6 +256,14 @@ public class Store {
 
     public void setLng(double lng) {
         this.lng = lng;
+    }
+
+    public String getTimeZone() {
+        return timeZone == null || timeZone.length() == 0 ? "UTC" : timeZone;
+    }
+
+    public void setTimeZone(String timeZone) {
+        this.timeZone = timeZone == null || timeZone.length() == 0 ? "UTC" : timeZone;
     }
 
     public String getPolicies() {
