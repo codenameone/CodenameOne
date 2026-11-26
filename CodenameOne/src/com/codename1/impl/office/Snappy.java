@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.office;
 
+import com.codename1.impl.SharedWithBackend;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
@@ -33,6 +34,7 @@ import java.io.IOException;
 /// without its stream identifier or checksums. Every length is checked against the input and
 /// the output is capped, so a damaged or hostile file fails with an `IOException` instead of
 /// exhausting memory.
+@SharedWithBackend
 public final class Snappy {
     /// The largest output `decompress` produces unless told otherwise: 64 MB.
     public static final int DEFAULT_LIMIT = 64 * 1024 * 1024;

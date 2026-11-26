@@ -79,63 +79,12 @@ final class Snappy {
                 | ((in[at + 2] & 0xff) << 8) | (in[at + 3] & 0xff);
     }
 
-    /// One snappy block, `in[from, end)`.
+    /// One raw block, appended to `out`. The block decoder is the core's, shared
+    /// with the Keynote reader; what is Kafka's is the framing and the ceiling,
+    /// which counts what the batch's earlier blocks produced.
     static void block(byte[] in, int from, int end, ByteSink out) throws IOException {
-        int p = from;
-        long size = 0;
-        for (int shift = 0;; shift += 7) {
-            if (p >= end || shift > 28) {
-                throw new IOException("A snappy Kafka batch has a malformed length");
-            }
-            int b = in[p++] & 0xff;
-            size |= (long) (b & 0x7f) << shift;
-            if ((b & 0x80) == 0) {
-                break;
-            }
-        }
-        if (size > Inflate.LIMIT) {
-            throw new IOException("A snappy Kafka batch claims " + size + " bytes");
-        }
-        int floor = out.length();
-        long expected = floor + size;
-        while (p < end) {
-            int tag = in[p++] & 0xff;
-            int kind = tag & 3;
-            if (kind == 0) {
-                int n = tag >>> 2;
-                if (n >= 60) {
-                    int bytes = n - 59;
-                    n = (int) Inflate.le(in, p, bytes, end);
-                    p += bytes;
-                    if (n < 0) {
-                        throw new IOException("A snappy Kafka batch is malformed");
-                    }
-                }
-                n++;
-                if (n > end - p) {
-                    throw new IOException("A snappy Kafka batch is truncated");
-                }
-                Inflate.put(out, in, p, n);
-                p += n;
-            } else if (kind == 1) {
-                if (p >= end) {
-                    throw new IOException("A snappy Kafka batch is truncated");
-                }
-                int n = 4 + ((tag >>> 2) & 7);
-                int distance = ((tag >>> 5) << 8) | (in[p++] & 0xff);
-                Inflate.copy(out, distance, n, floor);
-            } else {
-                int bytes = kind == 2 ? 2 : 4;
-                long distance = Inflate.le(in, p, bytes, end);
-                p += bytes;
-                Inflate.copy(out, distance, (tag >>> 2) + 1, floor);
-            }
-            if (out.length() > expected) {
-                throw new IOException("A snappy Kafka batch is longer than it claims");
-            }
-        }
-        if (out.length() != expected) {
-            throw new IOException("A snappy Kafka batch is shorter than it claims");
-        }
+        byte[] block = com.codename1.impl.office.Snappy.decompress(in, from, end - from,
+                Inflate.LIMIT - out.length());
+        Inflate.put(out, block, 0, block.length);
     }
 }
