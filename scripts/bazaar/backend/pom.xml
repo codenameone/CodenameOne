@@ -152,33 +152,6 @@
                 </executions>
             </plugin>
             <plugin>
-                <!--
-                     RestockAppE2ETest installs the sample third-party app
-                     (../sample-app) into this server and drives it end to end.
-                     One Backend runs per process and this server's beans exist
-                     only in this module's test build, so the app's sources are
-                     compiled into the tests here instead of being a dependency;
-                     the app itself still reaches Bazaar only over HTTP.
-                -->
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.4.0</version>
-                <executions>
-                    <execution>
-                        <id>add-sample-app-sources</id>
-                        <phase>generate-test-sources</phase>
-                        <goals>
-                            <goal>add-test-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/../sample-app/src/main/java</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M5</version>
@@ -190,4 +163,49 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>sample-app</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/../sample-app/pom.xml</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <!--
+                             RestockAppE2ETest installs the sample third-party app
+                             (../sample-app) into this server and drives it end to end.
+                             One Backend runs per process and this server's beans exist
+                             only in this module's test build, so the app's sources are
+                             compiled into the tests here instead of being a dependency;
+                             the app itself still reaches Bazaar only over HTTP. Only
+                             when ../sample-app is there: a project the Initializr
+                             generates from this one has no sample app, and neither
+                             this profile nor src/sample-app-test reaches it.
+                        -->
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <executions>
+                            <execution>
+                                <id>add-sample-app-sources</id>
+                                <phase>generate-test-sources</phase>
+                                <goals>
+                                    <goal>add-test-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>${project.basedir}/../sample-app/src/main/java</source>
+                                        <source>${project.basedir}/src/sample-app-test/java</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -122,10 +122,18 @@ def expected():
     # and join the template once a release reads those directories.
     modules.update(tree(sample / 'backend', 'backend/', skip=(
         'target', 'src/main/resources/db/migration/oracle',
-        'src/main/resources/db/migration/sqlserver')))
+        'src/main/resources/db/migration/sqlserver',
+        # Bazaar's end-to-end test of its sample third-party app; it builds
+        # only beside ../sample-app, which the template does not carry.
+        'src/sample-app-test')))
     # Logic both halves run (a game's simulation) lives in `shared`, never in a
     # module of its own: a sample with any other module is refused below.
+    # A sample third-party app (Bazaar's) is a separate server that only talks
+    # to the sample over HTTP; it teaches app developers and is not part of the
+    # application a generated project starts from, so it stays out.
     for extra in sorted(p.name for p in sample.iterdir() if (p / 'pom.xml').is_file()):
+        if extra == 'sample-app':
+            continue
         if extra not in ('shared', 'backend', 'common', 'android', 'ios', 'javase',
                          'javascript', 'win', 'linux', 'mac', 'cn1libs'):
             raise SystemExit('scripts/' + name + '/' + extra + ' is a module the template '
