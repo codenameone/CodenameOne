@@ -56,16 +56,20 @@ class UnsupportedTest {
         {"from java.java.util import ArrayList\n\nclass L(ArrayList):\n    pass\n", "3",
             "cannot extend the Java class ArrayList"},
         // ImmutableSlots: a store outside the generated constructor.
-        {"class Immutable:\n    __slots__ = ('_hash',)\n    def __init__(self, **kw):\n        pass\n"
+        {"class Immutable:\n    __slots__ = ('_hash',)\n    def __init__(self, **kwargs):\n        temp = []\n"
+            + "        for k, v in kwargs.items():\n            temp.append(type(v))\n            temp.append(v)\n"
+            + "            super().__setattr__(k, v)\n        super().__setattr__('_hash', hash(tuple(temp)))\n"
             + "    def __setattr__(self, n, v):\n        raise AttributeError(n)\n    def __eq__(self, o):\n        return True\n"
             + "    def __repr__(self):\n        return ''\n\nclass T(Immutable):\n    __slots__ = ('tag', '_hash')\n"
             + "    def __init__(self, tag):\n        super().__init__(tag=tag)\n"
-            + "    def retag(self, t):\n        self.tag = t\n", "17", "on an immutable instance"},
-        {"class Immutable:\n    __slots__ = ('_hash',)\n    def __init__(self, **kw):\n        pass\n"
+            + "    def retag(self, t):\n        self.tag = t\n", "22", "on an immutable instance"},
+        {"class Immutable:\n    __slots__ = ('_hash',)\n    def __init__(self, **kwargs):\n        temp = []\n"
+            + "        for k, v in kwargs.items():\n            temp.append(type(v))\n            temp.append(v)\n"
+            + "            super().__setattr__(k, v)\n        super().__setattr__('_hash', hash(tuple(temp)))\n"
             + "    def __setattr__(self, n, v):\n        raise AttributeError(n)\n    def __eq__(self, o):\n        return True\n"
             + "    def __repr__(self):\n        return ''\n\nclass T(Immutable):\n    __slots__ = ('tag', '_hash')\n"
             + "    def __init__(self, tag):\n        super().__init__(tag=tag)\n"
-            + "\nt = T(1)\nt.tag = 2\n", "18", "a field of an immutable class"},
+            + "\nt = T(1)\nt.tag = 2\n", "23", "a field of an immutable class"},
     };
 
     @TestFactory

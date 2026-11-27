@@ -82,7 +82,7 @@ public abstract class SqlFunctionBridge {
             Object[] cur = table.get();
             Object[] next = null;
             for (int i = 0; i < cur.length; i += 2) {
-                if (cur[i] == owner) {
+                if (cur[i] == owner) { //NOPMD CompareObjectsWithEquals - a connection is released by identity
                     if (next == null) {
                         next = new Object[cur.length];
                         System.arraycopy(cur, 0, next, 0, cur.length);

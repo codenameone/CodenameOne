@@ -130,8 +130,6 @@ public final class DeclarativeMap {
     /// `Class.attr` for every attribute read through a plain name anywhere.
     private final Set<String> dotted = new HashSet<String>();
     private final List<String> report = new ArrayList<String>();
-    private int lowered;
-    private int aliases;
     private int synthesized;
     /// The program subclasses of each program class, by key.
     private final Map<String, List<String>> children = new HashMap<String, List<String>>();
@@ -1225,11 +1223,6 @@ public final class DeclarativeMap {
                     && replace.containsKey(((Name) ((Assign) s).targets.get(0)).id)) {
                 String n = ((Name) ((Assign) s).targets.get(0)).id;
                 body.addAll(Arrays.asList(replace.get(n)));
-                if (aliasList.contains(n)) {
-                    aliases++;
-                } else {
-                    lowered++;
-                }
             } else {
                 body.add(s);
             }

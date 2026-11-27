@@ -124,7 +124,63 @@ public final class ImmutableSlots {
         FunctionDef set = method(c, "__setattr__");
         FunctionDef init = method(c, "__init__");
         return set != null && init != null && init.args.kwarg != null && init.args.positional.size() == 1
-                && raisesOnly(set) && method(c, "__eq__") != null && method(c, "__repr__") != null;
+                && raisesOnly(set) && method(c, "__eq__") != null && method(c, "__repr__") != null
+                && INIT_BODY.equals(ConstArgSpecialize.dump(init.body));
+    }
+
+    /// soupsieve's `Immutable.__init__` body, structurally. The subclasses'
+    /// generated constructors compute `_hash` the way it does, so a class of
+    /// the same shape whose constructor does anything else is not lowered
+    /// (and its computed stores then fail the build instead).
+    private static final String INIT_BODY = ConstArgSpecialize.dump(((FunctionDef) Parser.parse(
+            "def __init__(self, **kwargs):\n"
+            + "    temp = []\n"
+            + "    for k, v in kwargs.items():\n"
+            + "        temp.append(type(v))\n"
+            + "        temp.append(v)\n"
+            + "        super().__setattr__(k, v)\n"
+            + "    super().__setattr__('_hash', hash(tuple(temp)))\n", "<immutable>").body.get(0)).body);
+
+    /// Whether `f` reads an attribute by a computed name: soupsieve's
+    /// `__eq__`/`__repr__` walk `__slots__` that way. One that does not is the
+    /// class's own and is kept.
+    private static boolean readsComputed(FunctionDef f) {
+        return readsComputed((Object) f.body);
+    }
+
+    private static boolean readsComputed(Object o) {
+        if (o instanceof List) {
+            for (Object x : (List<?>) o) {
+                if (readsComputed(x)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!(o instanceof Node)) {
+            return false;
+        }
+        if (o instanceof Call && ((Call) o).func instanceof Name && "getattr".equals(((Name) ((Call) o).func).id)
+                && ((Call) o).args.size() >= 2 && !(((Call) o).args.get(1) instanceof Constant)) {
+            return true;
+        }
+        for (Class<?> c = o.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            for (java.lang.reflect.Field fl : c.getDeclaredFields()) {
+                Class<?> t = fl.getType();
+                if (java.lang.reflect.Modifier.isStatic(fl.getModifiers())
+                        || !Node.class.isAssignableFrom(t) && !List.class.isAssignableFrom(t)) {
+                    continue;
+                }
+                try {
+                    if (readsComputed(fl.get(o))) {
+                        return true;
+                    }
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean raisesOnly(FunctionDef f) {
@@ -372,7 +428,7 @@ public final class ImmutableSlots {
                 String n = ((FunctionDef) s).name;
                 if ("__init__".equals(n) || "__setattr__".equals(n)) {
                     root.body.remove(i);
-                } else if ("__eq__".equals(n) || "__repr__".equals(n)) {
+                } else if (("__eq__".equals(n) || "__repr__".equals(n)) && readsComputed((FunctionDef) s)) {
                     Node.Module g = Parser.parse("__eq__".equals(n) ? eq : repr, path);
                     DataclassInit.atLine(g, s.line);
                     root.body.remove(i);

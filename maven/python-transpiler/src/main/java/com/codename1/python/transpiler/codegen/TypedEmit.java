@@ -7659,9 +7659,8 @@ final class TypedEmit {
 
     private E call(Call c) {
         if (in.isCast(c, sc)) {
-            E v = expr(c.args.get(1));
             // typing.cast(T, v) is v (Infer#isCast).
-            return v;
+            return expr(c.args.get(1));
         }
         if (!inModuleCall && (c.func instanceof Name && "type".equals(((Name) c.func).id) && c.args.size() == 3
                 && c.keywords.isEmpty() && binding("type") == Scope.Binding.BUILTIN

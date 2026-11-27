@@ -155,6 +155,9 @@ public class DatabaseImpl extends Database {
     /** Every function registered on any connection, by the id SQLite hands back. */
     private static final List<Function<Object[], Object>> FUNCTIONS = new ArrayList<Function<Object[], Object>>();
 
+    /** The ids this connection registered, freed when it closes. */
+    private final List<Integer> ownIds = new ArrayList<Integer>();
+
     @Override
     public boolean supportsFunctions() {
         return true;
@@ -164,8 +167,15 @@ public class DatabaseImpl extends Database {
     public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         int id = -1;
         if (function != null) {
-            id = FUNCTIONS.size();
-            FUNCTIONS.add(function);
+            // A slot a closed connection freed is reused: its statements went with it.
+            id = FUNCTIONS.indexOf(null);
+            if (id < 0) {
+                id = FUNCTIONS.size();
+                FUNCTIONS.add(function);
+            } else {
+                FUNCTIONS.set(id, function);
+            }
+            ownIds.add(Integer.valueOf(id));
         }
         checkNative(SQLiteNative.createFunction(peer, name, argCount, id));
     }
@@ -314,6 +324,10 @@ public class DatabaseImpl extends Database {
             // Reported, not swallowed. The peer is already cleared so there is no retry, which
             // makes this the only chance to say the data may not have reached storage.
             checkNative(SQLiteNative.close(closing));
+            for (int iter = 0; iter < ownIds.size(); iter++) {
+                FUNCTIONS.set(ownIds.get(iter).intValue(), null);
+            }
+            ownIds.clear();
         } finally {
             // Last, not first: until the engine has let the database go this connection still
             // holds it, and giving the claim back sooner lets another connection start rewriting
