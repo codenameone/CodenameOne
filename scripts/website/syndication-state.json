@@ -3599,6 +3599,11 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-11-27T01:01:33+00:00"
+      },
+      "devto": {
+        "id": 5133305,
+        "url": "https://dev.to/codenameone/why-my-kids-are-learning-to-program-the-new-baseline-1349",
+        "syndicated_at": "2026-11-27T14:23:23+00:00"
       }
     }
   }
