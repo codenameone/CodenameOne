@@ -30,9 +30,11 @@ import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// The builder removes the template's phone-only orientation list by exact text
-/// when ios.interface_orientation is set. If the template drifts, that removal
+/// when the developer states orientations (the ios.interface_orientation hint, or
+/// an ios.plistInject orientation array). If the template drifts, that removal
 /// silently matches nothing and the hint stops reaching iPhones.
 class IPhoneBuilderOrientationTemplateTest {
     @Test
@@ -43,5 +45,20 @@ class IPhoneBuilderOrientationTemplateTest {
         assertEquals(true, first >= 0, "template no longer contains IPHONE_DEFAULT_ORIENTATIONS verbatim");
         assertEquals(first, plist.lastIndexOf(IPhoneBuilder.IPHONE_DEFAULT_ORIENTATIONS));
         assertFalse(IPhoneBuilder.IPHONE_DEFAULT_ORIENTATIONS.contains("UpsideDown"));
+    }
+
+    @Test
+    void anyStatedOrientationReplacesThePhoneDefault() {
+        String base = "<key>UISupportedInterfaceOrientations</key><array>"
+                + "<string>UIInterfaceOrientationPortrait</string></array>";
+        String phone = "<key>UISupportedInterfaceOrientations~iphone</key><array>"
+                + "<string>UIInterfaceOrientationPortrait</string></array>";
+        assertTrue(IPhoneBuilder.keepsPhoneOrientationDefault(null, ""));
+        assertTrue(IPhoneBuilder.keepsPhoneOrientationDefault(null, null));
+        assertTrue(IPhoneBuilder.keepsPhoneOrientationDefault(null, "<key>UIRequiresFullScreen</key><true/>"));
+        assertTrue(IPhoneBuilder.keepsPhoneOrientationDefault(null, "<!-- " + base + " -->"));
+        assertFalse(IPhoneBuilder.keepsPhoneOrientationDefault("UIInterfaceOrientationPortrait", ""));
+        assertFalse(IPhoneBuilder.keepsPhoneOrientationDefault(null, base));
+        assertFalse(IPhoneBuilder.keepsPhoneOrientationDefault(null, phone));
     }
 }

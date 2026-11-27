@@ -413,10 +413,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         // An open foldable phone reports the phone idiom, but its inner display
         // is tablet sized, so layouts that branch on isTablet() should treat it
         // as one. DevicePosture#isOpenFoldable() tells it apart from an iPad.
-        return isDesktop() || nativeInstance.isTablet() || isOpenFoldablePhone();
+        return isDesktop() || nativeInstance.isTablet() || isOpenFoldable();
     }
 
-    private static boolean isOpenFoldablePhone() {
+    @Override
+    public boolean isOpenFoldable() {
         // Reads only the pushed hinge state, never IOSFoldablePosture.isFoldable():
         // that probe hops to the main queue and can wait up to 300ms on a phone
         // with no hinge, and isTablet() is called by every app, early and often.

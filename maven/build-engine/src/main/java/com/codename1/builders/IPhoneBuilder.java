@@ -65,6 +65,21 @@ public class IPhoneBuilder extends Executor {
     /// the interface over whenever the device reports PortraitUpsideDown, and a
     /// foldable phone can report that while being opened. Must stay in sync
     /// with the template; IPhoneBuilderOrientationTemplateTest holds it.
+    /// Whether the template's phone-only orientation list stays in the plist.
+    /// An iPhone reads UISupportedInterfaceOrientations~iphone instead of the
+    /// base array, so the default goes whenever the developer states their own
+    /// orientations: through the ios.interface_orientation hint, or by injecting
+    /// either the base array (an iPhone would otherwise ignore it) or a ~iphone
+    /// array (the key would otherwise appear twice).
+    static boolean keepsPhoneOrientationDefault(String orientationHint, String plistInject) {
+        if (orientationHint != null) {
+            return false;
+        }
+        String live = plistWithoutComments(plistInject == null ? "" : plistInject);
+        return plistKeyNamed(live, "UISupportedInterfaceOrientations", 0) < 0
+                && plistKeyNamed(live, "UISupportedInterfaceOrientations~iphone", 0) < 0;
+    }
+
     static final String IPHONE_DEFAULT_ORIENTATIONS =
             "\t<key>UISupportedInterfaceOrientations~iphone</key>\n"
             + "\t<array>\n"
@@ -7235,15 +7250,7 @@ public class IPhoneBuilder extends Executor {
             stopwatch.split("ParparVM Execution");
             try {
                 String orientations = request.getArg("ios.interface_orientation", null);
-                if (orientations != null || plistKeyNamed(plistWithoutComments(
-                        request.getArg("ios.plistInject", "")),
-                        "UISupportedInterfaceOrientations~iphone", 0) >= 0) {
-                    // The template carries a UISupportedInterfaceOrientations~iphone
-                    // array without upside-down, which an iPhone reads instead of
-                    // the base array. An explicit hint is the developer's own list
-                    // for every device, so the phone-only default goes; so does a
-                    // project that injects its own ~iphone array, which would
-                    // otherwise leave the key in the plist twice.
+                if (!keepsPhoneOrientationDefault(orientations, request.getArg("ios.plistInject", ""))) {
                     File plist = new File(tmpFile, "dist/" + request.getMainClass() + "-src/" + request.getMainClass() + "-Info.plist");
                     replaceInFile(plist, IPHONE_DEFAULT_ORIENTATIONS, "");
                 }

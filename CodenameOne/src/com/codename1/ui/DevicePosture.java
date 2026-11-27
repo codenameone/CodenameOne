@@ -116,11 +116,7 @@ public final class DevicePosture {
     /// False when the device does not fold, when it is closed, and when its posture is still
     /// unknown, which a foldable can report briefly before its hinge has been read.
     public boolean isOpenFoldable() {
-        if (!isFoldable()) {
-            return false;
-        }
-        int posture = getPosture();
-        return posture == POSTURE_FLAT || posture == POSTURE_HALF_OPENED;
+        return Display.impl.isOpenFoldable();
     }
 
     /// True if the device is in a tabletop or book posture (half opened and separating the display).
