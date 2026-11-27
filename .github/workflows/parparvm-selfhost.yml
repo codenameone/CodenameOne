@@ -138,8 +138,8 @@ jobs:
             com.codename1.tools.translator
 
       # PERFORMANCE MOVED OUT, into every platform's own build: vm/selfhost/ci-perf-gate.sh
-      # runs in linux-build-run.yml (x64, arm64), parparvm-tests-windows.yml (x64, arm64)
-      # and scripts-macos.yml, fails that build on a regression and puts the per-benchmark
+      # runs in linux-build-run.yml (Linux x64/arm64, Windows x64/arm64)
+      # and scripts-ios.yml (Apple job), fails that build on a regression and puts the per-benchmark
       # table in that platform's PR comment.
       #
       # It used to live here, building the translator a second time at -O3 and then

@@ -62,7 +62,8 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 60 for the build and suite, plus the fidelity run on the default leg.
+    timeout-minutes: 90
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -238,6 +239,59 @@ jobs:
       - name: Rebuild the generated app at API 37
         if: matrix.id == 'default'
         run: ./scripts/verify-android-app-compile-sdk.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}" 37
+      # Native theme fidelity (Material 3), on the default leg's port build:
+      # it used to be scripts-fidelity.yml's own job, which set up the
+      # workspace and built the Android port a second time. The fidelity app
+      # renders each component as the CN1 widget AND the native widget in this
+      # same emulator and diffs the two; the committed baseline is the ratchet
+      # floor (re-anchor locally with FIDELITY_UPDATE_BASELINE=1). Not in a
+      # golden capture, and after the screenshot suite so it cannot change what
+      # that suite rendered.
+      - name: Regenerate native themes from CSS (fidelity)
+        if: ${{ !cancelled() && matrix.id == 'default' && inputs.cn1ss_capture == '' }}
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
+      - name: Build fidelity app (Android)
+        id: fidelity_build
+        if: ${{ !cancelled() && matrix.id == 'default' && inputs.cn1ss_capture == '' }}
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-fidelity-app.sh android -q -DskipTests
+      - name: Run fidelity suite (emulator)
+        if: ${{ !cancelled() && steps.fidelity_build.outcome == 'success' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          # CI renders differ subtly from a developer machine: re-seed the
+          # per-environment native goldens here; the ratchet gates the
+          # CN1-vs-native SCORE against the committed baseline, which is
+          # portable because both sides are rendered in this emulator.
+          FIDELITY_UPDATE_GOLDENS: '1'
+        with:
+          # Part of the android-m3 golden-set contract: the committed native
+          # references (scripts/build-android-native-ref.sh) are captured on
+          # this API level AND a 480x800 @ 160dpi screen. The wm override is
+          # load-bearing: the default AVD screen (320x640) is narrower than the
+          # 60mm tile (377px at 160dpi) and clamped every CN1 tile.
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 2048M
+          script: adb shell wm size 480x800 && adb shell wm density 160 && ./scripts/run-android-fidelity-tests.sh "${{ steps.fidelity_build.outputs.gradle_project_dir }}"
+      - name: Upload fidelity artifacts
+        if: ${{ !cancelled() && steps.fidelity_build.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-fidelity
+          path: |
+            artifacts/android-fidelity/**
+            scripts/fidelity-app/baseline/android-m3-fidelity-baseline.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload Android port status
         if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7

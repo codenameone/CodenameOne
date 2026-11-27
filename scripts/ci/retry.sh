@@ -31,7 +31,7 @@ set -uo pipefail
 #
 # The value `transient` selects the canonical set below instead of a hand-written
 # regex. Every workflow that spelled this out meant the same thing, and they drifted
-# into three different versions: a parparvm-tests run failed for good on
+# into three different versions: a linux-build-run (ParparVM tests) run failed for good on
 # "or one of its dependencies could not be resolved" -- a plain Central hiccup that
 # two other workflows already knew to retry and that one had never been taught. One
 # definition, so the next failure mode is added once.

@@ -45,7 +45,7 @@
       "id": "macos",
       "name": "macOS",
       "detail": "Native AppKit build",
-      "workflow": "scripts-macos.yml"
+      "workflow": "scripts-ios.yml"
     },
     {
       "id": "javascript",
@@ -69,13 +69,13 @@
       "id": "windows-x64",
       "name": "Windows x64",
       "detail": "Native cross-compiled binary on Windows",
-      "workflow": "windows-cross-build-run.yml"
+      "workflow": "linux-build-run.yml"
     },
     {
       "id": "windows-arm64",
       "name": "Windows ARM64",
       "detail": "Native ARM64 binary on Windows 11",
-      "workflow": "parparvm-tests-windows.yml"
+      "workflow": "linux-build-run.yml"
     },
     {
       "id": "watchos",

@@ -147,7 +147,7 @@ jobs:
       # dependency. Packaging alone without -am (and without install) leaves
       # nothing for the tests module to resolve against, which is how the first
       # revision of this workflow failed on all three arms including the control.
-      # This mirrors parparvm-tests.yml.
+      # This mirrors linux-build-run.yml.
       # Through retry.sh, transient failures only: a TLS handshake that did not
       # complete fetching maven-clean-plugin from Central failed this step once,
       # before anything under test had been built.

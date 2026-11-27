@@ -129,7 +129,7 @@ jobs:
       # OpenSSL's, the HTTP/2 framing is nghttp2's -- and the natives that call
       # them need those headers to compile at all: without them this failed on
       # "'curl/curl.h' file not found" after translating perfectly well. The same
-      # four packages, for the same reason, are in parparvm-tests.yml.
+      # four packages, for the same reason, are in linux-build-run.yml.
       #
       # xvfb is for the minimal-layout step, which runs cn1:test in the
       # simulator's runner, and is left around the archetype smoke as it was.

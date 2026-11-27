@@ -1,7 +1,7 @@
 # actionlint configuration. See scripts/check-workflows.sh.
 
 self-hosted-runner:
-  # windows-11-arm is a REAL GitHub-hosted label -- parparvm-tests-windows.yml runs on it
+  # windows-11-arm is a REAL GitHub-hosted label -- linux-build-run.yml runs on it
   # and has done for months. actionlint ships a static list of known labels and that list
   # lags GitHub's, so the label is reported as unknown.
   #

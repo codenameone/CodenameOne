@@ -58,15 +58,10 @@ jobs:
       contents: read
     outputs:
       scripts-ios: ${{ steps.select.outputs.scripts-ios }}
-      scripts-macos: ${{ steps.select.outputs.scripts-macos }}
-      scripts-fidelity: ${{ steps.select.outputs.scripts-fidelity }}
       scripts-android: ${{ steps.select.outputs.scripts-android }}
       scripts-javascript: ${{ steps.select.outputs.scripts-javascript }}
       scripts-javase: ${{ steps.select.outputs.scripts-javase }}
       linux-build-run: ${{ steps.select.outputs.linux-build-run }}
-      windows-cross-build-run: ${{ steps.select.outputs.windows-cross-build-run }}
-      parparvm-tests: ${{ steps.select.outputs.parparvm-tests }}
-      parparvm-tests-windows: ${{ steps.select.outputs.parparvm-tests-windows }}
       pr: ${{ steps.select.outputs.pr }}
       javadocs: ${{ steps.select.outputs.javadocs }}
       website-docs: ${{ steps.select.outputs.website-docs }}
@@ -92,7 +87,7 @@ jobs:
           set -euo pipefail
           python3 scripts/ci/select-ci-members.py --event "$EVENT" --base "$BASE" --head HEAD
           unity=false
-          for m in linux-build-run parparvm-tests-windows scripts-android scripts-ios scripts-javascript scripts-macos windows-cross-build-run; do
+          for m in linux-build-run scripts-android scripts-ios scripts-javascript; do
             if grep -qx "$m=true" "$GITHUB_OUTPUT"; then unity=true; fi
           done
           echo "unity=$unity" >> "$GITHUB_OUTPUT"
@@ -112,30 +107,6 @@ jobs:
     needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
     if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-ios == 'true' && needs.unity-gallery.result == 'success' }}
     uses: ./.github/workflows/scripts-ios.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: write
-      packages: read
-
-  scripts-macos:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-macos == 'true' && needs.unity-gallery.result == 'success' }}
-    uses: ./.github/workflows/scripts-macos.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: write
-      packages: read
-
-  scripts-fidelity:
-    needs: [golden-plan, source-gates, check-workflows, select]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-fidelity == 'true' }}
-    uses: ./.github/workflows/scripts-fidelity.yml
     secrets: inherit
     permissions:
       contents: write
@@ -184,42 +155,6 @@ jobs:
     needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
     if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.linux-build-run == 'true' && needs.unity-gallery.result == 'success' }}
     uses: ./.github/workflows/linux-build-run.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: write
-      packages: read
-
-  windows-cross-build-run:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.windows-cross-build-run == 'true' && needs.unity-gallery.result == 'success' }}
-    uses: ./.github/workflows/windows-cross-build-run.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: write
-      packages: read
-
-  parparvm-tests:
-    needs: [golden-plan, source-gates, check-workflows, select]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.parparvm-tests == 'true' }}
-    uses: ./.github/workflows/parparvm-tests.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      actions: write
-      packages: read
-
-  parparvm-tests-windows:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.parparvm-tests-windows == 'true' && needs.unity-gallery.result == 'success' }}
-    uses: ./.github/workflows/parparvm-tests-windows.yml
     secrets: inherit
     permissions:
       contents: write

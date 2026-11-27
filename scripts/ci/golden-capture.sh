@@ -21,9 +21,6 @@ WORKFLOWS=(
   scripts-android.yml
   scripts-javascript.yml
   linux-build-run.yml
-  parparvm-tests-windows.yml
-  windows-cross-build-run.yml
-  scripts-macos.yml
 )
 
 log() { echo "[golden-capture] $*" >&2; }
@@ -46,8 +43,9 @@ workflows() {
       # golden whenever arm64 anti-aliased a glyph past its allowance, and
       # held the capture on the scarcest runner. The other legs are compared
       # against it by the normal run the harvest commit starts.
-      scripts/windows/*) want+=" parparvm-tests-windows.yml" ;;
-      scripts/macos/*) want+=" scripts-macos.yml" ;;
+      # linux-build-run.yml holds all three; a capture skips the other two.
+      scripts/windows/*) want+=" linux-build-run.yml" ;;
+      scripts/macos/*) want+=" scripts-ios.yml" ;;
       *) want+=" ${WORKFLOWS[*]}" ;;
     esac
   done

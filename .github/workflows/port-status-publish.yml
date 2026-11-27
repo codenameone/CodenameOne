@@ -13,9 +13,7 @@ on:
       - Test iOS UI build scripts
       - Test macOS UI build scripts
       - Test JavaScript screenshot scripts
-      - Linux native build + run (GTK3, x64 + arm64)
-      - Windows cross-build + run (Linux build -> Windows run)
-      - ParparVM Java Tests (Windows)
+      - Native ParparVM (Linux + Windows) build, run and tests
     types: [completed]
 
 permissions:

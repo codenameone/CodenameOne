@@ -1562,7 +1562,7 @@ class PortStatusTest(unittest.TestCase):
         )
 
         by_id = {port["id"]: port for port in self.manifest["ports"]}
-        self.assertEqual("scripts-macos.yml", by_id["macos"]["workflow"])
+        self.assertEqual("scripts-ios.yml", by_id["macos"]["workflow"])
         self.assertIn(
             "scripts/macos/screenshots", self.manifest["golden_directories"])
 

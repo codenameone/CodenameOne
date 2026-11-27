@@ -50,7 +50,7 @@ import java.util.List;
  * android-m3 golden set.
  *
  * The golden-set contract: capture on the SAME emulator profile the fidelity
- * CI uses (API level + 160dpi -- see scripts-fidelity.yml). Tile pixel sizes
+ * CI uses (API level + 160dpi -- see scripts-android.yml). Tile pixel sizes
  * derive from mm exactly like the CN1 side (mm * dpi / 25.4), so at 160dpi a
  * 60mm tile is the same 377px on both sides.
  */

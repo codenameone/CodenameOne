@@ -13,6 +13,10 @@ on:
         description: "Also build the CN1SS test server and hand it over beside the bundle. For callers whose jobs run a screenshot suite."
         type: boolean
         default: false
+      mac_port:
+        description: "Also build the macOS port (scripts/build-mac-port.sh) on the same workspace and ship Ports/MacPort/nativeSources in the bundle. scripts-ios.yml's Apple job runs the macOS suite from this one bundle."
+        type: boolean
+        default: false
     outputs:
       cn1_built_cache_key:
         description: "Cache key the build job used for the cn1-built artifact bundle. Dependent jobs should reuse this exact key to avoid recomputing the hash and getting a spurious cache miss."
@@ -96,7 +100,18 @@ jobs:
               scripts/build-native-themes.sh \
               .github/workflows/_build-ios-port.yml \
               | shasum -a 256 | awk '{print $1}')
-          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+          HASH="${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}"
+          # With the macOS port in the bundle the key must also move with
+          # every file the AppKit build consumes -- all of Ports/MacPort, no
+          # extension list (the .metal shaders, .c natives and the
+          # shared-*.exclude manifests decide what is compiled) -- and the
+          # callers without it keep the key they always had.
+          if [ "${{ inputs.mac_port }}" = "true" ]; then
+            MAC_HASH=$( { find Ports/MacPort -type f -print0 | sort -z | xargs -0 shasum -a 256; \
+                shasum -a 256 scripts/build-mac-port.sh; } | shasum -a 256 | awk '{print $1}')
+            HASH="${HASH}-mac${MAC_HASH:0:16}"
+          fi
+          echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
@@ -149,6 +164,7 @@ jobs:
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
+            Ports/MacPort/nativeSources
           key: ${{ steps.cn1_built_key.outputs.key }}
 
       - name: Setup workspace
@@ -173,6 +189,18 @@ jobs:
       - name: Build iOS port
         if: steps.cn1_built.outputs.cache-hit != 'true'
         run: ./scripts/build-ios-port.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Verify native macOS font aliases with AppKit
+        if: ${{ inputs.mac_port }}
+        run: python3 scripts/test_mac_native_font.py
+
+      # The macOS port on the same workspace, so one job produces the bundle
+      # every Apple suite reads (it used to be _build-mac-port.yml, a second
+      # macOS runner doing setup-workspace again).
+      - name: Build macOS port
+        if: ${{ inputs.mac_port && steps.cn1_built.outputs.cache-hit != 'true' }}
+        run: ./scripts/build-mac-port.sh -q -Dtest=MacNativeFontModeTest -Dsurefire.failIfNoSpecifiedTests=false
         timeout-minutes: 40
 
       - name: Report cache outcome
@@ -205,10 +233,15 @@ jobs:
           # failed with "Workspace tools not found" even after the cn1-built
           # restore succeeded. Bundling it into the same artifact makes the
           # whole handoff eviction-proof.
+          MAC_SOURCES=""
+          if [ "${{ inputs.mac_port }}" = "true" ]; then
+            MAC_SOURCES="${GITHUB_WORKSPACE#/}/Ports/MacPort/nativeSources"
+          fi
           tar -C / -cf "$RUNNER_TEMP/cn1-built-bundle.tar" \
             "${HOME#/}/.m2/repository/com/codenameone" \
             "${GITHUB_WORKSPACE#/}/Themes" \
             "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources" \
+            ${MAC_SOURCES:+"$MAC_SOURCES"} \
             "${RUNNER_TEMP#/}/codenameone-tools"
           ls -la "$RUNNER_TEMP/cn1-built-bundle.tar"
 

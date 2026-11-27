@@ -472,7 +472,7 @@ shared `SqlAccess` is the pattern -- never a second copy. A marked class may onl
 on the JDK subset the backend compiles against and on other marked classes, and
 `package-info.java` cannot be marked (javac would emit a `package-info.class`).
 A class marked outside the current packages also needs its path added to
-`parparvm-tests.yml`'s `paths`, which cannot read the marker.
+the `linux-build-run` entry's `paths` in `.github/ci/ci-members.json`, which cannot read the marker.
 
 ### Two API references: client and backend
 
@@ -749,7 +749,7 @@ of them on by default in a customer build**:
   `CN1_NATIVE_VERIFY` or `-Dparparvm.nativeVerify` says `strict` or `warn`. Making
   the old soft failure hard would change the outcome of app builds that succeed
   today, so our CI opts in (`CN1_NATIVE_VERIFY: strict` at workflow level in
-  `pr.yml`, `parparvm-tests.yml` and `parparvm-tests-windows.yml`, inherited by
+  `pr.yml` and `linux-build-run.yml`, inherited by
   every forked translation) and nobody else has to. The `nativeVerify` build hint
   turns it on for a single build. With the check on, the per-symbol opt-out for a
   native that lives in a prebuilt `.a`/`.framework` is
@@ -1190,7 +1190,7 @@ Traps:
 - **Every PR-gating workflow that builds the application lists the gallery, both
   modules, the script, the workflow and the action in its `paths`** (for a
   `ci.yml` member, its entry in `.github/ci/ci-members.json`), and
-  `.github/ci/apple-checks.json` lists them for the four Apple suites.
+  `.github/ci/apple-checks.json` lists them for the Apple suites.
   A nightly suite (see *Nightly CI*) lists only its own tree and is exempt.
 - **`unpack` after `mvn clean` on the application, never before**: the output
   lives under `common/target`.
@@ -1463,6 +1463,15 @@ workflows of the samples, cn1libs and feature trees; nothing else.
   them (`test_select_ci_members.py`). A new heavy workflow is a member: an entry
   there and a job in `ci.yml`. They keep `workflow_dispatch` and their
   schedules, so golden capture and the nightlies dispatch them as before.
+- **One build per platform family, then the tests.** `scripts-ios.yml` builds
+  the iOS and Mac ports once (`_build-ios-port.yml`, `mac_port: true`) and runs
+  Metal, watchOS, tvOS, macOS and iOS fidelity as steps of ONE `xcode-27` job:
+  every suite runs even after an earlier one fails, and the job fails at the
+  end. `linux-build-run.yml` holds every native ParparVM suite (Linux, Windows
+  cross and native, the ParparVM JVM tests) behind one `prepare-suite`
+  producer, and Android fidelity runs inside `scripts-android.yml`. Do not split
+  a suite back out into its own workflow or runner; the `xcode-27` image is
+  scarce and every extra job is another wait.
 - **One run shares its artifacts.** The Unity gallery is built once per run.
   Inside a member `github.workflow` is `CI`, so each member's concurrency group
   starts with its own file name; keep that on a new one.

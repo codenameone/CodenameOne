@@ -1,32 +1,39 @@
-# Native Linux (GTK3) build + run pipeline. The Linux port builds natively on the
-# runner -- no cross-compile -- so each architecture both builds and runs the
-# binary. It runs on BOTH architectures GitHub hosts natively: x86_64
-# (ubuntu-24.04) and arm64 (ubuntu-24.04-arm), giving the port the same two-arch
-# screenshot coverage the native Windows port has.
+# Native ParparVM: every Linux- and Windows-native translation suite, and the
+# ParparVM JVM tests, in one workflow so the inputs they share are built once.
 #
-# The hellocodenameone screenshot suite is compiled by the codenameone maven
-# plugin, which depends on CEF -- and CEF has no linux-arm64 build, so the plugin
-# (hence the suite's *.class) only builds on x64. The translated C is
-# architecture-independent, so the suite classes are built once on x64 and shared;
-# each arch then builds only core + the Linux port (which build fine on arm64),
-# translates the shared classes with the "linux" app type, native-builds the ELF
-# (CMake/Ninja), runs it headless under Xvfb and captures the suite over the cn1ss
-# WebSocket.
+# prepare-suite (Linux x64) is the one build of the hellocodenameone
+# application: the plugin, the Unity gallery, the common module, the libraries
+# it ships (translation-libs) and the CI test server, uploaded as
+# linux-suite-classes. Those are bytecode and a runnable java copy, so every
+# leg below downloads them instead of rebuilding them -- on Linux and Windows.
+#
+# What each leg still builds is what genuinely belongs to its platform: core
+# and its own port (Linux natively per arch, so the per-arch native build
+# matches; Windows x64 on its own runner, which hands its core + port classes
+# to the arm64 leg, because Temurin has no JDK 8 for Windows/aarch64), the
+# ByteCodeTranslator and JavaAPI that each test module compiles as part of
+# `mvn -pl tests -am`, and the native toolchain output.
 #
 # Jobs:
-#   prepare-suite (x64)            -> builds the plugin + hellocodenameone-common,
-#                                     uploads the suite classes and those of
-#                                     the libraries it ships (translation-libs)
-#   build-run (matrix x64 + arm64) -> core + Linux port, translate + build + run,
-#                                     uploads PNGs/arch
-#   compare-comment (ubuntu)       -> diffs each arch vs its in-repo baseline,
-#                                     posts the PR comment
-name: Linux native build + run (GTK3, x64 + arm64)
+#   unity-gallery, prepare-suite      -> the shared suite build (Linux x64)
+#   build-run (x64 + arm64), build-run-musl, compare-comment
+#                                     -> Linux GTK3 port, translate + run + capture
+#   wincross-build, wincross-run, wincross-compare-comment
+#                                     -> Windows exe cross-built on Linux, run on Windows
+#   windows-port-screenshot(-arm64), windows-port-screenshot-comment-*
+#                                     -> Windows port built and run natively (clang-cl)
+#   vm-tests-windows, widgetboard-compile-check
+#                                     -> ParparVM clean-target build on Windows
+#   ablation-arms, vm-tests, backend-*, python-backend-native, release-jars
+#                                     -> ParparVM JVM tests (Linux); the
+#                                        quality-report-previews-parparvm push is in vm-tests
+#
+# golden-capture.sh dispatches this file for scripts/linux and scripts/windows;
+# a capture runs only the screenshot legs whose rendering is the golden (the
+# Linux legs and the native Windows x64 leg).
+name: Native ParparVM (Linux + Windows) build, run and tests
 
 on:
-  # Manual dispatch: this PR's changed-file count exceeds GitHub's paths-filter
-  # diff limit, so pull_request triggers stopped firing -- dispatch with
-  #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
     inputs:
       cn1ss_capture:
@@ -36,6 +43,11 @@ on:
         type: string
   schedule:
     - cron: '45 1 * * *'
+  # Publishing a release attaches the JavaAPI and ByteCodeTranslator jars
+  # (release-jars); the screenshot legs skip it.
+  release:
+    types:
+      - published
   # Pull requests and master pushes reach this workflow through ci.yml,
   # after its precheck; the paths that used to trigger it are in
   # .github/ci/ci-members.json.
@@ -55,12 +67,17 @@ env:
   # BytecodeMethod.appendMethodC. Not in the size or perf benchmarks, whose
   # binaries should be the ones customers get.
   CN1_CULL_TRAP: '1'
+  # CN1_NATIVE_VERIFY (strict) is set per job on the ParparVM test and Windows
+  # native jobs, as their own workflows did; the MSVC STL mismatch switch
+  # (CFLAGS/CXXFLAGS) is set on the Windows native jobs only, since a Linux
+  # compile must not see it.
 
 jobs:
   # The application has a Unity project in it. One Linux job compiles it and
   # hands the result to the jobs below as an artifact; none of them installs
   # the .NET SDK or builds the Unity modules.
   unity-gallery:
+    if: ${{ github.event_name != 'release' }}
     uses: ./.github/workflows/unity-gallery-prebuilt.yml
 
   # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
@@ -861,3 +878,2375 @@ jobs:
           name: cn1ss-capture-linux
           path: artifacts/cn1ss-capture
           if-no-files-found: ignore
+
+  wincross-build:
+    if: ${{ inputs.cn1ss_capture == '' }}  # a capture renders scripts/windows on the native x64 leg alone
+    needs: [prepare-suite]
+    name: cross-build suite exe (Linux, x64 + WebView2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      # The native BrowserComponent peer (cn1_windows_browser.cpp) is C++ that
+      # uses the MSVC STL via the xwin headers; the MSVC STL gates on a recent
+      # clang (older clang-cl trips STL1000 "Unexpected compiler version"), so
+      # pin LLVM 19 for the cross-build rather than the distro default.
+      - name: Install LLVM 19 + CMake/Ninja
+        # Capped well inside the job's 60 minutes. The inner bounds give a stalled mirror a
+        # second chance; this one guarantees that however they compound, the step cannot eat
+        # the budget the build itself needs -- which is what happened twice on 2026-08-19,
+        # each time surfacing as "Artifact not found" in a different job.
+        timeout-minutes: 20
+        run: |
+          set -e
+          # No explicit index refresh here: apt-get-install.sh does one itself, and doing it
+          # twice doubles the time a stalling mirror can take before anything is installed.
+          # No xvfb: nothing in this job opens a window. The sample build's css
+          # goal compiles theme.css headless, and the PE this job produces is
+          # run by the Windows jobs downstream, not here.
+          # Every network call here is bounded and retried. On 2026-08-19 this step sat in
+          # its first line for a full hour and was cancelled having installed nothing, which
+          # then failed the screenshot-comment job downstream for a missing artifact. That is
+          # the same hang apt-get-install.sh was written for -- a hung mirror should cost one
+          # attempt, not the job -- and this workflow had never adopted it.
+          bash scripts/ci/apt-get-install.sh cmake ninja-build unzip
+          # apt.llvm.org is a single host with no mirror, and llvm.sh both adds its repo and
+          # installs from it, so it is the likeliest thing in this step to stall forever.
+          RETRY_ATTEMPTS=3 bash scripts/ci/retry.sh \
+            wget -q --timeout=30 --tries=3 -O llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          # Two attempts of ten minutes, not three of fifteen: the point of a bound is to
+          # leave the job enough budget to do its actual work afterwards, and 3x900s is
+          # three quarters of the runner's hour.
+          RETRY_ATTEMPTS=2 bash scripts/ci/retry.sh timeout 600 sudo ./llvm.sh 19
+          bash scripts/ci/apt-get-install.sh clang-19 lld-19 llvm-19
+          echo "/usr/lib/llvm-19/bin" >> "$GITHUB_PATH"
+          /usr/lib/llvm-19/bin/clang-cl --version
+          /usr/lib/llvm-19/bin/lld-link --version 2>&1 | head -1 || true
+          /usr/lib/llvm-19/bin/llvm-rc --version 2>&1 | head -1 || true
+
+      # JDK matrix the translator harness auto-discovers (JDK_*_HOME). JDK 8 is
+      # restored last so it is the active JAVA_HOME (it builds codename1-core and
+      # is what CompilerHelper translates with). JDK 17 builds the sample app.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '11' }
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '17' }
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Restore JDK 8 as the active JDK
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Install xwin + lay out the Windows SDK (x64)
+        env:
+          # `cargo install xwin` and `xwin splat` flake on transient crates.io /
+          # download errors ("curl [16] HTTP2 framing layer", "[55] OpenSSL
+          # SSL_read unexpected eof"). Disable HTTP/2 multiplexing (forces
+          # HTTP/1.1, which avoids the framing errors) and let cargo retry.
+          CARGO_NET_RETRY: "10"
+          CARGO_HTTP_MULTIPLEXING: "false"
+        # --manifest-version 16 (SDK 10.0.22621): the current VS 17 manifest
+        # lists Win11SDK_10.0.26100 without the per-arch header packages xwin
+        # 0.9.0 looks for, so the default splat fails with "unable to find
+        # x86_64 headers". Every target here builds against 22621.
+        run: |
+          set -e
+          # Retry the whole install/splat a few times for non-cargo download
+          # hiccups (the xwin SDK fetch from Microsoft).
+          n=0
+          until [ "$n" -ge 3 ]; do
+            cargo install xwin --version 0.9.0 --locked \
+              && xwin --accept-license --manifest-version 16 --arch x86_64 splat --output "$RUNNER_TEMP/xwin-sdk" \
+              && break
+            n=$((n+1))
+            echo "xwin install/splat attempt $n failed; retrying after backoff..."
+            rm -rf "$RUNNER_TEMP/xwin-sdk"
+            sleep $((n*15))
+          done
+          test -d "$RUNNER_TEMP/xwin-sdk/crt/include"
+          test -f "$RUNNER_TEMP/xwin-sdk/sdk/include/um/d2d1.h"
+
+      # Fetch the WebView2 NuGet SDK on Linux (portable bash counterpart of the
+      # Windows fetch script). It is a plain zip of headers + the x64/arm64 static
+      # loader libs, so the cross-build links the BrowserComponent peer exactly
+      # like the Windows runners do. Non-fatal: if the download fails the browser
+      # natives compile as stubs (WEBVIEW2_SDK_DIR stays unset) and the suite runs
+      # without the BrowserComponent tile rather than failing the whole pipeline.
+      - name: Fetch WebView2 SDK (Linux)
+        continue-on-error: true
+        run: |
+          set -e
+          LINE="$(bash scripts/windows/fetch-webview2-sdk.sh "$RUNNER_TEMP/webview2sdk" | tail -1)"
+          echo "Resolved: $LINE"
+          case "$LINE" in
+            WEBVIEW2_SDK_DIR=*) echo "$LINE" >> "$GITHUB_ENV" ;;
+            *) echo "WebView2 fetch did not yield a dir; browser will be stubbed" ;;
+          esac
+
+      # Build codename1-core + the Windows port, the codenameone maven plugin
+      # (runs transcode-svg / css / annotation processing during the sample build)
+      # and cn1-ads-mock (a sample dependency) -- the same inputs the native
+      # Windows screenshot job installs. JDK 8: core is source/target 1.5.
+      - name: Build core + Windows port + CN1 maven plugin (JDK 8)
+        env:
+          # A build-only step: it compiles and then asserts two class files
+          # exist, so there is no test for a blanket retry to launder. Narrowed
+          # to resolution failures anyway, on the same principle the steps below
+          # apply -- this died on `Connection reset` pulling maven-plugin-api
+          # from Central, which is the canonical set's business and not this
+          # branch's.
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
+            mvn -B -pl windows -am \
+            -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+          test -f core/target/classes/com/codename1/ui/Form.class
+          test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
+          test -f ../scripts/hellocodenameone/common/target/classes/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class
+
+      # The suite classes, the libraries it ships and the test server, built
+      # once by prepare-suite (they are architecture- and OS-independent).
+      - name: Download suite classes
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: linux-suite-classes
+          path: .
+      - name: Unpack suite classes
+        run: tar xzf suite-classes.tgz
+      # Translate the full suite and cross-compile it to a Windows x64 PE with
+      # clang-cl + xwin. WEBVIEW2_SDK_DIR (exported above when the fetch worked)
+      # flows into the generated CMake and links the BrowserComponent peer. The
+      # exe is written to CN1_CROSS_EXE_OUT for the upload below.
+      - name: Cross-build the full suite exe (clang-cl + xwin + WebView2)
+        env:
+          CN1_XWIN_SYSROOT: ${{ runner.temp }}/xwin-sdk
+          CN1_CLANG_CL: clang-cl
+          CN1_LLVM_RC: llvm-rc
+          CN1_CROSS_EXE_OUT: ${{ github.workspace }}/artifacts/WinHelloMain.exe
+          # Narrowed to resolution failures, because this step RUNS A TEST. The wrapper
+          # retries every nonzero exit unless it is told what to look for, so a cross-build or
+          # translation failure that came and went would have passed on attempt two and taken
+          # the gate green with it -- laundering exactly the kind of intermittent product bug
+          # this job exists to catch. The unit test workflow narrows it for the same reason.
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          cd vm
+          # Through the retry wrapper: this resolves plugins from Maven Central and the runner
+          # edge intermittently resets the connection mid-download, which Maven treats as a
+          # permanent resolution failure -- this run died on a truncated plexus-utils with nothing
+          # compiled yet. A real failure fails the same way on every attempt.
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B -pl tests -am test \
+            '-Dtest=CleanTargetIntegrationTest#crossBuildsHelloSuiteExe' \
+            '-Dsurefire.failIfNoSpecifiedTests=false'
+          test -f "$CN1_CROSS_EXE_OUT"
+          ls -l "$CN1_CROSS_EXE_OUT"
+
+      - name: Upload cross-built suite exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-cross-suite-exe
+          # The .exe plus its separate .pdb symbol companion (for crash symbolication).
+          path: |
+            artifacts/WinHelloMain.exe
+            artifacts/WinHelloMain.pdb
+            artifacts/cn1ss-server/**
+          if-no-files-found: error
+          retention-days: 1
+
+  wincross-run:
+    name: run cross-built exe + capture (Windows x64)
+    needs: [wincross-build]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Only a JDK is needed here: with CN1_PREBUILT_EXE set the capture test
+      # neither translates nor builds -- it runs the test server the cross-build
+      # job built (CN1SS_SERVER_DIST), launches the prebuilt exe and collects the
+      # PNGs it streams. No MSVC /
+      # Ninja / clang. windows-latest ships the WebView2 Evergreen runtime the
+      # BrowserComponent peer loads at activation.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Download cross-built suite exe
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-cross-suite-exe
+          path: artifacts
+
+      - name: Verify the downloaded exe
+        shell: pwsh
+        run: |
+          $exe = "artifacts/WinHelloMain.exe"
+          if (!(Test-Path $exe)) { Write-Error "cross-built exe missing: $exe"; exit 1 }
+          Write-Host "Cross-built exe: $((Get-Item $exe).Length) bytes"
+
+      # Run the Linux-cross-compiled exe and capture the screenshot suite over the
+      # cn1ss WebSocket. CN1_PREBUILT_EXE makes the capture test run this exact
+      # binary instead of building one. ~112 PNGs land in CN1_SHOT_OUTPUT_DIR.
+      - name: Run cross-built suite + capture screenshots
+        working-directory: vm
+        shell: pwsh
+        env:
+          CN1_PREBUILT_EXE: ${{ github.workspace }}\artifacts\WinHelloMain.exe
+          CN1SS_SERVER_DIST: ${{ github.workspace }}\artifacts\cn1ss-server
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+        run: |
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      - name: Upload screenshot artifact (cross-compiled, x64)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-cross-screenshot-raw
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Diffs the screenshots produced by the Linux-cross-compiled binary against the
+  # in-repo baseline (scripts/windows/screenshots) and posts them to the PR, with
+  # a marker distinct from the native-Windows screenshot comment so both coexist.
+  wincross-compare-comment:
+    name: cross-compiled screenshot-comment
+    needs: [wincross-run]
+    # !cancelled(), for the same reason as linux-build-run.yml: without it GitHub
+    # skips this job whenever run-on-windows fails, so the run that most needs
+    # reporting uploads raw evidence but no port-status artifact. The nightly
+    # sweep then falls back to an older run, and while that one is still inside
+    # the freshness window the public table keeps showing it -- the current
+    # Windows failure masked by a stale pass. The workflow still goes red because
+    # run-on-windows itself failed.
+    # Not in a capture: the native x64 leg's rendering is the golden.
+    if: >-
+      inputs.cn1ss_capture == '' &&
+      (
+      !cancelled() &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' ||
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      # write, because this job publishes the normalized report to the
+      # port-status-data branch itself (see the publish step below).
+      contents: write
+      # write, to dispatch website-docs.yml -- the Port Status page is static,
+      # so a published report is invisible until Hugo rebuilds.
+      actions: write
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Download cross-compiled screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-cross-screenshot-raw
+          path: artifacts/windows-port/raw-x64
+
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
+      - name: Post screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_CROSS_COMPILED_COMMENT -->'
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-cross-compiled]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-cross'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port, REAL shipping pipeline: the hellocodenameone screenshot suite rendered by a binary CROSS-COMPILED on Linux (clang-cl + xwin, WebView2 linked) and RUN on a Windows x64 runner. Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw-x64" ]; then
+            for f in "$ART"/raw-x64/*.png; do
+              [ -f "$f" ] || continue
+              name=$(basename "$f" .png)
+              entries+=("$name=$f")
+            done
+          fi
+          if [ ${#entries[@]} -eq 0 ]; then
+            # A run that died before its first PNG still persists app-output.log,
+            # and that log is what normalization reads to produce the fail /
+            # not-run counts. Bailing out here left the failed capture with no
+            # port-status artifact at all, so the nightly sweep fell back to an
+            # older report and the table kept showing it. Carry on with an empty
+            # entry list when there is a log; only a run with neither has nothing
+            # to say. (Same handling as linux-build-run.yml.)
+            if [ ! -f "$ART/raw-x64/app-output.log" ]; then
+              echo "No screenshots and no app log; nothing to normalize."
+              exit 0
+            fi
+            echo "No screenshots were produced; normalizing from the app log so the failure reaches the table."
+          fi
+          echo "Posting ${#entries[@]} screenshot(s)"
+          mkdir -p "$ART/previews"
+          # Lift the SIMD benchmark tally (captured next to the PNGs) to the dir
+          # cn1ss scans for --extra-stats, so it renders in the comment.
+          cp -f "$ART"/raw-x64/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          # Gate for real: differing or missing screenshots FAIL the job (the
+          # comparison previously only posted diffs to the PR and exited green,
+          # which let 100+ render changes land unreviewed).
+          export CN1SS_FAIL_ON_MISMATCH=1
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          # Gate like the Linux port: fail on any mismatch/error or a new
+          # screenshot with no committed golden. Previously this job only
+          # posted the comparison as a PR comment, so stale goldens sailed
+          # through green CI.
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
+          export CN1SS_PORT_ID=windows-x64
+          export CN1SS_SUITE_LOG="$ART/raw-x64/app-output.log"
+          export CN1SS_BINARY_PATH="$ART/raw-x64/benchmark-app.exe"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
+          # Assertion-only failures count here as they do on every other producer.
+          # A test like CryptoApiTest can fail while the suite still emits its
+          # completion marker and every screenshot matches, and without this the
+          # step exited zero: the workflow stayed green and published a report
+          # containing failed tests. Linux, Android, JavaScript, iOS and Mac all
+          # set this; Windows was the one producer that did not.
+          export CN1SS_FAIL_ON_TEST_PROBLEMS=1
+          set +e
+          cn1ss_process_and_report \
+            "Native Windows port (cross-compiled)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            ${entries[@]+"${entries[@]}"}
+          gate_rc=$?
+          set -e
+          fail=0
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "[windows-cross] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+          fi
+          if [ -f "$ART/summary.txt" ] && grep -q "^missing_expected|" "$ART/summary.txt"; then
+            me="$(grep -c "^missing_expected|" "$ART/summary.txt" || echo 0)"
+            echo "[windows-cross] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "Windows cross screenshot gate failed."; exit 1; fi
+
+      - name: Upload Windows port status
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: port-status-windows-x64
+          path: artifacts/windows-port/port-status-windows-x64.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Publish from here rather than waiting for port-status-publish.yml.
+      # That workflow reacts to a workflow_run "completed" event, and GitHub has
+      # never delivered one for this workflow: ports/windows-x64.json had never
+      # existed on the data branch, so the public table served the checked-in
+      # fallback for the Windows x64 column. The report is already on disk in
+      # this job, so publish it directly and depend on no event.
+      #
+      # if: ${{ !cancelled() }} for the same reason the job itself runs on failure -- a
+      # report recording real failures is the one the table most needs.
+      - name: Publish the Windows report to the data branch
+        if: >-
+          !cancelled() && github.ref == 'refs/heads/master' &&
+          (github.event_name == 'push' || github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PORT_STATUS_PUBLISH: '1'
+        run: |
+          set -euo pipefail
+          report=artifacts/windows-port/port-status-windows-x64.json
+          if [ ! -f "$report" ]; then
+            echo "No normalized Windows report to publish." >&2
+            exit 1
+          fi
+          ./scripts/hellocodenameone/conformance/publish_port_status.sh "$report"
+          # Publishing to the data branch is only half the job. The Port Status
+          # page is STATIC -- Hugo reads the reports at build time -- and
+          # website-docs.yml is triggered by pushes to master, not by the data
+          # branch, so a report published here would sit unseen until the next
+          # daily rebuild. That is the same stale window this whole change
+          # exists to close. port-status-publish.yml dispatches the rebuild for
+          # the producers it handles; do the same for the ones that publish
+          # themselves. In the same step as the publish, so it runs only when
+          # the publish actually succeeded.
+          gh workflow run website-docs.yml --ref master -f deploy_production=true
+
+      - name: Upload golden capture
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-windows-cross-x64
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
+
+  # EVERY DOCUMENTED RUNTIME CONFIGURATION MUST STILL COMPILE.
+  #
+  # ParparVM's runtime carries ~40 compile-time arms: QA instruments, and ablations
+  # that exist so a gate can prove it is able to FAIL (GcSteadyStateIntegrationTest
+  # rebuilds with -DCN1_SATB_LOG_FRESH and REQUIRES its assertions to fail). None of
+  # them is a user-facing option and none may become one.
+  #
+  # Their failure mode is silent rot, and it is not hypothetical. The first sweep of
+  # this check found FOUR arms that no longer built, one of them (CN1_NURSERY) broken
+  # for as long as the bulk SATB barrier had existed, and another
+  # (-DCN1_DISABLE_CONSERVATIVE_GC_ROOTS) the only arm in the tree that can falsify a
+  # GC rooting claim. A third, -DCN1_DISABLE_BIBOP, is what run-bibop-adaptive.sh
+  # builds as its comparison baseline, so that script could not have run either.
+  #
+  # Its own job, in parallel with vm-tests, because it shares nothing with them: it is
+  # a compile-and-link sweep, not a behaviour suite, and what each arm DOES is its own
+  # gate's business.
+  ablation-arms:
+    if: ${{ inputs.cn1ss_capture == '' }}  # not a screenshot suite
+    runs-on: ubuntu-latest
+    env:
+      CN1_NATIVE_VERIFY: strict
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          sudo apt-get install -y clang
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      # -O1 rather than the release shape: this asks whether a configuration still
+      # COMPILES AND LINKS, not how well it optimises, and the arms that broke broke on
+      # undeclared identifiers and an undefined symbol -- neither needs -O3 to surface.
+      - name: Every ablation arm still builds
+        run: vm/benchmarks/check-ablation-arms.sh
+        env:
+          CN1_ABLATION_CFLAGS: -O1
+      - name: Preserve ablation failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ablation-failure-logs
+          path: |
+            vm/benchmarks/target/ablation/*.log
+            vm/benchmarks/target/ablation/*.run
+          if-no-files-found: warn
+
+  vm-tests:
+    if: ${{ inputs.cn1ss_capture == '' }}  # not a screenshot suite
+    runs-on: ubuntu-24.04
+    env:
+      CN1_NATIVE_VERIFY: strict
+    # The full suite and serial GC benchmarks took 69 and 47 minutes in run
+    # 38355108612. Both passed, but setup plus reporting exceeded two hours.
+    # Leave reporting headroom; each GC workload retains its own timeout.
+    #
+    # The tests of the runtime library no longer run once per JDK
+    # (CompilerHelper.getBookendCompilers), which gives back some of that
+    # time; the limit stays where a slow runner still fits inside it.
+    timeout-minutes: 150
+    # The two database engines the backend speaks a wire protocol to.
+    #
+    # BackendDatabaseTest and BackendOrmTest run one body of assertions against
+    # SQLite, PostgreSQL and MySQL and require the same answers from all three --
+    # that is the whole of the claim that a handler cannot tell which engine
+    # answered it, and that one entity class is stored by any of them. SQLite
+    # needs nothing installed, so without these two services the tests ran their
+    # easiest arm and reported green: the engines with a wire protocol, a
+    # different schema syntax and a different way of generating a key are exactly
+    # the ones worth running.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cn1
+          POSTGRES_PASSWORD: cn1secret
+          POSTGRES_DB: cn1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cn1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mariadb:
+        # The LTS, and the version that rejects MySQL's NO PAD collation -- which
+        # is the whole reason this service is here. Its own is utf8mb4_nopad_bin,
+        # which MySQL in turn does not have.
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: cn1secret
+          MARIADB_DATABASE: cn1
+          MARIADB_USER: cn1
+          MARIADB_PASSWORD: cn1secret
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
+      mysql:
+        # 8.0 rather than 8, because 8.4 no longer LOADS mysql_native_password
+        # and a service container cannot be given server flags to turn it back
+        # on: GitHub's `services` supports image, env, ports and options, and
+        # none of those appends a command. See the step below for why the plugin
+        # has to be reachable at all.
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: cn1secret
+          MYSQL_USER: cn1
+          MYSQL_PASSWORD: cn1secret
+          MYSQL_DATABASE: cn1
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ucn1 -pcn1secret"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+
+      sqlserver:
+        # 2017, the oldest release the backend supports; the samples' jobs run
+        # 2022. The image creates no database of its own, so the tests use
+        # master.
+        image: mcr.microsoft.com/mssql/server:2017-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: Cn1-Secret-9x
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Cn1-Secret-9x -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+
+      oracle:
+        # Oracle Free. 19c, the oldest release supported, is not pullable
+        # without an Oracle account.
+        image: gvenzl/oracle-free:23-slim
+        env:
+          ORACLE_PASSWORD: cn1secret
+          APP_USER: cn1
+          APP_USER_PASSWORD: cn1secret
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 40
+      # Oracle XE 21, the newest release WITHOUT 23ai's relaxations: SELECT
+      # with no FROM, BOOLEAN, IF [NOT] EXISTS. A statement that needs one of
+      # them passes on Free and fails here, as it would on 19c.
+      oracle21:
+        image: gvenzl/oracle-xe:21-slim
+        env:
+          ORACLE_PASSWORD: cn1secret
+          APP_USER: cn1
+          APP_USER_PASSWORD: cn1secret
+        ports:
+          - 1522:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      # Migrations serialise on DBMS_LOCK, which an ordinary user may not call.
+      - name: Let the Oracle test user take migration locks
+        run: |
+          docker exec -i "${{ job.services.oracle.id }}" sqlplus -s -L sys/cn1secret@FREEPDB1 as sysdba <<'SQL'
+          WHENEVER SQLERROR EXIT FAILURE
+          GRANT EXECUTE ON SYS.DBMS_LOCK TO cn1;
+          SQL
+          docker exec -i "${{ job.services.oracle21.id }}" sqlplus -s -L sys/cn1secret@XEPDB1 as sysdba <<'SQL'
+          WHENEVER SQLERROR EXIT FAILURE
+          GRANT EXECUTE ON SYS.DBMS_LOCK TO cn1;
+          SQL
+
+      # TDS 8.0 on the native runtime: TLS first, ALPN tds/8.0. A step, not a
+      # service, because the server needs a certificate generated first.
+      - name: Start SQL Server 2025 for sslmode=strict
+        run: |
+          URL=$(bash scripts/ci/start-sqlserver-strict.sh "$RUNNER_TEMP/sqlstrict")
+          echo "CN1_DBCHECK_SQLSERVER_STRICT=$URL" >> "$GITHUB_ENV"
+
+      # The backend's MySQL client REFUSES to complete caching_sha2_password's
+      # full exchange on an unencrypted connection, because that exchange sends
+      # the password itself. That refusal is the client behaving correctly, and
+      # it means a freshly created service container -- whose password cache is
+      # empty -- cannot be reached over plaintext loopback at all: the first
+      # connection is exactly the one with nothing cached.
+      #
+      # The alternative to this step is TLS, and the container's auto-generated
+      # certificate chains to nothing and carries no name the client could
+      # verify, so `sslmode=require` fails for a different reason. Native
+      # password authentication is what CI can actually offer, and the code path
+      # under test -- the wire protocol, the schema, the generated keys -- is the
+      # same either way.
+      - name: Let the MySQL service authenticate our client
+        run: |
+          docker exec ${{ job.services.mysql.id }} mysql -uroot -pcn1secret -e \
+            "ALTER USER 'cn1'@'%' IDENTIFIED WITH mysql_native_password BY 'cn1secret'; \
+             FLUSH PRIVILEGES;"
+
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          # clang alone is not enough to LINK a backend binary. vm/backend's
+          # build.sh links -lcurl -lssl -lcrypto -lnghttp2 (outbound TLS is
+          # libcurl's, the auth primitives are OpenSSL's, the HTTP/2 framing is
+          # nghttp2's) and needs their headers to compile the natives that call
+          # them. Without these, every test that builds a server binary --
+          # BackendDatabaseTest, BackendOrmTest, BackendRuntimeSelfTest --
+          # compiled, failed at the link, and SKIPPED, which this job reported
+          # as green for as long as it has existed.
+          sudo apt-get install -y clang libcurl4-openssl-dev libssl-dev libnghttp2-dev
+
+      # Install JDKs and export their paths
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 11 Path
+        run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 21 Path
+        run: echo "JDK_21_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 25 Path
+        run: echo "JDK_25_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      # Restore JDK 8 as the main runner (cache is on the first setup-java JDK 8 above)
+      - name: Restore JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      # WITHOUT THIS EVERY BACKEND TEST SKIPS. generate-contract.sh compiles the
+      # shared @RestClient/@Entity contract against codenameone-core and runs the
+      # Codename One maven plugin over it, so both have to be in the local repo
+      # the backend scripts use -- and this job never built the maven modules, so
+      # they never were. BackendDatabaseTest, BackendOrmTest,
+      # BackendRuntimeSelfTest and BackendJavaSeRuntimeTest all reported
+      # "codenameone-core:8.0-SNAPSHOT is not in .m2-repo" and skipped, which is
+      # why CN1_BACKEND_REQUIRED below found four of them at once: the PostgreSQL
+      # and MySQL services this job stands up were serving nobody.
+      #
+      # -Plocal-dev-javase and the repo-local .m2-repo are what the scripts
+      # expect; the path is $GITHUB_WORKSPACE/.m2-repo because that is where
+      # generate-contract.sh looks (CN1_M2 overrides it, and nothing sets one).
+      #
+      # The static-analysis gates are OFF here on purpose. This step exists to
+      # put jars in a repo, and -am drags in every port because the maven plugin
+      # depends on them -- so with them on, a SpotBugs finding in the Android
+      # port fails THIS workflow, where nobody would look for it and where it
+      # says nothing about ParparVM. pr.yml owns those gates and runs them over
+      # the same modules.
+      - name: Install core + maven plugin for the backend contract
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
+      - name: Run ParparVM JVM tests
+        working-directory: vm
+        # Maven Central intermittently serves 403/429 from the runner CDN edge
+        # and Maven treats it as a permanent resolution failure (killed this job
+        # at dependency download, before any test ran). See scripts/ci/retry.sh.
+        #
+        # Narrowed with RETRY_ONLY_MATCHING because the second command RUNS THE
+        # TESTS: without it the wrapper retries every nonzero exit, so a test that
+        # failed once and passed on the retry would take this gate green and hide
+        # the race that produced it. The Windows counterpart restricts it for the
+        # same reason.
+        run: |
+          retry() { bash ../scripts/ci/retry.sh "$@"; }
+          retry mvn -B clean package -pl JavaAPI -am -DskipTests
+          retry mvn -B test -pl tests -am -DexcludedGroups=benchmark
+        env:
+          RETRY_ONLY_MATCHING: transient
+          # BackendHttpIntegrationTest runs the backend with io_uring, and twice
+          # with it refused by seccomp. This makes the first copy FAIL unless it
+          # really got the ring: without it, a runner image that turned io_uring
+          # off would test the thread pool three times and stay green.
+          CN1_REQUIRE_IO_URING: '1'
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JDK_11_HOME: ${{ env.JDK_11_HOME }}
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+          JDK_21_HOME: ${{ env.JDK_21_HOME }}
+          JDK_25_HOME: ${{ env.JDK_25_HOME }}
+          # The services above. sslmode=disable because these are loopback
+          # containers with no certificate: the default, prefer, would attempt
+          # TLS and fail verification rather than quietly downgrading, which is
+          # the behaviour the database layer is supposed to have.
+          CN1_DBCHECK_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+          CN1_DBCHECK_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+          # MARIADB REACHED THROUGH A mysql:// URL, deliberately: the dialect is
+          # chosen from the server's handshake banner rather than from the
+          # scheme, and this is the case that proves it. The two families have
+          # no case-sensitive NO PAD collation in common, so picking the wrong
+          # one is an unknown-collation error on every CREATE TABLE.
+          CN1_DBCHECK_MARIADB: mysql://cn1:cn1secret@127.0.0.1:3307/cn1?sslmode=disable
+          CN1_DBCHECK_SQLSERVER: sqlserver://sa:Cn1-Secret-9x@127.0.0.1:1433/master?sslmode=disable
+          CN1_DBCHECK_ORACLE: oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1?sslmode=disable
+          CN1_DBCHECK_ORACLE21: oracle://cn1:cn1secret@127.0.0.1:1522/XEPDB1?sslmode=disable
+          # WITHOUT THIS THE BACKEND TESTS CAN SKIP AND THE JOB STAYS GREEN.
+          # BackendTestSupport.skipOrFail turns a backend build failure into a
+          # JUnit assumption abort, because a developer machine with no C
+          # toolchain must not fail the suite -- and a missing link library in CI
+          # looks exactly the same from inside the test. This is the only job
+          # that runs the whole tests module, so it is the one place that has to
+          # say the backend is expected to build here: a compile, link or
+          # toolchain regression fails the workflow rather than quietly
+          # subtracting BackendDatabaseTest, BackendOrmTest and the rest from it.
+          CN1_BACKEND_REQUIRED: 1
+          # BackendWebSocketIntegrationTest translates scripts/hellocodenameone/backend
+          # through server.sh, which would otherwise re-install the backend runtime
+          # the step above just installed from this same checkout.
+          CN1SS_BACKEND_SKIP_INSTALL: 1
+
+      # The SQLAlchemy conformance programs against the PostgreSQL service
+      # above: the suite in python-transpiler runs them on SQLite only, so this
+      # is the one place the postgresql dialect and the _cn1db bridge meet a
+      # real server. PostgreSQL and the job's MySQL service; MariaDB is run by
+      # hand. Last of the steps using MySQL: each program drops and recreates
+      # the cn1 database.
+      # python-runtime compiles at release 17, hence JDK 17 for the install.
+      - name: Python SQLAlchemy on PostgreSQL and MySQL
+        run: |
+          (cd maven && bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl python-runtime,python-transpiler \
+            install -DskipTests -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo")
+          # The test transpiles against JavaAPI from the same repository, and
+          # the step that installs it for the native samples runs after this.
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -f vm/pom.xml -pl JavaAPI install -DskipTests \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+          bash scripts/python-backend/sqlalchemy-realdb-test.sh "$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JAVA17_HOME: ${{ env.JDK_17_HOME }}
+          CN1_SQLA_POSTGRES: postgres://cn1:cn1secret@127.0.0.1:5432/cn1?sslmode=disable
+          CN1_SQLA_MYSQL: mysql://cn1:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
+
+      - name: Run ParparVM Benchmark
+        working-directory: vm
+        # Each benchmark already creates its own mutator/collector threads. Run
+        # classes serially: competing benchmarks change GC sizing and timings as
+        # they start and finish, invalidating comparisons within a measured run.
+        run: bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B test -pl tests -am -Dgroups=benchmark -Dparparvm.test.forkCount=1 -Djacoco.skip=true
+        env:
+          # Narrowed because this step RUNS TESTS: retry.sh retries every nonzero exit
+          # without it, so a test that failed once and passed on a later attempt would take
+          # this gate green and hide the race that produced it. The wrapper's own docs
+          # require this filter for test-running commands.
+          RETRY_ONLY_MATCHING: transient
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JDK_11_HOME: ${{ env.JDK_11_HOME }}
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+          JDK_21_HOME: ${{ env.JDK_21_HOME }}
+          JDK_25_HOME: ${{ env.JDK_25_HOME }}
+
+      - name: Publish ByteCodeTranslator quality previews
+        if: ${{ !cancelled() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        id: publish-bytecode-quality-previews
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [ "${SERVER_URL}" != "https://github.com" ]; then
+            echo "HTML previews are only published for github.com instances."
+            exit 0
+          fi
+
+          coverage_dir="vm/tests/target/site/jacoco"
+          if [ ! -f "${coverage_dir}/index.html" ]; then
+            echo "No HTML outputs detected; skipping preview publishing."
+            exit 0
+          fi
+
+          # Its own branch: pr.yml force-pushes quality-report-previews in the same ci.yml
+          # run, and a force-push replaces the whole branch.
+          run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}-parparvm"
+          tmp_dir=$(mktemp -d)
+          dest_dir="${tmp_dir}/${run_dir}/coverage"
+          mkdir -p "${dest_dir}"
+          cp -R "${coverage_dir}/." "${dest_dir}/"
+
+          printf '%s\n%s\n%s\n' \
+            '# Quality report previews' \
+            '' \
+            'This branch is automatically managed by the PR CI workflow and may be force-pushed.' \
+            > "${tmp_dir}/README.md"
+
+          git -C "${tmp_dir}" init -b previews >/dev/null
+          git -C "${tmp_dir}" config user.name "github-actions[bot]"
+          git -C "${tmp_dir}" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "${tmp_dir}" add .
+          git -C "${tmp_dir}" commit -m "Publish quality report previews for run ${RUN_ID} (attempt ${RUN_ATTEMPT})" >/dev/null
+
+          remote_url="${SERVER_URL}/${REPOSITORY}.git"
+          token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
+          for push_attempt in 1 2 3 4 5; do
+            if git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews-parparvm >/dev/null; then
+              break
+            fi
+            if [ "${push_attempt}" -eq 5 ]; then
+              echo "Failed to publish quality report previews after ${push_attempt} attempts." >&2
+              exit 1
+            fi
+            sleep $((push_attempt * 3))
+          done
+
+          commit_sha=$(git -C "${tmp_dir}" rev-parse HEAD)
+          raw_base="https://raw.githubusercontent.com/${REPOSITORY}/${commit_sha}/${run_dir}"
+          preview_base="https://htmlpreview.github.io/?${raw_base}"
+          echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
+
+      - name: Generate ByteCodeTranslator quality report
+        if: ${{ !cancelled() }}
+        env:
+          QUALITY_REPORT_TARGET_DIRS: vm/tests/target
+          QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
+          QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
+          QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          QUALITY_REPORT_TITLE: "✅ ByteCodeTranslator Quality Report"
+          JACOCO_HTML_URL: ${{ steps.publish-bytecode-quality-previews.outputs.jacoco_url }}
+        run: python3 .github/scripts/generate-quality-report.py
+
+      - name: Publish ByteCodeTranslator quality comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v9
+        with:
+          # Retried rather than fatal on a transient 5xx. The publisher
+          # already warns instead of throwing; this is the cheaper half of
+          # the same fix, so the comment usually still lands. 4xx codes the
+          # action treats as permanent are not retried.
+          retries: 3
+          script: |
+            const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
+            await publishQualityComment({
+              github,
+              context,
+              core,
+              marker: '<!-- bytecode-quality-report -->',
+              reportPath: 'quality-report.md',
+            });
+
+  # The websocket frame parser, against the Autobahn|Testsuite.
+  #
+  # Its own job rather than a step inside vm-tests: that job already carries three
+  # database service containers and a long budget, and a conformance failure
+  # deserves its own red check instead of being buried behind a MySQL health
+  # probe. Ubuntu because `--network host` means the host's network stack here,
+  # which is what lets the container reach a server on 127.0.0.1.
+  #
+  # ~300 cases, almost all of them frames no conformant client would send. The
+  # gate in vm/backend/conformance/check-autobahn.py has no per-case tolerance:
+  # every case must be strictly green, NON-STRICT included, and the set that ran
+  # has to match the committed manifest so the suite cannot quietly shrink to the
+  # cases it happens to pass.
+  backend-compiled-tests:
+    if: ${{ inputs.cn1ss_capture == '' }}  # not a screenshot suite
+    # The backend test framework's two runners over one test source: surefire on
+    # the JVM, then the same classes translated by ParparVM into a native test
+    # binary (cn1:backend-test), the way an application's own tests run when it
+    # asks for -Dcn1.backend.compiledTests=true. The project is the CI test server,
+    # scripts/hellocodenameone/backend, so these are also its self-checks.
+    #
+    # The compiled leg leaves out the Mockito-based test classes on its own; the
+    # report check at the end is what proves the binary actually ran tests, since
+    # a goal that skipped would otherwise leave this job green.
+    runs-on: ubuntu-24.04
+    env:
+      CN1_NATIVE_VERIFY: strict
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          sudo apt-get install -y clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      # Gates off for the reason the vm-tests install step gives.
+      - name: Install the backend runtime, its test support and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl backend,backend-test,codenameone-maven-plugin \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+
+      - name: Run the backend tests on the JVM and compiled
+        working-directory: scripts/hellocodenameone
+        run: |
+          mvn -B -Dcodename1.platform=backend -pl backend test \
+            -Dcn1.backend.compiledTests=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
+      - name: Check that both runners reported
+        working-directory: scripts/hellocodenameone/backend/target/surefire-reports
+        run: |
+          jvm=$(ls TEST-*.xml | grep -vc -- '-compiled.xml' || true)
+          compiled=$(ls TEST-*-compiled.xml 2>/dev/null | wc -l)
+          echo "JVM reports: $jvm, compiled reports: $compiled"
+          if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+            echo "::error::a runner produced no test reports"
+            exit 1
+          fi
+
+      - name: Upload the test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-compiled-tests
+          path: scripts/hellocodenameone/backend/target/surefire-reports/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  python-backend-native:
+    if: ${{ inputs.cn1ss_capture == '' }}  # not a screenshot suite
+    # The Flask and FastAPI samples built NATIVELY (ParparVM, clang) and
+    # driven over sockets by the same client as the JVM run. The only place
+    # Python handlers run on the backend's virtual threads, so the only run
+    # of the GIL's scheduler path. A job of its own: it takes most of an
+    # hour, and vm-tests already fills its limit without it.
+    runs-on: ubuntu-24.04
+    env:
+      CN1_NATIVE_VERIFY: strict
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Install native build tools
+        run: |
+          bash scripts/ci/apt-get-update.sh
+          sudo apt-get install -y clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 8 Path
+        run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 17 Path
+        run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      # Gates off for the reason the vm-tests install step gives.
+      - name: Install core, the backend and the plugin
+        working-directory: maven
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin \
+            -am install -DskipTests -Plocal-dev-javase \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
+      # python-runtime compiles at release 17, hence JDK 17 for the install.
+      - name: Install the Python transpiler and runtime, and JavaAPI
+        run: |
+          (cd maven && bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl python-runtime,python-transpiler \
+            install -DskipTests -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+            -Dmaven.javadoc.skip=true -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo")
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -f vm/pom.xml -pl JavaAPI install -DskipTests \
+            -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_17_HOME }}
+
+      - name: Python backend end to end, native
+        run: bash scripts/python-backend/e2e-test.sh --native "$GITHUB_WORKSPACE/.m2-repo"
+        env:
+          JAVA_HOME: ${{ env.JDK_8_HOME }}
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JAVA17_HOME: ${{ env.JDK_17_HOME }}
+
+  backend-websocket-conformance:
+    if: ${{ inputs.cn1ss_capture == '' }}  # not a screenshot suite
+    name: WebSocket conformance (Autobahn)
+    runs-on: ubuntu-24.04
+    env:
+      CN1_NATIVE_VERIFY: strict
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Cache the Autobahn image
+        id: autobahn-cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/autobahn-image.tar
+          key: autobahn-testsuite-image-v1
+
+      - name: Load or pull the Autobahn image
+        run: |
+          if [ -f "${{ runner.temp }}/autobahn-image.tar" ]; then
+            docker load -i "${{ runner.temp }}/autobahn-image.tar"
+          else
+            docker pull crossbario/autobahn-testsuite
+            docker save crossbario/autobahn-testsuite \
+              -o "${{ runner.temp }}/autobahn-image.tar"
+          fi
+
+      - name: Run the Autobahn fuzzing client
+        env:
+          CN1_BACKEND_JAVA: ${{ env.JAVA_HOME }}
+        run: vm/backend/ws-conformance.sh --arm javase
+
+      - name: Upload the Autobahn report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: autobahn-report
+          path: vm/backend/target/autobahn/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  release-jars:
+    if: ${{ (github.event_name == 'release' && github.event.action == 'published') }}
+    runs-on: ubuntu-24.04
+    env:
+      CN1_NATIVE_VERIFY: strict
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Build release jars
+        # This job runs once per published release, so a transient Maven Central
+        # 403/429 here silently ships a release without its ParparVM jars (that
+        # is what happened to 7.0.264). Retry, as the vm-tests job already does.
+        run: |
+          bash scripts/ci/retry.sh mvn -B -f vm/JavaAPI/pom.xml package
+          bash scripts/ci/retry.sh mvn -B -f vm/ByteCodeTranslator/pom.xml package
+
+      - name: Verify release jars
+        run: |
+          test -f vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
+          test -f vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
+
+      - name: Attach JavaAPI and ByteCodeTranslator jars to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
+            vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
+
+  vm-tests-windows:
+    # Not a screenshot suite: a golden capture skips it.
+    if: ${{ inputs.cn1ss_capture == '' && github.event_name != 'release' }}
+    name: clean-target (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    env:
+      CN1_NATIVE_VERIFY: strict
+      CFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+      CXXFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x64
+            runner: windows-latest
+            msvc_arch: amd64
+          - name: arm64
+            runner: windows-11-arm
+            msvc_arch: arm64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      # clang-cl uses the MSVC headers, CRT and linker, so the MSVC developer
+      # environment has to be on PATH for the spawned cmake/clang-cl to work.
+      # The arch is matched to the runner so the arm64 leg builds native arm64.
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
+      - name: Set up Ninja
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
+
+      # The runner image's MSVC STL (14.52) static_asserts "expected Clang 22
+      # or newer" (STL1000) while the image's own LLVM is 20, which failed every
+      # C++ unit of the native suite (cn1_windows_browser.cpp first) on x64.
+      # The image pairs the two, not us, so take Microsoft's documented escape
+      # hatch for that check; CMake seeds CMAKE_CXX_FLAGS from CXXFLAGS in the
+      # configure the tests spawn. Drop it once the image's clang catches up.
+      - name: Allow the image's clang with its newer STL
+        shell: pwsh
+        run: |
+          "CXXFLAGS=/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Verify LLVM / Ninja toolchain
+        shell: pwsh
+        run: |
+          clang-cl --version
+          ninja --version
+          cmake --version
+
+      # Install JDKs and export their paths (CompilerHelper reads JDK_*_HOME and
+      # also auto-discovers any others). Temurin does not publish Windows/aarch64
+      # builds for JDK 8/11, so those legs are x64-only; 17/21/25 run on both
+      # architectures, which still exercises every JavaAPI bytecode level the
+      # clean target supports.
+      - name: Set up JDK 8
+        if: ${{ matrix.name == 'x64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 8 Path
+        if: ${{ matrix.name == 'x64' }}
+        shell: pwsh
+        run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      - name: Set up JDK 11
+        if: ${{ matrix.name == 'x64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 11 Path
+        if: ${{ matrix.name == 'x64' }}
+        shell: pwsh
+        run: echo "JDK_11_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # Temurin publishes Windows/aarch64 only from JDK 21, so on arm64 the only
+      # JDK set up is 21; x64 covers 8/11/17/21/25. The translator test harness
+      # adapts to whatever JDKs are present.
+      - name: Set up JDK 17
+        if: ${{ matrix.name == 'x64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 17 Path
+        if: ${{ matrix.name == 'x64' }}
+        shell: pwsh
+        run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 21 Path
+        shell: pwsh
+        run: echo "JDK_21_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      - name: Set up JDK 25
+        if: ${{ matrix.name == 'x64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 25 Path
+        if: ${{ matrix.name == 'x64' }}
+        shell: pwsh
+        run: echo "JDK_25_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # Restore the active runner JDK that drives Maven: JDK 8 on x64 (matching
+      # the cache above), and JDK 21 on arm64 where 8/11/17 are unavailable.
+      - name: Restore JDK 8 (x64)
+        if: ${{ matrix.name == 'x64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - name: Restore JDK 21 (arm64)
+        if: ${{ matrix.name == 'arm64' }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      # Only the native-compilation tests are run here: this runner exists to
+      # prove the translated C compiles with clang-cl (LLVM) and executes on
+      # Windows, which is exactly what CleanTargetIntegrationTest does (translate
+      # Java -> C -> cmake/clang-cl build -> run the binary), including the
+      # "windows" app-type case that links the Direct2D/DirectWrite/Win32 stack.
+      # The rest of the vm suite is platform-agnostic Java already covered by
+      # parparvm-tests.yml on Linux, and the JavaScript integration tests
+      # additionally require Node.
+      - name: Run ParparVM clean-target build on Windows (clang-cl)
+        working-directory: vm
+        shell: pwsh
+        run: |
+          # Retried, in the same spirit as the Ninja install above: Maven Central
+          # answers 429 Too Many Requests under load and the build dies during
+          # dependency RESOLUTION, before a line of this project is compiled. Nothing
+          # about the failure involves the code under test, and a fresh runner IP is
+          # not something a re-run can be relied on to produce. Backoff is in tens of
+          # seconds rather than the 5 used for the pip blip, because a rate limit needs
+          # waiting out rather than retrying through.
+          # Written in the same plain loop shape as the Ninja install above rather
+          # than with a function and splatting, because that shape is already proven
+          # on these runners and this is not the place to find out about a quoting
+          # difference.
+          # Five attempts out to five minutes rather than three out to ninety seconds: a run
+          # that took all three still ended on "status code: 429, reason phrase: Too Many
+          # Requests" two minutes after it started, which is a rate limit that had not lifted
+          # yet rather than a blip. This step only downloads and builds, so waiting longer costs
+          # time and cannot turn a failing test green.
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Maven records a download that failed as a *.lastUpdated marker and then
+            # answers later resolutions from it instead of the network -- the "(absent)"
+            # in "Could not transfer artifact ... (absent)". Left in place, every retry
+            # below replays the first 403 offline and cannot succeed: one Central refusal
+            # of org.junit:junit-bom took all five attempts and the job. And because
+            # setup-java's cache: 'maven' restores ~/.m2 between runs, a marker can also
+            # arrive from an earlier run, so this clears them before EVERY attempt, not
+            # just the retries. A marker records only a failure, never an artifact, so
+            # deleting one costs at most a repeated question to Central.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B clean package -pl JavaAPI -am -DskipTests
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn clean package failed after all retries" }
+          # This one RUNS TESTS, so the retry is restricted to the failure shape it
+          # exists for. A blanket loop lets an intermittent product regression pass on
+          # attempt two and turns a blocking gate green -- which is the opposite of what
+          # a gate is for, and worse than the flake it was hiding.
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            # Single-quote the -D args: PowerShell otherwise mangles the dotted
+            # property name (splitting it at the '.').
+            # Tee-Object keeps the log on the console AND gives us something to match.
+            # GcForeignThreadIntegrationTest runs here because Windows is where most of what it
+            # guards lives: no stop signal and no cross-thread stack bounds, so without the
+            # suspend fallback every sweep was skipped. No other Windows job reaches it.
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest,GcForeignThreadIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+              Tee-Object -Variable mvnOutput
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if (-not ($mvnOutput -match $resolutionFailure)) {
+              throw "mvn test failed for a reason that is not a transient dependency-resolution error; not retrying"
+            }
+          }
+          if (-not $ok) { throw "mvn test failed after all retries" }
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JDK_11_HOME: ${{ env.JDK_11_HOME }}
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+          JDK_21_HOME: ${{ env.JDK_21_HOME }}
+          JDK_25_HOME: ${{ env.JDK_25_HOME }}
+
+  # Renders the native Windows port's UI headlessly and captures a PNG. This is
+  # the GUI/screenshot signal for the port (the "softer" signal in the plan): it
+  # builds codename1-core + the Windows port, translates a real Display/Form app
+  # with the "windows" app type, links it with clang-cl, and runs it in headless
+  # mode -- the app paints into an offscreen Direct2D/WIC bitmap (no window) and
+  # writes a PNG. The PNG is uploaded as an artifact; the companion comment job
+  # posts it to the PR. This x64 leg also publishes the compiled core + port
+  # bytecode for the native arm64 leg (windows-port-screenshot-arm64). Pull
+  # requests render review artifacts; master runs also produce the durable
+  # Windows ARM64 compliance report consumed by the static Port Status page.
+  # Separate from the clean-target gate so rendering failures are reported as
+  # their own blocking check with dedicated diagnostics.
+  windows-port-screenshot:
+    needs: [prepare-suite]
+    name: screenshot-capture (x64)
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    runs-on: windows-latest
+    env:
+      CN1_NATIVE_VERIFY: strict
+      CFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+      CXXFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    # 90 for the suite plus the ParparVM vs JDK 25 performance gate.
+    timeout-minutes: 140
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Set up Ninja
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
+
+      # JDK 17 compiles the hellocodenameone-common Java (release 17). Set up first
+      # so the JDK 8 below ends up the active JAVA_HOME.
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 17 path
+        shell: pwsh
+        run: echo "JDK_17_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # JDK 8 builds codename1-core (source/target 1.5), runs the Kotlin 1.6.0
+      # compiler (it aborts on JDK 17+), and is the JDK the translator harness uses
+      # (CompilerHelper auto-discovers JDK_8_HOME). Set up last so it stays active.
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Save JDK 8 path
+        shell: pwsh
+        run: echo "JDK_8_HOME=$env:JAVA_HOME" >> $env:GITHUB_ENV
+
+      # The Maven repository, restored from the NEAREST earlier run rather than an
+      # exact match. setup-java's cache: 'maven' keys on the hash of every pom.xml
+      # and restores nothing on a miss, so any change to a pom started this job
+      # from an empty repository -- and Central rate-limits Windows runners hard:
+      # one such run got 429 Too Many Requests on junit-bom through all five
+      # attempts of the retry loop below, over ten minutes, before building
+      # anything. A near match already holds almost every artifact, so the few new
+      # ones are all that has to come from Central.
+      - name: Maven repository cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: maven-${{ runner.os }}-screenshot-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-${{ runner.os }}-screenshot-
+
+      # Install the locally-built artifacts the hellocodenameone Maven build needs:
+      # codename1-core + the Windows port (translator inputs), the codenameone
+      # maven plugin (runs transcode-svg / css / annotation processing during the
+      # app build, '-am' also builds its svg-/lottie-transcoder + css-compiler
+      # deps), and cn1-ads-mock (a common-module dependency). With these in the
+      # local repo the sample resolves the 8.0-SNAPSHOT it pins and builds with the
+      # plugin exactly like a fresh initializr project.
+      - name: Build core + Windows port + CN1 maven plugin (JDK 8)
+        working-directory: maven
+        shell: pwsh
+        # Single-quote the dotted -D arg: PowerShell otherwise splits it at the
+        # dots and treats ".javadoc.skip=true" as a (bogus) lifecycle phase.
+        #
+        # Retried on the same backoff the clean-target job uses, and for the same
+        # reason: a Maven Central fetch that resets the connection takes the whole
+        # job down before a line of this repository's code has been compiled. It
+        # reached the build EXTENSION here -- central-publishing-maven-plugin,
+        # resolved while the POM is still being read -- so not even a module was
+        # built. This step only downloads and builds, so a blanket loop cannot
+        # turn a failing test green.
+        run: |
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B -pl windows -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn install failed after all retries" }
+
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
+      # The suite classes, the libraries it ships and the test server, built
+      # once by prepare-suite (they are architecture- and OS-independent).
+      - name: Download suite classes
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: linux-suite-classes
+          path: .
+      - name: Unpack suite classes
+        shell: pwsh
+        run: tar xzf suite-classes.tgz
+      # Publish the compiled (architecture-independent) core + port bytecode right
+      # after building it, so the native arm64 screenshot leg can translate +
+      # clang-cl-build an arm64 exe without rebuilding core -- codename1-core needs
+      # JDK 8 (source/target 1.5), which Temurin does not publish for Windows/
+      # aarch64. Uploaded before the capture step so an x64 capture flake does not
+      # block the arm64 leg.
+      - name: Upload compiled core + port classes
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: windows-port-classes
+          path: |
+            maven/core/target/classes
+            maven/windows/target/classes
+          if-no-files-found: error
+          retention-days: 1
+
+      # Build the ParparVM JavaAPI, then run the FULL hellocodenameone screenshot
+      # suite over the cn1ss WebSocket: capturesHelloSuiteOverWebSocket builds the
+      # suite exe (app + core + port + nativeSources via clang-cl), starts the
+      # cn1ss test server (scripts/hellocodenameone/backend), runs the exe (it renders each test Form offscreen
+      # with Direct2D/DirectWrite and streams each PNG over com.codename1.io
+      # WebSocket), waits for CN1SS:SUITE:FINISHED, and copies every received PNG
+      # to CN1_SHOT_OUTPUT_DIR (~112 images). This is the CI equivalent of
+      # scripts/windows/run-hello.bat.
+      # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
+      # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
+      # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
+      # The fetch script retries transient NuGet failures and fails after bounded
+      # exhaustion. Building browser stubs would silently drop BrowserComponent
+      # coverage, so an unavailable SDK must remain a blocking failure.
+      - name: Fetch WebView2 SDK (for the BrowserComponent peer)
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
+          if (!(Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h")) {
+            throw "WebView2 SDK header missing after successful fetch"
+          }
+          "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build JavaAPI + capture screenshot suite over WebSocket
+        working-directory: vm
+        shell: pwsh
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          CN1SS_SERVER_DIST: ${{ github.workspace }}\artifacts\cn1ss-server
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          # The suite's own translation, replayed by the performance gate below.
+          CN1_TRANSLATION_RECORD: ${{ github.workspace }}\artifacts\windows-port\raw\translation-record.jsonl
+          CN1_REQUIRE_SUITE: ${{ github.event_name != 'pull_request' }}
+          CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          # Both retried the way the clean-target job does. The package is a
+          # download-and-build, so a blanket loop is safe; the test is restricted
+          # to the resolution failure shape, because a blanket loop there would
+          # let an intermittent product regression pass on attempt two and turn a
+          # blocking gate green.
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B clean package -pl JavaAPI -am -DskipTests
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn clean package failed after all retries" }
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+              Tee-Object -Variable mvnOutput
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if (-not ($mvnOutput -match $resolutionFailure)) {
+              throw "mvn test failed for a reason that is not a transient dependency-resolution error; not retrying"
+            }
+          }
+          if (-not $ok) { throw "mvn test failed after all retries" }
+
+      # Preserve the native cn1WindowsLog output so the offscreen-capture path is
+      # confirmable on the green x64 gate too (compare against the arm64 leg).
+      - name: Collect native windows log (x64)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-port/raw | Out-Null
+          $log = Join-Path $env:TEMP 'cn1windows.log'
+          if (Test-Path $log) {
+            Copy-Item $log artifacts/windows-port/raw/cn1windows-native.log -Force
+            Write-Host "collected native log ($((Get-Item $log).Length) bytes)"
+          } else {
+            "no native cn1windows.log found at $log" | Out-File artifacts/windows-port/raw/cn1windows-native.log
+            Write-Host "no native log at $log"
+          }
+
+      # ParparVM against JDK 25 on this runner: this job's own suite translation, the
+      # translator translating itself, and every Bench workload. The table lands in this
+      # arch's screenshot comment and the job's last step fails it on a regression.
+      # JDK_8_HOME falls back to the job's JDK where there is no JDK 8 (arm64): the
+      # builds only ask javac for -source/-target 1.8 against an explicit bootclasspath.
+      - name: ParparVM vs JDK 25 (performance gate, x64)
+        if: success() || failure()
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          export JDK_8_HOME="${JDK_8_HOME:-$JAVA_HOME}"
+          vm/selfhost/ci-perf-gate.sh run windows-x64 artifacts/windows-port/raw/perf \
+            --hello-workload "$(cygpath -m "$GITHUB_WORKSPACE/artifacts/windows-port/raw/translation-record.jsonl")" \
+            --hello-app WinHelloMain
+
+      - name: Upload screenshot artifact (x64)
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: windows-port-screenshot-raw-x64
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-windows-x64
+          path: artifacts/windows-port/raw/perf/perf-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail on a ParparVM performance regression (x64)
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        if: ${{ (success() || failure()) && inputs.cn1ss_capture == '' }}
+        shell: bash
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
+
+  # Native arm64 leg of the screenshot capture: reuses the core + port bytecode
+  # compiled by the x64 job (architecture-independent), then translates +
+  # clang-cl-builds a native arm64 exe on the windows-11-arm runner and captures
+  # the same Contacts UI over the cn1ss WebSocket. Failures are blocking on pull
+  # requests and on master-report runs.
+  windows-port-screenshot-arm64:
+    name: screenshot-capture (arm64)
+    needs: [windows-port-screenshot]
+    # Runs when the x64 job FAILED too, not only when it passed: what this leg needs
+    # from it (the compiled classes) is uploaded early, and the x64 job's last step is
+    # the performance verdict. Requiring success let an x64 perf regression skip the
+    # whole arm64 leg, its screenshots and its own perf gate included. An x64 failure
+    # before the upload still fails here, at the download, with its own message.
+    # Not in a golden capture: the x64 leg's rendering is the golden
+    # (golden-capture.sh), and this leg is held to it by the normal run.
+    if: >-
+      inputs.cn1ss_capture == '' && (
+      !cancelled() && needs.windows-port-screenshot.result != 'skipped' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      )
+    runs-on: windows-11-arm
+    env:
+      CN1_NATIVE_VERIFY: strict
+      CFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+      CXXFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    # 60 for the suite plus the ParparVM vs JDK 25 performance gate.
+    timeout-minutes: 110
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      - name: Set up Ninja
+        shell: pwsh
+        run: |
+          # Install Ninja from PyPI wheels rather than the gha-setup-ninja action,
+          # whose GitHub-release download intermittently arrives corrupted ("No END
+          # header found") and fails the toolchain setup. pip wheels exist for both
+          # win_amd64 and win_arm64; retry to absorb transient network blips. The
+          # console script lands on PATH (the runner's Python Scripts dir).
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
+            python -m pip install --upgrade ninja
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Write-Host "ninja install attempt $i failed; retrying..."
+            Start-Sleep -Seconds 5
+          }
+          if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
+          ninja --version
+
+      # Temurin publishes Windows/aarch64 from JDK 21; that JDK drives the
+      # translator harness and builds the JavaAPI. Core + port come pre-compiled.
+      # setup-java's archive extraction can crash PowerShell on ARM64.
+      # Retry only setup; the final attempt and every build/test stay blocking.
+      - name: Set up JDK 21
+        id: jdk21
+        continue-on-error: true
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      - name: Retry JDK 21 setup
+        if: steps.jdk21.outcome == 'failure'
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      - name: Restore compiled core + port classes
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: windows-port-classes
+          path: maven
+
+      # The suite classes, the libraries it ships and the test server, built
+      # once by prepare-suite (they are architecture- and OS-independent).
+      - name: Download suite classes
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: linux-suite-classes
+          path: .
+      - name: Unpack suite classes
+        shell: pwsh
+        run: tar xzf suite-classes.tgz
+      # Fail loudly if the artifacts did not land where the test reads them --
+      # otherwise the capture test would silently skip (assumeTrue) and post nothing.
+      - name: Verify restored classes
+        shell: pwsh
+        run: |
+          $core = "maven/core/target/classes/com/codename1/ui/Form.class"
+          $port = "maven/windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class"
+          $common = "scripts/hellocodenameone/common/target/classes/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class"
+          if (!(Test-Path $core)) { Write-Error "core classes missing after download: $core"; exit 1 }
+          if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
+          if (!(Test-Path $common)) { Write-Error "common classes missing after download: $common"; exit 1 }
+          $libs = "scripts/hellocodenameone/common/target/translation-libs"
+          foreach ($lib in "com/codename1/ads/mock/MockAdProvider.class", "com/codename1/unitycompat/unityengine/UnityRuntime.class") {
+            if (!(Test-Path "$libs/$lib")) { Write-Error "application libraries missing after download: $libs/$lib"; exit 1 }
+          }
+          Write-Host "Restored core + Windows port + common classes OK"
+
+      # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
+      # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
+      # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
+      # The fetch script retries transient NuGet failures and fails after bounded
+      # exhaustion. Building browser stubs would silently drop BrowserComponent
+      # coverage, so an unavailable SDK must remain a blocking failure.
+      - name: Fetch WebView2 SDK (for the BrowserComponent peer)
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
+          if (!(Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h")) {
+            throw "WebView2 SDK header missing after successful fetch"
+          }
+          "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build JavaAPI + capture screenshot suite over WebSocket
+        working-directory: vm
+        shell: pwsh
+        env:
+          CN1SS_SERVER_DIST: ${{ github.workspace }}\artifacts\cn1ss-server
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          # The suite's own translation, replayed by the performance gate below.
+          CN1_TRANSLATION_RECORD: ${{ github.workspace }}\artifacts\windows-port\raw\translation-record.jsonl
+          CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          # Master reports must include the non-rendering tail of the suite too.
+          # PR screenshot jobs may still stop after the visual set stabilizes.
+          CN1_REQUIRE_SUITE: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          # Both retried the way the clean-target job does. The package is a
+          # download-and-build, so a blanket loop is safe; the test is restricted
+          # to the resolution failure shape, because a blanket loop there would
+          # let an intermittent product regression pass on attempt two and turn a
+          # blocking gate green.
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B clean package -pl JavaAPI -am -DskipTests
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          }
+          if (-not $ok) { throw "mvn clean package failed after all retries" }
+          $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies|UnknownHostException|Could not resolve host|Temporary failure in name resolution'
+          $ok = $false
+          foreach ($delay in 0, 30, 90, 180, 300) {
+            # Clear Maven's cached resolution failures first; see the first retry loop above.
+            Get-ChildItem -Path "$env:USERPROFILE\.m2\repository" -Recurse -File -Filter '*.lastUpdated' -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+            if ($delay -gt 0) {
+              Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
+              Start-Sleep -Seconds $delay
+            }
+            mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false' 2>&1 |
+              Tee-Object -Variable mvnOutput
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if (-not ($mvnOutput -match $resolutionFailure)) {
+              throw "mvn test failed for a reason that is not a transient dependency-resolution error; not retrying"
+            }
+          }
+          if (-not $ok) { throw "mvn test failed after all retries" }
+
+      # Preserve the native cn1WindowsLog output (%TEMP%\cn1windows.log) so an
+      # offscreen-target / capture failure is diagnosable from the artifact, and
+      # so the raw dir is never empty (the arm64 artifact would otherwise not be
+      # produced when the suite stalls before writing any PNG).
+      - name: Collect native windows log (arm64)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-port/raw | Out-Null
+          $log = Join-Path $env:TEMP 'cn1windows.log'
+          if (Test-Path $log) {
+            Copy-Item $log artifacts/windows-port/raw/cn1windows-native.log -Force
+            Write-Host "collected native log ($((Get-Item $log).Length) bytes)"
+          } else {
+            "no native cn1windows.log found at $log" | Out-File artifacts/windows-port/raw/cn1windows-native.log
+            Write-Host "no native log at $log"
+          }
+
+      # ParparVM against JDK 25 on this runner: this job's own suite translation, the
+      # translator translating itself, and every Bench workload. The table lands in this
+      # arch's screenshot comment and the job's last step fails it on a regression.
+      # JDK_8_HOME falls back to the job's JDK where there is no JDK 8 (arm64): the
+      # builds only ask javac for -source/-target 1.8 against an explicit bootclasspath.
+      - name: ParparVM vs JDK 25 (performance gate, arm64)
+        if: success() || failure()
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          export JDK_8_HOME="${JDK_8_HOME:-$JAVA_HOME}"
+          vm/selfhost/ci-perf-gate.sh run windows-arm64 artifacts/windows-port/raw/perf \
+            --hello-workload "$(cygpath -m "$GITHUB_WORKSPACE/artifacts/windows-port/raw/translation-record.jsonl")" \
+            --hello-app WinHelloMain
+
+      - name: Upload screenshot artifact (arm64)
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-windows-arm64
+          path: artifacts/windows-port/raw/perf/perf-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail on a ParparVM performance regression (arm64)
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        if: ${{ (success() || failure()) && inputs.cn1ss_capture == '' }}
+        shell: bash
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/windows-port/raw/perf
+
+  # Per-architecture PR comments. x64 (Intel/AMD) and arm64 (Apple Silicon / Arm)
+  # post SEPARATE comments with DISTINCT markers, each depending only on its own
+  # screenshot leg -- so a failure or re-run in one architecture's pipeline never
+  # overrides or hides the other's result (the previous single combined comment
+  # showed only x64 and was skipped entirely if the x64 leg failed). Each comment
+  # carries that arch's own benchmark table (SSE2 on x64, NEON on arm64).
+  windows-port-screenshot-comment-x64:
+    name: screenshot-comment (x64)
+    needs: [windows-port-screenshot]
+    if: >-
+      (
+      !cancelled() &&
+      needs.windows-port-screenshot.result != 'cancelled' &&
+      needs.windows-port-screenshot.result != 'skipped' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Download x64 screenshot artifact
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: windows-port-screenshot-raw-x64
+          path: artifacts/windows-port/raw
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
+      - name: Post x64 screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_X64_COMMENT -->'
+          # This arch's ParparVM vs JDK 25 table, measured by its capture job.
+          CN1SS_EXTRA_MARKDOWN: artifacts/windows-port/raw/perf/perf-comment.md
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port x64]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native-x64'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port (x64 / Intel-AMD): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, SSE2 SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw" ]; then
+            for f in "$ART"/raw/*.png; do
+              [ -f "$f" ] || continue
+              entries+=("$(basename "$f" .png)=$f")
+            done
+          fi
+          # Empty captures must produce not-run evidence and fail the gate.
+          mkdir -p "$ART"
+          echo "Posting ${#entries[@]} x64 screenshot(s)"
+          mkdir -p "$ART/previews"
+          cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          # Gate the Windows port like the Linux one: fail on any mismatch/error or
+          # a new screenshot with no committed golden (missing_expected). Without
+          # this the comparison only posted a PR comment and stale goldens slipped
+          # through green CI (the picker case-conversion refresh was missed here).
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
+          # PR capture may stop after the visual set; durable reports require the full suite.
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ ${#entries[@]} -eq 0 ]; then
+            export CN1SS_FAIL_ON_TEST_PROBLEMS=1
+          fi
+          export CN1SS_PORT_ID=windows-x64
+          export CN1SS_BINARY_PATH="$ART/raw/benchmark-app.exe"
+          export CN1SS_SUITE_LOG="$ART/raw/app-output.log"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
+          set +e
+          cn1ss_process_and_report \
+            "Native Windows port (x64)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            "${entries[@]}"
+          gate_rc=$?
+          set -e
+          fail=0
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "[windows-native-port x64] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+          fi
+          if [ -f "$ART/summary.txt" ] && grep -q "^missing_expected|" "$ART/summary.txt"; then
+            me="$(grep -c "^missing_expected|" "$ART/summary.txt" || echo 0)"
+            echo "[windows-native-port x64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "Windows x64 screenshot gate failed."; exit 1; fi
+
+      # The cross-build jobs (wincross-*) own the public windows-x64 report. Keep
+      # native-build diagnostics out of the publisher/backfill port-status-*
+      # selection so a green native run cannot hide a shipping-pipeline failure.
+      - name: Upload Windows native x64 diagnostics
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: windows-native-x64-diagnostics
+          path: artifacts/windows-port/port-status-windows-x64.json
+          # A capture (cn1ss_capture) renders goldens and writes no port
+          # status; requiring the file failed every capture's comment job.
+          if-no-files-found: ${{ inputs.cn1ss_capture != '' && 'ignore' || 'error' }}
+          retention-days: 14
+
+      - name: Upload golden capture
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-windows-x64
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
+
+  windows-port-screenshot-comment-arm64:
+    name: screenshot-comment (arm64)
+    needs: [windows-port-screenshot-arm64]
+    # The capture job uploads its raw evidence with if: ${{ !cancelled() }}. Normalize it
+    # even when capture failed so diagnostics remain available. The failed
+    # capture still remains a blocking red check.
+    if: >-
+      (
+      !cancelled() &&
+      needs.windows-port-screenshot-arm64.result != 'cancelled' &&
+      needs.windows-port-screenshot-arm64.result != 'skipped' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - name: Download arm64 screenshot artifact
+        uses: ./.github/actions/download-artifact-with-retry
+        with:
+          name: windows-port-screenshot-raw-arm64
+          path: artifacts/windows-port/raw
+      - name: Enter golden capture mode
+        uses: ./.github/actions/cn1ss-capture
+        with:
+          tests: ${{ inputs.cn1ss_capture }}
+          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
+
+      - name: Post arm64 screenshots to PR
+        shell: bash
+        env:
+          CN1SS_COMMENT_MARKER: '<!-- CN1SS_WINDOWS_NATIVE_ARM64_COMMENT -->'
+          # This arch's ParparVM vs JDK 25 table, measured by its capture job.
+          CN1SS_EXTRA_MARKDOWN: artifacts/windows-port/raw/perf/perf-comment.md
+          CN1SS_COMMENT_LOG_PREFIX: '[windows-native-port arm64]'
+          CN1SS_PREVIEW_SUBDIR: 'windows-native-arm64'
+          CN1SS_SUCCESS_MESSAGE: 'Native Windows port (arm64 / Apple Silicon - Arm): full hellocodenameone screenshot suite rendered offscreen with Direct2D/DirectWrite, plus the real benchmarks (base64 native/CN1/SIMD, image createMask/applyMask/modifyAlpha/PNG/JPEG, NEON SIMD kernels). Compared against the in-repo baseline in scripts/windows/screenshots.'
+        run: |
+          set -e
+          ART="artifacts/windows-port"
+          entries=()
+          if [ -d "$ART/raw" ]; then
+            for f in "$ART"/raw/*.png; do
+              [ -f "$f" ] || continue
+              entries+=("$(basename "$f" .png)=$f")
+            done
+          fi
+          # Empty captures must produce not-run evidence and fail the gate.
+          mkdir -p "$ART"
+          echo "Posting ${#entries[@]} arm64 screenshot(s)"
+          mkdir -p "$ART/previews"
+          cp -f "$ART"/raw/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
+          source scripts/lib/cn1ss.sh
+          cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          REF_DIR="$(pwd)/scripts/windows/screenshots"
+          # Same blocking gate as the x64 leg.
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
+          # PR capture may stop after the visual set; durable reports require the full suite.
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ ${#entries[@]} -eq 0 ]; then
+            export CN1SS_FAIL_ON_TEST_PROBLEMS=1
+          fi
+          export CN1SS_PORT_ID=windows-arm64
+          export CN1SS_BINARY_PATH="$ART/raw/benchmark-app.exe"
+          export CN1SS_SUITE_LOG="$ART/raw/app-output.log"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
+          set +e
+          cn1ss_process_and_report \
+            "Native Windows port (arm64)" \
+            "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
+            "$REF_DIR" "$ART/previews" "$ART" \
+            "${entries[@]}"
+          gate_rc=$?
+          set -e
+          fail=0
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "[windows-native-port arm64] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+          fi
+          if [ -f "$ART/summary.txt" ] && grep -q "^missing_expected|" "$ART/summary.txt"; then
+            me="$(grep -c "^missing_expected|" "$ART/summary.txt" || echo 0)"
+            echo "[windows-native-port arm64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "Windows arm64 screenshot gate failed."; exit 1; fi
+
+      - name: Upload Windows ARM64 port status
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/upload-artifact-with-retry
+        with:
+          name: port-status-windows-arm64
+          path: artifacts/windows-port/port-status-windows-arm64.json
+          # A capture (cn1ss_capture) renders goldens and writes no port
+          # status; requiring the file failed every capture's comment job.
+          if-no-files-found: ${{ inputs.cn1ss_capture != '' && 'ignore' || 'error' }}
+          retention-days: 14
+
+      - name: Upload golden capture
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cn1ss-capture-windows-arm64
+          path: artifacts/cn1ss-capture
+          if-no-files-found: ignore
+
+  # Widgets Board provider compile check: compiles the one nativeSources TU no
+  # other CI leg ever compiles -- cn1_windows_widgetboard.cpp, which is gated
+  # behind CN1_WIDGETBOARD (the default CMake build never defines it and the
+  # Linux xwin cross leg has no Windows App SDK) -- against the real Windows App
+  # SDK winmds + cppwinrt-generated C++/WinRT projections on a Windows host.
+  # This mirrors exactly what WindowsNativeBuilder does for windows.msix=true
+  # builds: clang-cl (the port is clang-cl-only by design -- cn1_globals.h uses
+  # `_Atomic` and `__thread`, which MSVC cl.exe rejects in C++ -- and the
+  # builder sets CMAKE_CXX_COMPILER to clang-cl on Windows hosts and cross
+  # builds alike), /std:c++17 (the translator-emitted CMAKE_CXX_STANDARD),
+  # /EHsc (C++/WinRT requires exceptions) and /DCN1_WIDGETBOARD=1 plus the
+  # WinAppSDK include dir. The same step also re-compiles
+  # cn1_windows_widgets.cpp (the plain-exe floating-widget TU) with the
+  # Windows-host toolchain as a second real-compiler check beyond the Linux
+  # xwin leg. Compile-only (/c): any compile error fails the job.
+  widgetboard-compile-check:
+    # Not a screenshot suite: a golden capture skips it.
+    if: ${{ inputs.cn1ss_capture == '' && github.event_name != 'release' }}
+    name: widgetboard-compile-check (x64)
+    runs-on: windows-latest
+    env:
+      CN1_NATIVE_VERIFY: strict
+      CFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+      CXXFLAGS: -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
+      # clang-cl uses the MSVC STL/CRT headers and the Windows SDK, which reach
+      # the compiler through the INCLUDE/LIB environment vcvarsall sets up.
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      # The Microsoft.WindowsAppSDK nupkg ships winmd metadata + MddBootstrap.h
+      # but NO prebuilt C++/WinRT headers, so the projection (winrt/base.h, the
+      # referenced Windows.* namespaces from the OS metadata, and
+      # winrt/Microsoft.Windows.Widgets[.Providers].h) is generated with
+      # cppwinrt.exe. Versions are pinned for reproducibility: the 1.5 servicing
+      # release matches the 1.5 series the provider bootstraps at runtime
+      # (CN1_WINAPPSDK_MAJORMINOR 0x00010005 in the TU). nuget.exe is
+      # preinstalled on the windows runners.
+      - name: Fetch Windows App SDK + generate C++/WinRT projections
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $wasdkVer = '1.5.250108004'
+          $cppwinrtVer = '2.0.240405.15'
+          nuget install Microsoft.WindowsAppSDK -Version $wasdkVer -OutputDirectory nupkgs -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "nuget install Microsoft.WindowsAppSDK failed" }
+          nuget install Microsoft.Windows.CppWinRT -Version $cppwinrtVer -OutputDirectory nupkgs -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "nuget install Microsoft.Windows.CppWinRT failed" }
+          $wasdk = "nupkgs/Microsoft.WindowsAppSDK.$wasdkVer"
+          $cppwinrt = "nupkgs/Microsoft.Windows.CppWinRT.$cppwinrtVer/bin/cppwinrt.exe"
+          # -in local merges the OS metadata (C:\Windows\System32\WinMetadata)
+          # so the Windows.Foundation types the Widgets winmd references are
+          # projected by the same cppwinrt version (mixing SDK-shipped headers
+          # with a different generator version trips base.h's version check).
+          & $cppwinrt -in "$wasdk/lib/uap10.0/Microsoft.Windows.Widgets.winmd" -in local -output winrt-gen
+          if ($LASTEXITCODE -ne 0) { throw "cppwinrt projection generation failed" }
+          if (!(Test-Path 'winrt-gen/winrt/Microsoft.Windows.Widgets.Providers.h')) {
+            throw "cppwinrt did not produce winrt/Microsoft.Windows.Widgets.Providers.h"
+          }
+          "CN1_WASDK_DIR=$wasdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Widgets Board provider compile check (clang-cl)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          clang-cl --version
+          # The runner's clang-cl is the standalone LLVM on PATH, not one matched
+          # to the image's MSVC STL. Image 20261116 moved the STL to 14.52, which
+          # refuses any clang older than 22 (STL1000) while the runner ships 20, so
+          # the check is a statement about the image, not about these sources. The
+          # STL's own escape hatch turns it off; a real incompatibility still fails
+          # the compile on the line that uses it.
+          $mismatch = '/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH'
+          # The widgetboard TU deliberately avoids the cn1 headers (cn1_globals.h's
+          # C11 stdatomic conflicts with the C++ <atomic> the winrt headers pull) and
+          # compiles at C++20: C++/WinRT at C++17 falls back to
+          # <experimental/coroutine>, which the modern MSVC STL rejects under clang
+          # (STL1009). This mirrors the -DCMAKE_CXX_STANDARD=20 WindowsNativeBuilder
+          # passes for windows.msix=true builds.
+          clang-cl /c /std:c++20 /EHsc $mismatch /DCN1_WIDGETBOARD=1 /Iwinrt-gen "/I$env:CN1_WASDK_DIR/include" `
+            Ports/WindowsPort/nativeSources/cn1_windows_widgetboard.cpp /Fowidgetboard.obj
+          if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgetboard.cpp failed to compile with CN1_WIDGETBOARD=1" }
+          # A translated app supplies the generated cn1_class_method_index.h; the
+          # floating-widget TU includes cn1_windows.h -> cn1_globals.h, which only
+          # needs this one constant from it here.
+          New-Item -ItemType Directory -Force stub-index | Out-Null
+          "#define cn1_array_start_offset 1000" | Set-Content stub-index/cn1_class_method_index.h -Encoding ascii
+          clang-cl /c /std:c++17 /EHsc $mismatch /Istub-index /Ivm/ByteCodeTranslator/src `
+            Ports/WindowsPort/nativeSources/cn1_windows_widgets.cpp /Fowidgets.obj
+          if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgets.cpp failed to compile" }
+          Write-Host "Widgets Board provider + floating-widget TUs compiled clean."

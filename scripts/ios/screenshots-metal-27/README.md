@@ -1,6 +1,6 @@
 # iOS 27 screenshot baselines
 
-Reference images for the `build-ios-metal-27` job in
+Reference images for the the iOS Metal suite of the `apple` job job in
 `.github/workflows/scripts-ios.yml`, which runs the same `scripts/hellocodenameone`
 suite on the Xcode 27 / iOS 27 image. It is the only iOS Metal golden set: the
 iOS 26 leg and its `screenshots-metal` directory were removed once Xcode 27
@@ -8,7 +8,7 @@ became the default toolchain.
 
 ## Provenance
 
-Captured by `build-ios-metal-27` on the GitHub `xcode-27` image (macOS 27.0,
+Captured by the iOS Metal suite of the `apple` job on the GitHub `xcode-27` image (macOS 27.0,
 Xcode 27.0), on an **iPhone 16 running iOS 27.0** created by the job itself --
 that image pre-creates iPhone 17 / 17e / 18 Pro / 18 Pro Max / Air and no
 iPhone 16, so the leg makes one rather than accepting a fallback device. Same

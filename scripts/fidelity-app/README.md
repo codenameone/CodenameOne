@@ -34,7 +34,7 @@ pinned to the OS **design generation** it was captured on:
 - `goldens/ios-26-metal` (+ `-frames`, `-anim`) -- captured on an iOS 26
   simulator runtime; the CI job asserts a matching runtime before running.
 - `goldens/android-m3` -- captured on the same emulator profile the CI uses
-  (API level + 160dpi; see `.github/workflows/scripts-fidelity.yml`).
+  (API level + 160dpi; see `.github/workflows/scripts-android.yml`).
 
 Each set has its own ratchet baseline
 (`baseline/<set>-fidelity-baseline.json`). When a new design generation lands
@@ -131,7 +131,7 @@ xcodebuild -workspace <FidelityApp.xcworkspace> -scheme FidelityApp \
 To re-seed in a fresh environment:
 `FIDELITY_UPDATE_GOLDENS=1 FIDELITY_UPDATE_BASELINE=1 ./scripts/run-...`.
 
-CI runs both platforms in `.github/workflows/scripts-fidelity.yml`, gating PRs
+CI runs Android in `.github/workflows/scripts-android.yml` and iOS in `.github/workflows/scripts-ios.yml` (the `apple` job), gating PRs
 that change the iOS Modern or Android Material CSS theme sources. Other changes
 can be tested deliberately with the workflow's manual dispatch.
 

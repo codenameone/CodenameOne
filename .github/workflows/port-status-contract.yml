@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/port-status-contract.yml'
       - '.github/workflows/port-status-publish.yml'
-      - '.github/workflows/parparvm-tests-windows.yml'
+      - '.github/workflows/linux-build-run.yml'
       - 'scripts/lib/cn1ss.sh'
       - 'docs/website/data/port_status.json'
       - 'docs/website/data/port_status_supplement.json'
@@ -36,7 +36,7 @@ on:
     paths:
       - '.github/workflows/port-status-contract.yml'
       - '.github/workflows/port-status-publish.yml'
-      - '.github/workflows/parparvm-tests-windows.yml'
+      - '.github/workflows/linux-build-run.yml'
       - 'scripts/lib/cn1ss.sh'
       - 'docs/website/data/port_status.json'
       - 'docs/website/data/port_status_supplement.json'

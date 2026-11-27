@@ -11,7 +11,7 @@ class AppleSelectionTest(unittest.TestCase):
     def test_packaging_only_does_not_expand_to_all_suites(self):
         for event in ['push', 'pull_request']:
             result = apple.select(['.github/workflows/ios-packaging.yml'], event)
-            self.assertEqual({'ios':'false', 'native':'false', 'packaging':'true', 'any':'true'}, result)
+            self.assertEqual({'ios':'false', 'native':'false', 'packaging':'true', 'macos':'false', 'fidelity':'false', 'any':'true'}, result)
 
     def test_no_native_runner_for_independent_cn1lib_or_core_unit_test(self):
         for event in ['push', 'pull_request']:

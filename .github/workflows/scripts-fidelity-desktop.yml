@@ -2,9 +2,9 @@
 name: Desktop theme fidelity
 
 # Scores the desktop native themes -- Windows Fluent, macOS Aqua, GNOME Adwaita -- against the
-# captured native references, the same way scripts-fidelity.yml does for iOS and Android.
+# captured native references, the same way scripts-ios.yml (iOS, the apple job) and scripts-android.yml (Android) do.
 #
-# A SEPARATE workflow rather than three more jobs in scripts-fidelity.yml. That file's
+# A SEPARATE workflow rather than three more jobs in the (since retired) scripts-fidelity.yml. That file's
 # pull_request paths trigger the WHOLE workflow, so adding these there would run the Android
 # emulator and the iOS simulator legs on every desktop CSS tweak, and would tie the desktop
 # gate's timing to theirs. They share the comparator and the golden-set machinery, which is
@@ -208,7 +208,7 @@ jobs:
         # classpath so a stale copy elsewhere cannot win -- which also means that without
         # this step a push that changes only native-themes/<platform>/theme.css is scored
         # against the PREVIOUS compiled theme and can pass without the change being tested.
-        # Same step, same reason, as the Android and iOS legs in scripts-fidelity.yml.
+        # Same step, same reason, as the Android leg in scripts-android.yml and the iOS leg in scripts-ios.yml.
         run: ./scripts/build-native-themes.sh
 
       - name: Score the theme against the native reference

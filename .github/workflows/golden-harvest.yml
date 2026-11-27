@@ -32,9 +32,7 @@ on:
       - Test iOS UI build scripts
       - Test Android build scripts
       - Test JavaScript screenshot scripts
-      - Linux native build + run (GTK3, x64 + arm64)
-      - ParparVM Java Tests (Windows)
-      - Windows cross-build + run (Linux build -> Windows run)
+      - Native ParparVM (Linux + Windows) build, run and tests
       - Test macOS UI build scripts
       # Pull request runs of the workflows above run inside ci.yml.
       - CI
