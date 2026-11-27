@@ -1,4 +1,4 @@
-# Runtime behaviour the llm and MarkItDown ports depend on (anyio, click,
+# Runtime behaviour real-world packages depend on (anyio, click,
 # sqlite-utils, the openai SDK).
 import asyncio
 import collections.abc

@@ -228,7 +228,7 @@ public final class PythonPackageResolver {
     }
 
     /// Whether `name` is the packaging toolchain -- pip, setuptools, wheel.
-    /// A tool such as llm requires them for its "install a plugin" command,
+    /// A tool with plugins requires them for its "install a plugin" command,
     /// which shells out to pip; an application's packages are fixed when it
     /// is built, so nothing can call them, and translating them would add
     /// about ten megabytes of source to every build.

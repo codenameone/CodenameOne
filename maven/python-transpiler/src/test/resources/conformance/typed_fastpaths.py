@@ -21,7 +21,7 @@
 # Please contact Codename One through http://www.codenameone.com/ if you
 # need additional information or have any questions.
 
-# The fast paths the llm hero port added, each held to what the general path
+# The typed fast paths, each held to what the general path
 # answers: datetime's fixed-offset construction, blake2b's digest that keeps
 # hashing, pydantic's cached field plan, and sqlite3 cursors that keep the
 # read lock while rows are pending.

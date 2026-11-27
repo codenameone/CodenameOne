@@ -293,11 +293,11 @@ that fixes it:
 
 [source,text]
 ----
-llm/cli.py:4424:9: a translated program cannot run or inspect code that was not compiled with it, and this one reaches code that does:
-  llm/cli.py:4424:9: exec() in llm.cli._tools_from_code
+mytool/cli.py:4424:9: a translated program cannot run or inspect code that was not compiled with it, and this one reaches code that does:
+  mytool/cli.py:4424:9: exec() in mytool.cli._tools_from_code
   sqlite_utils/utils.py:534:9: exec() in sqlite_utils.utils._compile_code
 Name each of those functions in cn1-python.properties, beside the Python sources. To leave them out (each then raises if it is called):
-  remove=llm.cli._tools_from_code,sqlite_utils.utils._compile_code
+  remove=mytool.cli._tools_from_code,sqlite_utils.utils._compile_code
 ----
 
 `cn1-python.properties` sits in `src/main/python`. Each line names

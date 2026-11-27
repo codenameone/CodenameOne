@@ -1274,7 +1274,7 @@ class _Opts:
 class _Plan:
     """What validating a class needs that does not change per call: read
     once per class instead of once per field of every instance. The
-    sqlite-backed llm app validated a model per prompt, and the config
+    sqlite-backed app validated a model per prompt, and the config
     lookups, the MRO walk of _is_root and a ValidationInfo per field (with a
     copy of the values so far) were most of what that cost."""
     __slots__ = ("fields_obj", "cfg", "by_name", "root", "extra_mode", "fields", "model_decls")

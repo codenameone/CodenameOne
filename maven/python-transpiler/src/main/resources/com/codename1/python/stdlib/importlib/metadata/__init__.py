@@ -8,7 +8,7 @@ metadata of every PyPI package it installed into the module
 _cn1_distributions (python-packages/_cn1_distributions.py): each one's name,
 version, top-level packages, requirements and the text of its
 entry_points.txt. Plugin systems that discover their plugins through entry
-points (pluggy's load_setuptools_entrypoints, llm's plugin loader) therefore
+points (pluggy's load_setuptools_entrypoints, plugin loaders) therefore
 find every plugin that was installed with the application, and only those.
 """
 import re as _re

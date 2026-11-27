@@ -790,7 +790,7 @@ public final class Database {
             // sqlite-utils names every savepoint afresh -- SAVEPOINT
             // sqlite_utils_<random> -- so these never repeat, never hit the
             // cache, and both full scans ran for each, measured at 4% of
-            // llm's log writer.
+            // a SQLite log writer.
             refuseNulInTextParameters(params);
             return sql;
         }
@@ -814,7 +814,7 @@ public final class Database {
         String rendered = dialect.bind(sql, paramCount);
         // ADMITTED ON ITS SECOND SIGHTING. A migration sends hundreds of
         // statements that never come again -- sqlite-utils' table rebuilds
-        // name a fresh random table each time -- and llm runs about 2,000
+        // name a fresh random table each time -- and an application can run about 2,000
         // distinct statements next to a dozen it repeats tens of thousands of
         // times. Admitting every miss let the one-offs evict the hot ones from
         // all 256 slots, measured: the cache almost never hit. A statement now
@@ -851,7 +851,7 @@ public final class Database {
     /// engine spell its placeholders -- depend on nothing but the text and
     /// the count, and an application sends the same few statements over and
     /// over. Scanning each one again on every call was a cost CPython's
-    /// sqlite3 does not have, measured on llm's log writer.
+    /// sqlite3 does not have, measured on a SQLite log writer.
     ///
     /// DIRECT MAPPED, never locked and never copied: a statement has one slot,
     /// chosen by its hash, and a newer statement with the same slot replaces
@@ -866,7 +866,7 @@ public final class Database {
     /// ONE PER DIALECT, shared by every connection that speaks it: the answer
     /// depends on the text, the count and the dialect, never on the
     /// connection, and an application that opens a Database per unit of work
-    /// (llm opens one per prompt) otherwise starts every unit with a cold
+    /// (an application may open one per request) otherwise starts every unit with a cold
     /// cache and scans every statement again.
     private final BoundCache boundStatements;
 

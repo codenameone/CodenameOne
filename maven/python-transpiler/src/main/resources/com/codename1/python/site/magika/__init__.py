@@ -277,7 +277,7 @@ def _classify_text(text, truncated):
         return "html"
     if low.startswith("<"):
         # Magika's model labels an RSS or Atom document plain xml, and
-        # markitdown's own sniffing tells the feed apart.
+        # the caller's own sniffing tells the feed apart.
         if "<svg" in low:
             return "svg"
         if low.startswith("<?xml") or low.startswith("<"):

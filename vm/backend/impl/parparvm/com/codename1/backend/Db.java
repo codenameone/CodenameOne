@@ -48,7 +48,7 @@ public final class Db {
     /// Prepared statements kept for reuse, by their SQL, oldest first.
     ///
     /// Preparing is parsing and planning the statement, and an application
-    /// sends the same few statements over and over: measured on llm's log
+    /// sends the same few statements over and over: measured on a SQLite log
     /// writer, preparing again on every call cost as much as a third of what
     /// SQLite spent executing them. CPython's sqlite3 keeps 128 for the same
     /// reason. A statement is marked BUSY while it runs and cleared afterwards,

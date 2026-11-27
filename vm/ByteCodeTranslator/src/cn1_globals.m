@@ -2012,7 +2012,7 @@ int instanceofFunction(int sourceClass, int destId) {
      * the question the array-store check asks of every store into an Object[]
      * (backend builds turn that check on), and the walk below answered it by
      * scanning the stored value's whole supertype list for Object, which it
-     * reaches last: measured as 3.5% of llm's log writer, transpiled Python
+     * reaches last: measured as 3.5% of a SQLite log writer, transpiled Python
      * storing into Object[] slots on nearly every call. */
     if(sourceClass == cn1_class_id_java_lang_Object) {
         return JAVA_TRUE;

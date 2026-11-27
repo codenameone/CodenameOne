@@ -1240,7 +1240,7 @@ public final class PyFunction extends PyObject {
             spareSlots = clear(slots);
             return r;
         }
-        // `**kwargs` (markitdown's `convert_a(self, el, text, **kwargs)`,
+        // `**kwargs` (markdownify's `convert_a(self, el, text, **kwargs)`,
         // called per link): a keyword no parameter takes goes into the dict
         // in the slot after the keyword-only ones, where bindArgs puts it.
         PyDict extra = null;

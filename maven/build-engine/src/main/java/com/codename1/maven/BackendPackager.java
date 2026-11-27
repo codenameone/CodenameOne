@@ -1189,7 +1189,7 @@ public class BackendPackager {
         // garbage rather than the VM's 24MB, and hold the heap near the live
         // set while the collector is mostly idle. This goal set neither, so a
         // packaged binary let its trigger climb to the 128MB ceiling -- the
-        // llm hero app peaked at a 200MB footprint, and 100-125MB with these,
+        // a measured application peaked at a 200MB footprint, and 100-125MB with these,
         // at the same wall time. Before the cflags, which may override them.
         command.add("-DCN1_BIBOP_GC_MIN_TRIGGER_BYTES=" + (4 * 1024 * 1024));
         command.add("-DCN1_BIBOP_TIGHT_SURVIVAL_PERCENT=66");

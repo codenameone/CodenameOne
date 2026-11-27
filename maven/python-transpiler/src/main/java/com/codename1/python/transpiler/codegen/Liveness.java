@@ -147,7 +147,7 @@ public final class Liveness {
     /// is not named anywhere in the runtime. That import raises
     /// ModuleNotFoundError where it stands, so nothing after it ever runs;
     /// the import itself stays, and raises as it did. bs4's html5lib
-    /// builder imports html5lib, which MarkItDown does not ship: bs4
+    /// builder imports html5lib, which a program need not ship: bs4
     /// catches the error, and the module's classes were analysed for
     /// nothing. A program that adds to `sys.modules` itself could make
     /// such an import succeed, so a name is only taken as missing when no
@@ -1986,7 +1986,7 @@ public final class Liveness {
     }
 
     /// Follows the entry points of every group whose name live code has
-    /// spelled (pluggy's `load_setuptools_entrypoints("llm")`); true when
+    /// spelled (pluggy's `load_setuptools_entrypoints("app")`); true when
     /// it reached something new.
     private boolean entryPoints() {
         boolean any = false;

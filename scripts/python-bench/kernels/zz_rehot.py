@@ -1,4 +1,4 @@
-# Scratch: the regular expressions markitdown spends its time in, each timed alone.
+# Scratch: the regular expressions a document converter spends its time in, each timed alone.
 # Patterns are copied from markdownify and CPython 3.14's html.parser.
 import re
 import time

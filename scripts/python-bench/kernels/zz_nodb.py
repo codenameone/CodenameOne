@@ -1,4 +1,4 @@
-# SQLite the way sqlite-utils drives it when llm logs a reply: for each row
+# SQLite the way sqlite-utils drives it when an application logs a reply: for each row
 # the table's columns are read back (PRAGMA table_info), an INSERT is built
 # as text from them, a JSON field is serialized, the row goes in with bound
 # parameters and the statement's rows come back as tuples. In memory, so the

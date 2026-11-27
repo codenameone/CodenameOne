@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// The shape of the typed code for patterns the hero apps were measured on.
+/// The shape of the typed code for patterns real programs were measured on.
 /// Each of these is an optimization whose loss changes no output: the
 /// program still runs, through the generic path, only slower. The
 /// conformance programs check what the code answers; this checks that the

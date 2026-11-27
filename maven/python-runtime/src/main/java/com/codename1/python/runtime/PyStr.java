@@ -78,7 +78,7 @@ public final class PyStr extends PyObject {
     /// Direct mapped by identity hash. A parser works on several long
     /// strings at once -- its buffer, the text a match holds, the slice it
     /// is building -- and a cache of one or two entries evicted one of them
-    /// on every access, which still cost MarkItDown a tenth of its time.
+    /// on every access, which still cost a converter workload a tenth of its time.
     ///
     /// Two tables, by length: the many short slices a parser makes must not
     /// evict the page it is walking, whose rescan is what costs. And the slot

@@ -1,5 +1,5 @@
 # JSON: decode an API-style document and walk it, the work behind every HTTP
-# client and LLM SDK (the OpenAI responses `llm` reads are JSON). The result
+# client and LLM SDK (API responses are JSON). The result
 # also folds in the decoder's edge cases, so a fast path that differs from
 # CPython changes the answer, not only the time.
 import json

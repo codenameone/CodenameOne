@@ -1086,7 +1086,7 @@ public class Parser extends ClassVisitor {
         // An id only for an array class the program has (ByteCodeClass.emitsArrayClass, the
         // same test that decides whether its descriptor is written); the descriptor is the
         // macro's only reader. Three ids for every class put a program of 16,706 classes
-        // past the 16-bit object header index (llm with its dependencies, translated whole).
+        // past the 16-bit object header index (a large Python application with its dependencies, translated whole).
         //
         // The ids are therefore NOT a function of the class id any more, and
         // instanceofFunction used to compute an array's dimension and element class from

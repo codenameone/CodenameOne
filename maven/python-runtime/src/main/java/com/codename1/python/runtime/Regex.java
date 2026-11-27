@@ -136,7 +136,7 @@ final class Regex {
         /// or null when a match can begin some other way (an assertion, an
         /// optional item, a backreference). A search skips every position
         /// none of them matches instead of running the program there, as
-        /// sre's charset prefix does; MarkItDown's HTML and Markdown
+        /// sre's charset prefix does; HTML and Markdown converters'
         /// patterns spent most of their time failing at every offset.
         Op[] first;
         /// For each ASCII char, whether one of the char-consuming [#first]

@@ -137,7 +137,7 @@ def _body():
     print(sqlite3.paramstyle, sqlite3.apilevel)
     con.close()
 
-    # User-defined functions, as sqlite-utils and llm register them.
+    # User-defined functions, as sqlite-utils registers them.
     fconn = sqlite3.connect(":memory:")
     fconn.create_function("plus_one", 1, lambda v: None if v is None else v + 1)
     fconn.create_function("joined", -1, lambda *a: "|".join(str(x) for x in a))

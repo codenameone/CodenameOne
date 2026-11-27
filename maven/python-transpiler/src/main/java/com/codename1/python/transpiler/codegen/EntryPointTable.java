@@ -44,7 +44,7 @@ import java.util.Set;
 ///
 /// The registrations are not kept for their effect (Liveness): the one of a
 /// group is kept only once live code spells that group's name, so a program
-/// that loads its `llm` plugins does not keep every console script.
+/// that loads its plugins does not keep every console script.
 public final class EntryPointTable {
     /// The module's name, and the file it is compiled from.
     public static final String MODULE = "_cn1_entry_points";

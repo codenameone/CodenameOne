@@ -1,4 +1,4 @@
-# Scratch: the hot shapes of the MarkItDown PDF and HTML paths, alone, in ns per operation.
+# Scratch: the hot shapes of document-conversion PDF and HTML paths, alone, in ns per operation.
 import logging
 import time
 

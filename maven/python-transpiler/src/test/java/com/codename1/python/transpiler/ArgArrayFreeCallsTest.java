@@ -42,12 +42,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// not allocate an argument array. A builtin whose fixed-arity slot is empty
 /// falls back to `call(Object[])`, which builds one per call: nothing fails, the
 /// program is simply slower and the garbage collector busier. This holds every
-/// call shape the llm hero app was measured making to a builtin to a fixed
+/// call shape a measured application was seen making to a builtin to a fixed
 /// slot, so a refactor that drops one fails here instead of in a benchmark.
 class ArgArrayFreeCallsTest {
     private static final String[] FIELDS = {"one", "two", "three", "four", "five", "six", "seven"};
 
-    /// module, name, arity: the shapes counted on the llm benchmark.
+    /// module, name, arity: the shapes counted on that benchmark.
     private static final Object[][] HOT = {
         {"_cn1sql", "plain", 1}, {"_cn1sql", "run", 4}, {"_cn1sql", "plan", 7},
         {"_cn1sql", "begin", 1}, {"_cn1sql", "commit", 1},

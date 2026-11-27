@@ -4493,7 +4493,7 @@ final class Infer {
         // its uses suggest, once the pass has settled [#uncalled]. Guessed
         // here, at the escape, a guess of OBJECT came before the direct calls
         // were seen and every typed argument they passed then joined into
-        // it (MarkItDown's `ConverterRegistration.__init__`).
+        // it (a registration record's `__init__`).
     }
 
     /// The type the uses of parameter `p` in `def` suggest: INT when it is
