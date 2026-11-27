@@ -144,6 +144,42 @@ public final class ImmutableSlots {
     /// Whether `f` reads an attribute by a computed name: soupsieve's
     /// `__eq__`/`__repr__` walk `__slots__` that way. One that does not is the
     /// class's own and is kept.
+    /// Whether `o` reads `.name` anywhere: soupsieve's `__eq__` compares
+    /// `_hash` and walks `__slots__`; one that does not is not replaced.
+    private static boolean readsAttr(Object o, String name) {
+        if (o instanceof List) {
+            for (Object x : (List<?>) o) {
+                if (readsAttr(x, name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (o instanceof Attribute && name.equals(((Attribute) o).attr)) {
+            return true;
+        }
+        if (!(o instanceof Node)) {
+            return false;
+        }
+        for (Class<?> c = o.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            for (java.lang.reflect.Field fl : c.getDeclaredFields()) {
+                Class<?> t = fl.getType();
+                if (java.lang.reflect.Modifier.isStatic(fl.getModifiers())
+                        || !Node.class.isAssignableFrom(t) && !List.class.isAssignableFrom(t)) {
+                    continue;
+                }
+                try {
+                    if (readsAttr(fl.get(o), name)) {
+                        return true;
+                    }
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        }
+        return false;
+    }
+
     private static boolean readsComputed(FunctionDef f) {
         return readsComputed((Object) f.body);
     }
@@ -428,7 +464,9 @@ public final class ImmutableSlots {
                 String n = ((FunctionDef) s).name;
                 if ("__init__".equals(n) || "__setattr__".equals(n)) {
                     root.body.remove(i);
-                } else if (("__eq__".equals(n) || "__repr__".equals(n)) && readsComputed((FunctionDef) s)) {
+                } else if (("__eq__".equals(n) || "__repr__".equals(n)) && readsComputed((FunctionDef) s)
+                        && ("__repr__".equals(n) || readsAttr(((FunctionDef) s).body, "_hash"))
+                        && readsAttr(((FunctionDef) s).body, "__slots__")) {
                     Node.Module g = Parser.parse("__eq__".equals(n) ? eq : repr, path);
                     DataclassInit.atLine(g, s.line);
                     root.body.remove(i);

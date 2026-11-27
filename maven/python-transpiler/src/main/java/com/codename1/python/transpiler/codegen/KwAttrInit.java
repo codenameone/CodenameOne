@@ -535,10 +535,10 @@ public final class KwAttrInit {
                     } else if (s instanceof Node.AnnAssign && ((Node.AnnAssign) s).value != null
                             && ((Node.AnnAssign) s).target instanceof Name
                             && c.keys.contains(((Name) ((Node.AnnAssign) s).target).id)
-                            && !inert(((Node.AnnAssign) s).value, all)) {
+                            && !inert(((Node.AnnAssign) s).value, all, trees)) {
                         c.refusal = k.name + " binds " + ((Name) ((Node.AnnAssign) s).target).id
                                 + " to a possible descriptor";
-                    } else if (s instanceof Node.Assign && !inert(((Node.Assign) s).value, all)) {
+                    } else if (s instanceof Node.Assign && !inert(((Node.Assign) s).value, all, trees)) {
                         // Anything but a constant may be a descriptor (property(...), a
                         // family or foreign descriptor instance) whose store runs code.
                         for (Expr t : ((Node.Assign) s).targets) {
@@ -837,23 +837,23 @@ public final class KwAttrInit {
     /// operator over such values, `type(...)` of one, a builtin type, or a
     /// name every module-level binding of which is itself inert. A name found
     /// bound nowhere (an import, a parameter) may be anything, so it is not.
-    private static boolean inert(Expr v, List<Node.Module> all) {
-        return inert(v, all, new HashSet<String>());
+    private static boolean inert(Expr v, List<Node.Module> all, Map<String, Node.Module> trees) {
+        return inert(v, all, trees.keySet(), new HashSet<String>());
     }
 
-    private static boolean inert(Expr v, List<Node.Module> all, Set<String> seen) {
+    private static boolean inert(Expr v, List<Node.Module> all, Set<String> paths, Set<String> seen) {
         if (v == null || v instanceof Constant) {
             return v != null;
         }
         if (v instanceof Node.UnaryOp) {
-            return inert(((Node.UnaryOp) v).operand, all, seen);
+            return inert(((Node.UnaryOp) v).operand, all, paths, seen);
         }
         if (v instanceof Node.BinOp) {
-            return inert(((Node.BinOp) v).left, all, seen) && inert(((Node.BinOp) v).right, all, seen);
+            return inert(((Node.BinOp) v).left, all, paths, seen) && inert(((Node.BinOp) v).right, all, paths, seen);
         }
         if (v instanceof Call && ((Call) v).func instanceof Name && "type".equals(((Name) ((Call) v).func).id)
                 && ((Call) v).args.size() == 1 && ((Call) v).keywords.isEmpty()) {
-            return inert(((Call) v).args.get(0), all, seen);
+            return inert(((Call) v).args.get(0), all, paths, seen);
         }
         if (!(v instanceof Name)) {
             return false;
@@ -865,10 +865,14 @@ public final class KwAttrInit {
         boolean bound = false;
         for (Node.Module m : all) {
             for (Stmt t : m.body) {
+                if (!(t instanceof Node.Assign) && !(t instanceof Node.AnnAssign) && bindsElsewhere(t, id, paths)) {
+                    seen.remove(id);
+                    return false;
+                }
                 if (t instanceof Node.Assign) {
                     for (Expr x : ((Node.Assign) t).targets) {
                         if (x instanceof Name && id.equals(((Name) x).id)) {
-                            if (!inert(((Node.Assign) t).value, all, seen)) {
+                            if (!inert(((Node.Assign) t).value, all, paths, seen)) {
                                 seen.remove(id);
                                 return false;
                             }
@@ -877,7 +881,7 @@ public final class KwAttrInit {
                     }
                 } else if (t instanceof Node.AnnAssign && ((Node.AnnAssign) t).target instanceof Name
                         && id.equals(((Name) ((Node.AnnAssign) t).target).id)) {
-                    if (!inert(((Node.AnnAssign) t).value, all, seen)) {
+                    if (!inert(((Node.AnnAssign) t).value, all, paths, seen)) {
                         seen.remove(id);
                         return false;
                     }
@@ -887,6 +891,72 @@ public final class KwAttrInit {
         }
         seen.remove(id);
         return bound || BUILTIN_TYPES.contains(id);
+    }
+
+    /// Whether `o` binds `id` in any way but the top-level assignment `inert`
+    /// reads: an import, a def or class, a nested assignment, a loop, `with`,
+    /// walrus or `except` target. Each may hold anything, a descriptor too.
+    private static boolean bindsElsewhere(Object o, String id, Set<String> paths) {
+        if (o instanceof Node.ImportFrom && ((Node.ImportFrom) o).level == 0
+                && ((Node.ImportFrom) o).module != null && inProgram(((Node.ImportFrom) o).module, paths)) {
+            // `from m import id` of a program module: m's own binding is among
+            // those `inert` reads. A rename still counts as a binding.
+            for (Node.Alias al : ((Node.ImportFrom) o).names) {
+                if ("*".equals(al.name) || al.asname != null && id.equals(al.asname)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (o instanceof Node.Alias) {
+            Node.Alias al = (Node.Alias) o;
+            String n = al.asname != null ? al.asname : al.name.indexOf('.') >= 0
+                    ? al.name.substring(0, al.name.indexOf('.')) : al.name;
+            if (id.equals(n) || "*".equals(al.name)) {
+                return true;
+            }
+        } else if (o instanceof FunctionDef && id.equals(((FunctionDef) o).name)
+                || o instanceof ClassDef && id.equals(((ClassDef) o).name)
+                || o instanceof Node.ExceptHandler && id.equals(((Node.ExceptHandler) o).name)
+                || o instanceof Node.NamedExpr && id.equals(((Node.NamedExpr) o).target.id)) {
+            return true;
+        } else if (o instanceof Node.Assign) {
+            for (Expr x : ((Node.Assign) o).targets) {
+                if (mentions(x, id)) {
+                    return true;
+                }
+            }
+        } else if (o instanceof Node.AnnAssign && mentions(((Node.AnnAssign) o).target, id)
+                || o instanceof Node.AugAssign && mentions(((Node.AugAssign) o).target, id)
+                || o instanceof Node.For && mentions(((Node.For) o).target, id)
+                || o instanceof Node.WithItem && ((Node.WithItem) o).vars != null
+                        && mentions(((Node.WithItem) o).vars, id)) {
+            return true;
+        }
+        final boolean[] hit = {false};
+        Infer.children(o, x -> hit[0] |= !hit[0] && bindsElsewhere(x, id, paths));
+        return hit[0];
+    }
+
+    private static boolean inProgram(String module, Set<String> paths) {
+        String base = module.replace('.', '/');
+        for (String p : paths) {
+            String q = p.replace('\\', '/');
+            if (q.equals(base + ".py") || q.endsWith("/" + base + ".py")
+                    || q.equals(base + "/__init__.py") || q.endsWith("/" + base + "/__init__.py")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean mentions(Object o, String id) {
+        if (o instanceof Name) {
+            return id.equals(((Name) o).id);
+        }
+        final boolean[] hit = {false};
+        Infer.children(o, x -> hit[0] |= !hit[0] && mentions(x, id));
+        return hit[0];
     }
 
     private static boolean isTop(Map<String, Node.Module> trees, ClassDef k) {

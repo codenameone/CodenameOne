@@ -297,6 +297,20 @@ public final class OxmlDeclarative {
                 ks = new LinkedHashSet<String>();
                 adderKeywords.put(a, ks);
             }
+            // The generated adder sets attributes in one order and lxml keeps
+            // insertion order, so call sites that order them differently would
+            // serialize differently from CPython: those are refused.
+            List<String> known = new ArrayList<String>();
+            for (Keyword k : c.keywords) {
+                if (k.arg != null && ks.contains(k.arg)) {
+                    known.add(k.arg);
+                }
+            }
+            List<String> prior = new ArrayList<String>(ks);
+            prior.retainAll(known);
+            if (!prior.equals(known)) {
+                ks.add(null);
+            }
             for (Keyword k : c.keywords) {
                 if (k.arg == null) {
                     // A spread: the names are not known here.
@@ -659,7 +673,7 @@ public final class OxmlDeclarative {
             Set<String> ks = adderKeywords.get("_add_" + p);
             List<String> kw = ks == null ? new ArrayList<String>() : new ArrayList<String>(ks);
             if (kw.contains(null)) {
-                return "a call spreads keywords into _add_" + p;
+                return "a call spreads keywords into _add_" + p + ", or two calls order them differently";
             }
             b.append("def _add_").append(p).append("(self");
             for (String k : kw) {
@@ -716,7 +730,8 @@ public final class OxmlDeclarative {
         b.append("    return ").append(type).append(".from_xml(_ox_v)\n@").append(prop).append(".setter\ndef ")
                 .append(prop).append("(self, value):\n");
         if (optional) {
-            b.append("    if value == ").append(def).append(":\n        if ").append(clark)
+            // python-pptx and python-docx both clear the attribute for None too.
+            b.append("    if value is None or value == ").append(def).append(":\n        if ").append(clark)
                     .append(" in self.attrib:\n            del self.attrib[").append(clark)
                     .append("]\n        return\n");
         }
