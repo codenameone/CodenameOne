@@ -63,6 +63,17 @@ class AndroidGradle9DefaultTest {
         assertTrue(block("", "plugins { id 'com.example.thing' }", "")
                 .contains("com.example.thing"));
 
+        // What the parser cannot read keeps the build on Gradle 8.
+        assertTrue(block("classpath group: 'io.fabric.tools', name: 'gradle', version: '1.31.2'", "", "")
+                .contains("classpath group"));
+        assertTrue(block("", "apply plugin: SomePluginClass", "").contains("SomePluginClass"));
+        assertTrue(block("", "apply(plugin = \"com.example.kts\")", "").contains("com.example.kts"));
+        // android.gradlePlugin reaches the generated build.gradle too; the caller joins it to
+        // android.xgradle before asking.
+        assertTrue(block("", "\n" + "apply plugin: 'kotlin-android'", "").contains("kotlin-android"));
+        assertTrue(block("", "android { }\napply plugin: 'com.google.firebase.crashlytics'", "")
+                .contains("crashlytics"));
+        assertNull(block("", "android { defaultConfig { resValue \"string\", \"id\", \"x\" } }", ""), "a resValue named id is not a plugin");
         String gms = "classpath 'com.google.gms:google-services:4.3.15'";
         assertEquals(AndroidGradleBuilder.agp9GoogleServicesRefusal(gms), block(gms, "", ""));
         String placeholder = "<uses-sdk android:maxSdkVersion=\"${maxSdk}\"/>";

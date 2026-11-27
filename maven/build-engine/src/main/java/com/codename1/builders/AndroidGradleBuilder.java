@@ -1936,7 +1936,8 @@ public class AndroidGradleBuilder extends Executor {
             String stay = gradle9DefaultBlocker(useGradle8,
                     request.getArg("android.forceJava8Builder", "false").equals("true"),
                     request.getArg("android.topDependency", ""),
-                    request.getArg("android.xgradle", ""),
+                    request.getArg("android.xgradle", "") + "\n"
+                            + request.getArg("android.gradlePlugin", ""),
                     request.getArg("android.xmanifest", ""),
                     huaweiPushPossible(request.getArg("android.messagingService", ""), sourceZip));
             if (stay == null) {
@@ -12066,7 +12067,7 @@ public class AndroidGradleBuilder extends Executor {
     /// @param useGradle8 the modern Gradle project; Gradle 9 is only ever generated in it
     /// @param forceJava8Builder android.forceJava8Builder=true; Gradle 9 does not run on Java 8
     /// @param topDependency the android.topDependency value
-    /// @param xgradle the android.xgradle value
+    /// @param xgradle the android.xgradle and android.gradlePlugin values, joined
     /// @param xmanifest the android.xmanifest value
     /// @param huaweiPush whether this build may use Huawei push (see huaweiPushPossible)
     /// @return the reason to stay on Gradle 8, or null
@@ -12085,20 +12086,41 @@ public class AndroidGradleBuilder extends Executor {
             return "a build hint applies kotlin-android, which Android Gradle plugin "
                     + ANDROID_GRADLE_PLUGIN_9_VERSION + "'s built-in Kotlin refuses.";
         }
-        java.util.regex.Matcher classpath = java.util.regex.Pattern.compile(
-                "classpath\\s*\\(?\\s*['\"]([^'\":]+:[^'\":]+)").matcher(top);
-        while (classpath.find()) {
-            if (!"com.google.gms:google-services".equals(classpath.group(1))) {
-                return "android.topDependency adds the Gradle plugin " + classpath.group(1)
+        // Line by line, and a line that names a classpath or applies a plugin in a form these
+        // patterns cannot read keeps the build on Gradle 8: unknown is not "known to work".
+        java.util.regex.Pattern classpathPattern = java.util.regex.Pattern.compile(
+                "classpath\\s*\\(?\\s*['\"]([^'\":]+:[^'\":]+)");
+        for (String line : top.split("\n")) {
+            if (!line.contains("classpath")) {
+                continue;
+            }
+            java.util.regex.Matcher m = classpathPattern.matcher(line);
+            String id = m.find() ? m.group(1) : null;
+            if (!"com.google.gms:google-services".equals(id)) {
+                return "android.topDependency adds the Gradle plugin "
+                        + (id != null ? id : "'" + line.trim() + "'")
                         + ", which is not known to apply on Android Gradle plugin "
                         + ANDROID_GRADLE_PLUGIN_9_VERSION + ".";
             }
         }
-        java.util.regex.Matcher plugin = java.util.regex.Pattern.compile(
-                "(?:apply\\s+plugin\\s*:|\\bid)\\s*\\(?\\s*['\"]([^'\"]+)['\"]").matcher(x);
-        while (plugin.find()) {
-            if (!"com.google.gms.google-services".equals(plugin.group(1))) {
-                return "android.xgradle applies the Gradle plugin " + plugin.group(1)
+        java.util.regex.Pattern pluginPattern = java.util.regex.Pattern.compile(
+                "(?:apply\\s*\\(?\\s*plugin\\s*[:=]|\\bid)\\s*\\(?\\s*['\"]([^'\"]+)['\"]");
+        for (String line : x.split("\n")) {
+            boolean applies = line.matches(".*\\bapply\\s*\\(?\\s*plugin\\b.*")
+                    || line.matches("^\\s*id[\\s(].*") || line.contains("plugins {")
+                    || line.contains("plugins{");
+            if (!applies) {
+                continue;
+            }
+            java.util.regex.Matcher m = pluginPattern.matcher(line);
+            String id = m.find() ? m.group(1) : null;
+            if (id == null && (line.contains("plugins {") || line.contains("plugins{"))
+                    && !line.contains("id")) {
+                continue;
+            }
+            if (!"com.google.gms.google-services".equals(id)) {
+                return "a build hint applies the Gradle plugin "
+                        + (id != null ? id : "'" + line.trim() + "'")
                         + ", which is not known to apply on Android Gradle plugin "
                         + ANDROID_GRADLE_PLUGIN_9_VERSION + ".";
             }
