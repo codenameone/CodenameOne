@@ -109,6 +109,20 @@ public final class DevicePosture {
         return Display.impl.isPostureSeparating();
     }
 
+    /// True if this is a foldable device that is currently open, flat or half opened, so the large
+    /// inner display is in use. `Display#isTablet()` answers true for such a device as well; use
+    /// this to tell an open foldable apart from a real tablet.
+    ///
+    /// False when the device does not fold, when it is closed, and when its posture is still
+    /// unknown, which a foldable can report briefly before its hinge has been read.
+    public boolean isOpenFoldable() {
+        if (!isFoldable()) {
+            return false;
+        }
+        int posture = getPosture();
+        return posture == POSTURE_FLAT || posture == POSTURE_HALF_OPENED;
+    }
+
     /// True if the device is in a tabletop or book posture (half opened and separating the display).
     public boolean isTableTop() {
         return getPosture() == POSTURE_HALF_OPENED && isSeparating();

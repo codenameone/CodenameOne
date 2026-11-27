@@ -60,6 +60,19 @@ import java.io.DataInputStream;
 import java.util.regex.Pattern;
 
 public class IPhoneBuilder extends Executor {
+    /// The phone-only orientation list in ByteCodeTranslator's template-Info.plist,
+    /// byte for byte. It leaves out upside-down: an iPhone that allows it turns
+    /// the interface over whenever the device reports PortraitUpsideDown, and a
+    /// foldable phone can report that while being opened. Must stay in sync
+    /// with the template; IPhoneBuilderOrientationTemplateTest holds it.
+    static final String IPHONE_DEFAULT_ORIENTATIONS =
+            "\t<key>UISupportedInterfaceOrientations~iphone</key>\n"
+            + "\t<array>\n"
+            + "\t\t<string>UIInterfaceOrientationPortrait</string>\n"
+            + "\t\t<string>UIInterfaceOrientationLandscapeLeft</string>\n"
+            + "\t\t<string>UIInterfaceOrientationLandscapeRight</string>\n"
+            + "\t</array>\n";
+
     /// The application's own library jars, listed right after its sources are
     /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
     private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
@@ -7222,6 +7235,14 @@ public class IPhoneBuilder extends Executor {
             stopwatch.split("ParparVM Execution");
             try {
                 String orientations = request.getArg("ios.interface_orientation", null);
+                if (orientations != null) {
+                    // The template carries a UISupportedInterfaceOrientations~iphone
+                    // array without upside-down, which an iPhone reads instead of
+                    // the base array. An explicit hint is the developer's own list
+                    // for every device, so the phone-only default goes.
+                    File plist = new File(tmpFile, "dist/" + request.getMainClass() + "-src/" + request.getMainClass() + "-Info.plist");
+                    replaceInFile(plist, IPHONE_DEFAULT_ORIENTATIONS, "");
+                }
                 if (orientations != null && orientations.split(":").length < 4) {
                     orientations = orientations.toLowerCase();
                     File infoPlist = new File(tmpFile, "dist/" + request.getMainClass() + "-src/" + request.getMainClass() + "-Info.plist");

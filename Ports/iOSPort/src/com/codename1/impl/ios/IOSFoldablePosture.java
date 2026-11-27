@@ -44,15 +44,15 @@ import com.codename1.ui.geom.Rectangle;
  * handler, so they are whatever the last update said. The fold GEOMETRY is pull:
  * {@code -[UIView reservedRegionsOfKind:]} answers synchronously.</p>
  *
- * <p>Foldability needs both, and the reason is measured. On an iPhone Duo
- * running iOS 27.1 and folded shut, the view reports no division region --
+ * <p>Foldability needs both, and the reason is measured. On the iPhone Duo
+ * simulator running iOS 27.1 (it has not been measured on a real device) and folded shut, the view reports no division region --
  * inactive ones included -- while the hinge reports
  * {@code UIHingeStatusClosed}. A closed foldable has nothing for the fold to
  * divide. So {@link #isFoldable()} consults the region, and when it says
  * nothing it falls back to the hinge, which is the only thing that knows.</p>
  *
  * <p>Only the DIVISION region counts. The occlusion region is not
- * fold-specific: on the same device it is the camera housing, a 111x111 square,
+ * fold-specific: on the same simulator it is the camera housing, a 111x111 square,
  * and an earlier cut of this class reported it as the fold -- which would have
  * made {@link #isSeparating()} true and {@link #getFoldBounds} the Dynamic
  * Island on every modern iPhone.</p>

@@ -878,13 +878,25 @@ public class CN extends CN1Constants {
         Display.impl.unlockOrientation();
     }
 
-    /// Indicates whether the device is a tablet, notice that this is often a guess
+    /// Indicates whether the device is a tablet, notice that this is often a guess. An open
+    /// foldable phone counts as a tablet, since its inner display is tablet sized; use
+    /// `#isOpenFoldable()` to tell the two apart.
     ///
     /// #### Returns
     ///
     /// true if the device is assumed to be a tablet
     public static boolean isTablet() {
         return Display.impl.isTablet();
+    }
+
+    /// True if this is a foldable device that is currently open, which `#isTablet()` also reports
+    /// as a tablet. See `com.codename1.ui.DevicePosture#isOpenFoldable()`.
+    ///
+    /// #### Returns
+    ///
+    /// true for an open foldable, false otherwise
+    public static boolean isOpenFoldable() {
+        return DevicePosture.getInstance().isOpenFoldable();
     }
 
     /// Returns true if this is a desktop application

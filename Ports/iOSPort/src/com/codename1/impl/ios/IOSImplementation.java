@@ -410,7 +410,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public boolean isTablet() {
-        return isDesktop() || nativeInstance.isTablet();
+        // An open foldable phone reports the phone idiom, but its inner display
+        // is tablet sized, so layouts that branch on isTablet() should treat it
+        // as one. DevicePosture#isOpenFoldable() tells it apart from an iPad.
+        return isDesktop() || nativeInstance.isTablet() || isOpenFoldablePhone();
+    }
+
+    private static boolean isOpenFoldablePhone() {
+        if (!IOSFoldablePosture.isFoldable()) {
+            return false;
+        }
+        int posture = IOSFoldablePosture.getPosture();
+        return posture == com.codename1.ui.DevicePosture.POSTURE_FLAT
+                || posture == com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED;
     }
 
     @Override
@@ -9956,8 +9968,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             int dispWidth = getDisplayWidth();
             int dispHeight = getDisplayHeight();
-            // ipad mini is ignored, there is no sensible way to detect it
-            if(isTablet()) {
+            // ipad mini is ignored, there is no sensible way to detect it.
+            // The iPad idiom, not isTablet(): an open foldable phone is a
+            // tablet for layout, but its pixel density is a phone's.
+            if(nativeInstance.isTablet()) {
                 if(dispWidth < 1100) {
                     dDensity = Display.DENSITY_MEDIUM;
                     return dDensity;
@@ -10087,7 +10101,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         // ipad mini is ignored, there is no sensible way to detect it
         if(ppi == 0) {
             int dispWidth = getDisplayWidth();
-            if(isTablet()) {
+            // iPad idiom only, for the same reason as getDeviceDensity().
+            if(nativeInstance.isTablet()) {
                 if(dispWidth < 1100) {
                     ppi = 5.1975051975052;
                 } else {
@@ -13715,7 +13730,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(isTV()) {
             return new String[] {"tv", "ios", "appletv"};
         }
-        if(isTablet()) {
+        // The iPad idiom rather than isTablet(): overrides pick resources once,
+        // and an open foldable phone must not switch to iPad resources when it
+        // happens to be unfolded at launch.
+        if(nativeInstance.isTablet()) {
             return new String[] {"tablet", "ios", "ipad"};
         } else {
             return new String[] {"phone", "ios", "iphone"};

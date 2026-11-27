@@ -86,7 +86,7 @@ int cn1HingeAngleDegrees(void);
 /// the return value is 0.
 ///
 /// Only DIVISION regions count as a fold. Occlusion regions are not
-/// fold-specific -- on an iPhone Duo the occlusion set is the camera housing
+/// fold-specific -- on the iPhone Duo simulator (no device was available) the occlusion set is the camera housing
 /// (a 111x111 square), so reading it here would report the Dynamic Island of
 /// any iPhone as a hinge. See the note in CN1Hinge.m.
 int cn1HingeFoldRegion(int *out);
