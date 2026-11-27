@@ -1,0 +1,4 @@
+# Seeded from the arm64 capture: the x64 capture job hung in cmake --build
+# twice. Absorb x64/arm64 anti-aliasing variance.
+maxChannelDelta=64
+maxMismatchPercent=4.0
