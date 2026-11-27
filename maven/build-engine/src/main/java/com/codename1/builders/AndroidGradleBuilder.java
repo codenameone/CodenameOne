@@ -94,14 +94,16 @@ public class AndroidGradleBuilder extends Executor {
     private static final String GRADLE_8_DISTRIBUTION_URL =
             "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
 
-    // The opt-in Gradle 9 pairing, selected by android.gradleVersion=9 (or an explicit 9.x).
+    // The default Gradle 9 pairing: a build that names no Gradle gets it unless
+    // gradle9DefaultBlocker keeps it on Gradle 8, and android.gradleVersion=9 (or an explicit
+    // 9.x) asks for it -- and is refused, not downgraded, when it cannot work.
     // Gradle 9 cannot run the 8.x Android Gradle plugin line at all, so choosing Gradle 9 means
     // choosing AGP 9 too, and AGP 9 is a breaking release for the generated project: jcenter()
     // is gone, dexOptions is gone, built-in Kotlin refuses the kotlin-android plugin,
     // proguard-android.txt is refused, <uses-sdk> may no longer carry SDK versions, and the
     // google-services plugin below 4.4 still uses the removed applicationVariants API. Each of
-    // those is handled where the file is written, keyed off useGradle9, so the default Gradle 8
-    // project is byte-identical to what it was. Measured: the hellocodenameone project (Kotlin
+    // those is handled where the file is written, keyed off useGradle9, so a Gradle 8 project
+    // (pinned, or kept there by gradle9DefaultBlocker) is byte-identical to what it was. Measured: the hellocodenameone project (Kotlin
     // sources, a Wear module, FCM) assembles debug and R8 release on this pairing.
     static final String GRADLE_9_VERSION = "9.8.0";
     static final String ANDROID_GRADLE_PLUGIN_9_VERSION = "9.4.1";
@@ -1924,7 +1926,26 @@ public class AndroidGradleBuilder extends Executor {
                     + "renaming, but " + reason + ". Build a signed release variant with R8 enabled, set "
                     + "harden.rename=false, or set harden.level=off.");
         }
-        String requestedGradle9 = requestedGradle9Version(request.getArg("android.gradleVersion", ""));
+        String gradleHint = request.getArg("android.gradleVersion", "");
+        String requestedGradle9 = requestedGradle9Version(gradleHint);
+        if (requestedGradle9 == null && gradleHint.trim().length() == 0) {
+            // Gradle 9 is the default. A build that names no Gradle gets it whenever it can
+            // run there and otherwise keeps the Gradle 8 it built with before -- never the
+            // refusals below, which are for a project that ASKED for 9, so moving the default
+            // turns no working build into a refused one. The reason is logged.
+            String stay = gradle9DefaultBlocker(useGradle8,
+                    request.getArg("android.forceJava8Builder", "false").equals("true"),
+                    request.getArg("android.topDependency", ""),
+                    request.getArg("android.xgradle", ""),
+                    request.getArg("android.xmanifest", ""),
+                    huaweiPushPossible(request.getArg("android.messagingService", ""), sourceZip));
+            if (stay == null) {
+                requestedGradle9 = GRADLE_9_VERSION;
+            } else {
+                log("Staying on Gradle " + GRADLE_8_VERSION + " instead of the default Gradle "
+                        + GRADLE_9_VERSION + ": " + stay);
+            }
+        }
         useGradle9 = requestedGradle9 != null;
         if (useGradle9 && !useGradle8) {
             throw new BuildException("android.gradleVersion=" + request.getArg("android.gradleVersion", "")
@@ -12031,22 +12052,104 @@ public class AndroidGradleBuilder extends Executor {
                 || "com/codename1/health/HealthUnitDimension".equals(cls);
     }
 
-    /**
-     * The Gradle 9 distribution {@code android.gradleVersion} asks for, or null for the default
-     * Gradle 8 build.
-     *
-     * <p>{@code 9} alone means the measured pairing, {@link #GRADLE_9_VERSION}. An explicit 9.x is
-     * the exact release to build with, padded to three components (9.6 is 9.6.0, the name
-     * Gradle publishes it under), and is refused below {@link #GRADLE_9_MIN_VERSION},
-     * which the Android Gradle plugin would refuse anyway, only later. A value below 9 is
-     * ignored, as this builder always ignored the hint: its Gradle 8 line is not selectable.
-     * Gradle 10 and later are refused rather than attempted, because nothing here knows which
-     * Android Gradle plugin they need.</p>
-     *
-     * @param hint the raw android.gradleVersion value
-     * @return the Gradle 9 version to build with, or null
-     * @throws BuildException if the value is not a version, or names an unsupported one
-     */
+    /// Why a build that names no Gradle cannot take the Gradle 9 default, or null when it can.
+    ///
+    /// An allow-list, not the refusals alone. A build an explicit `android.gradleVersion=9`
+    /// would refuse stays on Gradle 8, and so does one whose failure on Android Gradle plugin
+    /// 9 would only show up inside Gradle: a Gradle plugin a hint adds (anything but
+    /// google-services, whose floor is checked), `kotlin-android` (built-in Kotlin refuses
+    /// it), and Huawei push, whose agcp plugin is the builder's own and has not been measured
+    /// on that plugin. Moving the default must turn no working build into a failing one.
+    /// The same method exists in both Android builders (build-engine and the BuildDaemon);
+    /// keep them identical.
+    ///
+    /// @param useGradle8 the modern Gradle project; Gradle 9 is only ever generated in it
+    /// @param forceJava8Builder android.forceJava8Builder=true; Gradle 9 does not run on Java 8
+    /// @param topDependency the android.topDependency value
+    /// @param xgradle the android.xgradle value
+    /// @param xmanifest the android.xmanifest value
+    /// @param huaweiPush whether this build may use Huawei push (see huaweiPushPossible)
+    /// @return the reason to stay on Gradle 8, or null
+    static String gradle9DefaultBlocker(boolean useGradle8, boolean forceJava8Builder,
+            String topDependency, String xgradle, String xmanifest, boolean huaweiPush) {
+        if (!useGradle8) {
+            return "android.useGradle8=false selects the legacy Gradle project.";
+        }
+        if (forceJava8Builder) {
+            return "android.forceJava8Builder=true, and Gradle 9 does not run on Java 8.";
+        }
+        String top = topDependency == null ? "" : topDependency;
+        String x = xgradle == null ? "" : xgradle;
+        if (top.contains("kotlin-android") || x.contains("kotlin-android")
+                || x.contains("kotlin(\"android\")")) {
+            return "a build hint applies kotlin-android, which Android Gradle plugin "
+                    + ANDROID_GRADLE_PLUGIN_9_VERSION + "'s built-in Kotlin refuses.";
+        }
+        java.util.regex.Matcher classpath = java.util.regex.Pattern.compile(
+                "classpath\\s*\\(?\\s*['\"]([^'\":]+:[^'\":]+)").matcher(top);
+        while (classpath.find()) {
+            if (!"com.google.gms:google-services".equals(classpath.group(1))) {
+                return "android.topDependency adds the Gradle plugin " + classpath.group(1)
+                        + ", which is not known to apply on Android Gradle plugin "
+                        + ANDROID_GRADLE_PLUGIN_9_VERSION + ".";
+            }
+        }
+        java.util.regex.Matcher plugin = java.util.regex.Pattern.compile(
+                "(?:apply\\s+plugin\\s*:|\\bid)\\s*\\(?\\s*['\"]([^'\"]+)['\"]").matcher(x);
+        while (plugin.find()) {
+            if (!"com.google.gms.google-services".equals(plugin.group(1))) {
+                return "android.xgradle applies the Gradle plugin " + plugin.group(1)
+                        + ", which is not known to apply on Android Gradle plugin "
+                        + ANDROID_GRADLE_PLUGIN_9_VERSION + ".";
+            }
+        }
+        if (huaweiPush) {
+            return "Huawei push adds the agcp Gradle plugin, which is not known to apply on"
+                    + " Android Gradle plugin " + ANDROID_GRADLE_PLUGIN_9_VERSION + ".";
+        }
+        String refusal = agp9GoogleServicesRefusal(top);
+        return refusal != null ? refusal : agp9MaxSdkRefusal(xmanifest);
+    }
+
+    /// Whether this build may end up on Huawei push, decided before the sources are
+    /// unpacked: the messaging service names it, or the project carries an
+    /// agconnect-services.json (which "auto" picks Huawei push from). Errs toward true --
+    /// its only use is keeping the build on Gradle 8.
+    ///
+    /// @param messagingService the android.messagingService value
+    /// @param sourceZip the uploaded sources
+    /// @return true when Huawei push is possible
+    static boolean huaweiPushPossible(String messagingService, File sourceZip) {
+        if ("hms".equalsIgnoreCase(messagingService) || "huawei".equalsIgnoreCase(messagingService)) {
+            return true;
+        }
+        if (sourceZip == null || !sourceZip.isFile()) {
+            return false;
+        }
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(sourceZip);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                String name = entries.nextElement().getName();
+                if (name.equals("agconnect-services.json") || name.endsWith("/agconnect-services.json")) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (java.io.IOException unreadable) {
+            return true;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (java.io.IOException ignored) {
+                    // read-only; nothing to lose
+                }
+            }
+        }
+    }
+
     static String requestedGradle9Version(String hint) throws BuildException {
         String value = hint == null ? "" : hint.trim();
         if (value.length() == 0) {
