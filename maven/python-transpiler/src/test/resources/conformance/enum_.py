@@ -77,3 +77,20 @@ class Status(IntEnum):
 
 print(Status.OK < Status.NOT_FOUND, sorted([Status.NOT_FOUND, Status.OK]), Status(404).name, Status.OK + 0)
 print(int(Status.OK), Status.OK == 200, "%d" % Status.OK, max(Status))
+
+import enum
+class BE(int, enum.Enum):
+    def __new__(cls, v, doc):
+        self = int.__new__(cls, v)
+        self._value_ = v
+        self.__doc__ = doc.strip()
+        return self
+    def __str__(self): return f"{self.name} ({self.value})"
+class ST(BE):
+    AUTO = (1, ' a ')
+    PIC = (13, 'p')
+class Shp:
+    def __init__(self, t): self.t = t
+    def kind(self) -> ST: return ST(self.t)
+s = Shp(13)
+print(s.kind(), s.kind() is ST.PIC, ST.PIC == 13, ST.AUTO.__doc__, [str(m) for m in ST], s.kind() == ST.PIC)

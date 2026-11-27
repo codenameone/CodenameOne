@@ -47,6 +47,16 @@ public final class PyStaticMethod extends PyObject {
     }
 
     @Override
+    public Object call1(Object a) {
+        return Py.obj(func).call1(a);
+    }
+
+    @Override
+    public Object call2(Object a, Object b) {
+        return Py.obj(func).call2(a, b);
+    }
+
+    @Override
     public Object getAttrOrNull(String attr) {
         if ("__func__".equals(attr) || "__wrapped__".equals(attr)) {
             return func;

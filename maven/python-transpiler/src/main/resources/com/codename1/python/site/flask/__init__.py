@@ -478,14 +478,9 @@ class _Proxy:
             return c.session
         return c.app
 
-    def __getattr__(self, name):
-        return getattr(self._get(), name)
-
-    def __setattr__(self, name, value):
-        setattr(self._get(), name, value)
-
-    def __delattr__(self, name):
-        delattr(self._get(), name)
+    # No __getattr__/__setattr__: the build gives each program a subclass
+    # with one forwarding property per attribute name it uses on the proxy
+    # (codegen FlaskProxyLowering), so no name is looked up at run time.
 
     def __contains__(self, name):
         return name in self._get()
@@ -1636,9 +1631,10 @@ class SecureCookieSessionInterface:
 
 
 def flash(message, category="message"):
-    flashes = session.get("_flashes", [])
+    sess = session._get()
+    flashes = sess.get("_flashes", [])
     flashes.append([category, message])
-    session["_flashes"] = flashes
+    sess["_flashes"] = flashes
 
 
 def get_flashed_messages(with_categories=False, category_filter=()):

@@ -58,16 +58,31 @@ PYEOF
     # The sources go through a response file: a large translation (every
     # Python conformance program in one binary) is more file names than
     # macOS's argument limit takes.
+    # The path is appended (-n 1), not substituted with -I: BSD xargs caps a
+    # substituted line at 255 bytes, less than a source under a temporary directory.
     # CN1_COMPILE_JOBS compiles the objects in parallel and links them after,
     # for a build without LTO; one clang over thousands of files is serial.
     if [ -n "${CN1_COMPILE_JOBS:-}" ]; then
         local objs="$dist/../objs"
         mkdir -p "$objs"
-        find "$srcdir" -maxdepth 1 \( -name '*.c' -o -name '*.S' \) | CC="$CC" FLAGS="$flags -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off $CN1_SELFHOST_CFLAGS -I$srcdir" OBJS="$objs" \
-            xargs -P "$CN1_COMPILE_JOBS" -I{} sh -c '$CC $FLAGS -c "$1" -o "$OBJS/$(basename "$1").o"' _ {} \
-            2> "$log" || { echo "COMPILE FAILED"; tail -40 "$log"; return 1; }
+        local cflags="$flags -w -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf -ffp-contract=off $CN1_SELFHOST_CFLAGS"
+        # CN1_COMPILE_PREVIOUS names the output of an earlier build of the same program
+        # at the same path: reuse-objects.py keeps every object this build would compile
+        # to the same thing, which after a small change is nearly all of them. -MMD writes
+        # the headers each object read, which is what that decision needs next time.
+        if [ -n "${CN1_COMPILE_PREVIOUS:-}" ] && [ -d "$CN1_COMPILE_PREVIOUS/objs" ]; then
+            "${PYTHON:-python3}" "$REPO/vm/selfhost/reuse-objects.py" "$srcdir" \
+                "$CN1_COMPILE_PREVIOUS/dist/$app-src" "$CN1_COMPILE_PREVIOUS/objs" "$objs" "$CC $cflags" \
+                > "$dist/../compile.txt" || return 1
+        else
+            find "$srcdir" -maxdepth 1 \( -name '*.c' -o -name '*.S' \) > "$dist/../compile.txt"
+        fi
+        printf '%s' "$CC $cflags" > "$objs/flags.txt"
+        CC="$CC" FLAGS="$cflags -I$srcdir" OBJS="$objs" \
+            xargs -P "$CN1_COMPILE_JOBS" -n 1 sh -c '$CC $FLAGS -MMD -MF "$OBJS/$(basename "$1").d" -c "$1" -o "$OBJS/$(basename "$1").o"' _ \
+            < "$dist/../compile.txt" 2> "$log" || { echo "COMPILE FAILED"; tail -40 "$log"; return 1; }
         find "$objs" -name '*.o' | sed 's/.*/"&"/' > "$dist/../objs.rsp"
-        $CC $flags @"$dist/../objs.rsp" -lm -lpthread -o "$bin" 2>> "$log" \
+        $CC $flags $CN1_SELFHOST_CFLAGS @"$dist/../objs.rsp" -lm -lpthread -o "$bin" 2>> "$log" \
             || { echo "LINK FAILED"; tail -40 "$log"; return 1; }
         echo "built $bin"
         return 0

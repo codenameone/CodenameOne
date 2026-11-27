@@ -108,7 +108,7 @@ public final class PyMemoryView extends PyObject {
     }
 
     private int index(Object key) {
-        long i = Py.index(key);
+        long i = Py.subscript(key);
         if (i < 0) {
             i += length;
         }
@@ -202,28 +202,28 @@ public final class PyMemoryView extends PyObject {
 
     static void install() {
         PyType t = Py.MEMORYVIEW_TYPE;
-        t.define("tobytes", PyBuiltin.method(t, "tobytes", a -> new PyBytes(self(a[0]).bytes())));
-        t.define("tolist", PyBuiltin.method(t, "tolist", a -> {
-            byte[] b = self(a[0]).bytes();
+        t.define("tobytes", PyBuiltin.method1(t, "tobytes", a0 -> new PyBytes(self(a0).bytes())));
+        t.define("tolist", PyBuiltin.method1(t, "tolist", a0 -> {
+            byte[] b = self(a0).bytes();
             Object[] r = new Object[b.length];
             for (int i = 0; i < b.length; i++) {
                 r[i] = PyInt.of(b[i] & 0xff);
             }
             return new PyList(r);
         }));
-        t.define("hex", PyBuiltin.method(t, "hex", a -> Py.call(Py.BYTES_TYPE.lookup("hex"),
-                new PyBytes(self(a[0]).bytes()))));
-        t.define("release", PyBuiltin.method(t, "release", a -> {
-            self(a[0]).released = true;
+        t.define("hex", PyBuiltin.method1(t, "hex", a0 -> Py.call(Py.BYTES_TYPE.lookup("hex"),
+                new PyBytes(self(a0).bytes()))));
+        t.define("release", PyBuiltin.method1(t, "release", a0 -> {
+            self(a0).released = true;
             return Py.NONE;
         }));
-        t.define("toreadonly", PyBuiltin.method(t, "toreadonly", a -> {
-            PyMemoryView m = self(a[0]);
+        t.define("toreadonly", PyBuiltin.method1(t, "toreadonly", a0 -> {
+            PyMemoryView m = self(a0);
             return new PyMemoryView(new PyBytes(m.bytes()), 0, 1, m.length);
         }));
-        t.define("__enter__", PyBuiltin.method(t, "__enter__", a -> self(a[0])));
-        t.define("__exit__", PyBuiltin.method(t, "__exit__", a -> {
-            self(a[0]).released = true;
+        t.define("__enter__", PyBuiltin.method1(t, "__enter__", a0 -> self(a0)));
+        t.define("__exit__", PyBuiltin.method1(t, "__exit__", a0 -> {
+            self(a0).released = true;
             return Py.FALSE;
         }));
         t.factory = (type, args, kw) -> {

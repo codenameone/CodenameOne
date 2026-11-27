@@ -1,0 +1,13 @@
+['bb', 'ccc']
+['A=1.5', 'BB=2.0', '*CCC=3.25']
+13.5
+['a!', 'b!', 'b!', 'c!', 'c!', 'c!']
+[['aa', 'abb', 'accc'], ['bba', 'bbbb', 'bbccc'], ['ccca', 'cccbb', 'cccccc']]
+['alpha', 'beta', 'gamma']
+[True, True, False]
+["'x'", "'y'", '3', 'None']
+['a:1.5', 'bb:2.0', 'ccc:3.25']
+['a', 'b', 'c']
+[('a', 1.5), ('bb', 2.0), ('ccc', 3.25)]
+(['a', 'bb', 'ccc'], 42)
+[0.25, 1.5625, 4.0]

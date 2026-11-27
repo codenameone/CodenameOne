@@ -1,0 +1,15 @@
+(1, 2, 3, 'x')
+(1, 5, 3, 'x')
+(1, 2, 3, 'y')
+(7, 2, 9, 'x')
+eval a
+eval c
+(1, 2, 4, 'x')
+(1, 2)
+posonly kw rejected
+too many rejected
+unknown kw rejected
+non-None init rejected
+(4, 2, 8, 'x')
+('new', 4, 8)
+('new', 3, 0)

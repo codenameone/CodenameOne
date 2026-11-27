@@ -7624,6 +7624,99 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailabl
     return cn1SqlitePool ? !!cn1SqlitePoolVfs : cn1SqliteMemoryVfs !== "memdb";
   });
 
+/**
+ * A scalar SQL function whose body is Java (Database.createFunction).
+ *
+ * The oo1 createFunction converts arguments with sqlite3_values_to_js, which turns every integer
+ * that fits a double into a JS number and so loses whether SQLite held an INTEGER or a REAL --
+ * a function that returns its argument would hand 1 back as 1.0. Arguments are therefore read
+ * here with their own SQLite type: an integer as its exact 64-bit text, a real as its text, text,
+ * a blob as a byte[], NULL as null; DatabaseImpl.callFunction parses the numbers. The result
+ * comes back as [kind, value] with the same codes ("0" is an error message) and is set with the
+ * matching sqlite3_result_* call, an integer through BigInt so 64 bits survive.
+ *
+ * The Java side runs synchronously inside sqlite3_step, so it must not block; a function that
+ * does is reported as this function's error rather than suspending the statement.
+ */
+function cn1SqliteCallJavaFunction(id, args, kinds) {
+  const fn = global.cn1_com_codename1_impl_html5_database_DatabaseImpl_callFunction_int_java_lang_Object_1ARRAY_int_1ARRAY_R_java_lang_Object_1ARRAY
+      || global.cn1_com_codename1_impl_html5_database_DatabaseImpl_callFunction___int_java_lang_Object_1ARRAY_int_1ARRAY_R_java_lang_Object_1ARRAY;
+  return cn1_ivsDrive(fn(id, args, kinds), "DatabaseImpl.callFunction");
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_createFunction_long_java_lang_String_int_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_createFunction___long_java_lang_String_int_int_R_boolean"],
+  function(dbId, name, argCount, id) {
+    return cn1SqliteGuard(function() {
+      const db = cn1SqliteLookup(Number(dbId));
+      const capi = cn1Sqlite.capi;
+      const wasm = cn1Sqlite.wasm;
+      const fnId = id | 0;
+      const ptrSize = wasm.pointerSize || 4;
+      const xFunc = wasm.installFunction("v(pip)", function(ctx, argc, argv) {
+        try {
+          const n = argc | 0;
+          const args = jvm.newArray(n, "java_lang_Object", 1);
+          const kinds = jvm.newArray(n, "JAVA_INT", 1);
+          for (let i = 0; i < n; i++) {
+            const v = wasm.peekPtr(argv + i * ptrSize);
+            const t = capi.sqlite3_value_type(v);
+            if (t === capi.SQLITE_INTEGER) {
+              kinds[i] = 1;
+              args[i] = jvm.createStringLiteral(String(capi.sqlite3_value_int64(v)));
+            } else if (t === capi.SQLITE_FLOAT) {
+              kinds[i] = 2;
+              args[i] = jvm.createStringLiteral(String(capi.sqlite3_value_double(v)));
+            } else if (t === capi.SQLITE_TEXT) {
+              kinds[i] = 3;
+              args[i] = jvm.createStringLiteral(String(capi.sqlite3_value_to_js(v)));
+            } else if (t === capi.SQLITE_BLOB) {
+              kinds[i] = 4;
+              const bytes = capi.sqlite3_value_to_js(v) || new Uint8Array(0);
+              const out = jvm.newArray(bytes.length | 0, "JAVA_BYTE", 1);
+              for (let j = 0; j < out.length; j++) {
+                const u = bytes[j] | 0;
+                out[j] = u > 127 ? u - 256 : u;
+              }
+              args[i] = out;
+            } else {
+              kinds[i] = 5;
+              args[i] = null;
+            }
+          }
+          const r = cn1SqliteCallJavaFunction(fnId, args, kinds);
+          const kind = jvm.toNativeString(r[0]);
+          const value = r[1];
+          if (kind === "0") {
+            capi.sqlite3_result_error_js(ctx, value == null ? "error" : jvm.toNativeString(value));
+          } else if (kind === "1") {
+            capi.sqlite3_result_int64(ctx, BigInt(jvm.toNativeString(value)));
+          } else if (kind === "2") {
+            capi.sqlite3_result_double(ctx, Number(jvm.toNativeString(value)));
+          } else if (kind === "3") {
+            capi.sqlite3_result_js(ctx, jvm.toNativeString(value));
+          } else if (kind === "4") {
+            const bytes = new Uint8Array(value.length | 0);
+            for (let j = 0; j < bytes.length; j++) {
+              bytes[j] = value[j] & 0xff;
+            }
+            capi.sqlite3_result_js(ctx, bytes);
+          } else {
+            capi.sqlite3_result_null(ctx);
+          }
+        } catch (err) {
+          capi.sqlite3_result_error_js(ctx, err && err.message ? String(err.message) : String(err));
+        }
+      });
+      const rc = capi.sqlite3_create_function_v2(db.pointer, jvm.toNativeString(name), argCount | 0,
+          capi.SQLITE_UTF8, 0, xFunc, 0, 0, 0);
+      if (rc !== 0) {
+        wasm.uninstallFunction(xFunc);
+        throw new Error(capi.sqlite3_errmsg(db.pointer));
+      }
+      return true;
+    }, false);
+  });
+
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
   function(name) {
     return cn1SqliteGuard(function() {

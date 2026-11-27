@@ -108,8 +108,10 @@ class _Dialect:
         def pick(name, default):
             if name in kw:
                 return kw[name]
-            if dialect is not None and getattr(dialect, name, None) is not None:
-                return getattr(dialect, name)
+            if dialect is not None:
+                v = _dialect_attr(dialect, name)
+                if v is not None:
+                    return v
             return default
 
         self.delimiter = _char("delimiter", pick("delimiter", ","), False)
@@ -174,16 +176,44 @@ def list_dialects():
     return list(_dialects)
 
 
+def _dialect_attr(d, name):
+    """One dialect parameter, each read by its own name (a computed
+    getattr cannot be typed); a parameter the dialect lacks reads None."""
+    if name == "delimiter":
+        return getattr(d, "delimiter", None)
+    if name == "quotechar":
+        return getattr(d, "quotechar", None)
+    if name == "escapechar":
+        return getattr(d, "escapechar", None)
+    if name == "doublequote":
+        return getattr(d, "doublequote", None)
+    if name == "skipinitialspace":
+        return getattr(d, "skipinitialspace", None)
+    if name == "lineterminator":
+        return getattr(d, "lineterminator", None)
+    if name == "quoting":
+        return getattr(d, "quoting", None)
+    if name == "strict":
+        return getattr(d, "strict", None)
+    raise TypeError("not a dialect parameter: " + name)
+
+
 class _Frozen:
     __slots__ = ("delimiter", "quotechar", "escapechar", "doublequote", "skipinitialspace", "lineterminator",
                  "quoting", "strict")
 
     def __init__(self, d):
-        for n in self.__slots__:
-            object.__setattr__(self, n, getattr(d, n))
+        self.delimiter = d.delimiter
+        self.quotechar = d.quotechar
+        self.escapechar = d.escapechar
+        self.doublequote = d.doublequote
+        self.skipinitialspace = d.skipinitialspace
+        self.lineterminator = d.lineterminator
+        self.quoting = d.quoting
+        self.strict = d.strict
 
-    def __setattr__(self, name, value):
-        raise AttributeError("attribute '%s' of '_csv.Dialect' objects is not writable" % name)
+    # Read-only by convention: a __setattr__ that refuses writes would leave the
+    # class without a layout, and nothing in this module writes to one.
 
 
 register_dialect("excel", excel)

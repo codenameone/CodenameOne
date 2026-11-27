@@ -1,0 +1,6 @@
+6 dims 6 shape-kind 7
+20 dims 20 layout shape-kind 1 4
+True True False
+['Layout', 'Placeholder', 'Dims', 'Shape', 'object']
+99 99 99
+99

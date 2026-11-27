@@ -1,0 +1,2 @@
+main:1 class Spy has no layout: its body binds __getattribute__
+main:19 class Fake has no layout: its body binds __getattribute__

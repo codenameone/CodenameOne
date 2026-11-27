@@ -25,6 +25,7 @@ package com.codename1.python.transpiler.codegen;
 
 import com.codename1.python.transpiler.ast.Node.*;
 
+import com.codename1.python.transpiler.ast.Node.Yield;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -40,6 +41,8 @@ import java.util.Set;
 /// Walrus targets, comprehensions and lambdas are not followed.
 final class DefAssign {
     final Set<Name> safe = Collections.newSetFromMap(new IdentityHashMap<Name, Boolean>());
+    /// The reads not proven to follow a binding.
+    final Set<Name> unsafe = Collections.newSetFromMap(new IdentityHashMap<Name, Boolean>());
 
     /// Marks the safe loads of `body`, a function whose parameters `params`
     /// are bound on entry.
@@ -209,8 +212,21 @@ final class DefAssign {
             return res;
         }
         if (s instanceof FunctionDef) {
+            // Decorators and defaults are read where the def stands.
+            FunctionDef fd = (FunctionDef) s;
+            for (Expr d : fd.decorators) {
+                expr(d, in);
+            }
+            for (Expr d : fd.args.defaults) {
+                expr(d, in);
+            }
+            for (Expr d : fd.args.kwDefaults) {
+                if (d != null) {
+                    expr(d, in);
+                }
+            }
             Set<String> out = new HashSet<String>(in);
-            out.add(((FunctionDef) s).name);
+            out.add(fd.name);
             return out;
         }
         if (s instanceof ClassDef) {
@@ -338,6 +354,8 @@ final class DefAssign {
         if (e instanceof Name) {
             if (in.contains(((Name) e).id)) {
                 safe.add((Name) e);
+            } else {
+                unsafe.add((Name) e);
             }
         } else if (e instanceof Attribute || e instanceof Subscript) {
             parts(e, in);
@@ -363,6 +381,8 @@ final class DefAssign {
             expr(((IfExp) e).orelse, in);
         } else if (e instanceof NamedExpr) {
             expr(((NamedExpr) e).value, in);
+        } else if (e instanceof Yield) {
+            expr(((Yield) e).value, in);
         } else if (e instanceof Call) {
             Call c = (Call) e;
             expr(c.func, in);
@@ -381,7 +401,40 @@ final class DefAssign {
                 expr(k, in);
             }
             exprs(((DictExpr) e).values, in);
+        } else if (e instanceof Comp) {
+            // A comprehension runs where it stands: its first iterable in
+            // this scope, the rest reading this scope's locals as they are
+            // now (its own targets are its own scope's).
+            Comp c = (Comp) e;
+            expr(c.generators.get(0).iter, in);
+            Set<String> inner = new HashSet<String>(in);
+            if (c.scope != null) {
+                inner.addAll(c.scope.assigned);
+            }
+            for (int i = 0; i < c.generators.size(); i++) {
+                Comprehension g = c.generators.get(i);
+                if (i > 0) {
+                    expr(g.iter, inner);
+                }
+                exprs(g.ifs, inner);
+            }
+            expr(c.elt, inner);
+            expr(c.value, inner);
+        } else if (e instanceof JoinedStr) {
+            for (Expr part : ((JoinedStr) e).parts) {
+                expr(part, in);
+            }
+        } else if (e instanceof FormattedValue) {
+            expr(((FormattedValue) e).value, in);
+            expr(((FormattedValue) e).spec, in);
+        } else if (e instanceof Lambda) {
+            // Its defaults are evaluated where it stands; its body later,
+            // so a read there is left checked.
+            exprs(((Lambda) e).args.defaults, in);
+            for (Expr d : ((Lambda) e).args.kwDefaults) {
+                expr(d, in);
+            }
         }
-        // Comprehensions, lambdas, f-strings, await, yield: left checked.
+        // Await, yield, a lambda's body: left checked.
     }
 }

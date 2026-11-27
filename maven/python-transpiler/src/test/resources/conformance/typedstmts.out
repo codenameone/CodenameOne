@@ -1,0 +1,9 @@
+kept 1 set ['in', 'out -', 'in', 'out KeyError']
+done ['in', 1, 'out -', 'in', 'out -', 'in', 3, 'out -', 'in', 'out -']
+returned ['in', 'out -']
+3
+assert too big 3
+([('k', 2)], 'k')
+(['b'], [2, 3], False)
+unbound UnboundLocalError
+2 5 5

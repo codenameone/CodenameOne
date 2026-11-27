@@ -1,0 +1,2 @@
+main:99 class Odd has no layout: its metaclass Swap is not one defined once in the module, deriving from type and binding no hook besides __call__, __getattr__, __new__ and __init__
+main:110 class Dim4 has no layout: base Odd has no layout

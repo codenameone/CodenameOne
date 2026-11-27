@@ -62,6 +62,21 @@ public class PyInstance extends PyObject {
     /// `o.__dict__ is o.__dict__` as in CPython. Null until then.
     private InstanceDict dictView;
 
+    /// The instance's one `__dict__` view, made on first use.
+    final PyDict dictView() {
+        InstanceDict d = dictView;
+        if (d == null) {
+            d = new InstanceDict(this);
+            dictView = d;
+        }
+        return d;
+    }
+
+    /// The view if one was made: what [AttrSite] compares a read with.
+    final Object dictViewOrNull() {
+        return dictView;
+    }
+
     /// The shape, the empty one for null.
     final Shape shape() {
         return shape == null ? Shape.EMPTY : shape;
@@ -94,6 +109,60 @@ public class PyInstance extends PyObject {
         return null;
     }
 
+    /// Every field into `d[0..fieldNames().length)`, as getField answers
+    /// each; generated classes write them in one pass.
+    protected void copyFields(Object[] d) {
+        int n = fieldNames().length;
+        for (int i = 0; i < n; i++) {
+            d[i] = getField(i);
+        }
+    }
+
+    /// The state half of `copy.copy` and `copy.deepcopy` (`_cn1copy`): every
+    /// attribute of this instance into `y`, a fresh instance of the same
+    /// class that `copy` just made, each value passed through `deep` (with
+    /// `memo`) when it is not null. CPython copies an instance by reducing
+    /// it to `__dict__` and storing every key back with `setattr`; here the
+    /// fields move by index through the methods the transpiler generates per
+    /// class ([#copyFields], [#setField]), and the attributes held beside
+    /// them in the shape move with it, so no attribute is looked up by name.
+    void copyStateInto(PyInstance y, Object memo, Object deep) {
+        int nf = fieldNames().length;
+        if (nf > 0) {
+            Object[] d = new Object[nf];
+            copyFields(d);
+            for (int i = 0; i < nf; i++) {
+                Object v = d[i];
+                if (v != null) {
+                    y.setField(i, deep == null ? v : Py.call(deep, v, memo));
+                }
+            }
+        }
+        Shape sh = shape;
+        int n = sh == null ? 0 : sh.size();
+        if (n == 0) {
+            return;
+        }
+        Object[] src = slots;
+        if (y.shape == null && y.getClass() == getClass() && y.cls == cls) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object[] out = new Object[src.length];
+            for (int i = 0; i < n; i++) {
+                Object v = src[i];
+                out[i] = deep == null || v == FIELD_HERE ? v : Py.call(deep, v, memo); //NOPMD CompareObjectsWithEquals - identity is meant
+            }
+            y.slots = out;
+            y.shape = sh;
+            y.extra = extra;
+            return;
+        }
+        for (int i = 0; i < n; i++) {
+            Object v = src[i];
+            if (v != FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                y.store(sh.names[i], deep == null ? v : Py.call(deep, v, memo));
+            }
+        }
+    }
+
     /// Stores field `i`; null unsets it.
     protected void setField(int i, Object value) {
     }
@@ -105,6 +174,10 @@ public class PyInstance extends PyObject {
 
     private static final String[] NO_NAMES = new String[0];
 
+    /// The slot value of a field's name in the shape: the name marks where
+    /// the attribute was first set (see [#store]), its value is the field.
+    static final Object FIELD_HERE = new Object();
+
     /// The instance attribute `name`, or null.
     Object own(String name) {
         int f = fieldIndex(name);
@@ -115,16 +188,56 @@ public class PyInstance extends PyObject {
             }
         }
         int i = shape == null ? -1 : shape.indexOf(name);
-        return i < 0 ? null : slots[i];
+        Object v = i < 0 ? null : slots[i];
+        return v == FIELD_HERE ? null : v; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// The field index of each of `names` in this instance's class, -1 for
+    /// one it keeps elsewhere: for a caller that reads the same attributes of
+    /// many instances, through [#ownAt] and [#storeAt], without matching a
+    /// name each time.
+    int[] fieldIndexes(String[] names) {
+        int[] out = new int[names.length];
+        for (int i = 0; i < names.length; i++) {
+            out[i] = fieldIndex(names[i]);
+        }
+        return out;
+    }
+
+    /// [#own] with the field index already known (see [#fieldIndexes]).
+    Object ownAt(int f, String name) {
+        if (f >= 0) {
+            Object v = getField(f);
+            if (v != null || !extra) {
+                return v;
+            }
+        }
+        return own(name);
+    }
+
+    /// [#store] with the field index already known (see [#fieldIndexes]).
+    void storeAt(int f, String name, Object value) {
+        if (f >= 0 && (!extra || getField(f) != null)) {
+            setField(f, value);
+            return;
+        }
+        store(name, value);
     }
 
     /// Stores `name`, adding it to the shape if the instance lacks it.
     void store(String name, Object value) {
         int f = fieldIndex(name);
-        // A field first set after some other attribute would list before
-        // it; such a late attribute is kept in the shape instead, which
-        // remembers the order.
-        if (f >= 0 && (!extra || getField(f) != null)) {
+        if (f >= 0) {
+            // A field first set after some other attribute would list before
+            // it: the shape takes its name, which keeps the order, and the
+            // value stays in the field, where compiled code reads and stores
+            // it. Kept in the shape instead, a subclass that sets one
+            // attribute of its own before calling the compiled __init__ had
+            // every compiled access to its fields go the generic way.
+            // An unset field has no marker: deleting one drops it.
+            if (extra && getField(f) == null) {
+                append(shape().with(name), FIELD_HERE);
+            }
             setField(f, value);
             return;
         }
@@ -137,6 +250,12 @@ public class PyInstance extends PyObject {
                 throw Py.attributeError("'" + cls.name + "' object has no attribute '" + name
                         + "' and no __dict__ for setting new attributes");
             }
+            Object hook = cls.newAttrHook();
+            if (hook != null && Py.isTrue(Py.obj(hook).call3(this, name, value))) {
+                // The class kept the value elsewhere (pydantic's extras) or
+                // raised: a model refuses a name that is not a field.
+                return;
+            }
             append(shape().with(name), value);
         }
     }
@@ -146,15 +265,50 @@ public class PyInstance extends PyObject {
     void append(Shape next, Object value) {
         int n = shape().size();
         if (slots == null) {
-            slots = new Object[4];
+            slots = new Object[cls.slotHint];
         } else if (n == slots.length) {
-            Object[] grown = new Object[n < 4 ? 4 : n * 2];
+            int size = n < 4 ? 4 : n * 2;
+            Object[] grown = new Object[size];
             System.arraycopy(slots, 0, grown, 0, n);
             slots = grown;
+            if (size > cls.slotHint) {
+                cls.slotHint = size;
+            }
         }
         slots[n] = value;
         shape = next;
         extra = true;
+    }
+
+    /// How many of the shape's names are fields listed at that place (see
+    /// [#store]).
+    int fieldMarkers() {
+        Object[] sl = slots;
+        int n = shape == null ? 0 : shape.size();
+        int c = 0;
+        for (int i = 0; i < n; i++) {
+            if (sl[i] == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                c++;
+            }
+        }
+        return c;
+    }
+
+    /// Which of the `n` fields have a marker in the shape, or null when none
+    /// has.
+    boolean[] markedFields(int n) {
+        Object[] sl = slots;
+        int size = shape == null ? 0 : shape.size();
+        boolean[] out = null;
+        for (int i = 0; i < size; i++) {
+            if (sl[i] == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                if (out == null) {
+                    out = new boolean[n];
+                }
+                out[fieldIndex(shape.names[i])] = true;
+            }
+        }
+        return out;
     }
 
     /// The attribute names: the set fields, then the rest in the order they
@@ -165,8 +319,10 @@ public class PyInstance extends PyObject {
             return shape().names;
         }
         List<String> out = new ArrayList<String>();
+        boolean[] marked = markedFields(f.length);
         for (int i = 0; i < f.length; i++) {
-            if (getField(i) != null) {
+            // A field whose name the shape holds lists at that place.
+            if (getField(i) != null && (marked == null || !marked[i])) {
                 out.add(f[i]);
             }
         }
@@ -185,7 +341,7 @@ public class PyInstance extends PyObject {
             // type and never comes here. An AttributeError it raises falls back
             // to __getattr__, as CPython's slot does.
             try {
-                return Py.obj(cls.lookup("__getattribute__")).call(new Object[] {this, name}, Py.NO_KW);
+                return Py.obj(cls.lookup("__getattribute__")).call2(this, name);
             } catch (PyException e) {
                 if (!e.matches(Py.ATTRIBUTE_ERROR)) {
                     throw e;
@@ -194,7 +350,7 @@ public class PyInstance extends PyObject {
                 if (ga == null) {
                     return null;
                 }
-                return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
+                return Py.obj(ga).call2(this, name);
             }
         }
         Object v = genericAttrOrNull(name);
@@ -203,7 +359,7 @@ public class PyInstance extends PyObject {
         }
         Object ga = cls.lookup("__getattr__");
         if (ga != null) {
-            return Py.obj(ga).call(new Object[] {this, name}, Py.NO_KW);
+            return Py.obj(ga).call2(this, name);
         }
         return null;
     }
@@ -222,7 +378,7 @@ public class PyInstance extends PyObject {
             PyType dt = ((PyInstance) clsAttr).cls;
             get = dt.lookup("__get__");
             if (get != null && (dt.lookup("__set__") != null || dt.lookup("__delete__") != null)) {
-                return Py.obj(get).call(new Object[] {clsAttr, this, cls}, Py.NO_KW);
+                return Py.obj(get).call3(clsAttr, this, cls);
             }
         }
         Object v = own(name);
@@ -230,7 +386,7 @@ public class PyInstance extends PyObject {
             return v;
         }
         if (get != null) {
-            return Py.obj(get).call(new Object[] {clsAttr, this, cls}, Py.NO_KW);
+            return Py.obj(get).call3(clsAttr, this, cls);
         }
         if ("__dict__".equals(name)) {
             // A live view: its stores and deletes reach the instance, and it
@@ -243,10 +399,7 @@ public class PyInstance extends PyObject {
             }
             // One view per instance, refilled from the instance before
             // every read, so a view fetched earlier sees later writes.
-            if (dictView == null) {
-                dictView = new InstanceDict(this);
-            }
-            return dictView;
+            return dictView();
         }
         if ("__class__".equals(name)) {
             return cls;
@@ -263,7 +416,7 @@ public class PyInstance extends PyObject {
         // a property or another data descriptor owns, as in CPython.
         Object sa = cls.lookup("__setattr__");
         if (sa != null && !(sa instanceof PyBuiltin)) {
-            Py.obj(sa).call(new Object[] {this, name, value}, Py.NO_KW);
+            Py.obj(sa).call3(this, name, value);
             return;
         }
         setAttrObject(name, value);
@@ -272,6 +425,23 @@ public class PyInstance extends PyObject {
     /// `object.__setattr__(self, name, value)`: data descriptors, then the
     /// plain store, never an overriding `__setattr__`.
     public void setAttrObject(String name, Object value) {
+        if ("__dict__".equals(name) && value instanceof PyDict && cls.slotNames() == null
+                && cls.lookup("__dict__") == null) {
+            // Replacing the dict (pydantic's construct does): the attributes
+            // become the dict's. They are copied, not aliased, so a later
+            // store into the old dict object no longer reaches the instance.
+            for (String n : attributeNames()) {
+                delAttrDirect(n);
+            }
+            PyDict d = (PyDict) value;
+            for (Object k : d.keyArray()) {
+                if (!(k instanceof String)) {
+                    throw Py.typeError("attribute name must be string");
+                }
+                store((String) k, d.getItem(k));
+            }
+            return;
+        }
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyProperty) {
             ((PyProperty) clsAttr).set(this, value);
@@ -280,7 +450,7 @@ public class PyInstance extends PyObject {
         if (clsAttr instanceof PyInstance) {
             Object set = ((PyInstance) clsAttr).cls.lookup("__set__");
             if (set != null) {
-                Py.obj(set).call(new Object[] {clsAttr, this, value}, Py.NO_KW);
+                Py.obj(set).call3(clsAttr, this, value);
                 return;
             }
         }
@@ -296,14 +466,14 @@ public class PyInstance extends PyObject {
     public void delAttr(String name) {
         Object da = cls.lookup("__delattr__");
         if (da != null && !(da instanceof PyBuiltin)) {
-            Py.obj(da).call(new Object[] {this, name}, Py.NO_KW);
+            Py.obj(da).call2(this, name);
             return;
         }
         Object clsAttr = cls.lookup(name);
         if (clsAttr instanceof PyInstance) {
             Object del = ((PyInstance) clsAttr).cls.lookup("__delete__");
             if (del != null) {
-                Py.obj(del).call(new Object[] {clsAttr, this}, Py.NO_KW);
+                Py.obj(del).call2(clsAttr, this);
                 return;
             }
         }
@@ -318,7 +488,10 @@ public class PyInstance extends PyObject {
                 setField(f, null);
                 // Set again, it is the newest attribute: see store.
                 extra = true;
-                return;
+                if (shape == null || shape.indexOf(name) < 0) {
+                    return;
+                }
+                // Its place in the shape goes too.
             }
         }
         int at = shape().indexOf(name);
@@ -344,13 +517,13 @@ public class PyInstance extends PyObject {
         if (m == null) {
             return null;
         }
-        Object r = Py.obj(m).call(new Object[] {this, arg}, Py.NO_KW);
+        Object r = (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call2(this, arg);
         return r == Py.NOT_IMPLEMENTED ? null : r; //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     private Object dunder0(String name) {
         Object m = cls.lookup(name);
-        return m == null ? null : Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+        return m == null ? null : (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call1(this);
     }
 
     @Override
@@ -359,7 +532,7 @@ public class PyInstance extends PyObject {
         if (r != null) {
             return Py.strValue(r, "__repr__");
         }
-        return "<" + cls.name + " object at 0x" + Integer.toHexString(System.identityHashCode(this)) + ">";
+        return "<" + cls.fullName() + " object at 0x" + Integer.toHexString(System.identityHashCode(this)) + ">";
     }
 
     @Override
@@ -373,16 +546,25 @@ public class PyInstance extends PyObject {
 
     @Override
     public boolean isTrue() {
-        Object m = cls.lookup("__bool__");
+        PyType t = cls;
+        if (t.truthVersion != PyType.version) {
+            t.truthMethods();
+        }
+        if (t.truthBase && base != null) {
+            return Py.isTrue(base);
+        }
+        if (t.truthConst != null) {
+            return t.truthConst == Py.TRUE; //NOPMD CompareObjectsWithEquals - identity is meant
+        }
+        Object m = t.truthBool;
         if (m != null) {
-            Object r = Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+            Object r = (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call1(this);
             if (!(r instanceof PyBool)) {
                 throw Py.typeError("__bool__ should return bool, returned " + Py.typeOf(r).name);
             }
             return r == Py.TRUE; //NOPMD CompareObjectsWithEquals - identity is meant
         }
-        m = cls.lookup("__len__");
-        if (m != null) {
+        if (t.truthLen != null) {
             return len() != 0;
         }
         return true;
@@ -394,7 +576,43 @@ public class PyInstance extends PyObject {
         if (m == null) {
             return super.call(args, kwNames);
         }
-        return Py.obj(m).call(Py.prepend(this, args), kwNames);
+        return (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call(Py.prepend(this, args), kwNames);
+    }
+
+    // Fixed-arity calls hand `self` and the arguments on without building an
+    // argument array and then a second one with `self` prepended.
+
+    private Object callable() {
+        Object m = cls.lookup("__call__");
+        if (m == null) {
+            throw Py.typeError("'" + type().name + "' object is not callable");
+        }
+        return m;
+    }
+
+    @Override
+    public Object call0() {
+        return Py.obj(callable()).call1(this);
+    }
+
+    @Override
+    public Object call1(Object a) {
+        return Py.obj(callable()).call2(this, a);
+    }
+
+    @Override
+    public Object call2(Object a, Object b) {
+        return Py.obj(callable()).call3(this, a, b);
+    }
+
+    @Override
+    public Object call3(Object a, Object b, Object c) {
+        return Py.obj(callable()).call4(this, a, b, c);
+    }
+
+    @Override
+    public Object call4(Object a, Object b, Object c, Object d) {
+        return Py.obj(callable()).call5(this, a, b, c, d);
     }
 
     @Override
@@ -548,6 +766,13 @@ public class PyInstance extends PyObject {
 
     @Override
     public long hash() {
+        PyType t = cls;
+        if (t.truthVersion != PyType.version) {
+            t.truthMethods();
+        }
+        if (t.hashBase && base != null) {
+            return Py.hashOf(base);
+        }
         Object m = cls.lookup("__hash__");
         if (m == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
             throw Py.typeError("unhashable type: '" + cls.name + "'");
@@ -558,21 +783,20 @@ public class PyInstance extends PyObject {
             }
             return System.identityHashCode(this);
         }
-        return Py.asLong(Py.obj(m).call(new Object[] {this}, Py.NO_KW));
+        return Py.asLong((m instanceof PyObject ? (PyObject) m : Py.obj(m)).call1(this));
     }
 
     @Override
     public Object getItem(Object key) {
         if (base instanceof PyDict) {
-            Object m = cls.lookup("__getitem__");
-            if (m instanceof PyBuiltin) {
+            if (cls.hasBuiltinGetitem()) {
                 Object v = ((PyDict) base).getOrNull(key);
                 if (v != null) {
                     return v;
                 }
-                Object missing = cls.lookup("__missing__");
+                Object missing = cls.missingMethod();
                 if (missing != null) {
-                    return Py.obj(missing).call(new Object[] {this, key}, Py.NO_KW);
+                    return Py.obj(missing).call2(this, key);
                 }
             }
         }
@@ -587,7 +811,7 @@ public class PyInstance extends PyObject {
             super.setItem(key, value);
             return;
         }
-        Py.obj(m).call(new Object[] {this, key, value}, Py.NO_KW);
+        (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call3(this, key, value);
     }
 
     @Override
@@ -597,11 +821,18 @@ public class PyInstance extends PyObject {
             super.delItem(key);
             return;
         }
-        Py.obj(m).call(new Object[] {this, key}, Py.NO_KW);
+        (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call2(this, key);
     }
 
     @Override
     public int len() {
+        PyType t = cls;
+        if (t.truthVersion != PyType.version) {
+            t.truthMethods();
+        }
+        if (t.lenBase && base != null) {
+            return Py.len(base);
+        }
         Object r = dunder0("__len__");
         if (r == null) {
             return super.len();
@@ -617,7 +848,7 @@ public class PyInstance extends PyObject {
     public boolean contains(Object x) {
         Object m = cls.lookup("__contains__");
         if (m != null) {
-            return Py.isTrue(Py.obj(m).call(new Object[] {this, x}, Py.NO_KW));
+            return Py.isTrue((m instanceof PyObject ? (PyObject) m : Py.obj(m)).call2(this, x));
         }
         return super.contains(x);
     }
@@ -641,7 +872,7 @@ public class PyInstance extends PyObject {
             return super.next();
         }
         try {
-            return Py.obj(m).call(new Object[] {this}, Py.NO_KW);
+            return (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call1(this);
         } catch (PyException e) {
             if (e.matches(Py.STOP_ITERATION)) {
                 return null;
@@ -681,6 +912,13 @@ public class PyInstance extends PyObject {
         private long seenFields;
         private boolean seen;
 
+        /// Where each entry's value lives, by entry index, while the keys are
+        /// as the last refill laid them out: a field index, or `~j` for slot
+        /// `j`. An iteration step reads its value from there with no name
+        /// lookup; null when the layout is not known.
+        private int[] src;
+        private int srcLen;
+
         // No "dictionary keys changed during iteration" check: CPython 3.14
         // does not raise it for an instance's __dict__ either (deleting one
         // attribute and adding another while iterating runs on, as
@@ -699,31 +937,33 @@ public class PyInstance extends PyObject {
             syncing = true;
             try {
                 String[] fields = self.fieldNames();
-                long mask = 0;
                 boolean small = fields.length <= 64;
-                for (int i = 0; small && i < fields.length; i++) {
-                    if (self.getField(i) != null) {
-                        mask |= 1L << i;
-                    }
-                }
+                long mask = small ? fieldMask(fields.length) : 0;
                 // A net, not the mechanism: every write through this dict
                 // clears `seen`, but a path that changes the instance without
                 // moving its shape or set fields would otherwise go unseen.
                 PyDict other0 = self.nonStrKeys;
-                int expected = Long.bitCount(mask) + self.shape().size() + (other0 == null ? 0 : other0.size);
+                int expected = Long.bitCount(mask) + self.shape().size() - self.fieldMarkers()
+                        + (other0 == null ? 0 : other0.size);
                 if (small && seen && seenShape == self.shape && seenFields == mask //NOPMD CompareObjectsWithEquals - identity is meant
-                        && size == expected && refreshValues(fields, mask)) {
+                        && size == expected && (keysOnly || refreshValues(fields, mask))) {
                     return;
                 }
                 seenShape = self.shape;
                 seenFields = mask;
                 seen = small;
-                String[] names = self.attributeNames();
                 PyDict other = self.nonStrKeys;
-                if (sameKeys(names, other)) {
+                if (size == 0 && other == null && small && fromTemplate(mask)) {
+                    return;
+                }
+                // A dict with no entries yet (the first read of this
+                // instance's __dict__) cannot hold the same keys already.
+                String[] names = size == 0 ? null : self.attributeNames();
+                if (names != null && sameKeys(names, other)) {
                     // The same keys in the same order: the values are
                     // brought up to date in place, so an iteration in
                     // progress over this dict is not disturbed.
+                    src = null;
                     int n = 0;
                     for (int i = 0; i < used && n < names.length; i++) {
                         if (keys[i] != null) {
@@ -733,8 +973,9 @@ public class PyInstance extends PyObject {
                     return;
                 }
                 super.clear();
-                for (String e : names) {
-                    super.setItem(e, self.own(e));
+                refill(fields, other == null ? 0 : other.size);
+                if (other == null && small) {
+                    keepTemplate(mask);
                 }
                 if (other != null) {
                     for (int i = 0; i < other.used; i++) {
@@ -755,7 +996,214 @@ public class PyInstance extends PyObject {
         /// the shape, the set fields and the size, which fix the keys; the
         /// name check is a cheap safety net against a path that changes the
         /// keys without moving any of those, never the expected case.
+        /// Fills the emptied dict with the set fields and then the shape's
+        /// slots, the order attributeNames lists them in, by index: what
+        /// `own(name)` answers for each name, without looking a name up.
+        private void refill(String[] fields, int others) {
+            String[] shapeNames = self.shape().names;
+            Object[] sl = self.slots;
+            int n = shapeNames.length;
+            reserve(fields.length + n + others);
+            int[] map = new int[fields.length + n];
+            int w = 0;
+            boolean[] marked = self.markedFields(fields.length);
+            for (int i = 0; i < fields.length; i++) {
+                Object v = self.getField(i);
+                if (v != null && (marked == null || !marked[i])) {
+                    super.setItem(fields[i], v);
+                    map[w++] = i;
+                }
+            }
+            for (int j = 0; j < n; j++) {
+                Object v = sl == null || j >= sl.length ? null : sl[j];
+                if (v == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    // A field listed where it was first set (see store).
+                    int f = self.fieldIndex(shapeNames[j]);
+                    super.setItem(shapeNames[j], self.getField(f));
+                    map[w++] = f;
+                    continue;
+                }
+                super.setItem(shapeNames[j], v);
+                map[w++] = ~j;
+            }
+            src = used == w ? map : null;
+            srcLen = w;
+        }
+
+        /// Fills this empty dict from the class's template when the instance
+        /// has the shape, the set fields and the field markers it was built
+        /// for: the keys, hashes and index table are copied, and only the
+        /// values are read. [#snap] holds the fields, from [#fieldMask].
+        private boolean fromTemplate(long mask) {
+            PyType c = self.cls;
+            Shape sh = self.shape;
+            if (c.dictTplKeys == null || c.dictTplShape != sh || c.dictTplMask != mask) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return false;
+            }
+            Object[] sl = self.slots;
+            boolean[] marks = c.dictTplMarks;
+            for (int j = 0; j < marks.length; j++) {
+                if ((sl[j] == FIELD_HERE) != marks[j]) { //NOPMD CompareObjectsWithEquals - identity is meant
+                    return false;
+                }
+            }
+            int[] map = c.dictTplMap;
+            int n = map.length;
+            Object[] k = new Object[n];
+            long[] h = new long[n];
+            Object[] v = new Object[n];
+            System.arraycopy(c.dictTplKeys, 0, k, 0, n);
+            System.arraycopy(c.dictTplHashes, 0, h, 0, n);
+            int[] ix = null;
+            int[] tix = c.dictTplIndex;
+            if (tix != null) {
+                ix = new int[tix.length];
+                System.arraycopy(tix, 0, ix, 0, tix.length);
+            }
+            Object[] d = snap;
+            for (int i = 0; i < n; i++) {
+                int s = map[i];
+                v[i] = s >= 0 ? d[s] : sl[~s];
+            }
+            adopt(k, h, ix, v, n);
+            src = map;
+            srcLen = n;
+            return true;
+        }
+
+        /// Records what [#refill] just built as the class's template, when
+        /// the entries are exactly the ones its value map names.
+        private void keepTemplate(long mask) {
+            int[] map = src;
+            if (map == null || srcLen != used || used != size) {
+                return;
+            }
+            int n = used;
+            PyType c = self.cls;
+            int sn = self.shape == null ? 0 : self.shape.size();
+            boolean[] marks = new boolean[sn];
+            for (int j = 0; j < sn; j++) {
+                marks[j] = self.slots[j] == FIELD_HERE; //NOPMD CompareObjectsWithEquals - identity is meant
+            }
+            Object[] k = new Object[n];
+            long[] h = new long[n];
+            int[] m = new int[n];
+            System.arraycopy(keys, 0, k, 0, n);
+            System.arraycopy(hashes, 0, h, 0, n);
+            System.arraycopy(map, 0, m, 0, n);
+            int[] ix = indexTable();
+            int[] tix = null;
+            if (ix != null) {
+                tix = new int[ix.length];
+                System.arraycopy(ix, 0, tix, 0, ix.length);
+            }
+            c.dictTplShape = self.shape;
+            c.dictTplMask = mask;
+            c.dictTplMarks = marks;
+            c.dictTplKeys = k;
+            c.dictTplHashes = h;
+            c.dictTplIndex = tix;
+            c.dictTplMap = m;
+        }
+
+        /// Which of the instance's first `n` (at most 64) fields are set.
+        /// The fields as [#fieldMask] last read them, in one copyFields call.
+        private Object[] snap = new Object[0];
+
+        /// Which of the `n` fields are set, from a fresh [#snap].
+        private long fieldMask(int n) {
+            Object[] d = snap;
+            if (d.length < n) {
+                d = new Object[n];
+                snap = d;
+            }
+            self.copyFields(d);
+            long mask = 0;
+            for (int i = 0; i < n; i++) {
+                if (d[i] != null) {
+                    mask |= 1L << i;
+                }
+            }
+            return mask;
+        }
+
+        // Iterating an instance's __dict__ used to sync the whole dict on
+        // every step, quadratic in the attributes. While the keys are as last
+        // read (same shape, same set fields), a step re-reads only the value
+        // it returns.
+        /// Set while [#syncForWalk] runs: the keys are checked, the values
+        /// are left to each step's [#valueAt].
+        private boolean keysOnly;
+
+        @Override
+        void syncForWalk() {
+            keysOnly = true;
+            try {
+                sync();
+            } finally {
+                keysOnly = false;
+            }
+        }
+
+        @Override
+        void syncStep(boolean last) {
+            // The set fields are compared (every field read) only at the end
+            // of the walk: per step that made iterating quadratic in the
+            // attributes -- pdfplumber's dict(map(..., obj.__dict__.items()))
+            // spent 6x CPython's time here. A step reads its value from the
+            // instance anyway (valueAt); an attribute added or removed in the
+            // middle changes the size, which the last step still reports.
+            if (!seen || seenShape != self.shape //NOPMD CompareObjectsWithEquals - identity is meant
+                    || last && fieldMask(self.fieldNames().length) != seenFields) {
+                sync();
+            }
+        }
+
+        @Override
+        boolean walkAsView() {
+            return true;
+        }
+
+        @Override
+        Object valueAt(int e) {
+            int[] m = src;
+            if (m != null && e < srcLen) {
+                int s = m[e];
+                Object v;
+                if (s >= 0) {
+                    v = self.getField(s);
+                } else {
+                    Object[] sl = self.slots;
+                    v = sl != null && ~s < sl.length ? sl[~s] : null;
+                }
+                if (v != null) {
+                    values[e] = v;
+                }
+                return values[e];
+            }
+            Object k = keys[e];
+            if (k instanceof String) {
+                Object v = self.own((String) k);
+                if (v != null) {
+                    values[e] = v;
+                }
+            }
+            return values[e];
+        }
+
         private boolean refreshValues(String[] fieldNames, long mask) {
+            int[] m = src;
+            Object[] sl0 = self.slots;
+            if (m != null && srcLen == used) {
+                // The order refill recorded; the caller has matched the shape
+                // and the set fields, which fix it.
+                Object[] d = snap;
+                for (int i = 0; i < used; i++) {
+                    int s = m[i];
+                    values[i] = s >= 0 ? d[s] : sl0[~s];
+                }
+                return true;
+            }
             int fieldCount = fieldNames.length;
             String[] shapeNames = self.shape().names;
             int f = 0;
@@ -772,9 +1220,10 @@ public class PyInstance extends PyObject {
                     if (!fieldNames[f].equals(keys[i])) {
                         return false;
                     }
-                    values[i] = self.getField(f++);
+                    // Read by the fieldMask the caller has just taken.
+                    values[i] = snap[f++];
                 } else if (sl != null && slot < sl.length && slot < shapeNames.length) {
-                    if (!shapeNames[slot].equals(keys[i])) {
+                    if (!shapeNames[slot].equals(keys[i]) || sl[slot] == FIELD_HERE) { //NOPMD CompareObjectsWithEquals - identity is meant
                         return false;
                     }
                     values[i] = sl[slot++];
@@ -837,6 +1286,7 @@ public class PyInstance extends PyObject {
             // The write may restore a shape the stamp already holds (del
             // d['b'] then c.b = 9), so the next sync must not trust it.
             seen = false;
+            src = null;
         }
 
         @Override
@@ -858,6 +1308,7 @@ public class PyInstance extends PyObject {
         /// Removes `key` from what the dict stands for.
         private void forget(Object key) {
             seen = false;
+            src = null;
             if (isStr(key)) {
                 self.delAttrDirect(Py.toStr(key));
             } else if (self.nonStrKeys != null) {

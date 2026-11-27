@@ -135,6 +135,27 @@ def _wrap(mode, size, handle):
 
 class Image:
     format = None
+    # The file an opened image was read from, as Pillow keeps it: a file
+    # object passed in, or a BytesIO of a named file's bytes.
+    fp = None
+
+    # The bytes of an opened JPEG not decoded yet (see _im).
+    _lazy = None
+    _imv = None
+
+    @property
+    def _im(self):
+        h = self._imv
+        if h is None and self._lazy is not None:
+            data = self._lazy
+            self._lazy = None
+            h = self._imv = _cn1image.jpeg_decode(data)
+        return h
+
+    @_im.setter
+    def _im(self, v):
+        self._imv = v
+        self._lazy = None
 
     def __init__(self):
         self.mode = ""
@@ -494,8 +515,22 @@ def open(fp, mode="r", formats=None):
     if isinstance(fp, (str, os.PathLike)):
         with builtins.open(os.fspath(fp), "rb") as f:
             data = f.read()
+        import io
+        source = io.BytesIO(data)
     else:
+        # Pillow reads a file object from its start, wherever it was left
+        try:
+            fp.seek(0)
+        except (AttributeError, OSError):
+            pass
         data = fp.read()
+        source = fp
+    im = _open_data(fp, data)
+    im.fp = source
+    return im
+
+
+def _open_data(fp, data):
     if data[:8] == _PNG_SIG and not _cn1image.exact():
         # A device decodes through the platform, then takes the file's mode
         mode = {0: "L", 2: "RGB", 3: "RGBA", 4: "LA", 6: "RGBA"}.get(data[25], "RGBA")
@@ -507,9 +542,16 @@ def open(fp, mode="r", formats=None):
         im.format = "PNG"
         return im
     if data[:3] == b"\xff\xd8\xff":
-        handle = _cn1image.jpeg_decode(data)
-        mode = "L" if len(_cn1image.getpixel(handle, 0, 0)) == 1 else "RGB"
-        im = _wrap(mode, _cn1image.size(handle), handle)
+        head = _jpeg_header(data)
+        if head is None:
+            handle = _cn1image.jpeg_decode(data)
+            mode = "L" if len(_cn1image.getpixel(handle, 0, 0)) == 1 else "RGB"
+            im = _wrap(mode, _cn1image.size(handle), handle)
+        else:
+            # As Pillow does, open reads the header; the pixels are decoded
+            # when first used (python-pptx opens every picture for its size).
+            im = _wrap(head[0], head[1], None)
+            im._lazy = data
         im.format = "JPEG"
         return im
     kind = None
@@ -529,6 +571,40 @@ def open(fp, mode="r", formats=None):
         im = im.convert("RGB")
         im.format = kind
     return im
+
+
+# Start-of-frame markers: baseline, extended, progressive, lossless, and
+# their differential and arithmetic-coded forms.
+_SOF = frozenset((0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF))
+
+
+def _jpeg_header(data):
+    """(mode, (width, height)) from a JPEG's frame header, or None."""
+    i = 2
+    n = len(data)
+    while i + 4 <= n:
+        if data[i] != 0xFF:
+            return None
+        marker = data[i + 1]
+        if marker == 0xFF:
+            i += 1
+            continue
+        if marker == 0xD8 or 0xD0 <= marker <= 0xD7 or marker == 0x01:
+            i += 2
+            continue
+        length = (data[i + 2] << 8) | data[i + 3]
+        if marker in _SOF:
+            if i + 10 > n:
+                return None
+            h = (data[i + 5] << 8) | data[i + 6]
+            w = (data[i + 7] << 8) | data[i + 8]
+            if w == 0 or h == 0:
+                return None
+            return ("L" if data[i + 9] == 1 else "RGB"), (w, h)
+        if marker == 0xDA or length < 2:
+            return None
+        i += 2 + length
+    return None
 
 
 def _native_decode(data):

@@ -1,0 +1,6 @@
+set 2
+new red
+dotted !
+deleted False
+raising AttributeError
+undone 1 False /

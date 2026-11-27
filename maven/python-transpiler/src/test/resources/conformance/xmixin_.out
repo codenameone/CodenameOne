@@ -1,0 +1,6 @@
+['a', 'b', '/b', 'thtml']
+['A', 'B', '/B', 'THTML'] a 4 0 0
+True True ['TagParser', 'Parser', 'Detects', 'object']
+True False True
+[] None 0
+5 ['_first', 'count', 'data', 'pos', 'tags', 'upper']

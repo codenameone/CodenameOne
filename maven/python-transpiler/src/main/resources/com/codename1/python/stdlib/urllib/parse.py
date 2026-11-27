@@ -3,7 +3,7 @@
 # exception, as the rest of the Codename One Python runtime.
 """Parse URLs into components, and quote and unquote their parts."""
 
-from collections import namedtuple
+import _cn1url
 
 __all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag", "urlsplit", "urlunsplit", "urlencode",
            "parse_qs", "parse_qsl", "quote", "quote_plus", "quote_from_bytes", "unquote", "unquote_plus",
@@ -111,9 +111,173 @@ class _NetlocResultMixinBase:
         return hostname, port
 
 
-_DefragResultBase = namedtuple("DefragResult", "url fragment", module="urllib.parse")
-_SplitResultBase = namedtuple("SplitResult", "scheme netloc path query fragment", module="urllib.parse")
-_ParseResultBase = namedtuple("ParseResult", "scheme netloc path params query fragment", module="urllib.parse")
+# The result bases are written out as namedtuple writes them, so each is a
+# class statement the compiler gives a layout.
+class _DefragResultBase(tuple):
+    "DefragResult(url, fragment)"
+
+    __slots__ = ()
+    _fields = ('url', 'fragment',)
+    _field_defaults = {}
+    __match_args__ = _fields
+
+    def __new__(_cls, url, fragment):
+        return tuple.__new__(_cls, (url, fragment,))
+
+    @classmethod
+    def _make(cls, iterable):
+        result = tuple.__new__(cls, iterable)
+        if len(result) != 2:
+            raise TypeError("Expected 2 arguments, got %d" % len(result))
+        return result
+
+    def _replace(self, /, **kwds):
+        result = self._make([kwds.pop(name) if name in kwds else v for name, v in zip(self._fields, self)])
+        if kwds:
+            raise TypeError("Got unexpected field names: %r" % list(kwds))
+        return result
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(url=%r, fragment=%r)" % tuple(self)
+
+    def _asdict(self):
+        return dict(zip(self._fields, self))
+
+    def __getnewargs__(self):
+        return tuple(self)
+
+    @property
+    def url(self):
+        "Alias for field number 0"
+        return self[0]
+
+    @property
+    def fragment(self):
+        "Alias for field number 1"
+        return self[1]
+
+
+class _SplitResultBase(tuple):
+    "SplitResult(scheme, netloc, path, query, fragment)"
+
+    __slots__ = ()
+    _fields = ('scheme', 'netloc', 'path', 'query', 'fragment',)
+    _field_defaults = {}
+    __match_args__ = _fields
+
+    def __new__(_cls, scheme, netloc, path, query, fragment):
+        return tuple.__new__(_cls, (scheme, netloc, path, query, fragment,))
+
+    @classmethod
+    def _make(cls, iterable):
+        result = tuple.__new__(cls, iterable)
+        if len(result) != 5:
+            raise TypeError("Expected 5 arguments, got %d" % len(result))
+        return result
+
+    def _replace(self, /, **kwds):
+        result = self._make([kwds.pop(name) if name in kwds else v for name, v in zip(self._fields, self)])
+        if kwds:
+            raise TypeError("Got unexpected field names: %r" % list(kwds))
+        return result
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(scheme=%r, netloc=%r, path=%r, query=%r, fragment=%r)" % tuple(self)
+
+    def _asdict(self):
+        return dict(zip(self._fields, self))
+
+    def __getnewargs__(self):
+        return tuple(self)
+
+    @property
+    def scheme(self):
+        "Alias for field number 0"
+        return self[0]
+
+    @property
+    def netloc(self):
+        "Alias for field number 1"
+        return self[1]
+
+    @property
+    def path(self):
+        "Alias for field number 2"
+        return self[2]
+
+    @property
+    def query(self):
+        "Alias for field number 3"
+        return self[3]
+
+    @property
+    def fragment(self):
+        "Alias for field number 4"
+        return self[4]
+
+
+class _ParseResultBase(tuple):
+    "ParseResult(scheme, netloc, path, params, query, fragment)"
+
+    __slots__ = ()
+    _fields = ('scheme', 'netloc', 'path', 'params', 'query', 'fragment',)
+    _field_defaults = {}
+    __match_args__ = _fields
+
+    def __new__(_cls, scheme, netloc, path, params, query, fragment):
+        return tuple.__new__(_cls, (scheme, netloc, path, params, query, fragment,))
+
+    @classmethod
+    def _make(cls, iterable):
+        result = tuple.__new__(cls, iterable)
+        if len(result) != 6:
+            raise TypeError("Expected 6 arguments, got %d" % len(result))
+        return result
+
+    def _replace(self, /, **kwds):
+        result = self._make([kwds.pop(name) if name in kwds else v for name, v in zip(self._fields, self)])
+        if kwds:
+            raise TypeError("Got unexpected field names: %r" % list(kwds))
+        return result
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(scheme=%r, netloc=%r, path=%r, params=%r, query=%r, fragment=%r)" % tuple(self)
+
+    def _asdict(self):
+        return dict(zip(self._fields, self))
+
+    def __getnewargs__(self):
+        return tuple(self)
+
+    @property
+    def scheme(self):
+        "Alias for field number 0"
+        return self[0]
+
+    @property
+    def netloc(self):
+        "Alias for field number 1"
+        return self[1]
+
+    @property
+    def path(self):
+        "Alias for field number 2"
+        return self[2]
+
+    @property
+    def params(self):
+        "Alias for field number 3"
+        return self[3]
+
+    @property
+    def query(self):
+        "Alias for field number 4"
+        return self[4]
+
+    @property
+    def fragment(self):
+        "Alias for field number 5"
+        return self[5]
 
 
 class DefragResult(_DefragResultBase):
@@ -469,6 +633,10 @@ _safe_cache = {}
 
 
 def quote(string, safe="/", encoding=None, errors=None):
+    if encoding is None and errors is None and type(string) is str:
+        r = _cn1url.quote(string, safe)
+        if r is not None:
+            return r
     if isinstance(string, str):
         if not string:
             return string
@@ -501,6 +669,9 @@ def quote_from_bytes(bs, safe="/"):
         raise TypeError("quote_from_bytes() expected bytes")
     if not bs:
         return ""
+    r = _cn1url.quote(bs, safe)
+    if r is not None:
+        return r
     if isinstance(safe, str):
         safe = safe.encode("ascii", "ignore")
     else:

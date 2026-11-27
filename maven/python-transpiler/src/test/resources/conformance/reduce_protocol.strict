@@ -1,0 +1,3 @@
+pickle:1276 setattr with a computed name is reflection; write override = pickle.Unpickler._step in cn1-python.properties and its compliant body in cn1-python-overrides/pickle.Unpickler._step.py
+pickle:1338 getattr with a computed name is reflection; write override = pickle.Unpickler.find_class in cn1-python.properties and its compliant body in cn1-python-overrides/pickle.Unpickler.find_class.py
+pickle:225 getattr with a computed name is reflection; write override = pickle._getattribute in cn1-python.properties and its compliant body in cn1-python-overrides/pickle._getattribute.py

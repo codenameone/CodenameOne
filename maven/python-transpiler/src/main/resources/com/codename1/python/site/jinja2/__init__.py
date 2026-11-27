@@ -3,6 +3,12 @@
 # exception, as the rest of the Codename One Python runtime.
 """Clean-room subset of Jinja2, interpreted (no code generation, no eval).
 
+Attribute access is not looked up by name: the build parses every template
+whose source is a literal (``Jinja2Lowering``) and writes one accessor per
+``.name`` and ``['literal']`` site into ``_cn1_jinja2_tables``, keyed by the
+template source and then by tag and position. The tokenizer hands each site
+its accessor; a template the build did not see cannot use either form.
+
 Supported: ``{{ expr }}`` with filters and tests, ``{% if/elif/else %}``,
 ``{% for %}`` (tuple targets, ``loop.*``, ``else``, inline ``if``),
 ``{% set %}``, ``{% extends %}``/``{% block %}`` with ``super()``,
@@ -11,9 +17,11 @@ control. Written from Jinja's public template documentation.
 """
 import os as _os
 
+import _cn1_jinja2_tables
+
 from markupsafe import Markup, escape
 
-__all__ = ["Environment", "Template", "DictLoader", "FileSystemLoader", "BaseLoader",
+__all__ = ["Environment", "Template", "DictLoader", "FileSystemLoader", "PackageLoader", "BaseLoader",
            "select_autoescape", "Markup", "escape", "Undefined", "TemplateNotFound",
            "TemplateSyntaxError", "UndefinedError", "TemplateError"]
 
@@ -130,11 +138,23 @@ class FileSystemLoader(BaseLoader):
         if ".." in parts:
             raise TemplateNotFound(template)
         for base in self.searchpath:
-            fn = _os.path.join(base, *parts)
-            if _os.path.isfile(fn):
-                with open(fn, "r", encoding=self.encoding) as f:
-                    return f.read(), fn, lambda: True
+            # A relative search path is the project's own directory, which
+            # the build packs as package data under /cn1python/.
+            roots = [base] if base.startswith("/") else [base, "/cn1python/" + base]
+            for root in roots:
+                fn = _os.path.join(root, *parts)
+                if _os.path.isfile(fn):
+                    with open(fn, "r", encoding=self.encoding) as f:
+                        return f.read(), fn, lambda: True
         raise TemplateNotFound(template)
+
+
+class PackageLoader(FileSystemLoader):
+    """The templates a package ships: its data files, under /cn1python/."""
+
+    def __init__(self, package_name, package_path="templates", encoding="utf-8"):
+        FileSystemLoader.__init__(self, "/cn1python/" + package_name.replace(".", "/") + "/" + package_path,
+                                  encoding)
 
 
 class ChoiceLoader(BaseLoader):
@@ -292,7 +312,26 @@ def _tokenize(s):
                 toks.append(("op", c))
                 i += 1
     toks.append(("end", None))
+    # Accessors the build generated for this tag, in token order: one per
+    # "." site and one per "[" str "]" site (Jinja2Lowering mirrors this).
+    cur = _CUR
+    for i in range(len(toks) - 1):
+        t = toks[i]
+        if t[0] != "op":
+            continue
+        if t[1] == "." or (t[1] == "[" and toks[i + 1][0] == "str" and i + 2 < len(toks)
+                           and toks[i + 2] == ("op", "]")):
+            if cur[1] >= len(cur[0]):
+                raise TemplateSyntaxError("attribute or item access in a template the build did not"
+                                          " compile; give its source as a literal")
+            nt = toks[i + 1]
+            toks[i + 1] = (nt[0], nt[1], cur[0][cur[1]])
+            cur[1] += 1
     return toks
+
+
+# [accessors of the tag being parsed, next index]
+_CUR = [(), 0]
 
 
 class _P:
@@ -420,8 +459,14 @@ class _P:
         while True:
             if self.accept("op", "."):
                 tok = self.next()
-                e = ("getattr", e, str(tok[1]))
+                e = ("getattr", e, str(tok[1]), tok[2])
             elif self.accept("op", "["):
+                nt = self.peek()
+                if nt[0] == "str" and len(nt) == 3 and self.peek(1) == ("op", "]"):
+                    self.next()
+                    self.next()
+                    e = ("getlit", e, nt[1], nt[2])
+                    continue
                 k = self.expr()
                 self.expect("op", "]")
                 e = ("getitem", e, k)
@@ -450,7 +495,8 @@ class _P:
 
     def primary(self):
         tok = self.next()
-        k, v = tok
+        k = tok[0]
+        v = tok[1]
         if k in ("num", "str"):
             if k == "str":
                 while self.at("str"):
@@ -530,7 +576,16 @@ def _params(p):
     return params
 
 
-def _parse(tokens):
+def _parse(tokens, table=()):
+    # The build's accessors per lexed tag (text tags hold none).
+    tags = []
+    ti = 0
+    for t in tokens:
+        if t[0] == "text":
+            tags.append(())
+        else:
+            tags.append(table[ti] if ti < len(table) else ())
+            ti += 1
     pos = [0]
     blocks = {}
     meta = {"extends": None}
@@ -543,8 +598,12 @@ def _parse(tokens):
             if kind == "text":
                 nodes.append(("text", val))
             elif kind == "var":
+                _CUR[0] = tags[pos[0] - 1]
+                _CUR[1] = 0
                 nodes.append(("out", _parse_expr(val)))
             else:
+                _CUR[0] = tags[pos[0] - 1]
+                _CUR[1] = 0
                 word = val.split(None, 1)[0] if val else ""
                 if "(" in word:
                     word = word[:word.index("(")]
@@ -598,9 +657,9 @@ def _parse(tokens):
                     e = ("tuple", items)
                 return ("set", targets, e)
             filt = None
-            if p.accept("op", "|"):
-                fp = _P("__cn1_body|" + rest.split("|", 1)[1])
-                filt = fp.expr()
+            if p.at("op", "|"):
+                # The filters continue this tag's tokens, never re-tokenized.
+                filt = p.postfix(("name", "__cn1_body"))
             b, _, _ = body(("endset",))
             return ("setblock", targets[0], b, filt)
         if word == "block":
@@ -682,6 +741,18 @@ class _TemplateModule:
     def __init__(self, name):
         self._name = name
         self._body = ""
+        self._exports = {}
+
+    def __getitem__(self, key):
+        return self._exports[key]
+
+    def __getattr__(self, name):
+        # A template's exports are data (its macros and top-level sets),
+        # read by key; nothing here reads an attribute by name.
+        try:
+            return self._exports[name]
+        except KeyError:
+            raise AttributeError(name)
 
     def __str__(self):
         return self._body
@@ -803,12 +874,30 @@ class _Loop:
             return True
         return False
 
-    index = property(lambda self: self.index0 + 1)
-    revindex = property(lambda self: self.length - self.index0)
-    revindex0 = property(lambda self: self.length - self.index0 - 1)
-    first = property(lambda self: self.index0 == 0)
-    last = property(lambda self: self.index0 == self.length - 1)
-    previtem = property(lambda self: self._items[self.index0 - 1] if self.index0 > 0 else Undefined())
+    @property
+    def index(self):
+        return self.index0 + 1
+
+    @property
+    def revindex(self):
+        return self.length - self.index0
+
+    @property
+    def revindex0(self):
+        return self.length - self.index0 - 1
+
+    @property
+    def first(self):
+        return self.index0 == 0
+
+    @property
+    def last(self):
+        return self.index0 == self.length - 1
+
+    @property
+    def previtem(self):
+        return self._items[self.index0 - 1] if self.index0 > 0 else Undefined()
+
     nextitem = property(lambda self: self._items[self.index0 + 1]
                         if self.index0 + 1 < self.length else Undefined())
 
@@ -816,31 +905,19 @@ class _Loop:
         return args[self.index0 % len(args)]
 
 
-def _attr(obj, name):
-    if isinstance(obj, Undefined):
-        obj._fail()
-    try:
-        return getattr(obj, name)
-    except AttributeError:
-        pass
-    try:
-        return obj[name]
-    except (TypeError, LookupError, AttributeError):
-        return Undefined(name=name)
-
-
 def _item(obj, key):
+    """``obj[key]`` with a key computed at render time. Jinja falls back to
+    the attribute of that name; a computed name has no literal accessor, so
+    for an object that is no container that is an error, not a guess."""
     if isinstance(obj, Undefined):
         obj._fail()
     try:
         return obj[key]
     except (TypeError, LookupError, AttributeError):
         pass
-    if isinstance(key, str):
-        try:
-            return getattr(obj, key)
-        except AttributeError:
-            pass
+    if isinstance(key, str) and not isinstance(obj, (dict, list, tuple, str, _TemplateModule)):
+        raise UndefinedError("%r has no item %r; an attribute needs a literal name in the template"
+                             % (type(obj).__name__, key))
     return Undefined(name=key)
 
 
@@ -853,7 +930,7 @@ def _do_default(v, default="", boolean=False):
 def _do_join(env_ae, v, d="", attribute=None):
     items = list(v)
     if attribute is not None:
-        items = [_attr(x, attribute) for x in items]
+        items = [_item(x, attribute) for x in items]
     if env_ae:
         return escape(d).join(items)
     return str(d).join(str(x) for x in items)
@@ -1017,11 +1094,12 @@ class Template:
         self.environment = env
         self.name = name
         self.filename = filename
+        table = _cn1_jinja2_tables.TABLES.get(source, ())
         if not env.keep_trailing_newline and source.endswith("\n"):
             source = source[:-1]
             if source.endswith("\r"):
                 source = source[:-1]
-        self._nodes, self._blocks, self._extends = _parse(_lex(source))
+        self._nodes, self._blocks, self._extends = _parse(_lex(source), table)
         ae = env.autoescape
         self.autoescape = bool(ae(name)) if callable(ae) else bool(ae)
 
@@ -1111,7 +1189,7 @@ class Template:
         elif k == "fromimport":
             mod = self._module(self._eval(n[1], fr))
             for name, alias in n[2]:
-                v = getattr(mod, name, None)
+                v = mod._exports.get(name)
                 if v is None or name.startswith("_"):
                     v = Undefined(hint="the template %r does not export the requested name %r"
                                   % (mod._name, name), name=name)
@@ -1148,7 +1226,7 @@ class Template:
         for k, v in vars.items():
             if k not in self.environment.globals or vars[k] is not self.environment.globals[k]:
                 if not k.startswith("_"):
-                    setattr(mod, k, v)
+                    mod._exports[k] = v
         mod._body = "".join(out)
         return mod
 
@@ -1220,8 +1298,14 @@ class Template:
             if name in fr.vars:
                 return fr.vars[name]
             return Undefined(name=name)
-        if k == "getattr":
-            return _attr(self._eval(e[1], fr), e[2])
+        if k == "getattr" or k == "getlit":
+            obj = self._eval(e[1], fr)
+            if isinstance(obj, Undefined):
+                obj._fail()
+            v = e[3](obj)
+            if v is _cn1_jinja2_tables.MISS:
+                return Undefined(name=e[2])
+            return v
         if k == "getitem":
             return _item(self._eval(e[1], fr), self._eval(e[2], fr))
         if k == "call":

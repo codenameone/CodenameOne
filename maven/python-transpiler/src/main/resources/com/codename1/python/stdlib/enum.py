@@ -9,6 +9,7 @@ __all__ = ["EnumType", "EnumMeta", "Enum", "IntEnum", "StrEnum", "Flag", "IntFla
 
 _MIXINS = (int, str, float, bytes)
 builtins_property = property
+from _cn1op import EnumType, enum_install
 # The library's own bases, whose __new__ never builds a member.
 _BASES = []
 
@@ -66,199 +67,130 @@ def _mixin_of(bases):
     return None
 
 
-class EnumType(type):
-    @classmethod
-    def __prepare__(metacls, cls, bases, **kwds):
-        return {}
+# EnumType is the runtime's own metaclass (runtime class EnumMeta), as
+# ABCMeta is abc's: a class it makes is an ordinary class with a layout, and
+# its class-level protocol (call, iteration, in, len, [name], __members__) is
+# Java over the tables below. Right after making one, the runtime calls
+# _finish, which sets those tables up; the compiler then defines every
+# member once, in definition order (_member).
 
-    def __new__(metacls, cls, bases, classdict, *, boundary=None, _simple=False, **kwds):
-        enum_class = super().__new__(metacls, cls, bases, classdict, **kwds)
-        type.__setattr__(enum_class, "_member_names_", [])
-        type.__setattr__(enum_class, "_member_map_", {})
-        type.__setattr__(enum_class, "_value2member_map_", {})
-        type.__setattr__(enum_class, "_unhashable_values_", [])
-        mixin = _mixin_of(bases)
-        type.__setattr__(enum_class, "_member_type_", mixin if mixin is not None else object)
-        flag = Flag is not None and any(isinstance(b, EnumType) and issubclass(b, Flag) for b in bases)
-        type.__setattr__(enum_class, "_is_flag_", flag)
-        type.__setattr__(enum_class, "_boundary_", boundary)
-        if any(isinstance(b, EnumType) and b._member_names_ for b in bases):
-            raise TypeError(
-                "<enum %r> cannot extend %s" % (cls, ", ".join("<enum %r>" % b.__name__ for b in bases
-                                                                if isinstance(b, EnumType) and b._member_names_)))
-        last_values = []
-        all_bits = 0
-        for name, value in list(classdict.items()):
-            if isinstance(value, nonmember):
-                type.__setattr__(enum_class, name, value.value)
+
+def _finish(enum_class, boundary):
+    cls = enum_class.__name__
+    bases = enum_class.__bases__
+    type.__setattr__(enum_class, "_member_names_", [])
+    type.__setattr__(enum_class, "_member_map_", {})
+    type.__setattr__(enum_class, "_value2member_map_", {})
+    type.__setattr__(enum_class, "_unhashable_values_", [])
+    mixin = _mixin_of(bases)
+    type.__setattr__(enum_class, "_member_type_", mixin if mixin is not None else object)
+    flag = len(_FLAG) > 0 and any(isinstance(b, EnumType) and issubclass(b, _FLAG[0]) for b in bases)
+    type.__setattr__(enum_class, "_is_flag_", flag)
+    type.__setattr__(enum_class, "_boundary_", boundary)
+    if any(isinstance(b, EnumType) and b._member_names_ for b in bases):
+        raise TypeError(
+            "<enum %r> cannot extend %s" % (cls, ", ".join("<enum %r>" % b.__name__ for b in bases
+                                                            if isinstance(b, EnumType) and b._member_names_)))
+    type.__setattr__(enum_class, "_last_values_", [])
+    for name, value in enum_class.__dict__.items():
+        if not (_is_dunder(name) or _is_sunder(name) or _is_private(cls, name) or _is_descriptor(value)):
+            # The compiler defines every member after the class statement
+            # (EnumLowering); a value left in the body is one it missed.
+            raise TypeError("enum %s: member %r was not defined by the compiler" % (cls, name))
+    if mixin is not None:
+        # The mixin type comes first in the MRO, so its __repr__ and
+        # __str__ would shadow the enum's: take the nearest enum's own. Its
+        # hash stays the mixin's, as the MRO has it.
+        for dunder in ("__repr__", "__str__", "__format__"):
+            if dunder in enum_class.__dict__:
                 continue
-            if isinstance(value, member):
-                value = value.value
-            elif _is_dunder(name) or _is_sunder(name) or _is_private(cls, name) or _is_descriptor(value):
-                continue
-            if name in enum_class._member_map_:
-                raise TypeError("%r already defined as %r" % (name, enum_class._member_map_[name]))
-            if isinstance(value, auto):
-                if value.value is None:
-                    value = enum_class._generate_next_value_(name, 1, len(enum_class._member_names_),
-                                                             last_values[:])
-                else:
-                    value = value.value
-            elif isinstance(value, tuple) and any(isinstance(v, auto) for v in value):
-                value = tuple(enum_class._generate_next_value_(name, 1, len(enum_class._member_names_),
-                                                               last_values[:]) if isinstance(v, auto) else v
-                              for v in value)
-            last_values.append(value)
-            m = metacls._make_member(enum_class, name, value, mixin)
-            canonical = None
-            for other in enum_class._member_names_:
-                o = enum_class._member_map_[other]
-                if o._value_ == m._value_:
-                    canonical = o
+            for k in enum_class.__mro__:
+                if isinstance(k, EnumType) and dunder in k.__dict__:
+                    type.__setattr__(enum_class, dunder, k.__dict__[dunder])
                     break
-            if canonical is not None:
-                m = canonical
-            else:
-                enum_class._member_names_.append(name)
-                if flag and isinstance(m._value_, int):
-                    all_bits |= m._value_
-            enum_class._member_map_[name] = m
-            try:
-                enum_class._value2member_map_.setdefault(m._value_, m)
-            except TypeError:
-                enum_class._unhashable_values_.append(m._value_)
-            type.__setattr__(enum_class, name, m)
-        if mixin is not None:
-            # The mixin type comes first in the MRO, so its __repr__ and
-            # __str__ would shadow the enum's: take the nearest enum's own.
-            for dunder in ("__repr__", "__str__", "__format__"):
-                if dunder in classdict:
-                    continue
-                for k in enum_class.__mro__:
-                    if isinstance(k, EnumType) and dunder in k.__dict__:
-                        type.__setattr__(enum_class, dunder, k.__dict__[dunder])
-                        break
-        type.__setattr__(enum_class, "_flag_mask_", all_bits)
-        type.__setattr__(enum_class, "_all_bits_", all_bits)
-        return enum_class
+        if "__hash__" not in enum_class.__dict__:
+            type.__setattr__(enum_class, "__hash__", mixin.__hash__)
+    type.__setattr__(enum_class, "_flag_mask_", 0)
+    type.__setattr__(enum_class, "_all_bits_", 0)
 
-    @staticmethod
-    def _make_member(enum_class, name, value, mixin):
-        args = value if isinstance(value, tuple) else (value,)
-        custom_new = enum_class.__dict__.get("_new_member_", None)
-        new = None
-        for k in enum_class.__mro__:
-            if "__new__" in k.__dict__ and k not in _BASES and k is not object:
-                if k not in _MIXINS:
-                    new = k.__dict__["__new__"]
-                break
-        if new is not None:
-            m = new(enum_class, *args)
-        elif mixin is None:
-            m = object.__new__(enum_class)
+
+def _make_member(enum_class, name, value, mixin):
+    args = value if isinstance(value, tuple) else (value,)
+    new = None
+    for k in enum_class.__mro__:
+        if "__new__" in k.__dict__ and k not in _BASES and k is not object:
+            if k not in _MIXINS:
+                new = k.__dict__["__new__"]
+            break
+    if new is not None:
+        m = new(enum_class, *args)
+    elif mixin is None:
+        m = object.__new__(enum_class)
+    else:
+        m = mixin.__new__(enum_class, *args)
+    if not hasattr(m, "_value_"):
+        if mixin is None:
+            m._value_ = value
         else:
-            m = mixin.__new__(enum_class, *args)
-        if not hasattr(m, "_value_"):
-            if mixin is None:
-                m._value_ = value
-            else:
-                m._value_ = mixin(*args)
-        m._name_ = name
-        m._sort_order_ = len(enum_class._member_names_)
-        init = getattr(enum_class, "__init__", None)
-        if init is not None and init is not Enum.__init__:
-            m.__init__(*args)
-        return m
+            m._value_ = mixin(*args)
+    m._name_ = name
+    m._sort_order_ = len(enum_class._member_names_)
+    init = getattr(enum_class, "__init__", None)
+    if init is not None and init is not Enum.__init__:
+        # The function found on the class, called with the member: what
+        # m.__init__(*args) runs, but read off the class, which only a
+        # loose class's __init__ can answer -- through the member, any
+        # __init__ of the program could.
+        init(m, *args)
+    return m
 
-    def __call__(cls, value, names=None, *values, module=None, qualname=None, type=None, start=1, boundary=None):
-        if names is None:
-            return cls.__new_member_lookup__(value)
-        return cls._create_(value, names, module=module, qualname=qualname, type=type, start=start,
-                            boundary=boundary)
 
-    def __new_member_lookup__(cls, value):
-        if isinstance(value, cls):
-            return value
-        try:
-            return cls._value2member_map_[value]
-        except (KeyError, TypeError):
-            pass
-        for m in cls._member_map_.values():
-            if m._value_ == value:
-                return m
-        result = cls._missing_(value)
-        if isinstance(result, cls):
-            return result
-        if result is None:
-            raise ValueError("%r is not a valid %s" % (value, cls.__qualname__))
-        raise TypeError("error in %s._missing_: returned %r instead of None or a valid member"
-                        % (cls.__name__, result))
+def _member(enum_class, name, value):
+    """Defines member `name` of `value`: the compiler calls it once per
+    member, in definition order, right after the class statement."""
+    if name in enum_class._member_map_:
+        raise TypeError("%r already defined as %r" % (name, enum_class._member_map_[name]))
+    last_values = enum_class._last_values_
+    if isinstance(value, auto):
+        if value.value is None:
+            value = enum_class._generate_next_value_(name, 1, len(enum_class._member_names_), last_values[:])
+        else:
+            value = value.value
+    elif isinstance(value, tuple) and any(isinstance(v, auto) for v in value):
+        value = tuple(enum_class._generate_next_value_(name, 1, len(enum_class._member_names_),
+                                                       last_values[:]) if isinstance(v, auto) else v
+                      for v in value)
+    last_values.append(value)
+    m = _make_member(enum_class, name, value, _mixin_of(enum_class.__bases__))
+    canonical = None
+    for other in enum_class._member_names_:
+        o = enum_class._member_map_[other]
+        if o._value_ == m._value_:
+            canonical = o
+            break
+    if canonical is not None:
+        m = canonical
+    else:
+        enum_class._member_names_.append(name)
+        if enum_class._is_flag_ and isinstance(m._value_, int):
+            bits = enum_class._all_bits_ | m._value_
+            type.__setattr__(enum_class, "_flag_mask_", bits)
+            type.__setattr__(enum_class, "_all_bits_", bits)
+    enum_class._member_map_[name] = m
+    try:
+        enum_class._value2member_map_.setdefault(m._value_, m)
+    except TypeError:
+        enum_class._unhashable_values_.append(m._value_)
+    return m
 
-    def _create_(cls, class_name, names, *, module=None, qualname=None, type=None, start=1, boundary=None):
-        bases = (cls,) if type is None else (type, cls)
-        classdict = {}
-        if isinstance(names, str):
-            names = names.replace(",", " ").split()
-        if isinstance(names, (tuple, list)) and names and isinstance(names[0], str):
-            original, names, last = names, [], []
-            for count, name in enumerate(original):
-                value = cls._generate_next_value_(name, start, count, last[:])
-                last.append(value)
-                names.append((name, value))
-        if isinstance(names, dict):
-            names = list(names.items())
-        for name, value in names:
-            classdict[name] = value
-        return EnumType(class_name, bases, classdict, boundary=boundary)
 
-    def __contains__(cls, value):
-        if isinstance(value, cls):
-            return True
-        try:
-            if value in cls._value2member_map_:
-                return True
-        except TypeError:
-            pass
-        return value in cls._unhashable_values_
-
-    def __delattr__(cls, attr):
-        if attr in cls._member_map_:
-            raise AttributeError("%r cannot delete member %r." % (cls.__name__, attr))
-        super().__delattr__(attr)
-
-    def __getitem__(cls, name):
-        return cls._member_map_[name]
-
-    def __iter__(cls):
-        return (cls._member_map_[name] for name in cls._member_names_)
-
-    def __reversed__(cls):
-        return (cls._member_map_[name] for name in reversed(cls._member_names_))
-
-    def __len__(cls):
-        return len(cls._member_names_)
-
-    def __bool__(cls):
-        return True
-
-    @builtins_property
-    def __members__(cls):
-        return dict(cls._member_map_)
-
-    def __repr__(cls):
-        if Flag is not None and issubclass(cls, Flag):
-            return "<flag %r>" % cls.__name__
-        return "<enum %r>" % cls.__name__
-
-    def __setattr__(cls, name, value):
-        member_map = cls.__dict__.get("_member_map_", {})
-        if name in member_map:
-            raise AttributeError("cannot reassign member %r" % (name,))
-        super().__setattr__(name, value)
+enum_install(_finish)
 
 
 EnumMeta = EnumType
-Flag = None
+# Flag once it exists; a list, so the name Flag is bound once (by its class)
+# and keeps a layout its subclasses extend.
+_FLAG = []
 
 
 class Enum(metaclass=EnumType):
@@ -330,13 +262,17 @@ class ReprEnum(Enum):
 
 
 class IntEnum(int, ReprEnum):
-    pass
+    __str__ = ReprEnum.__str__
+    __format__ = ReprEnum.__format__
 
 
 _BASES.extend((ReprEnum, IntEnum))
 
 
 class StrEnum(str, ReprEnum):
+    __str__ = ReprEnum.__str__
+    __format__ = ReprEnum.__format__
+
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name.lower()
@@ -473,7 +409,13 @@ class Flag(Enum, boundary=STRICT):
     __rxor__ = __xor__
 
 
-class IntFlag(int, ReprEnum, Flag, boundary=KEEP):
+_FLAG.append(Flag)
+
+
+# CPython's bases are (int, ReprEnum, Flag); ReprEnum adds only the two
+# methods the body takes from it, so it is left out of the bases, which keeps
+# the class to one compiled base after its builtin.
+class IntFlag(int, Flag, boundary=KEEP):
     __str__ = ReprEnum.__str__
     __format__ = ReprEnum.__format__
     __repr__ = Flag.__repr__
@@ -481,6 +423,7 @@ class IntFlag(int, ReprEnum, Flag, boundary=KEEP):
     __and__ = __rand__ = Flag.__and__
     __xor__ = __rxor__ = Flag.__xor__
     __invert__ = Flag.__invert__
+    __bool__ = Flag.__bool__
 
 
 _BASES.extend((Flag, IntFlag))

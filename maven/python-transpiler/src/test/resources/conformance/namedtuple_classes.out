@@ -1,0 +1,11 @@
+Version(major=1, minor=2, micro=3) Version(major=1, minor=2, micro=4) {'major': 1, 'minor': 2, 'micro': 3} ('major', 'minor', 'micro') True 3 2
+Version(major=4, minor=5, micro=6) (1, 2, 3) True True
+replace error TypeError
+make error Expected 3 arguments, got 1
+Point(x=1, y=2) 1 2 A point. ('x', 'y') True Point(x=5, y=2)
+{'x': <class 'int'>, 'y': <class 'int'>}
+3 Point Version Version(major=1, minor=2, micro=3)
+1 2 ['a', 'b'] True 9 [('a', 1), ('b', 2)] True
+True False collections.abc Container
+SplitResult(scheme='http', netloc='u:p@h.com:80', path='/a', query='q=1', fragment='f') h.com 80 http://u:p@h.com:80/a?q=1#f http://u:p@h.com:80/b?q=1#f SplitResultBytes(scheme=b'http', netloc=b'u:p@h.com:80', path=b'/a', query=b'q=1', fragment=b'f')
+{'scheme': 'https', 'netloc': 'x.org', 'path': '/p', 'params': 'r', 'query': 'q', 'fragment': 'z'} True u:p@h.com:80 SplitResult

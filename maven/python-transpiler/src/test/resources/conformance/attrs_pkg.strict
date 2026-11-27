@@ -1,0 +1,3 @@
+main:233 attrs define(...) applied to a class built at run time cannot be lowered; decorate a class statement instead
+main:348 attrs make_class builds a class at run time, which a closed-world build cannot compile; declare the class with a class statement and @define
+main:350 attrs make_class builds a class at run time, which a closed-world build cannot compile; declare the class with a class statement and @define

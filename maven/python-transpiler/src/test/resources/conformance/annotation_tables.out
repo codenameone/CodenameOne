@@ -1,0 +1,36 @@
+Point 10
+  x = int
+  y = str Point
+  tags = alias True 1
+  table = alias True 2
+  maybe = alias True 2
+  either = alias True 2
+  fn = alias True 2
+  seq = alias True 1
+  lit = alias True 2
+  flag = alias True 2
+plain 6
+  a = int
+  b = str
+  rest = bytes
+  key = float
+  more = bool
+  return = None
+shaped 6
+  a = alias True 1
+  b = alias True 2
+  c = alias True 3
+  d = alias False 0
+  e = str Point
+  return = alias True 2
+called 3
+  a = alias True 2
+  b = alias True 2
+  return = alias True 2
+none 0
+True
+True True
+True ([<class 'int'>, <class 'str'>], <class 'bool'>)
+True True
+('a', 'b') (<class 'int'>, 'x')
+(<class 'str'>, tuple[int, ...]) True

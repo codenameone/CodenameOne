@@ -1,0 +1,8 @@
+main:194 getattr with a computed name is reflection; write override = main.message in cn1-python.properties and its compliant body in cn1-python-overrides/main.message.py
+unittest:1109 getattr with a computed name is reflection; write override = unittest._WritelnDecorator.__getattr__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest._WritelnDecorator.__getattr__.py
+unittest:265 getattr with a computed name is reflection; write override = unittest.TestCase.__init__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestCase.__init__.py
+unittest:341 getattr with a computed name is reflection; write override = unittest.TestCase.run in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestCase.run.py
+unittest:927 getattr with a computed name is reflection; write override = unittest.TestLoader.loadTestsFromModule in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestLoader.loadTestsFromModule.py
+unittest:941 getattr with a computed name is reflection; write override = unittest.TestLoader.loadTestsFromName in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestLoader.loadTestsFromName.py
+unittest:952 getattr with a computed name is reflection; write override = unittest.TestLoader.loadTestsFromName in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestLoader.loadTestsFromName.py
+unittest:966 getattr with a computed name is reflection; write override = unittest.TestLoader.getTestCaseNames in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestLoader.getTestCaseNames.py

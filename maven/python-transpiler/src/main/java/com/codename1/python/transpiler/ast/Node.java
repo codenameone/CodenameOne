@@ -32,6 +32,10 @@ import java.util.List;
 /// annotates them, and the emitter walks them.
 public abstract class Node {
     public int line;
+    /// A construct a lowering found the build cannot compile in a closed
+    /// world (a class made at run time, a parser whose destination is
+    /// computed): the strict-mode message, reported against `line`.
+    public String refusal;
     public int col;
 
     public <T extends Node> T at(int l, int c) {
@@ -92,7 +96,8 @@ public abstract class Node {
 
     public static final class Attribute extends Expr {
         public final Expr value;
-        public final String attr;
+        /// Not final: codegen.ConstArgSpecialize points a call at a clone.
+        public String attr;
 
         public Attribute(Expr value, String attr) {
             this.value = value;
@@ -237,6 +242,10 @@ public abstract class Node {
 
     public static final class SetExpr extends Expr {
         public final List<Expr> elts;
+        /// The right side of `in` with only constants in it: CPython folds it
+        /// to a frozenset constant, and so does the emitter (one per module,
+        /// never a set per test).
+        public boolean frozenConstant;
 
         public SetExpr(List<Expr> elts) {
             this.elts = elts;
@@ -589,6 +598,9 @@ public abstract class Node {
         public final Expr returns;
         public final boolean isAsync;
         public Scope scope;
+        /// The `__init__` codegen.DataclassInit wrote: its stores are the
+        /// constructor's, not a store a frozen class must refuse.
+        public boolean dataclassInit;
 
         public FunctionDef(String name, Arguments args, List<Stmt> body, List<Expr> decorators, Expr returns,
                 boolean isAsync) {
@@ -608,6 +620,15 @@ public abstract class Node {
         public final List<Stmt> body;
         public final List<Expr> decorators;
         public Scope scope;
+        /// Its one decorator is `@dataclass`, whose `__init__` the class
+        /// now defines (codegen.DataclassInit): the decorator hands back
+        /// the class itself, with methods added.
+        public boolean dataclass;
+        /// A frozen one of those: its stores go through the `__setattr__`
+        /// the decorator adds.
+        public boolean dataclassFrozen;
+        /// Its field names, in order.
+        public final List<String> dataclassFields = new ArrayList<String>();
 
         public ClassDef(String name, List<Expr> bases, List<Keyword> keywords, List<Stmt> body,
                 List<Expr> decorators) {

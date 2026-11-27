@@ -430,9 +430,8 @@ class FastAPI(APIRouter):
         if p is not None and p.field is not None:
             if p.field.title:
                 s["title"] = p.field.title
-            for k in ("gt", "ge", "lt", "le", "min_length", "max_length", "pattern", "multiple_of"):
-                v = getattr(p.field, k, None)
-                if v is not None:
+            for k, v in p.field.constraints().items():
+                if True:
                     s[{"gt": "exclusiveMinimum", "ge": "minimum", "lt": "exclusiveMaximum", "le": "maximum",
                        "min_length": "minLength", "max_length": "maxLength", "pattern": "pattern",
                        "multiple_of": "multipleOf"}[k]] = v

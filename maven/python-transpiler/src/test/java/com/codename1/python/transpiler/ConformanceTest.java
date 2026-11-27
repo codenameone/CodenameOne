@@ -106,8 +106,16 @@ class ConformanceTest {
         }
         if (Files.isDirectory(program)) {
             try (Stream<Path> s = Files.walk(program)) {
-                for (Path p : s.filter(x -> x.toString().endsWith(".py")).collect(Collectors.toList())) {
+                for (Path p : s.filter(x -> x.toString().endsWith(".py")
+                        || com.codename1.python.transpiler.codegen.Jinja2Lowering.isTemplateFile(
+                                program.relativize(x).toString().replace(File.separatorChar, '/')))
+                        .collect(Collectors.toList())) {
                     String rel = program.relativize(p).toString().replace(File.separatorChar, '/');
+                    if (!rel.endsWith(".py")) {
+                        // A template jinja2's loaders read, as the build passes it.
+                        sources.put(rel, read(p));
+                        continue;
+                    }
                     if (natives.containsKey(rel.substring(0, rel.length() - 3).replace('/', '.'))) {
                         continue;
                     }
@@ -155,10 +163,52 @@ class ConformanceTest {
         boolean client = stem.startsWith("pilclient_");
         List<File> classPath = new ArrayList<File>();
         classPath.add(new File(core));
+        // The runtime too, as an application has it: the build then leaves
+        // out what the program does not reach, and every program here runs
+        // without it.
+        classPath.add(new File(runtime));
         if (backend != null) {
             classPath.add(new File(backend));
         }
-        for (Map.Entry<String, String> e : PythonTranspiler.transpile(sources, "main", classPath, natives).entrySet()) {
+        // A program written to exercise runtime reflection cannot compile in
+        // strict mode. Its `.strict` file lists the refusals, one per line
+        // (`module:line` and what was refused), and the build must fail with
+        // exactly those: one accepted silently, or refused differently, fails
+        // here. The `.out` beside it stays CPython's output, for the day the
+        // construct gets a compliant lowering.
+        Path strict = ROOT.resolve(stem + ".strict");
+        if (Files.isRegularFile(strict)) {
+            IllegalStateException e = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> PythonTranspiler.transpile(sources, "main", classPath, natives),
+                    "strict mode accepted a program it must refuse");
+            String[] lines = String.valueOf(e.getMessage()).split("\n");
+            assertTrue(lines[0].startsWith("cn1.python.strict: "), e.getMessage());
+            List<String> actual = new ArrayList<String>();
+            for (int i = 1; i < lines.length; i++) {
+                actual.add(lines[i].trim());
+            }
+            java.util.Collections.sort(actual);
+            List<String> expected = new ArrayList<String>();
+            for (String l : Files.readAllLines(strict, StandardCharsets.UTF_8)) {
+                if (!l.trim().isEmpty()) {
+                    expected.add(l.trim());
+                }
+            }
+            java.util.Collections.sort(expected);
+            assertEquals(String.join("\n", expected), String.join("\n", actual), "strict refusals differ");
+            return;
+        }
+        Map<String, String> generated = PythonTranspiler.transpile(sources, "main", classPath, natives);
+        if ("liveness_".equals(stem)) {
+            // What nothing live imports is left out: neither emitted nor
+            // registered.
+            for (String k : generated.keySet()) {
+                if (k.contains("unused")) {
+                    throw new AssertionError("a module nothing imports was emitted: " + k);
+                }
+            }
+        }
+        for (Map.Entry<String, String> e : generated.entrySet()) {
             Path f = gen.resolve(e.getKey());
             Files.createDirectories(f.getParent());
             Files.write(f, e.getValue().getBytes(StandardCharsets.US_ASCII));
@@ -234,6 +284,10 @@ class ConformanceTest {
                 }
             } catch (InvocationTargetException e) {
                 failure = String.valueOf(e.getCause());
+                if (System.getProperty("conformance.only") != null) {
+                    // One program asked for by name: the whole trace.
+                    e.getCause().printStackTrace(savedErr);
+                }
                 if (!failure.startsWith("com.codename1.python.runtime.PyException")) {
                     // A Java failure: name the frames that recur, which is
                     // where a runaway recursion is.

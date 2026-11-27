@@ -1,8 +1,9 @@
 # Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
 # Licensed under the GNU General Public License version 2 with the Classpath
 # exception, as the rest of the Codename One Python runtime.
-"""inspect: signatures and the is* predicates. There are no frames or
-source to read, so what needs them (stack, getsource) is absent."""
+"""inspect: signatures and the is* predicates. A translated program ships
+no source, so getsource raises OSError; currentframe is sys._getframe's
+frame, which carries globals but no locals."""
 
 import types as _types
 
@@ -155,13 +156,22 @@ class Signature:
     def __str__(self):
         parts = []
         star = False
+        positional_only = False
         for p in self._params.values():
+            if p.kind == POSITIONAL_ONLY:
+                positional_only = True
+            elif positional_only:
+                # The "/" closes the positional-only parameters.
+                parts.append("/")
+                positional_only = False
             if p.kind == VAR_POSITIONAL:
                 star = True
             elif p.kind == KEYWORD_ONLY and not star:
                 parts.append("*")
                 star = True
             parts.append(str(p))
+        if positional_only:
+            parts.append("/")
         s = "(" + ", ".join(parts) + ")"
         if self.return_annotation is not _empty:
             s += " -> " + _formatannotation(self.return_annotation)
@@ -225,9 +235,10 @@ def _function_signature(f, skip_first):
     ann = getattr(f, "__annotations__", {}) or {}
     params = []
     first_default = npos - len(defaults)
+    nposonly = code.co_posonlyargcount
     for i in range(npos):
         n = names[i]
-        params.append(Parameter(n, POSITIONAL_OR_KEYWORD,
+        params.append(Parameter(n, POSITIONAL_ONLY if i < nposonly else POSITIONAL_OR_KEYWORD,
                                 default=defaults[i - first_default] if i >= first_default else _empty,
                                 annotation=ann.get(n, _empty)))
     at = npos + nkw
@@ -263,6 +274,12 @@ def signature(obj, *, follow_wrapped=True):
             if "__init__" in base.__dict__ and isfunction(base.__dict__["__init__"]):
                 return _function_signature(base.__dict__["__init__"], True)
         return Signature([])
+    if obj is object.__init__:
+        # What CPython reads from object.__init__'s text signature; a class
+        # that defines no __init__ of its own hands this one on.
+        return Signature([Parameter("self", POSITIONAL_ONLY),
+                          Parameter("args", VAR_POSITIONAL),
+                          Parameter("kwargs", VAR_KEYWORD)])
     call = getattr(type(obj), "__call__", None)
     if call is not None and isfunction(call):
         return _function_signature(call, True)
@@ -312,6 +329,39 @@ def isgeneratorfunction(obj):
 
 def isasyncgenfunction(obj):
     return bool(getattr(obj, "__code__", None) and obj.__code__.co_flags & 0x200)
+
+
+def isasyncgen(obj):
+    return type(obj).__name__ == "async_generator"
+
+
+CORO_CREATED = "CORO_CREATED"
+CORO_RUNNING = "CORO_RUNNING"
+CORO_SUSPENDED = "CORO_SUSPENDED"
+CORO_CLOSED = "CORO_CLOSED"
+GEN_CREATED = "GEN_CREATED"
+GEN_RUNNING = "GEN_RUNNING"
+GEN_SUSPENDED = "GEN_SUSPENDED"
+GEN_CLOSED = "GEN_CLOSED"
+
+
+def _state(obj, prefix):
+    if getattr(obj, prefix.lower() + "_running", False):
+        return prefix + "_RUNNING"
+    frame = getattr(obj, prefix.lower() + "_frame", 0)
+    if frame is None:
+        return prefix + "_CLOSED"
+    if getattr(obj, "_started", True) is False:
+        return prefix + "_CREATED"
+    return prefix + "_SUSPENDED"
+
+
+def getcoroutinestate(coroutine):
+    return _state(coroutine, "CORO")
+
+
+def getgeneratorstate(generator):
+    return _state(generator, "GEN")
 
 
 def isawaitable(obj):
@@ -368,3 +418,76 @@ def unwrap(func):
     while hasattr(func, "__wrapped__"):
         func = func.__wrapped__
     return func
+
+
+_sentinel = object()
+
+
+def getattr_static(obj, attr, default=_sentinel):
+    """Looks attr up without running descriptors or __getattr__: the
+    instance's own __dict__ first, then each class of the MRO."""
+    klass = obj if isinstance(obj, type) else type(obj)
+    if not isinstance(obj, type):
+        try:
+            d = object.__getattribute__(obj, "__dict__")
+        except AttributeError:
+            d = None
+        if isinstance(d, dict) and attr in d:
+            return d[attr]
+    for k in klass.__mro__:
+        kd = k.__dict__
+        if attr in kd:
+            return kd[attr]
+    if default is not _sentinel:
+        return default
+    raise AttributeError(attr)
+
+
+def isdatadescriptor(obj):
+    t = type(obj)
+    return hasattr(t, "__set__") or hasattr(t, "__delete__")
+
+
+def ismethoddescriptor(obj):
+    t = type(obj)
+    return hasattr(t, "__get__") and not hasattr(t, "__set__") and not isclass(obj) and not isfunction(obj)
+
+
+# A translated program ships no source, so asking for it raises OSError, as
+# CPython does for code whose file it cannot read; callers that fall back on
+# that (anyio's lazy importer, doctest-style tooling) take their fallback.
+def _no_source(obj):
+    raise OSError("source code not available")
+
+
+def getsource(obj):
+    _no_source(obj)
+
+
+def getsourcelines(obj):
+    _no_source(obj)
+
+
+def getsourcefile(obj):
+    return None
+
+
+def getfile(obj):
+    f = getattr(obj, "__file__", None)
+    if f is None:
+        mod = getattr(obj, "__module__", None)
+        import sys
+        m = sys.modules.get(mod) if mod else None
+        f = getattr(m, "__file__", None)
+    if f is None:
+        raise TypeError("%r has no source file" % (obj,))
+    return f
+
+
+def currentframe():
+    import sys
+    return sys._getframe(1)
+
+
+def stack(context=1):
+    return []

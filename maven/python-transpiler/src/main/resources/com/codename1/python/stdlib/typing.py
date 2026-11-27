@@ -25,6 +25,52 @@ def _type_repr(obj):
     return repr(obj)
 
 
+# Subscriptions are memoized, as CPython's typing does with _tp_cache: code
+# that writes cast(List[X], v) in a loop builds the alias once. The type of
+# the parameters is part of the key (Literal[1] is not Literal[True]), and an
+# unhashable subscription is simply not cached.
+_tp_cache = {}
+
+
+# One dict per kind, of one dict per owner, for a subscript by a single
+# class (`List[str]` in a `cast` that runs in a loop): a class hashes and
+# compares by identity, so it is the key by itself -- no key tuple, and no
+# closure made on every hit as `_cached` needs.
+_by_class = ({}, {}, {}, {})
+
+
+def _cached_class(kind, owner, params, make):
+    per = _by_class[kind].get(owner)
+    if per is None:
+        per = {}
+        if len(_by_class[kind]) >= 4096:
+            _by_class[kind].clear()
+        _by_class[kind][owner] = per
+    hit = per.get(params)
+    if hit is None:
+        hit = make(owner, params)
+        per[params] = hit
+    return hit
+
+
+def _form_getitem(form, params):
+    return form._getitem(form, params)
+
+
+def _cached(kind, owner, params, make):
+    key = (kind, owner, params, type(params))
+    try:
+        hit = _tp_cache.get(key)
+    except TypeError:
+        return make()
+    if hit is None:
+        hit = make()
+        if len(_tp_cache) >= 4096:
+            _tp_cache.clear()
+        _tp_cache[key] = hit
+    return hit
+
+
 class _Final:
     __slots__ = ()
 
@@ -70,7 +116,9 @@ class _SpecialForm(_Final):
     def __getitem__(self, params):
         if self._getitem is None:
             raise TypeError(self._name + " is not subscriptable")
-        return self._getitem(self, params)
+        if type(params) is type:
+            return _cached_class(0, self, params, _form_getitem)
+        return _cached(0, self, params, lambda: self._getitem(self, params))
 
     def __call__(self, *args, **kwds):
         raise TypeError("Cannot instantiate " + repr(self))
@@ -123,6 +171,11 @@ class _GenericAlias(_Final):
         return result
 
     def __getitem__(self, params):
+        if type(params) is type:
+            return _cached_class(1, self, params, type(self)._subscript)
+        return _cached(1, self, params, lambda: self._subscript(params))
+
+    def _subscript(self, params):
         if not isinstance(params, tuple):
             params = (params,)
         subst = dict(zip(self.__parameters__, params))
@@ -242,6 +295,11 @@ class _SpecialGenericAlias(_Final):
         return "typing." + self._name
 
     def __getitem__(self, params):
+        if type(params) is type:
+            return _cached_class(2, self, params, _SpecialGenericAlias._subscript)
+        return _cached(2, self, params, lambda: self._subscript(params))
+
+    def _subscript(self, params):
         if self._name == "Callable" and isinstance(params, tuple) and len(params) == 2:
             args, result = params
             if args is ...:
@@ -326,6 +384,15 @@ Text = str
 AnyStr = None
 
 
+def _lazy_re():
+    import re
+    return re
+
+
+Pattern = _SpecialGenericAlias(_lazy_re().Pattern, "Pattern", 1)
+Match = _SpecialGenericAlias(_lazy_re().Match, "Match", 1)
+
+
 class TypeVar(_Final):
     def __init__(self, name, *constraints, bound=None, covariant=False, contravariant=False,
                  infer_variance=False, default=None):
@@ -400,31 +467,28 @@ class Generic:
     __slots__ = ()
 
     def __class_getitem__(cls, params):
-        if not isinstance(params, tuple):
-            params = (params,)
-        if cls is Generic or cls is Protocol:
-            return _GenericAlias(cls, params, cls.__name__)
-        return _GenericAlias(cls, params)
+        if type(params) is type:
+            return _cached_class(3, cls, params, _generic_alias)
+        return _cached(3, cls, params, lambda: _generic_alias(cls, params))
 
     def __init_subclass__(cls, *args, **kwargs):
         super().__init_subclass__(*args, **kwargs)
 
 
-class _ProtocolMeta(type(_abc.Sized)):
-    def __instancecheck__(cls, instance):
-        if not cls.__dict__.get("_is_runtime_protocol", False) and not cls.__dict__.get("_is_protocol", False):
-            return super().__instancecheck__(instance)
-        if super().__instancecheck__(instance):
-            return True
-        if cls.__dict__.get("_is_protocol", False) and not cls.__dict__.get("_is_runtime_protocol", False):
-            raise TypeError("Instance and class checks can only be used with @runtime_checkable protocols")
-        for attr in cls.__protocol_attrs__:
-            if not hasattr(instance, attr):
-                return False
-        return True
+def _generic_alias(cls, params):
+    if not isinstance(params, tuple):
+        params = (params,)
+    if cls is Generic or cls is Protocol:
+        return _GenericAlias(cls, params, cls.__name__)
+    return _GenericAlias(cls, params)
 
 
-class Protocol(Generic, metaclass=_ProtocolMeta):
+# Protocol has no metaclass. isinstance and issubclass against a protocol
+# class are answered by the runtime (PyType.protocolCheck) through the
+# member check the transpiler generates for each protocol body from its
+# literal member names (ProtocolChecks): no member is looked up by a
+# computed name.
+class Protocol(Generic):
     __slots__ = ()
     _is_protocol = True
 
@@ -432,22 +496,6 @@ class Protocol(Generic, metaclass=_ProtocolMeta):
         super().__init_subclass__(*args, **kwargs)
         if not cls.__dict__.get("_is_protocol", False):
             cls._is_protocol = any(b is Protocol for b in cls.__bases__)
-        attrs = set()
-        for base in cls.__mro__[:-1]:
-            if base.__name__ in ("Protocol", "Generic", "object"):
-                continue
-            for name in list(base.__dict__.keys()) + list(base.__dict__.get("__annotations__", {}).keys()):
-                if not name.startswith("_abc_") and name not in ("__module__", "__qualname__", "__doc__",
-                                                                "__annotations__", "__dict__", "__weakref__",
-                                                                "__init__", "__slots__", "_is_protocol",
-                                                                "__abstractmethods__", "__parameters__",
-                                                                "__orig_bases__", "__protocol_attrs__",
-                                                                "_is_runtime_protocol", "__init_subclass__",
-                                                                "__subclasshook__", "__match_args__",
-                                                                "__firstlineno__", "__static_attributes__",
-                                                                "_abc_registry"):
-                    attrs.add(name)
-        cls.__protocol_attrs__ = attrs
 
 
 def runtime_checkable(cls):
@@ -455,8 +503,9 @@ def runtime_checkable(cls):
     return cls
 
 
-def cast(typ, val):
-    return val
+# A builtin, so that a call the compiler can see is this one skips building
+# its type argument (see StdModules.CAST).
+from _cn1op import cast
 
 
 def assert_type(val, typ, /):
@@ -562,10 +611,11 @@ class _HintParser:
     `X[...]`, `|`, `None`, `...` and string literals, which is the grammar
     annotations are written in."""
 
-    def __init__(self, text, ns):
+    def __init__(self, text, ns, hints):
         self.text = text
         self.pos = 0
         self.ns = ns
+        self.hints = hints
 
     def _ws(self):
         while self.pos < len(self.text) and self.text[self.pos] == " ":
@@ -594,7 +644,7 @@ class _HintParser:
             end = self.text.index(c, self.pos + 1)
             inner = self.text[self.pos + 1:end]
             self.pos = end + 1
-            return _HintParser(inner, self.ns).parse()
+            return _HintParser(inner, self.ns, self.hints).parse()
         if self.text.startswith("...", self.pos):
             self.pos += 3
             return ...
@@ -625,24 +675,33 @@ class _HintParser:
         return items
 
     def _lookup(self, name):
-        parts = name.split(".")
-        if parts[0] == "None":
+        # A forward reference resolves to what the build resolved it to:
+        # `self.hints` is the module's `__cn1_hints__` table, which the
+        # compiler writes from every string annotation in the module, each
+        # entry a compiled reference. `self.ns` holds only what the caller
+        # handed over (globalns/localns, the class being read). Nothing is
+        # looked up in a module's or class's namespace by the string.
+        if name == "None":
             return None
-        if parts[0] in self.ns:
-            value = self.ns[parts[0]]
-        else:
-            import builtins
-            if not hasattr(builtins, parts[0]):
-                raise NameError("name '" + parts[0] + "' is not defined")
-            value = getattr(builtins, parts[0])
-        for p in parts[1:]:
-            value = getattr(value, p)
-        return value
+        if "." not in name and name in self.ns:
+            return self.ns[name]
+        if name in self.hints:
+            return self.hints[name]
+        raise NameError("forward reference " + repr(name) + " in annotation " + repr(self.text)
+                        + " was not resolved at build time: only names a string annotation of the"
+                        + " module spells, bound in its globals or builtins, are resolvable")
 
 
-def _resolve_hint(value, ns):
+def _module_hints(modname):
+    import sys
+    m = sys.modules.get(modname) if modname is not None else None
+    table = getattr(m, "__cn1_hints__", None) if m is not None else None
+    return table() if table is not None else {}
+
+
+def _resolve_hint(value, ns, hints):
     if isinstance(value, str):
-        return _HintParser(value, ns).parse()
+        return _HintParser(value, ns, hints).parse()
     return value
 
 
@@ -651,18 +710,31 @@ def get_type_hints(obj, globalns=None, localns=None, include_extras=False):
     hints = {}
     if isinstance(obj, type):
         for base in reversed(obj.__mro__):
-            ns = dict(globalns) if globalns is not None else dict(getattr(sys.modules.get(base.__module__), "__dict__", {}))
+            ns = dict(globalns) if globalns is not None else {}
             ns.setdefault(base.__name__, base)
             if localns:
                 ns.update(localns)
+            table = None
             for k, v in base.__dict__.get("__annotations__", {}).items():
-                hints[k] = _resolve_hint(v, ns)
+                if table is None and isinstance(v, str):
+                    table = _module_hints(base.__module__)
+                hints[k] = _resolve_hint(v, ns, table)
     else:
-        ns = dict(globalns) if globalns is not None else dict(getattr(obj, "__globals__", {}))
+        # As CPython does: a bound method or a decorated function is read
+        # through to the function it wraps, whose module the names are in.
+        while True:
+            inner = getattr(obj, "__wrapped__", None) or getattr(obj, "__func__", None)
+            if inner is None or inner is obj:
+                break
+            obj = inner
+        ns = dict(globalns) if globalns is not None else {}
         if localns:
             ns.update(localns)
+        table = None
         for k, v in getattr(obj, "__annotations__", {}).items():
-            hints[k] = _resolve_hint(v, ns)
+            if table is None and isinstance(v, str):
+                table = _module_hints(getattr(obj, "__module__", None))
+            hints[k] = _resolve_hint(v, ns, table)
     if not include_extras:
         for k, v in list(hints.items()):
             if isinstance(v, _AnnotatedAlias):
@@ -706,20 +778,28 @@ class TypeAliasType:
         return _GenericAlias(self, params)
 
 
-class _NamedTupleMeta(type):
-    def __new__(cls, typename, bases, ns):
-        import collections
-        types = ns.get("__annotations__", {})
-        default_names = [n for n in types if n in ns]
-        nm_tpl = collections.namedtuple(typename, list(types.keys()),
-                                        defaults=[ns[n] for n in default_names],
-                                        module=ns.get("__module__", "__main__"))
-        nm_tpl.__annotations__ = types
-        for key, val in ns.items():
-            if key not in ("__annotations__", "__module__", "__qualname__") and key not in types and \
-                    key not in ("__slots__", "_fields", "__new__", "__init__"):
-                setattr(nm_tpl, key, val)
+def __NamedTupleMeta__new__(cls, typename, bases, ns):
+    import collections
+    types = ns.get("__annotations__", {})
+    default_names = [n for n in types if n in ns]
+    nm_tpl = collections.namedtuple(typename, list(types.keys()),
+                                    defaults=[ns[n] for n in default_names],
+                                    module=ns.get("__module__", "__main__"))
+    nm_tpl.__annotations__ = types
+    # The body's own members go on a subclass built from them, rather than
+    # being stored onto the tuple class one computed name at a time.
+    extra = {key: val for key, val in ns.items()
+             if key not in ("__annotations__", "__module__", "__qualname__") and key not in types
+             and key not in ("__slots__", "_fields", "__new__", "__init__")}
+    if not extra:
         return nm_tpl
+    extra["__slots__"] = ()
+    return type(typename, (nm_tpl,), extra)
+
+
+# Made by a call rather than a class statement: a class deriving from
+# `type` has no layout, and this metaclass is only ever used dynamically.
+_NamedTupleMeta = type("_NamedTupleMeta", (type,), {"__new__": staticmethod(__NamedTupleMeta__new__)})
 
 
 def NamedTuple(typename, fields=None, /, **kwargs):
@@ -742,27 +822,46 @@ def _namedtuple_mro_entries(bases):
 NamedTuple.__mro_entries__ = _namedtuple_mro_entries
 
 
-class _TypedDictMeta(type):
-    def __new__(cls, name, bases, ns, total=True):
-        annotations = {}
-        for base in bases:
-            annotations.update(base.__dict__.get("__annotations__", {}))
-        annotations.update(ns.get("__annotations__", {}))
-        tp_dict = type.__new__(_TypedDictMeta, name, (dict,), ns)
-        tp_dict.__annotations__ = annotations
-        tp_dict.__total__ = total
-        tp_dict.__required_keys__ = frozenset(annotations) if total else frozenset()
-        tp_dict.__optional_keys__ = frozenset() if total else frozenset(annotations)
-        return tp_dict
+def __TypedDictMeta__new__(cls, name, bases, ns, total=True):
+    annotations = {}
+    required = set()
+    optional = set()
+    for base in bases:
+        annotations.update(base.__dict__.get("__annotations__", {}))
+        required.update(base.__dict__.get("__required_keys__", ()))
+        optional.update(base.__dict__.get("__optional_keys__", ()))
+    own = ns.get("__annotations__", {})
+    annotations.update(own)
+    # Each key takes its class's totality, unless Required[...] or
+    # NotRequired[...] (possibly inside Annotated) says otherwise.
+    for key, hint in own.items():
+        form = get_origin(hint)
+        if form is Annotated:
+            form = get_origin(get_args(hint)[0])
+        if form is Required or (form is not NotRequired and total):
+            required.add(key)
+            optional.discard(key)
+        else:
+            optional.add(key)
+            required.discard(key)
+    tp_dict = type.__new__(_TypedDictMeta, name, (dict,), ns)
+    tp_dict.__annotations__ = annotations
+    tp_dict.__total__ = total
+    tp_dict.__required_keys__ = frozenset(required)
+    tp_dict.__optional_keys__ = frozenset(optional)
+    return tp_dict
 
-    def __call__(cls, *args, **kwargs):
-        # A TypedDict describes a plain dict; instances are exactly that.
-        return dict(*args, **kwargs)
+def __TypedDictMeta__call__(cls, *args, **kwargs):
+    # A TypedDict describes a plain dict; instances are exactly that.
+    return dict(*args, **kwargs)
 
-    def __instancecheck__(cls, other):
-        raise TypeError("TypedDict does not support instance and class checks")
+def __TypedDictMeta__instancecheck__(cls, other):
+    raise TypeError("TypedDict does not support instance and class checks")
 
-    __subclasscheck__ = __instancecheck__
+
+# Made by a call rather than a class statement: a class deriving from
+# `type` has no layout, and this metaclass is only ever used dynamically.
+_TypedDictMeta = type("_TypedDictMeta", (type,), {"__new__": staticmethod(__TypedDictMeta__new__), "__call__": __TypedDictMeta__call__, "__instancecheck__": __TypedDictMeta__instancecheck__, "__subclasscheck__": __TypedDictMeta__instancecheck__})
 
 
 def TypedDict(typename, fields=None, /, *, total=True, **kwargs):
@@ -812,3 +911,18 @@ runtime_checkable(SupportsFloat)
 runtime_checkable(SupportsIndex)
 runtime_checkable(SupportsAbs)
 runtime_checkable(SupportsRound)
+
+
+class IO(Generic[AnyStr]):
+    """The type of a file object, for annotations; the runtime's files are
+    not subclasses of it, as CPython's are not either."""
+    __slots__ = ()
+
+
+class BinaryIO(IO[bytes]):
+    __slots__ = ()
+
+
+class TextIO(IO[str]):
+    __slots__ = ()
+

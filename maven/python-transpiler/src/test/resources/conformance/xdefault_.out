@@ -1,0 +1,9 @@
+b none=True type=bool True True False
+b2 none=False type=int False True
+c none=False type=int False True x
+c2 none=True type=int True
+t none=False type=str True False
+u none=False type=NoneType d none=False type=float
+False False
+tree:1 plain:2 -5 2 tree:3 plain:4
+urn:rel o None True

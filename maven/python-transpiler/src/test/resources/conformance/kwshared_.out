@@ -1,0 +1,11 @@
+['a']
+['a', 'ab']
+[3, 6, 2, 4]
+[4, 5, 6, 7]
+[True, False, False, True, 'y', 'n', 'n', 'y']
+['x', 'abc']
+['x', 'abc']
+True
+False f
+[True, False, False, True, 'y', 'n', 'n', 'y']
+patched

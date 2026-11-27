@@ -132,6 +132,79 @@ static inline JAVA_BOOLEAN cn1InlListAdd(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 }
 #endif
 
+// Boxing at the call site. valueOf and xxxValue on Integer, Long and Double were plain
+// calls into nativeMethods.m, and the generated files compile at -inline-threshold=50, so a
+// tagged box -- a shift and an OR -- still cost a call per value: 5% of a Python generator
+// drain was Long.valueOf alone. The tag work is done here; everything else (the clinit a
+// first box must force, a value outside the tag range, a heap box, null) goes through the
+// out-of-line function exactly as before. The prototypes are declared here rather than
+// included because a class the program never boxes may have none, and an unused inline
+// naming an undeclared function is still a compile error.
+#if CN1_TAGGED_ACTIVE
+extern int cn1__clinit_java_lang_Integer;
+extern int cn1__clinit_java_lang_Long;
+extern int cn1__clinit_java_lang_Double;
+#endif
+JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i);
+JAVA_OBJECT java_lang_Long_valueOf___long_R_java_lang_Long(CODENAME_ONE_THREAD_STATE, JAVA_LONG i);
+JAVA_OBJECT java_lang_Double_valueOf___double_R_java_lang_Double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d);
+JAVA_INT java_lang_Integer_intValue___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+JAVA_LONG java_lang_Long_longValue___R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+JAVA_DOUBLE java_lang_Double_doubleValue___R_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
+
+static inline JAVA_OBJECT cn1InlBoxInt(CODENAME_ONE_THREAD_STATE, JAVA_INT v) {
+#if CN1_TAGGED_ACTIVE
+    if(__builtin_expect(__atomic_load_n(&cn1__clinit_java_lang_Integer, __ATOMIC_ACQUIRE) != 0, 1)) {
+        return CN1_TAG_INT(v);
+    }
+#endif
+    return java_lang_Integer_valueOf___int_R_java_lang_Integer(threadStateData, v);
+}
+static inline JAVA_OBJECT cn1InlBoxLong(CODENAME_ONE_THREAD_STATE, JAVA_LONG v) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(__builtin_expect(CN1_LONG_TAGGABLE(v) && __atomic_load_n(&cn1__clinit_java_lang_Long, __ATOMIC_ACQUIRE) != 0, 1)) {
+        return CN1_TAG_LONG_VAL(v);
+    }
+#endif
+    return java_lang_Long_valueOf___long_R_java_lang_Long(threadStateData, v);
+}
+static inline JAVA_OBJECT cn1InlBoxDouble(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    union { JAVA_DOUBLE d; uint64_t b; } u;
+    u.d = d;
+    if(__builtin_expect(CN1_DOUBLE_TAGGABLE_BITS(u.b) && __atomic_load_n(&cn1__clinit_java_lang_Double, __ATOMIC_ACQUIRE) != 0, 1)) {
+        return CN1_TAG_DOUBLE_BITS(u.b);
+    }
+#endif
+    return java_lang_Double_valueOf___double_R_java_lang_Double(threadStateData, d);
+}
+static inline JAVA_INT cn1InlUnboxInt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+#if CN1_TAGGED_ACTIVE
+    if(__builtin_expect(CN1_TAG_CODE(o) == CN1_TAG_INTEGER, 1)) {
+        return CN1_UNTAG_INT(o);
+    }
+#endif
+    return java_lang_Integer_intValue___R_int(threadStateData, o);
+}
+static inline JAVA_LONG cn1InlUnboxLong(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(__builtin_expect(CN1_TAG_CODE(o) == CN1_TAG_LONG, 1)) {
+        return CN1_UNTAG_LONG(o);
+    }
+#endif
+    return java_lang_Long_longValue___R_long(threadStateData, o);
+}
+static inline JAVA_DOUBLE cn1InlUnboxDouble(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+#if CN1_TAGGED_EXTRA_ACTIVE
+    if(__builtin_expect(CN1_TAG_CODE(o) == CN1_TAG_DOUBLE, 1)) {
+        union { JAVA_DOUBLE d; uint64_t b; } u;
+        u.b = CN1_UNTAG_DOUBLE_BITS(o);
+        return u.d;
+    }
+#endif
+    return java_lang_Double_doubleValue___R_double(threadStateData, o);
+}
+
 #if defined(__has_include)
 #if __has_include("java_lang_StringBuilder.h") && __has_include("java_lang_String.h")
 #include "java_lang_StringBuilder.h"
@@ -141,6 +214,27 @@ static inline JAVA_BOOLEAN cn1InlListAdd(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT 
 #endif
 
 #ifdef CN1_HAVE_SB_INTRINSICS
+
+// cn1StrChars and cn1StrIsLatin1 (nativeMethods.m), for the inline bodies below.
+// Those two are functions in another translation unit, so without link-time
+// optimisation an inlined charAt was still two calls: a loop over a string paid
+// them for every character. The store is still named in one place per form --
+// keep these two and their out-of-line twins the same.
+extern struct clazz class_array1__JAVA_BYTE;
+static inline __attribute__((always_inline)) void* cn1InlStrChars(JAVA_OBJECT s) {
+    JAVA_OBJECT v = ((struct obj__java_lang_String*)s)->java_lang_String_value;
+    if(v == JAVA_NULL) {
+        return (void*)((char*)s + ((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7));
+    }
+    return CN1_ARRAY_DATA((JAVA_ARRAY)v);
+}
+static inline __attribute__((always_inline)) int cn1InlStrIsLatin1(JAVA_OBJECT s) {
+    JAVA_OBJECT v = ((struct obj__java_lang_String*)s)->java_lang_String_value;
+    if(v == JAVA_NULL) {
+        return CN1_OBJ_CLASS(s) == &class__java_lang_String_i8;
+    }
+    return CN1_OBJ_CLASS(((JAVA_ARRAY)v)) == &class_array1__JAVA_BYTE;
+}
 
 // Heap builders take the protected native path. Keep lock scopes out of these
 // small inline bodies so escape-proven stack builders retain their fast path.
@@ -304,9 +398,9 @@ static inline JAVA_OBJECT cn1InlStrReplace(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     CN1_KEEP_NATIVE_OWNER(sourceOwner, str);
     if(oldChar == newChar) return str;
     struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
-    if(cn1StrIsLatin1(str)) {
+    if(cn1InlStrIsLatin1(str)) {
         int count = s->java_lang_String_count;
-        const uint8_t* input = (const uint8_t*)cn1StrChars(str);
+        const uint8_t* input = (const uint8_t*)cn1InlStrChars(str);
         if(oldChar > 255 || memchr(input, oldChar, (size_t)count) == 0) return str;
         if(newChar <= 255) {
             JAVA_ARRAY_BYTE* output;
@@ -345,22 +439,22 @@ static inline __attribute__((always_inline)) JAVA_BOOLEAN cn1InlStrEquals(
     if(count == 0) return JAVA_TRUE;
     int ah = a->java_lang_String_hashCode, bh = b->java_lang_String_hashCode;
     if(ah != 0 && bh != 0 && ah != bh) return JAVA_FALSE;
-    int al = cn1StrIsLatin1(self);
-    int bl = cn1StrIsLatin1(other);
+    int al = cn1InlStrIsLatin1(self);
+    int bl = cn1InlStrIsLatin1(other);
     if(al && bl) {
-        const uint8_t* x = (const uint8_t*)cn1StrChars(self);
-        const uint8_t* y = (const uint8_t*)cn1StrChars(other);
+        const uint8_t* x = (const uint8_t*)cn1InlStrChars(self);
+        const uint8_t* y = (const uint8_t*)cn1InlStrChars(other);
         return cn1CompactBytesEqual(x, y, (size_t)count);
     }
-    const uint16_t* ax = (const uint16_t*)cn1StrChars(self);
-    const uint16_t* bx = (const uint16_t*)cn1StrChars(other);
+    const uint16_t* ax = (const uint16_t*)cn1InlStrChars(self);
+    const uint16_t* bx = (const uint16_t*)cn1InlStrChars(other);
     if(!al && !bl) {
         return cn1CompactBytesEqual(ax,
                 bx, (size_t)count * sizeof(uint16_t));
     }
-    return al ? cn1CompactMixedEquals((const uint8_t*)cn1StrChars(self),
+    return al ? cn1CompactMixedEquals((const uint8_t*)cn1InlStrChars(self),
                     bx, (size_t)count)
-              : cn1CompactMixedEquals((const uint8_t*)cn1StrChars(other),
+              : cn1CompactMixedEquals((const uint8_t*)cn1InlStrChars(other),
                     ax, (size_t)count);
 
 }
@@ -378,10 +472,10 @@ static inline JAVA_INT cn1InlStrHash(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
         }
         JAVA_INT end = count;
         JAVA_INT i = 0;
-        if(cn1StrIsLatin1(s)) {
+        if(cn1InlStrIsLatin1(s)) {
             // Latin-1: (b & 0xff) IS the char value, so the hash is bit-identical to
             // the same text stored as char[]. 4-way reassociation mirrors the char path.
-            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)cn1StrChars(s);
+            JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*)cn1InlStrChars(s);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + (b[i] & 0xff) * 29791
@@ -393,7 +487,7 @@ static inline JAVA_INT cn1InlStrHash(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
                 hash = 31 * hash + (b[i] & 0xff);
             }
         } else {
-            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)cn1StrChars(s);
+            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)cn1InlStrChars(s);
             for (; i + 4 <= end; i += 4) {
                 hash = hash * 923521
                      + chars[i] * 29791
@@ -419,10 +513,10 @@ static inline JAVA_CHAR cn1InlStrCharAt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s
     if(__builtin_expect((unsigned int)index < (unsigned int)t->java_lang_String_count, 1)) {
         JAVA_INT o = index;
         // Latin-1 vs UTF-16 chosen by the store, named in one place.
-        if(cn1StrIsLatin1(s)) {
-            return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)cn1StrChars(s))[o] & 0xff);
+        if(cn1InlStrIsLatin1(s)) {
+            return (JAVA_CHAR)(((JAVA_ARRAY_BYTE*)cn1InlStrChars(s))[o] & 0xff);
         }
-        return ((JAVA_ARRAY_CHAR*)cn1StrChars(s))[o];
+        return ((JAVA_ARRAY_CHAR*)cn1InlStrChars(s))[o];
     }
     return java_lang_String_charAt___int_R_char(threadStateData, s, index); // throws
 }

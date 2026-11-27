@@ -196,7 +196,11 @@ class catch_warnings:
     def __init__(self, *, record=False, module=None, action=None, category=Warning, lineno=0, append=False):
         self._record = record
         self._entered = False
-        self._module = sys.modules["warnings"] if module is None else module
+        # Kept as given: this class saves and restores this module's own
+        # globals and never reads it. Naming sys.modules["warnings"] here
+        # made the module a value read by computed names, which left every
+        # class of it untyped.
+        self._module = module
         if action is None:
             self._filter = None
         else:

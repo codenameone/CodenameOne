@@ -37,7 +37,7 @@ class SafeUUID:
 
 
 class UUID:
-    __slots__ = ("int", "is_safe", "__weakref__")
+    __slots__ = ("_int", "_is_safe", "__weakref__")
 
     def __init__(self, hex=None, bytes=None, bytes_le=None, fields=None, int=None, version=None, *,
                  is_safe=SafeUUID.unknown):
@@ -83,57 +83,73 @@ class UUID:
             int &= _RFC_4122_CLEARFLAGS_MASK
             int |= 0x8000 << 48
             int |= version << 76
-        object.__setattr__(self, "int", int)
-        object.__setattr__(self, "is_safe", is_safe)
+        self._int = int
+        self._is_safe = is_safe
 
     @classmethod
     def _from_int(cls, value):
         self = object.__new__(cls)
-        object.__setattr__(self, "int", value)
-        object.__setattr__(self, "is_safe", SafeUUID.unknown)
+        self._int = value
+        self._is_safe = SafeUUID.unknown
         return self
 
     def __getstate__(self):
-        d = {"int": self.int}
-        if self.is_safe != SafeUUID.unknown:
-            d["is_safe"] = self.is_safe
+        d = {"int": self._int}
+        if self._is_safe != SafeUUID.unknown:
+            d["is_safe"] = self._is_safe
         return d
 
     def __eq__(self, other):
         if isinstance(other, UUID):
-            return self.int == other.int
+            return self._int == other.int
         return NotImplemented
 
     def __lt__(self, other):
         if isinstance(other, UUID):
-            return self.int < other.int
+            return self._int < other.int
         return NotImplemented
 
     def __gt__(self, other):
         if isinstance(other, UUID):
-            return self.int > other.int
+            return self._int > other.int
         return NotImplemented
 
     def __le__(self, other):
         if isinstance(other, UUID):
-            return self.int <= other.int
+            return self._int <= other.int
         return NotImplemented
 
     def __ge__(self, other):
         if isinstance(other, UUID):
-            return self.int >= other.int
+            return self._int >= other.int
         return NotImplemented
 
     def __hash__(self):
-        return hash(self.int)
+        return hash(self._int)
 
     def __int__(self):
-        return self.int
+        return self._int
 
     def __repr__(self):
         return "%s(%r)" % (self.__class__.__name__, str(self))
 
-    def __setattr__(self, name, value):
+    # Immutable: the two values are read-only properties over private slots,
+    # rather than a refusing __setattr__, which would leave UUID without a
+    # layout. Only __init__ and _from_int store the slots.
+    @property
+    def int(self):
+        return self._int
+
+    @int.setter
+    def int(self, value):
+        raise TypeError("UUID objects are immutable")
+
+    @property
+    def is_safe(self):
+        return self._is_safe
+
+    @is_safe.setter
+    def is_safe(self, value):
         raise TypeError("UUID objects are immutable")
 
     def __str__(self):
@@ -142,7 +158,7 @@ class UUID:
 
     @property
     def bytes(self):
-        return self.int.to_bytes(16, "big")
+        return self._int.to_bytes(16, "big")
 
     @property
     def bytes_le(self):
@@ -156,35 +172,35 @@ class UUID:
 
     @property
     def time_low(self):
-        return self.int >> 96
+        return self._int >> 96
 
     @property
     def time_mid(self):
-        return (self.int >> 80) & 0xffff
+        return (self._int >> 80) & 0xffff
 
     @property
     def time_hi_version(self):
-        return (self.int >> 64) & 0xffff
+        return (self._int >> 64) & 0xffff
 
     @property
     def clock_seq_hi_variant(self):
-        return (self.int >> 56) & 0xff
+        return (self._int >> 56) & 0xff
 
     @property
     def clock_seq_low(self):
-        return (self.int >> 48) & 0xff
+        return (self._int >> 48) & 0xff
 
     @property
     def time(self):
         if self.version == 6:
-            time_hi = self.int >> 96
-            time_lo = (self.int >> 64) & 0x0fff
+            time_hi = self._int >> 96
+            time_lo = (self._int >> 64) & 0x0fff
             return time_hi << 28 | (self.time_mid << 12) | time_lo
         elif self.version == 7:
-            return self.int >> 80
+            return self._int >> 80
         else:
             time_hi = self.time_hi_version & 0x0fff
-            time_lo = self.int >> 96
+            time_lo = self._int >> 96
             return time_hi << 48 | (self.time_mid << 32) | time_lo
 
     @property
@@ -193,11 +209,11 @@ class UUID:
 
     @property
     def node(self):
-        return self.int & 0xffffffffffff
+        return self._int & 0xffffffffffff
 
     @property
     def hex(self):
-        return "%032x" % self.int
+        return "%032x" % self._int
 
     @property
     def urn(self):
@@ -205,11 +221,11 @@ class UUID:
 
     @property
     def variant(self):
-        if not self.int & (0x8000 << 48):
+        if not self._int & (0x8000 << 48):
             return RESERVED_NCS
-        elif not self.int & (0x4000 << 48):
+        elif not self._int & (0x4000 << 48):
             return RFC_4122
-        elif not self.int & (0x2000 << 48):
+        elif not self._int & (0x2000 << 48):
             return RESERVED_MICROSOFT
         else:
             return RESERVED_FUTURE
@@ -217,7 +233,7 @@ class UUID:
     @property
     def version(self):
         if self.variant == RFC_4122:
-            return int((self.int >> 76) & 0xf)
+            return int((self._int >> 76) & 0xf)
 
 
 _int = int

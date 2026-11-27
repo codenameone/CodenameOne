@@ -75,9 +75,14 @@ def _colorize(message, file, prog, headings):
 class Namespace:
     """Holds the parsed values as attributes."""
 
-    def __init__(self, **kwargs):
-        for name in kwargs:
-            setattr(self, name, kwargs[name])
+    def __init__(self, _cn1_init=(), **kwargs):
+        # Namespace(a=1) arrives as _cn1_init=((store_a, 1),), each store
+        # naming its attribute literally (ArgparseLowering).
+        if kwargs:
+            raise TypeError("argparse.Namespace: keyword names must be literal at the call so "
+                            "the transpiler can write their stores")
+        for store, value in _cn1_init:
+            store(self, value)
 
     def __repr__(self):
         parts = []
@@ -497,6 +502,32 @@ class MetavarTypeHelpFormatter(HelpFormatter):
 
 # ---------------------------------------------------------------- actions
 
+def _cn1_need(action):
+    acc = action._cn1_acc
+    if acc is None:
+        # The build refuses such an argument on any parser that may parse
+        # (codegen.ArgparseLowering); only one it saw used for help alone
+        # keeps it, and that one is never stored.
+        raise TypeError("argparse: the destination %r is not a literal the build could see; "
+                        "pass literal option strings (or dest=\"name\") to add_argument so the "
+                        "transpiler can write its store" % (action.dest,))
+    return acc
+
+
+def _store(action, namespace, value):
+    _cn1_need(action)[0](namespace, value)
+
+
+def _load(action, namespace, default):
+    return _cn1_need(action)[1](namespace, default)
+
+
+def _has(action, namespace):
+    # A dest with no accessor was never stored: only _store writes one.
+    acc = action._cn1_acc
+    return acc is not None and acc[2](namespace)
+
+
 class Action:
     """What an argument does when it is seen. Subclass it and implement
     __call__(self, parser, namespace, values, option_string=None)."""
@@ -514,6 +545,9 @@ class Action:
         self.help = help
         self.metavar = metavar
         self.deprecated = deprecated
+        # (store, load, has) over the literal dest, written at the
+        # add_argument call site by the transpiler (ArgparseLowering).
+        self._cn1_acc = None
 
     def _get_subactions(self):
         return []
@@ -540,7 +574,7 @@ class BooleanOptionalAction(Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         if option_string in self.option_strings:
-            setattr(namespace, self.dest, not option_string.startswith("--no-"))
+            _store(self, namespace, not option_string.startswith("--no-"))
 
     def format_usage(self):
         return " | ".join(self.option_strings)
@@ -558,7 +592,7 @@ class _StoreAction(Action):
                         required, help, metavar, deprecated)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, values)
+        _store(self, namespace, values)
 
 
 class _StoreConstAction(Action):
@@ -568,7 +602,7 @@ class _StoreConstAction(Action):
                         help, metavar, deprecated)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, self.const)
+        _store(self, namespace, self.const)
 
 
 class _StoreTrueAction(_StoreConstAction):
@@ -604,9 +638,9 @@ class _AppendAction(Action):
                         required, help, metavar, deprecated)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        items = _copy_items(getattr(namespace, self.dest, None))
+        items = _copy_items(_load(self, namespace, None))
         items.append(values)
-        setattr(namespace, self.dest, items)
+        _store(self, namespace, items)
 
 
 class _AppendConstAction(Action):
@@ -616,9 +650,9 @@ class _AppendConstAction(Action):
                         help, metavar, deprecated)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        items = _copy_items(getattr(namespace, self.dest, None))
+        items = _copy_items(_load(self, namespace, None))
         items.append(self.const)
-        setattr(namespace, self.dest, items)
+        _store(self, namespace, items)
 
 
 class _CountAction(Action):
@@ -628,17 +662,17 @@ class _CountAction(Action):
                         help, None, deprecated)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        count = getattr(namespace, self.dest, None)
+        count = _load(self, namespace, None)
         if count is None:
             count = 0
-        setattr(namespace, self.dest, count + 1)
+        _store(self, namespace, count + 1)
 
 
 class _ExtendAction(_AppendAction):
     def __call__(self, parser, namespace, values, option_string=None):
-        items = _copy_items(getattr(namespace, self.dest, None))
+        items = _copy_items(_load(self, namespace, None))
         items.extend(values)
-        setattr(namespace, self.dest, items)
+        _store(self, namespace, items)
 
 
 class _HelpAction(Action):
@@ -717,7 +751,7 @@ class _SubParsersAction(Action):
         parser_name = values[0]
         arg_strings = values[1:]
         if self.dest is not SUPPRESS:
-            setattr(namespace, self.dest, parser_name)
+            _store(self, namespace, parser_name)
         if parser_name not in self._name_parser_map:
             choices = ", ".join(self._name_parser_map)
             raise ArgumentError(self, "unknown parser %r (choices: %s)" % (parser_name, choices))
@@ -725,12 +759,19 @@ class _SubParsersAction(Action):
         if parser_name in self._deprecated:
             parser._warning("command '%s' is deprecated" % parser_name)
         subnamespace, arg_strings = sub.parse_known_args(arg_strings, None)
-        for key, value in subnamespace.__dict__.items():
-            setattr(namespace, key, value)
+        # Every value the subparser set, copied through each one's own
+        # literal accessor (never by name).
+        for sub_action in sub._actions:
+            acc = sub_action._cn1_acc
+            if sub_action.dest is not SUPPRESS and acc is not None and acc[2](subnamespace):
+                acc[0](namespace, acc[1](subnamespace, None))
+        for name, acc in sub._cn1_dacc.items():
+            if acc[2](subnamespace):
+                acc[0](namespace, acc[1](subnamespace, None))
         if arg_strings:
-            if _UNRECOGNIZED_ARGS_ATTR not in namespace.__dict__:
-                setattr(namespace, _UNRECOGNIZED_ARGS_ATTR, [])
-            getattr(namespace, _UNRECOGNIZED_ARGS_ATTR).extend(arg_strings)
+            if not hasattr(namespace, "_unrecognized_args"):
+                namespace._unrecognized_args = []
+            namespace._unrecognized_args.extend(arg_strings)
 
 
 class FileType:
@@ -773,6 +814,7 @@ class _ActionsContainer:
         """add_argument(dest, ..., name=value, ...) or
         add_argument(option_string, option_string, ..., name=value, ...)"""
         chars = self._parser_ref().prefix_chars
+        acc = kwargs.pop("_cn1_acc", None)
         if not args or len(args) == 1 and args[0] and args[0][0] not in chars:
             if args and "dest" in kwargs:
                 raise TypeError("dest supplied twice for positional argument, did you mean metavar?")
@@ -794,6 +836,7 @@ class _ActionsContainer:
         if not callable(action_class):
             raise ValueError("unknown action %r" % (action_class,))
         action = action_class(**kwargs)
+        action._cn1_acc = acc
         type_func = action.type
         if type_func is not None and not callable(type_func):
             raise TypeError("%r is not callable" % (type_func,))
@@ -850,7 +893,13 @@ class _ActionsContainer:
 
     def set_defaults(self, **kwargs):
         parser = self._parser_ref()
+        accs = kwargs.pop("_cn1_accs", None)
+        if kwargs and (accs is None or len(accs) != len(kwargs)):
+            raise TypeError("argparse: set_defaults needs literal keyword names the build can see "
+                            "(no **mapping) so the transpiler can write their stores")
         parser._defaults.update(kwargs)
+        for name, acc in accs or ():
+            parser._cn1_dacc[name] = acc
         for action in parser._actions:
             if action.dest in kwargs:
                 action.default = kwargs[action.dest]
@@ -930,6 +979,7 @@ class ArgumentParser(_ActionsContainer):
         self._action_groups = []
         self._mutually_exclusive_groups = []
         self._defaults = {}
+        self._cn1_dacc = {}
         self._has_negative_number_optionals = []
         self._subparsers = None
         self._positionals = self.add_argument_group("positional arguments")
@@ -941,6 +991,7 @@ class ArgumentParser(_ActionsContainer):
         for parent in parents:
             self._add_container_actions(parent)
             self._defaults.update(parent._defaults)
+            self._cn1_dacc.update(parent._cn1_dacc)
 
     def _parser_ref(self):
         return self
@@ -1020,7 +1071,9 @@ class ArgumentParser(_ActionsContainer):
             formatter.add_usage(None, positionals, self._mutually_exclusive_groups, "")
             kwargs["prog"] = formatter.format_help().strip()
         action_class = kwargs.pop("action", _SubParsersAction)
+        acc = kwargs.pop("_cn1_acc", None)
         action = action_class(option_strings=[], **kwargs)
+        action._cn1_acc = acc
         self._subparsers._add_action(action)
         return action
 
@@ -1041,11 +1094,11 @@ class ArgumentParser(_ActionsContainer):
             namespace = Namespace()
         for action in self._actions:
             if action.dest is not SUPPRESS and action.default is not SUPPRESS:
-                if not hasattr(namespace, action.dest):
-                    setattr(namespace, action.dest, action.default)
-        for dest in self._defaults:
-            if not hasattr(namespace, dest):
-                setattr(namespace, dest, self._defaults[dest])
+                if not _has(action, namespace):
+                    _store(action, namespace, action.default)
+        for dest, acc in self._cn1_dacc.items():
+            if not acc[2](namespace):
+                acc[0](namespace, self._defaults[dest])
         if self.exit_on_error:
             try:
                 namespace, args = self._parse_known_args(args, namespace)
@@ -1053,9 +1106,9 @@ class ArgumentParser(_ActionsContainer):
                 self.error(str(err))
         else:
             namespace, args = self._parse_known_args(args, namespace)
-        if _UNRECOGNIZED_ARGS_ATTR in namespace.__dict__:
-            args.extend(getattr(namespace, _UNRECOGNIZED_ARGS_ATTR))
-            delattr(namespace, _UNRECOGNIZED_ARGS_ATTR)
+        if hasattr(namespace, "_unrecognized_args"):
+            args.extend(namespace._unrecognized_args)
+            del namespace._unrecognized_args
         return namespace, args
 
     def _parse_known_args(self, arg_strings, namespace):
@@ -1191,9 +1244,9 @@ class ArgumentParser(_ActionsContainer):
                 if action.required:
                     required.append(_action_name(action))
                 elif (action.default is not None and isinstance(action.default, str)
-                      and hasattr(namespace, action.dest)
-                      and action.default is getattr(namespace, action.dest)):
-                    setattr(namespace, action.dest, self._get_value(action, action.default))
+                      and _has(action, namespace)
+                      and action.default is _load(action, namespace, None)):
+                    _store(action, namespace, self._get_value(action, action.default))
         if required:
             raise ArgumentError(None, "the following arguments are required: %s" % ", ".join(required))
 

@@ -69,14 +69,23 @@ public class ImportPythonProjectMojo extends AbstractCN1Mojo {
             throw new MojoFailureException("Name the Python project to import: -Dsource=/path/to/my-python-app");
         }
         File common = getCN1ProjectDir();
+        // A command-line tool is a backend-only project with the Python at its
+        // root's src/main/python; its pom carries the python profile already.
+        boolean tool = common == null && project != null
+                && UpdateCodenameOneMojo.isBackendOnlyRoot(project.getBasedir());
+        if (tool) {
+            common = project.getBasedir();
+        }
         if (common == null) {
-            throw new MojoExecutionException("Run this from a Codename One application project");
+            throw new MojoExecutionException("Run this from a Codename One application or command-line project");
         }
         if (!PythonProjectBuilder.isPythonProject(PythonProjectImporter.sourceRoot(from))) {
             // Before the pom is touched: a mistyped path must change nothing.
             throw new MojoFailureException(from + " has no Python sources");
         }
-        wirePython(common);
+        if (!tool) {
+            wirePython(common);
+        }
         String pkg = properties == null ? null : properties.getProperty("codename1.packageName");
         String main = properties == null ? null : properties.getProperty("codename1.mainName");
         PythonProjectImporter.Result r;
@@ -89,6 +98,11 @@ public class ImportPythonProjectMojo extends AbstractCN1Mojo {
                 + (r.removedFiles == 0 ? "" : "; removed " + r.removedFiles + " the project no longer has"));
         getLog().info(r.mainModule == null ? "No entry module was found: the sources are imported as a library"
                 : "Entry module: " + r.mainModule);
+        if (tool && !"main".equals(r.mainModule)) {
+            throw new MojoFailureException("A command-line tool runs main.py as __main__, and " + from
+                    + " has " + (r.mainModule == null ? "no entry module" : "the entry module " + r.mainModule)
+                    + ": add a main.py that runs it");
+        }
         if (r.requirementSpecs.isEmpty()) {
             return;
         }

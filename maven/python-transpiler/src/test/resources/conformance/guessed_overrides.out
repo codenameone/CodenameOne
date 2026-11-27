@@ -1,0 +1,17 @@
+['START', 'startstart', 4.0, 'yes', 3, 1, 'heavy']
+['DYN', 'dyndyn', 7.0, 'no', 3, 1, 'heavy']
+['7', 14, 9, 'no', 4, 9, 'heavy']
+["['a']", ['a', 'a'], 3, 'yes', 4, 'a']
+zero zerozero
+start startstart
+2 4
+6 ab [1, 2]
+43
+Back 4
+aa
+bbbb
+cccccc
+['fb', 'fb', 'fb', 'fb']
+['real', 'real', 'fb', 'real', 'fb', 'fb']
+['fb']
+['fb', 'real']

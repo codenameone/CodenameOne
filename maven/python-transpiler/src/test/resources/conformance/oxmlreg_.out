@@ -1,0 +1,7 @@
+CT_NvPr None
+CT_Ph ph title 3 True
+['CT_Ph', 'CT_Ext']
+ext 2
+None 2
+invalid required ``<p:nvPr>`` child element not present
+4

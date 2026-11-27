@@ -1,0 +1,2 @@
+main:1 class Guarded has no layout: its body binds __setattr__
+main:40 class WithSetter has no layout: its body binds __setattr__

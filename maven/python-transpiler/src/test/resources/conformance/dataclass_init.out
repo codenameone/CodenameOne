@@ -1,0 +1,20 @@
+Point(x=1, y=0, tags=[3]) Point(x=2, y=5, tags=[]) [3] [] p False False
+Reg(name='a', priority=2.5) 3.5 Reg(name='b', priority=0.0) True
+frozen cannot assign to field 'name'
+Sized(w=2.0, h=3.5, area=7.0) 7.0
+Child(v=3, k='a') hi 3 True [Child(v=1, k='a'), Child(v=5, k='a'), Child(v=5, k='b')]
+Empty() True
+TypeError Point.__init__() missing 1 required positional argument: 'x'
+TypeError Point.__init__() got multiple values for argument 'x'
+TypeError Point.__init__() got an unexpected keyword argument 'z'
+TypeError Reg.__init__() takes 1 positional argument but 2 were given
+TypeError Reg.__init__() missing 1 required keyword-only argument: 'name'
+TypeError Sized.__init__() takes 3 positional arguments but 4 were given
+TypeError Empty.__init__() takes 1 positional argument but 2 were given
+['x', 'y', 'tags', 'label'] {'x': 2, 'y': 5, 'tags': [], 'label': 'p'} Point(x=2, y=9, tags=[])
+999000.0
+Key(kind='a', rank=1) 2 1 True True
+frozen cannot assign to field 'rank'
+frozen cannot delete field 'rank'
+frozen cannot assign to field 'xy'
+1 4950

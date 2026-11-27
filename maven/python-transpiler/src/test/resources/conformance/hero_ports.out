@@ -1,0 +1,26 @@
+debug True
+coroutine True True
+generator True False
+deleted False
+AttributeError 'function' object has no attribute 'missing'
+hints [('return', <class 'str'>), ('x', <class 'int'>)]
+object init (self, /, *args, **kwargs)
+in transaction after script False
+in transaction after insert True
+udf [(2,), (4,), (6,)]
+OperationalError user-defined function raised exception
+threads saw ['unset', 'main'] main still main
+cancelling 1
+uncancel 0
+cancelled True
+callback saw in callback context
+factory used [1] True
+runner done
+asyncio.run slept
+signatures (a, b, /, c, *, d) (a, /)
+TypeError only_positional() got some positional-only arguments passed as keyword arguments: 'a'
+to kwargs (1, {'a': 2}) 2
+60 True y False
+45 True b 6
+44 True True True
+20

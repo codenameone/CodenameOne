@@ -1,10 +1,12 @@
 # Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
 # Licensed under the GNU General Public License version 2 with the Classpath
 # exception, as the rest of the Codename One Python runtime.
-"""Generated __init__, __repr__, __eq__ and friends for classes of fields.
+"""Field records for classes the build gave __init__, __repr__, __eq__ and friends.
 
-CPython builds these methods by exec'ing source text; the methods here are
-closures over the field list instead, since no source is compiled at run time.
+CPython builds those methods by exec'ing source text. Nothing is compiled at run
+time here: the build writes them into every @dataclass class as plain methods
+(DataclassInit), and the decorator only records the fields and checks that they
+are the ones the build saw.
 """
 
 import copy as _copy
@@ -65,6 +67,7 @@ class Field:
         self.metadata = {} if metadata is None else metadata
         self.kw_only = kw_only
         self._field_type = None
+
 
     def __repr__(self):
         return ("Field(name=%r,type=%r,default=%r,default_factory=%r,init=%r,repr=%r,hash=%r,compare=%r,"
@@ -129,10 +132,14 @@ def _is_kw_only(a_type):
 
 
 def _get_field(cls, a_name, a_type, default_kw_only):
-    default = getattr(cls, a_name, MISSING)
-    if isinstance(default, Field):
-        f = default
-    else:
+    # The compiler moved every field(...) of the class body into
+    # __dataclass_field_specs__, leaving the class attribute the default alone.
+    specs = cls.__dict__.get("__dataclass_field_specs__")
+    f = specs.get(a_name) if specs is not None else None
+    if f is None:
+        default = cls.__dict__.get(a_name, MISSING)
+        if isinstance(default, Field):
+            raise TypeError("dataclass " + cls.__qualname__ + " was not lowered at build time")
         f = field(default=default)
     f.name = a_name
     f.type = a_type
@@ -155,158 +162,21 @@ def _get_field(cls, a_name, a_type, default_kw_only):
     return f
 
 
-def _set_new_attribute(cls, name, value):
-    if name in cls.__dict__:
+_repr_running = set()
+
+
+def _repr_enter(obj):
+    # Called by every generated __repr__: true when obj is already being shown
+    # further up the stack, which CPython's recursive_repr prints as "...".
+    key = id(obj)
+    if key in _repr_running:
         return True
-    setattr(cls, name, value)
+    _repr_running.add(key)
     return False
 
 
-def _fields_in_init_order(fields):
-    std = [f for f in fields if f.init and not f.kw_only]
-    kw = [f for f in fields if f.init and f.kw_only]
-    return std, kw
-
-
-def _make_init(cls, fields, std_fields, kw_only_fields, frozen, has_post_init):
-    seen_default = None
-    for f in std_fields:
-        if f.default is not MISSING or f.default_factory is not MISSING:
-            seen_default = f
-        elif seen_default is not None:
-            raise TypeError("non-default argument " + repr(f.name) + " follows default argument " +
-                            repr(seen_default.name))
-    qualname = cls.__qualname__ + ".__init__"
-    nstd = len(std_fields)
-    nreq = len([f for f in std_fields if f.default is MISSING and f.default_factory is MISSING])
-    names = [f.name for f in std_fields + kw_only_fields]
-    initvars = [f.name for f in fields if f._field_type is _FIELD_INITVAR]
-
-    def __init__(self, *args, **kwargs):
-        if len(args) > nstd:
-            if nreq == nstd:
-                takes = "%d positional argument%s" % (nstd + 1, "" if nstd == 0 else "s")
-            else:
-                takes = "from %d to %d positional arguments" % (nreq + 1, nstd + 1)
-            raise TypeError("%s() takes %s but %d were given" % (qualname, takes, len(args) + 1))
-        values = {}
-        for i in range(len(args)):
-            values[std_fields[i].name] = args[i]
-        for k, v in kwargs.items():
-            if k not in names:
-                raise TypeError(qualname + "() got an unexpected keyword argument " + repr(k))
-            if k in values:
-                raise TypeError(qualname + "() got multiple values for argument " + repr(k))
-            values[k] = v
-        missing = [f.name for f in std_fields if f.name not in values and f.default is MISSING and
-                   f.default_factory is MISSING]
-        if missing:
-            raise TypeError("%s() missing %d required positional argument%s: %s"
-                            % (qualname, len(missing), "" if len(missing) == 1 else "s",
-                               _and_join(["'" + m + "'" for m in missing])))
-        missing = [f.name for f in kw_only_fields if f.name not in values and f.default is MISSING and
-                   f.default_factory is MISSING]
-        if missing:
-            raise TypeError("%s() missing %d required keyword-only argument%s: %s"
-                            % (qualname, len(missing), "" if len(missing) == 1 else "s",
-                               _and_join(["'" + m + "'" for m in missing])))
-        for f in fields:
-            if f._field_type is not _FIELD:
-                continue
-            if f.init and f.name in values:
-                v = values[f.name]
-            elif f.default_factory is not MISSING:
-                v = f.default_factory()
-            elif f.default is not MISSING:
-                if not f.init:
-                    continue
-                v = f.default
-            else:
-                continue
-            if frozen:
-                object.__setattr__(self, f.name, v)
-            else:
-                setattr(self, f.name, v)
-        if has_post_init:
-            extra = []
-            for name in initvars:
-                if name in values:
-                    extra.append(values[name])
-                else:
-                    extra.append(next(f.default for f in fields if f.name == name))
-            self.__post_init__(*extra)
-    __init__.__qualname__ = qualname
-    return __init__
-
-
-def _and_join(items):
-    if len(items) == 1:
-        return items[0]
-    if len(items) == 2:
-        return items[0] + " and " + items[1]
-    return ", ".join(items[:-1]) + ", and " + items[-1]
-
-
-def _make_repr(fields):
-    shown = [f for f in fields if f._field_type is _FIELD and f.repr]
-    active = set()
-
-    def __repr__(self):
-        key = id(self)
-        if key in active:
-            return "..."
-        active.add(key)
-        try:
-            return type(self).__qualname__ + "(" + ", ".join(f.name + "=" + repr(getattr(self, f.name))
-                                                             for f in shown) + ")"
-        finally:
-            active.discard(key)
-    # pprint lays out a dataclass field by field only when its repr is ours.
-    __repr__._dataclass_repr = True
-    return __repr__
-
-
-def _tuple_of(fields):
-    compared = [f.name for f in fields if f._field_type is _FIELD and f.compare]
-
-    def as_tuple(self):
-        return tuple(getattr(self, n) for n in compared)
-    return as_tuple
-
-
-def _make_eq(as_tuple):
-    def __eq__(self, other):
-        if self is other:
-            return True
-        if other.__class__ is self.__class__:
-            return as_tuple(self) == as_tuple(other)
-        return NotImplemented
-    return __eq__
-
-
-def _make_order(as_tuple, op):
-    def compare(self, other):
-        if other.__class__ is not self.__class__:
-            return NotImplemented
-        a = as_tuple(self)
-        b = as_tuple(other)
-        if op == "__lt__":
-            return a < b
-        if op == "__le__":
-            return a <= b
-        if op == "__gt__":
-            return a > b
-        return a >= b
-    compare.__name__ = op
-    return compare
-
-
-def _make_hash(fields):
-    hashed = [f.name for f in fields if f._field_type is _FIELD and (f.compare if f.hash is None else f.hash)]
-
-    def __hash__(self):
-        return hash(tuple(getattr(self, n) for n in hashed))
-    return __hash__
+def _repr_leave(obj):
+    _repr_running.discard(id(obj))
 
 
 def _make_frozen(cls, fields):
@@ -325,21 +195,23 @@ def _make_frozen(cls, fields):
 
 
 def _process_class(cls, init, repr, eq, order, unsafe_hash, frozen, match_args, kw_only, slots, weakref_slot):
+    lowered = cls.__dict__.get("__cn1_dc_lowered__")
+    if lowered is None:
+        raise TypeError("dataclass " + cls.__qualname__ + " was not lowered at build time")
     fields = {}
-    setattr(cls, _PARAMS, _DataclassParams(init, repr, eq, order, unsafe_hash, frozen, match_args, kw_only,
+    cls.__dataclass_params__ = (_DataclassParams(init, repr, eq, order, unsafe_hash, frozen, match_args, kw_only,
                                            slots, weakref_slot))
     any_frozen_base = False
     has_dataclass_bases = False
     for b in cls.__mro__[-1:0:-1]:
-        base_fields = getattr(b, _FIELDS, None)
+        base_fields = getattr(b, "__dataclass_fields__", None)
         if base_fields is not None:
             has_dataclass_bases = True
             for f in base_fields.values():
                 fields[f.name] = f
-            if getattr(b, _PARAMS).frozen:
+            if getattr(b, "__dataclass_params__").frozen:
                 any_frozen_base = True
     cls_annotations = cls.__dict__.get("__annotations__", {})
-    cls_fields = []
     kw_only_seen = False
     for name, type_ in cls_annotations.items():
         if _is_kw_only(type_):
@@ -348,14 +220,10 @@ def _process_class(cls, init, repr, eq, order, unsafe_hash, frozen, match_args, 
             kw_only_seen = True
             kw_only = True
         else:
-            cls_fields.append(_get_field(cls, name, type_, kw_only))
-    for f in cls_fields:
-        fields[f.name] = f
-        if isinstance(getattr(cls, f.name, None), Field):
-            if f.default is MISSING:
-                delattr(cls, f.name)
-            else:
-                setattr(cls, f.name, f.default)
+            f = _get_field(cls, name, type_, kw_only)
+            fields[f.name] = f
+            if isinstance(cls.__dict__.get(f.name), Field):
+                raise TypeError("dataclass " + cls.__qualname__ + " was not lowered at build time")
     for name, value in cls.__dict__.items():
         if isinstance(value, Field) and name not in cls_annotations:
             raise TypeError(repr(name) + " is a field but has no type annotation")
@@ -364,44 +232,25 @@ def _process_class(cls, init, repr, eq, order, unsafe_hash, frozen, match_args, 
             raise TypeError("cannot inherit non-frozen dataclass from a frozen one")
         if not any_frozen_base and frozen:
             raise TypeError("cannot inherit frozen dataclass from a non-frozen one")
-    setattr(cls, _FIELDS, fields)
-    class_hash = cls.__dict__.get("__hash__", MISSING)
-    has_explicit_hash = not (class_hash is MISSING or (class_hash is None and "__eq__" in cls.__dict__))
-    all_fields = list(fields.values())
-    field_list = [f for f in all_fields if f._field_type is _FIELD]
-    std, kw = _fields_in_init_order([f for f in all_fields if f._field_type in (_FIELD, _FIELD_INITVAR)])
-    if init:
-        has_post_init = hasattr(cls, "__post_init__")
-        _set_new_attribute(cls, "__init__", _make_init(cls, all_fields, std, kw, frozen, has_post_init))
-    if repr:
-        _set_new_attribute(cls, "__repr__", _make_repr(field_list))
-    as_tuple = _tuple_of(field_list)
-    if eq:
-        _set_new_attribute(cls, "__eq__", _make_eq(as_tuple))
-    if order:
-        for op in ("__lt__", "__le__", "__gt__", "__ge__"):
-            if _set_new_attribute(cls, op, _make_order(as_tuple, op)):
-                raise TypeError("Cannot overwrite attribute " + op + " in class " + cls.__name__ +
-                                ". Consider using functools.total_ordering")
+    cls.__dataclass_fields__ = fields
+    # The build wrote every method from the fields it could see; a base it
+    # could not (one from another module) must not have added any.
+    names, post_init = lowered
+    seen = tuple(f.name for f in fields.values() if f._field_type is not _FIELD_CLASSVAR)
+    if seen != names:
+        raise TypeError("dataclass " + cls.__qualname__ + " has fields " + repr(seen) + " but was built for " +
+                        repr(names) + ": its dataclass bases must be in the same module")
+    if post_init is not None and post_init != hasattr(cls, "__post_init__"):
+        raise TypeError("dataclass " + cls.__qualname__ + " inherits a __post_init__ the build could not see")
     if frozen:
-        setter, deleter = _make_frozen(cls, field_list)
-        for name, fn in (("__setattr__", setter), ("__delattr__", deleter)):
-            if _set_new_attribute(cls, name, fn):
+        setter, deleter = _make_frozen(cls, [f for f in fields.values() if f._field_type is _FIELD])
+        for name in ("__setattr__", "__delattr__"):
+            if name in cls.__dict__:
                 raise TypeError("Cannot overwrite attribute " + name + " in class " + cls.__name__)
-    if unsafe_hash:
-        if has_explicit_hash:
-            raise TypeError("Cannot overwrite attribute __hash__ in class " + cls.__name__)
-        cls.__hash__ = _make_hash(field_list)
-    elif not has_explicit_hash:
-        if eq and frozen:
-            cls.__hash__ = _make_hash(field_list)
-        elif eq:
-            cls.__hash__ = None
-    if match_args:
-        _set_new_attribute(cls, "__match_args__", tuple(f.name for f in std))
-    if "__replace__" not in cls.__dict__:
-        cls.__replace__ = _replace
+        cls.__setattr__ = setter
+        cls.__delattr__ = deleter
     return cls
+
 
 
 def dataclass(cls=None, /, *, init=True, repr=True, eq=True, order=False, unsafe_hash=False, frozen=False,
@@ -418,7 +267,7 @@ def dataclass(cls=None, /, *, init=True, repr=True, eq=True, order=False, unsafe
 
 def fields(class_or_instance):
     try:
-        fs = getattr(class_or_instance, _FIELDS)
+        fs = getattr(class_or_instance, "__dataclass_fields__")
     except AttributeError:
         raise TypeError("must be called with a dataclass type or instance") from None
     return tuple(f for f in fs.values() if f._field_type is _FIELD)
@@ -426,22 +275,22 @@ def fields(class_or_instance):
 
 def is_dataclass(obj):
     cls = obj if isinstance(obj, type) else type(obj)
-    return hasattr(cls, _FIELDS)
+    return hasattr(cls, "__cn1_dc_lowered__")
 
 
 def _is_dataclass_instance(obj):
-    return hasattr(type(obj), _FIELDS)
+    return hasattr(type(obj), "__cn1_dc_lowered__")
 
 
 def asdict(obj, *, dict_factory=dict):
     if not _is_dataclass_instance(obj):
         raise TypeError("asdict() should be called on dataclass instances")
-    return _asdict_inner(obj, dict_factory)
+    return obj.__cn1_asdict__(dict_factory)
 
 
 def _asdict_inner(obj, dict_factory):
     if _is_dataclass_instance(obj):
-        return dict_factory([(f.name, _asdict_inner(getattr(obj, f.name), dict_factory)) for f in fields(obj)])
+        return obj.__cn1_asdict__(dict_factory)
     if isinstance(obj, tuple) and hasattr(obj, "_fields"):
         return type(obj)(*[_asdict_inner(v, dict_factory) for v in obj])
     if isinstance(obj, (list, tuple)):
@@ -454,12 +303,12 @@ def _asdict_inner(obj, dict_factory):
 def astuple(obj, *, tuple_factory=tuple):
     if not _is_dataclass_instance(obj):
         raise TypeError("astuple() should be called on dataclass instances")
-    return _astuple_inner(obj, tuple_factory)
+    return obj.__cn1_astuple__(tuple_factory)
 
 
 def _astuple_inner(obj, tuple_factory):
     if _is_dataclass_instance(obj):
-        return tuple_factory([_astuple_inner(getattr(obj, f.name), tuple_factory) for f in fields(obj)])
+        return obj.__cn1_astuple__(tuple_factory)
     if isinstance(obj, tuple) and hasattr(obj, "_fields"):
         return type(obj)(*[_astuple_inner(v, tuple_factory) for v in obj])
     if isinstance(obj, (list, tuple)):
@@ -470,42 +319,17 @@ def _astuple_inner(obj, tuple_factory):
     return _copy.deepcopy(obj)
 
 
+
 def make_dataclass(cls_name, fields, *, bases=(), namespace=None, init=True, repr=True, eq=True, order=False,
                    unsafe_hash=False, frozen=False, match_args=True, kw_only=False, slots=False,
                    weakref_slot=False, module=None):
-    ns = {} if namespace is None else dict(namespace)
-    annotations = {}
-    for item in fields:
-        if isinstance(item, str):
-            annotations[item] = "typing.Any"
-        elif len(item) == 2:
-            annotations[item[0]] = item[1]
-        else:
-            annotations[item[0]] = item[1]
-            ns[item[0]] = item[2]
-    ns["__annotations__"] = annotations
-    cls = type(cls_name, bases, ns)
-    return dataclass(cls, init=init, repr=repr, eq=eq, order=order, unsafe_hash=unsafe_hash, frozen=frozen,
-                     match_args=match_args, kw_only=kw_only, slots=slots, weakref_slot=weakref_slot)
-
-
-def _replace(self, /, **changes):
-    for f in getattr(self, _FIELDS).values():
-        if f._field_type is _FIELD_CLASSVAR:
-            continue
-        if not f.init:
-            if f.name in changes:
-                raise TypeError("field " + f.name + " is declared with init=False, it cannot be specified with "
-                                "replace()")
-            continue
-        if f.name not in changes:
-            if f._field_type is _FIELD_INITVAR and f.default is MISSING:
-                raise TypeError("InitVar " + repr(f.name) + " must be specified with replace()")
-            changes[f.name] = getattr(self, f.name)
-    return self.__class__(**changes)
+    # A call with a literal field list is turned into a class statement at
+    # build time and never reaches this; a class is not assembled from names
+    # at run time.
+    raise TypeError("make_dataclass(" + repr(cls_name) + ") needs a literal field list to be lowered at build time")
 
 
 def replace(obj, /, **changes):
     if not _is_dataclass_instance(obj):
         raise TypeError("replace() should be called on dataclass instances")
-    return _replace(obj, **changes)
+    return obj.__replace__(**changes)

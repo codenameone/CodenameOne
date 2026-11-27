@@ -228,17 +228,14 @@ class URL:
 
 
 class State:
+    # An attribute stored on a state is an ordinary instance attribute; the
+    # mapping it was made with answers the names never stored. Binding
+    # __setattr__ to route stores into the mapping gave the class no layout.
     def __init__(self, state=None):
-        self.__dict__["_state"] = dict(state or {})
-
-    def __setattr__(self, key, value):
-        self._state[key] = value
+        self._state = dict(state or {})
 
     def __getattr__(self, key):
         try:
-            return self.__dict__["_state"][key]
+            return self._state[key]
         except KeyError:
             raise AttributeError("'State' object has no attribute '%s'" % key)
-
-    def __delattr__(self, key):
-        del self._state[key]

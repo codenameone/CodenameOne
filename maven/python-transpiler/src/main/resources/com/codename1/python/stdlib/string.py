@@ -209,6 +209,16 @@ def _field_name_split(name):
     return first, iter(rest)
 
 
+class _AttrField:
+    """A replacement field with an attribute part: the value it starts from
+    and the rest of the field (".real", ".a[1]")."""
+    __slots__ = ("base", "tail")
+
+    def __init__(self, base, tail):
+        self.base = base
+        self.tail = tail
+
+
 class Formatter:
     def format(self, format_string, /, *args, **kwargs):
         return self.vformat(format_string, args, kwargs)
@@ -238,6 +248,14 @@ class Formatter:
                     auto_arg_index = False
                 obj, arg_used = self.get_field(field_name, args, kwargs)
                 used_args.add(arg_used)
+                if isinstance(obj, _AttrField):
+                    # The attribute part goes to str.format, whose own field
+                    # lookup reads it: nothing here names it at run time.
+                    format_spec, auto_arg_index = self._vformat(format_spec, args, kwargs, used_args,
+                                                                recursion_depth - 1, auto_arg_index=auto_arg_index)
+                    conv = "" if conversion is None else "!" + conversion
+                    result.append(("{0" + obj.tail + conv + ":" + format_spec + "}").format(obj.base))
+                    continue
                 obj = self.convert_field(obj, conversion)
                 format_spec, auto_arg_index = self._vformat(format_spec, args, kwargs, used_args,
                                                             recursion_depth - 1, auto_arg_index=auto_arg_index)
@@ -272,9 +290,14 @@ class Formatter:
     def get_field(self, field_name, args, kwargs):
         first, rest = _field_name_split(field_name)
         obj = self.get_value(first, args, kwargs)
+        tail = None
         for is_attr, i in rest:
-            if is_attr:
-                obj = getattr(obj, i)
+            if is_attr or tail is not None:
+                # From the first attribute part on, the field is resolved by
+                # str.format itself (see _vformat).
+                tail = (tail or "") + ("." + i if is_attr else "[" + str(i) + "]")
             else:
                 obj = obj[i]
+        if tail is not None:
+            return _AttrField(obj, tail), first
         return obj, first

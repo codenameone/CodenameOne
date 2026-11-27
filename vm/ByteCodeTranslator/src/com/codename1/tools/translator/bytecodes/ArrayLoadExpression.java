@@ -85,6 +85,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         if (instr.isBoundsSafe()) {
             out.markBoundsSafe();
         }
+        out.setRunGuardBound(instr.getRunGuardBound());
         
         instructions.remove(index-2);
         instructions.remove(index-2);
@@ -213,7 +214,11 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             b.append("    JAVA_OBJECT __cn1ArrayTmp = ").append(arrayExpr).append(";\n");
             b.append("    JAVA_INT __cn1IndexTmp = ").append(indexExpr).append(";\n");
             if (!isBoundsSafe() && (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks())) {
-                b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
+                if (getRunGuardBound() >= 0) {
+                    b.append("    CN1_ARRAY_RUN_GUARD(__cn1ArrayTmp, __cn1IndexTmp, ").append(getRunGuardBound()).append(");\n");
+                } else {
+                    b.append("    CHECK_ARRAY_ACCESS_WITH_ARGS(__cn1ArrayTmp, __cn1IndexTmp);\n");
+                }
             }
             b.append("    ").append(varName).append(" = ((").append(arrayDataType).append("*) CN1_ARRAY_DATA((JAVA_ARRAY)__cn1ArrayTmp))[__cn1IndexTmp];\n");
             b.append("}\n");
@@ -223,6 +228,19 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
 
         if (varName != null) {
             b.append(varName).append("=");
+        }
+        if (getRunGuardBound() >= 0 && !isBoundsSafe()
+                && (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks())) {
+            // The first load of a constant-index run: checks the run's highest index
+            // (diverging, never falling through) so the loads after it can go
+            // unchecked. See BytecodeMethod.analyzeConstantIndexRuns.
+            b.append("CN1_ARRAY_ELEMENT_RUN(").append(arrayDataType).append(", ").append(arrayExpr)
+                    .append(", ").append(indexExpr).append(", ").append(getRunGuardBound()).append(")");
+            if (varName != null) {
+                b.append(";\n");
+            }
+            sb.append(b);
+            return true;
         }
         b.append("CN1_ARRAY_ELEMENT_");
         b.append(arrayType);
@@ -315,8 +333,13 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         out.append("JAVA_OBJECT ").append(tempName).append("_a = ").append(arrayExpr).append("; ");
         out.append("JAVA_INT ").append(tempName).append("_i = ").append(indexExpr).append(";\n    ");
         if (!isBoundsSafe() && (getMethod() == null || !getMethod().isDisableNullAndArrayBoundsChecks())) {
-            out.append("CN1_ARRAY_CHECK_DIVERGE(").append(tempName).append("_a, ")
-               .append(tempName).append("_i, ").append(retvalText).append(");\n    ");
+            if (getRunGuardBound() >= 0) {
+                out.append("CN1_ARRAY_RUN_GUARD(").append(tempName).append("_a, ")
+                   .append(tempName).append("_i, ").append(getRunGuardBound()).append(");\n    ");
+            } else {
+                out.append("CN1_ARRAY_CHECK_DIVERGE(").append(tempName).append("_a, ")
+                   .append(tempName).append("_i, ").append(retvalText).append(");\n    ");
+            }
         }
         out.append(elemType).append(' ').append(tempName).append(" = ((").append(dataType)
            .append("*) CN1_ARRAY_DATA((JAVA_ARRAY)").append(tempName).append("_a))[").append(tempName).append("_i];\n    ");

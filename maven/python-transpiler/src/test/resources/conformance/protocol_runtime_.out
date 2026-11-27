@@ -1,0 +1,8 @@
+True False False
+True False
+True False True
+True False True
+True False
+TypeError Instance and class checks can only be used with @runtime_checkable protocols
+TypeError Protocols with non-method members don't support issubclass(). Non-method members: 'name'.
+closer other closer

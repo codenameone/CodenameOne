@@ -30,37 +30,82 @@ R_OK = 4
 W_OK = 2
 X_OK = 1
 
-environ = _cn1fs.environ()
 _unset = set()
 error = OSError
 
 
+class _Environ(dict):
+    """The process environment. ParparVM cannot enumerate it, so the mapping
+    starts with what the platform could list and reads any other variable by
+    name on first use; a variable unset here stays unset."""
+
+    def __missing__(self, key):
+        v = None if key in _unset or not isinstance(key, str) else _cn1fs.getenv(key)
+        if v is None:
+            raise KeyError(key)
+        dict.__setitem__(self, key, v)
+        return v
+
+    def __contains__(self, key):
+        if dict.__contains__(self, key):
+            return True
+        try:
+            self.__missing__(key)
+        except KeyError:
+            return False
+        return True
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __setitem__(self, key, value):
+        dict.__setitem__(self, key, value)
+        _unset.discard(key)
+
+    def __delitem__(self, key):
+        if not dict.__contains__(self, key):
+            self.__missing__(key)
+        dict.__delitem__(self, key)
+        _unset.add(key)
+
+    def pop(self, key, *default):
+        _unset.add(key)
+        return dict.pop(self, key, *default)
+
+
+environ = _Environ(_cn1fs.environ())
+
+
 def getenv(key, default=None):
-    if key in environ:
-        return environ[key]
-    # ParparVM cannot enumerate the environment, so environ may lack a
-    # variable that is still readable by name.
-    v = None if key in _unset else _cn1fs.getenv(key)
-    return default if v is None else v
+    return environ.get(key, default)
 
 
 def putenv(key, value):
     environ[key] = value
-    _unset.discard(key)
 
 
 def unsetenv(key):
     environ.pop(key, None)
-    _unset.add(key)
 
 
-class PathLike:
+import abc as _abc
+
+
+class PathLike(metaclass=_abc.ABCMeta):
     def __fspath__(self):
         raise NotImplementedError
 
     @classmethod
     def __subclasshook__(cls, C):
         return hasattr(C, "__fspath__") or NotImplemented
+
+    def __class_getitem__(cls, item):
+        # os.PathLike[str] in annotations, as CPython allows; an
+        # annotation only needs something that evaluates.
+        return cls
 
 
 def fspath(p):
@@ -209,16 +254,46 @@ class stat_result(tuple):
     def __new__(cls, seq):
         return tuple.__new__(cls, seq)
 
-    st_mode = property(lambda self: self[0])
-    st_ino = property(lambda self: self[1])
-    st_dev = property(lambda self: self[2])
-    st_nlink = property(lambda self: self[3])
-    st_uid = property(lambda self: self[4])
-    st_gid = property(lambda self: self[5])
-    st_size = property(lambda self: self[6])
-    st_atime = property(lambda self: self[10])
-    st_mtime = property(lambda self: self[10])
-    st_ctime = property(lambda self: self[10])
+    @property
+    def st_mode(self):
+        return self[0]
+
+    @property
+    def st_ino(self):
+        return self[1]
+
+    @property
+    def st_dev(self):
+        return self[2]
+
+    @property
+    def st_nlink(self):
+        return self[3]
+
+    @property
+    def st_uid(self):
+        return self[4]
+
+    @property
+    def st_gid(self):
+        return self[5]
+
+    @property
+    def st_size(self):
+        return self[6]
+
+    @property
+    def st_atime(self):
+        return self[10]
+
+    @property
+    def st_mtime(self):
+        return self[10]
+
+    @property
+    def st_ctime(self):
+        return self[10]
+
 
     def __repr__(self):
         return ("os.stat_result(st_mode=%d, st_ino=0, st_dev=0, st_nlink=1, st_uid=0, st_gid=0, "
@@ -240,11 +315,32 @@ def stat(p, *, dir_fd=None, follow_symlinks=True):
 lstat = stat
 
 
+def fstat(fd):
+    # A translated program's files are streams over the platform's storage,
+    # not descriptors: there is nothing to stat by number.
+    raise OSError(9, "Bad file descriptor")
+
+
 def access(p, mode, *, dir_fd=None, effective_ids=False, follow_symlinks=True):
     return path.exists(p)
 
 
+def chmod(p, mode, *, dir_fd=None, follow_symlinks=True):
+    """Permissions are the platform's to set on an application's files."""
+    if not path.exists(p):
+        raise FileNotFoundError(2, "No such file or directory", p)
+
+
+def chown(p, uid, gid, *, dir_fd=None, follow_symlinks=True):
+    chmod(p, 0)
+
+
+def umask(mask):
+    return 0o022
+
+
 class DirEntry:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, parent, name):
         self.name = name
         self.path = path.join(parent, name)
@@ -341,13 +437,19 @@ def get_terminal_size(fd=1):
 
 
 class terminal_size(tuple):
-    columns = property(lambda self: self[0])
-    lines = property(lambda self: self[1])
+    @property
+    def columns(self):
+        return self[0]
+
+    @property
+    def lines(self):
+        return self[1]
+
 
 
 def urandom(n):
-    import random as _random
-    return _random.SystemRandom().randbytes(n)
+    import _cn1hash
+    return _cn1hash.urandom(n)
 
 
 def strerror(code):

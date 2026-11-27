@@ -8,24 +8,28 @@ Supported: raises (as context manager with match=, excinfo.value / .type /
 mark.parametrize / skip / skipif / xfail (other marks are accepted and
 ignored), param(..., id=, marks=), fixture (function scope, found by parameter name from the test's class,
 the module or the fixtures registered so far; yield fixtures run their teardown;
-fixtures may use other fixtures; autouse is honoured), the built-in
-monkeypatch fixture (capsys, tmp_path and the rest are absent), and run_module(module) /
+fixtures may use other fixtures; autouse is honoured, and a conftest module's
+autouse fixtures apply to every module once it is imported; params= runs a
+test once per value), async def tests (each on a fresh asyncio loop), the
+built-in monkeypatch, tmp_path, tmpdir and request (param, addfinalizer,
+getfixturevalue) fixtures (capsys and the rest are absent), the httpx_mock
+fixture of the bundled pytest_httpx2, and run_module(module) /
 main([...]) which run every test_* function and Test* class of a module
 object and print a summary such as "3 passed, 1 failed".
 
-Not supported: collecting files from disk, conftest.py, plugins, fixture
+Not supported: collecting files from disk (a conftest module is imported by
+the test runner's code like any other), plugin entry points, async fixtures, fixture
 scopes above function (accepted, treated as function), assertion rewriting (a failed assert reports its message only), capture of
 stdout, and the long traceback report. Plain `assert` is Python's assert.
 """
 
 import sys
 import re
-import inspect
 import math
 
 __all__ = ["raises", "approx", "fail", "skip", "xfail", "mark", "fixture",
            "main", "run_module", "param", "Failed", "Skipped", "XFailed",
-           "ExceptionInfo", "warns", "importorskip"]
+           "ExceptionInfo", "warns", "importorskip", "FixtureRequest", "MonkeyPatch"]
 
 
 class Failed(BaseException):
@@ -288,16 +292,164 @@ _registry = {}
 
 
 class _FixtureDef:
-    def __init__(self, func, name, autouse):
+    def __init__(self, func, name, autouse, params=None, ids=None):
         self.func = func
         self.name = name
         self.autouse = autouse
+        self.params = params
+        self.ids = ids
+        # set by the _Table of the module defining it: the fixture names it
+        # asks for and the call passing them
+        self.deps = None
+        self.call = None
+
+
+class FixtureRequest:
+    """The `request` a fixture or test asks for: `param` (a parametrized
+    fixture's current value), `fixturename`, `addfinalizer` and
+    `getfixturevalue`. The node, config and scope objects are absent."""
+
+    def __init__(self, param=None, fixturename=None, session=None, instance=None, cache=None):
+        self.param = param
+        self.fixturename = fixturename
+        self._session = session
+        self._instance = instance
+        self._cache = cache
+
+    def addfinalizer(self, finalizer):
+        self._session.teardowns.append(finalizer)
+
+    def getfixturevalue(self, argname):
+        return self._session.make(argname, self._instance, self._cache, [])
+
+
+class _LocalPath:
+    """tmpdir's value: the py.path.local subset tests use, over a string
+    path. `/` and join give another, str() and os.fspath the path."""
+
+    def __init__(self, path):
+        import os
+        self.strpath = os.fspath(path)
+
+    def __fspath__(self):
+        return self.strpath
+
+    def __str__(self):
+        return self.strpath
+
+    def __repr__(self):
+        return "local(%r)" % self.strpath
+
+    def __eq__(self, other):
+        import os
+        try:
+            return self.strpath == os.fspath(other)
+        except TypeError:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash(self.strpath)
+
+    def __truediv__(self, other):
+        return self.join(other)
+
+    def join(self, *parts):
+        import os
+        return _LocalPath(os.path.join(self.strpath, *[str(p) for p in parts]))
+
+    @property
+    def basename(self):
+        import os
+        return os.path.basename(self.strpath)
+
+    @property
+    def dirname(self):
+        import os
+        return os.path.dirname(self.strpath)
+
+    def dirpath(self):
+        return _LocalPath(self.dirname)
+
+    def mkdir(self, *parts):
+        import os
+        target = self.join(*parts) if parts else self
+        os.mkdir(target.strpath)
+        return target
+
+    def ensure(self, *parts, dir=False):
+        import os
+        target = self.join(*parts) if parts else self
+        if dir:
+            os.makedirs(target.strpath, exist_ok=True)
+        else:
+            os.makedirs(os.path.dirname(target.strpath), exist_ok=True)
+            if not os.path.exists(target.strpath):
+                open(target.strpath, "a").close()
+        return target
+
+    def exists(self):
+        import os
+        return os.path.exists(self.strpath)
+
+    def check(self, file=None, dir=None, exists=None):
+        import os
+        if file:
+            return os.path.isfile(self.strpath)
+        if dir:
+            return os.path.isdir(self.strpath)
+        return os.path.exists(self.strpath)
+
+    def isdir(self):
+        import os
+        return os.path.isdir(self.strpath)
+
+    def isfile(self):
+        import os
+        return os.path.isfile(self.strpath)
+
+    def listdir(self):
+        import os
+        return [self.join(n) for n in sorted(os.listdir(self.strpath))]
+
+    def read(self, mode="r"):
+        with open(self.strpath, mode) as f:
+            return f.read()
+
+    def read_text(self, encoding="utf-8"):
+        with open(self.strpath, encoding=encoding) as f:
+            return f.read()
+
+    def read_binary(self):
+        with open(self.strpath, "rb") as f:
+            return f.read()
+
+    def write(self, data, mode="w", ensure=False):
+        if ensure:
+            self.dirpath().ensure(dir=True)
+        if isinstance(data, bytes) and "b" not in mode:
+            mode += "b"
+        with open(self.strpath, mode) as f:
+            f.write(data)
+
+    def write_text(self, data, encoding="utf-8", ensure=False):
+        self.write(data.encode(encoding), "wb", ensure)
+
+    def write_binary(self, data, ensure=False):
+        self.write(data, "wb", ensure)
+
+    def remove(self):
+        import os
+        import shutil
+        if os.path.isdir(self.strpath):
+            shutil.rmtree(self.strpath)
+        else:
+            os.remove(self.strpath)
 
 
 def fixture(func=None, *, scope="function", params=None, autouse=False, ids=None, name=None):
     def register(f):
         fname = name or f.__name__
-        f.__cn1_fixture__ = _FixtureDef(f, fname, autouse)
+        f.__cn1_fixture__ = _FixtureDef(f, fname, autouse, params, ids)
         _registry[fname] = f.__cn1_fixture__
         return f
     if func is not None:
@@ -305,27 +457,88 @@ def fixture(func=None, *, scope="function", params=None, autouse=False, ids=None
     return register
 
 
+_MISSING = object()
+_NOTSET = object()
+_ENV = object()
+_CWD = object()
+_SYSPATH = object()
+_ATTR = object()
+
+
 class _MonkeyPatch:
     def __init__(self):
         self._undo = []
 
-    def setattr(self, target, name, value=None, raising=True):
-        if value is None and isinstance(target, str):
-            raise TypeError("monkeypatch.setattr with a string target is not supported")
-        old = getattr(target, name, _MISSING)
+    # The attribute is named by the accessors PytestLowering writes at each
+    # call site, `_cn1_acc=(name, get, set, delete, owner)`: the build refuses
+    # a name it cannot read, so nothing stores by computed name here.
+    def setattr(self, target, name, value=_NOTSET, raising=True, _cn1_acc=None):
+        if _cn1_acc is None:
+            raise TypeError("monkeypatch.setattr: the call was not lowered at build time; write the "
+                            "attribute name as a literal")
+        attr, get, put, drop, owner = _cn1_acc
+        if isinstance(target, str):
+            # "package.module.attr": the module must already be imported
+            if value is not _NOTSET:
+                raise TypeError("use setattr(target, name, value) or setattr(target, value) with target "
+                                "being a dotted import string")
+            value = name
+            target = owner()
+        old = get(target, _MISSING)
         if old is _MISSING and raising:
-            raise AttributeError("%r has no attribute %r" % (target, name))
-        self._undo.append((target, name, old))
-        setattr(target, name, value)
+            raise AttributeError("%r has no attribute %r" % (target, attr))
+        self._undo.append((_ATTR, (target, _cn1_acc), old))
+        put(target, value)
 
-    def delattr(self, target, name, raising=True):
-        old = getattr(target, name, _MISSING)
+    def delattr(self, target, name, raising=True, _cn1_acc=None):
+        if _cn1_acc is None:
+            raise TypeError("monkeypatch.delattr: the call was not lowered at build time; write the "
+                            "attribute name as a literal")
+        old = _cn1_acc[1](target, _MISSING)
         if old is _MISSING:
             if raising:
-                raise AttributeError(name)
+                raise AttributeError(_cn1_acc[0])
             return
-        self._undo.append((target, name, old))
-        delattr(target, name)
+        self._undo.append((_ATTR, (target, _cn1_acc), old))
+        _cn1_acc[3](target)
+
+    def setenv(self, name, value, prepend=None):
+        import os
+        value = str(value)
+        if prepend and name in os.environ:
+            value = value + prepend + os.environ[name]
+        self._undo.append((_ENV, name, os.environ.get(name, _MISSING)))
+        os.environ[name] = value
+
+    def delenv(self, name, raising=True):
+        import os
+        if name not in os.environ:
+            if raising:
+                raise KeyError(name)
+            return
+        self._undo.append((_ENV, name, os.environ[name]))
+        del os.environ[name]
+
+    def chdir(self, path):
+        import os
+        self._undo.append((_CWD, None, os.getcwd()))
+        os.chdir(os.fspath(path))
+
+    def syspath_prepend(self, path):
+        self._undo.append((_SYSPATH, None, list(sys.path)))
+        sys.path.insert(0, str(path))
+
+    def context(self):
+        import contextlib
+
+        @contextlib.contextmanager
+        def ctx():
+            m = _MonkeyPatch()
+            try:
+                yield m
+            finally:
+                m.undo()
+        return ctx()
 
     def setitem(self, dic, name, value):
         self._undo.append((dic, name, dic.get(name, _MISSING)))
@@ -342,28 +555,70 @@ class _MonkeyPatch:
     def undo(self):
         while self._undo:
             target, name, old = self._undo.pop()
-            if isinstance(target, dict):
+            if target is _ENV:
+                import os
+                if old is _MISSING:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = old
+            elif target is _CWD:
+                import os
+                os.chdir(old)
+            elif target is _SYSPATH:
+                sys.path[:] = old
+            elif isinstance(target, dict):
                 if old is _MISSING:
                     target.pop(name, None)
                 else:
                     target[name] = old
-            elif old is _MISSING:
-                delattr(target, name)
-            else:
-                setattr(target, name, old)
+            elif target is _ATTR:
+                obj, acc = name
+                if old is _MISSING:
+                    acc[3](obj)
+                else:
+                    acc[2](obj, old)
 
 
-_MISSING = object()
+MonkeyPatch = _MonkeyPatch
+
+
+class _PatchCall:
+    # One lowered call site's accessors bound to its MonkeyPatch.
+    def __init__(self, mp, acc):
+        self.mp = mp
+        self.acc = acc
+
+    def setattr(self, target, name, value=_NOTSET, raising=True):
+        return self.mp.setattr(target, name, value, raising, _cn1_acc=self.acc)
+
+    def delattr(self, target, name, raising=True):
+        return self.mp.delattr(target, name, raising, _cn1_acc=self.acc)
+
+
+def _cn1_mp(r, delete, acc):
+    # PytestLowering routes every `r.setattr(...)`/`r.delattr(...)` statement
+    # with a literal name here: the accessors reach `r` only when it really
+    # is a MonkeyPatch, any other receiver gets its own method untouched.
+    if isinstance(r, _MonkeyPatch):
+        r = _PatchCall(r, acc)
+    if delete:
+        return r.delattr
+    return r.setattr
+
+
+def _dotted(path, candidates):
+    """The object a dotted monkeypatch target names: `candidates` are the
+    (module name, literal attribute load) pairs PytestLowering wrote for
+    each module prefix of `path`, longest first."""
+    for modname, load in candidates:
+        mod = sys.modules.get(modname)
+        if mod is not None:
+            return load(mod)
+    raise ImportError("monkeypatch target %r is not imported" % path)
+
 
 
 # -- running ----------------------------------------------------------------
-
-def _param_names(func, skip_self):
-    names = list(inspect.signature(func).parameters)
-    if skip_self and names:
-        names = names[1:]
-    return names
-
 
 def _split_argnames(argnames):
     if isinstance(argnames, str):
@@ -465,51 +720,137 @@ class _Result:
         return ", ".join(parts) if parts else "no tests ran"
 
 
+class _Table:
+    """A module's tests and fixtures, as PytestLowering lists them at build
+    time in dir() order: ("f", name, function, fixture names, call) for a
+    module-level function, where call(resolve) passes each fixture name
+    literally, and ("c", name, class, members) for a Test* class, each member
+    (name, function, fixture names, call(instance, resolve), bound(instance))."""
+
+    def __init__(self, entries):
+        self.entries = entries
+        self.fixtures = {}
+        for e in entries:
+            if e[0] == "f":
+                d = getattr(e[2], "__cn1_fixture__", None)
+                if d is not None:
+                    d.deps = e[3]
+                    d.call = e[4]
+                    self.fixtures[d.name] = e
+
+
 class _Session:
-    def __init__(self, module, quiet):
+    def __init__(self, module, quiet, table):
         self.module = module
         self.quiet = quiet
+        self.table = table
         self.result = _Result()
         self.teardowns = []
+        self.fixture_params = {}
+        # the fixtures of the Test* class running, by fixture name
+        self.class_fixtures = None
 
-    # fixture lookup: class attribute, module attribute, then the registry
-    def find_fixture(self, name, instance):
-        if instance is not None:
-            f = getattr(type(instance), name, None)
-            if f is not None and hasattr(f, "__cn1_fixture__"):
-                return f, True
-        f = getattr(self.module, name, None)
-        if f is not None and hasattr(f, "__cn1_fixture__"):
-            return f, False
+    def param_fixtures(self, deps):
+        """The parametrized fixtures a test reaches, directly or through
+        other fixtures, in the order first met."""
+        found = []
+        seen = set()
+        todo = list(deps)
+        while todo:
+            n = todo.pop(0)
+            if n in seen:
+                continue
+            seen.add(n)
+            f = self.find_fixture(n)
+            if f is None:
+                continue
+            d = f[3]
+            if d.params is not None:
+                found.append(d)
+            todo.extend(f[0] or ())
+        return found
+
+    def expand(self, func, deps):
+        """_expand_params, multiplied by each parametrized fixture's params;
+        the fixture values ride in the dict under a ("fixture", name) key."""
+        combos = _expand_params(func)
+        for d in self.param_fixtures(deps):
+            nxt = []
+            for base_id, vals, marks in combos:
+                for i, p in enumerate(d.params):
+                    pid = str(d.ids[i]) if d.ids is not None and i < len(d.ids) \
+                        else _idpart(p, d.name, i)
+                    v = dict(vals)
+                    v[("fixture", d.name)] = p
+                    nxt.append((pid if not base_id else base_id + "-" + pid, v, marks))
+            combos = nxt
+        return combos
+
+    # fixture lookup: the running class's, the module's, then the registry;
+    # (fixture names, call, is_method, definition) or None
+    def find_fixture(self, name):
+        if self.class_fixtures is not None:
+            m = self.class_fixtures.get(name)
+            if m is not None:
+                return m[2], m[3], True, m[1].__cn1_fixture__
+        e = self.table.fixtures.get(name)
+        if e is not None:
+            return e[3], e[4], False, e[2].__cn1_fixture__
         d = _registry.get(name)
+        if d is None and name in ("httpx_mock", "httpx2_mock"):
+            # A plugin's fixture, used without importing the plugin: pytest
+            # would have loaded it through its entry point.
+            import pytest_httpx2  # noqa: F401
+            d = _registry.get(name)
         if d is not None:
-            return d.func, False
-        return None, False
+            return d.deps, d.call, False, d
+        return None
 
     def make(self, name, instance, cache, stack):
-        if name in cache:
+        if name in cache and name != "request":
             return cache[name]
         if name == "monkeypatch":
             mp = _MonkeyPatch()
             self.teardowns.append(mp.undo)
             cache[name] = mp
             return mp
-        func, is_method = self.find_fixture(name, instance)
-        if func is None:
+        if name == "request":
+            req = FixtureRequest(self.fixture_params.get(stack[-1]) if stack else None,
+                                 stack[-1] if stack else None, self, instance, cache)
+            cache[name] = req
+            return req
+        if name == "tmpdir":
+            # tmp_path's directory, as py.path.local: pytest gives both the same one
+            value = _LocalPath(self.make("tmp_path", instance, cache, stack))
+            cache[name] = value
+            return value
+        if name == "tmp_path":
+            # A fresh directory per test under the system temporary directory,
+            # as pytest's tmp_path is; it is left in place, as pytest keeps
+            # the last few runs' directories.
+            import tempfile
+            import pathlib
+            path = pathlib.Path(tempfile.mkdtemp(prefix="pytest-"))
+            cache[name] = path
+            return path
+        found = self.find_fixture(name)
+        if found is None:
             raise Failed("fixture '%s' not found" % name)
+        call = found[1]
+        if call is None:
+            raise Failed("fixture '%s' is defined where the build lists no fixtures (only module and "
+                         "Test* class level ones are)" % name)
         if name in stack:
             raise Failed("recursive dependency involving fixture '%s'" % name)
         stack.append(name)
-        names = _param_names(func, is_method)
-        kwargs = {}
-        for n in names:
-            kwargs[n] = self.make(n, instance, cache, stack)
-        stack.pop()
-        if is_method:
-            bound = getattr(instance, func.__name__)
-            value = bound(**kwargs)
+
+        def resolve(n):
+            return self.make(n, instance, cache, stack)
+        if found[2]:
+            value = call(instance, resolve)
         else:
-            value = func(**kwargs)
+            value = call(resolve)
+        stack.pop()
         if _is_generator(value):
             gen = value
             value = next(gen)
@@ -527,22 +868,23 @@ class _Session:
                 errors.append(e)
         return errors
 
-    def autouse_names(self, instance):
-        names = []
-        for n in dir(self.module):
-            f = getattr(self.module, n)
-            d = getattr(f, "__cn1_fixture__", None)
-            if d is not None and d.autouse:
-                names.append(d.name)
-        if instance is not None:
-            for n in dir(type(instance)):
-                f = getattr(type(instance), n)
-                d = getattr(f, "__cn1_fixture__", None)
+    def autouse_names(self):
+        # conftest's autouse fixtures apply to every module, as pytest's do
+        names = [d.name for d in _registry.values()
+                 if d.autouse and getattr(d.func, "__module__", "").rpartition(".")[2] == "conftest"]
+        for e in self.table.entries:
+            if e[0] == "f":
+                d = getattr(e[2], "__cn1_fixture__", None)
                 if d is not None and d.autouse and d.name not in names:
+                    names.append(d.name)
+        if self.class_fixtures is not None:
+            for m in self.class_fixtures.values():
+                d = m[1].__cn1_fixture__
+                if d.autouse and d.name not in names:
                     names.append(d.name)
         return names
 
-    def run_one(self, nodeid, func, instance, is_method, extra_marks, values):
+    def run_one(self, nodeid, func, instance, call, extra_marks, values):
         marks = _marks_of(func) + extra_marks
         if instance is not None:
             marks = marks + _marks_of(type(instance))
@@ -562,23 +904,27 @@ class _Session:
                 if cond:
                     xfail_mark = m
         cache = {}
+        self.fixture_params = dict((k[1], v) for k, v in values.items() if isinstance(k, tuple))
         outcome = None
         detail = ""
+
+        def resolve(n):
+            if n in values:
+                return values[n]
+            return self.make(n, instance, cache, [])
         try:
             try:
-                for n in self.autouse_names(instance):
+                for n in self.autouse_names():
                     self.make(n, instance, cache, [])
-                names = _param_names(func, is_method)
-                kwargs = {}
-                for n in names:
-                    if n in values:
-                        kwargs[n] = values[n]
-                    else:
-                        kwargs[n] = self.make(n, instance, cache, [])
-                if is_method:
-                    getattr(instance, func.__name__)(**kwargs)
+                if instance is not None:
+                    ret = call(instance, resolve)
                 else:
-                    func(**kwargs)
+                    ret = call(resolve)
+                if type(ret).__name__ == "coroutine":
+                    # An async test runs to completion on a fresh loop, as
+                    # pytest-asyncio's function-scoped loop runs it.
+                    import asyncio
+                    asyncio.run(ret)
                 outcome = "passed"
             except Skipped as e:
                 outcome = "skipped"
@@ -611,33 +957,40 @@ class _Session:
         self.result.record(nodeid, outcome, detail)
         return {"passed": ".", "failed": "F", "skipped": "s", "xfailed": "x", "xpassed": "X"}[outcome]
 
-    def run_function(self, prefix, func, instance, is_method, extra_marks):
+    def run_function(self, prefix, entry):
+        name, func, deps, call = entry[1], entry[2], entry[3], entry[4]
         out = ""
-        for pid, values, pmarks in _expand_params(func):
-            nodeid = prefix + func.__name__ + ("[" + pid + "]" if pid else "")
-            out += self.run_one(nodeid, func, instance, is_method, extra_marks + pmarks, values)
+        for pid, values, pmarks in self.expand(func, deps):
+            nodeid = prefix + name + ("[" + pid + "]" if pid else "")
+            out += self.run_one(nodeid, func, None, call, pmarks, values)
         return out
 
-    def run_class(self, name, cls):
+    def run_class(self, name, cls, members):
         out = ""
-        for attr in dir(cls):
-            if not attr.startswith("test"):
-                continue
-            member = getattr(cls, attr)
-            if not callable(member):
-                continue
-            for pid, values, pmarks in _expand_params(member):
-                nodeid = "%s::%s::%s%s" % (self.module_name(), name, attr, "[" + pid + "]" if pid else "")
-                instance = cls()
-                if hasattr(instance, "setup_method"):
-                    instance.setup_method(getattr(instance, attr))
-                out += self.run_one(nodeid, member, instance, True, pmarks, values)
-                if hasattr(instance, "teardown_method"):
-                    instance.teardown_method(getattr(instance, attr))
+        self.class_fixtures = {}
+        for m in members:
+            d = getattr(m[1], "__cn1_fixture__", None)
+            if d is not None:
+                self.class_fixtures[d.name] = m
+        try:
+            for attr, member, deps, call, bound in members:
+                if not attr.startswith("test") or not callable(member):
+                    continue
+                for pid, values, pmarks in self.expand(member, deps):
+                    nodeid = "%s::%s::%s%s" % (self.module_name(), name, attr, "[" + pid + "]" if pid else "")
+                    instance = cls()
+                    if hasattr(instance, "setup_method"):
+                        instance.setup_method(bound(instance))
+                    out += self.run_one(nodeid, member, instance, call, pmarks, values)
+                    if hasattr(instance, "teardown_method"):
+                        instance.teardown_method(bound(instance))
+        finally:
+            self.class_fixtures = None
         return out
 
     def module_name(self):
         return getattr(self.module, "__name__", "module")
+
 
 
 def _is_generator(value):
@@ -661,19 +1014,26 @@ def _describe(e):
 
 
 def run_module(module, quiet=False):
-    """Run every test_* function and Test* class of a module object. Prints
+    """Run every test_* function and Test* class of a module object, as the
+    table PytestLowering wrote into it at build time lists them. Prints
     one line per test when not quiet, then the summary; returns the exit code
     pytest would use (0 all passed, 1 failures)."""
-    session = _Session(module, quiet)
+    table = getattr(module, "__cn1_pytest__", None)
+    if table is None:
+        raise TypeError("pytest.run_module(%r): the module has no test table; only a module that "
+                        "imports pytest and defines tests at its top level gets one" % (module,))
+    session = _Session(module, quiet, table)
     prefix = session.module_name() + "::"
     line = ""
-    for name in dir(module):
-        obj = getattr(module, name)
-        if name.startswith("test") and callable(obj) and not isinstance(obj, type) and \
-                not hasattr(obj, "__cn1_fixture__"):
-            line += session.run_function(prefix, obj, None, False, [])
-        elif isinstance(obj, type) and name.startswith("Test"):
-            line += session.run_class(name, obj)
+    for e in table.entries:
+        name = e[1]
+        obj = e[2]
+        if e[0] == "f":
+            if name.startswith("test") and callable(obj) and not isinstance(obj, type) and \
+                    not hasattr(obj, "__cn1_fixture__"):
+                line += session.run_function(prefix, e)
+        elif isinstance(obj, type):
+            line += session.run_class(name, obj, e[3])
     result = session.result
     if not quiet:
         print(line)

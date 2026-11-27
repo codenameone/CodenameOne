@@ -1,0 +1,7 @@
+text:char-a <Char char-a> 3 3 1 a
+True True ['Char', 'Item', 'Text', 'object']
+1 2 2 item2
+line1 4 True
+5 6
+7 None
+CHAR-A

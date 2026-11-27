@@ -54,17 +54,50 @@ class struct_time(tuple):
         self._gmtoff = seq[10] if len(seq) > 10 else gmtoff
         return self
 
-    tm_year = property(lambda self: self[0])
-    tm_mon = property(lambda self: self[1])
-    tm_mday = property(lambda self: self[2])
-    tm_hour = property(lambda self: self[3])
-    tm_min = property(lambda self: self[4])
-    tm_sec = property(lambda self: self[5])
-    tm_wday = property(lambda self: self[6])
-    tm_yday = property(lambda self: self[7])
-    tm_isdst = property(lambda self: self[8])
-    tm_zone = property(lambda self: self._zone)
-    tm_gmtoff = property(lambda self: self._gmtoff)
+    @property
+    def tm_year(self):
+        return self[0]
+
+    @property
+    def tm_mon(self):
+        return self[1]
+
+    @property
+    def tm_mday(self):
+        return self[2]
+
+    @property
+    def tm_hour(self):
+        return self[3]
+
+    @property
+    def tm_min(self):
+        return self[4]
+
+    @property
+    def tm_sec(self):
+        return self[5]
+
+    @property
+    def tm_wday(self):
+        return self[6]
+
+    @property
+    def tm_yday(self):
+        return self[7]
+
+    @property
+    def tm_isdst(self):
+        return self[8]
+
+    @property
+    def tm_zone(self):
+        return self._zone
+
+    @property
+    def tm_gmtoff(self):
+        return self._gmtoff
+
 
     def __repr__(self):
         return ("time.struct_time(tm_year=%d, tm_mon=%d, tm_mday=%d, tm_hour=%d, tm_min=%d, "

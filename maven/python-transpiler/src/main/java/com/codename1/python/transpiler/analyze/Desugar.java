@@ -116,6 +116,8 @@ public final class Desugar {
                 i += r.size() - 1;
             } else if (s instanceof Try && ((Try) s).star) {
                 body.set(i, exceptStar((Try) s));
+            } else if (s instanceof Try && nextOrStop((Try) s) != null) {
+                body.set(i, nextOrStop((Try) s));
             } else if (inFunction && s instanceof AnnAssign && ((AnnAssign) s).value != null) {
                 // CPython never evaluates the annotation of a function's
                 // local (PEP 526), so `x: int = v` there is `x = v`; as a
@@ -212,6 +214,84 @@ public final class Desugar {
             }
         }
         return out;
+    }
+
+    /// `try: x = next(it) except StopIteration: H [else: E]` is how a loop
+    /// pulls from a generator by hand (bs4's filters do it per element).
+    /// Raising and catching a StopIteration per exhaustion costs an exception
+    /// object, its type's construction and a handler search, so it becomes
+    /// `$n = __cn1_next_or_stop__(next, it)` and an `is __cn1_stop__` test.
+    /// The intrinsic is handed the `next` the name resolves to, so a shadowed
+    /// `next` is still called (and a StopIteration it raises still caught).
+    /// A handler that names or re-raises the exception keeps the try.
+    private Stmt nextOrStop(Try t) {
+        if (t.star || !t.finalbody.isEmpty() || t.body.size() != 1 || t.handlers.size() != 1
+                || !(t.body.get(0) instanceof Assign)) {
+            return null;
+        }
+        ExceptHandler h = t.handlers.get(0);
+        if (h.name != null || !(h.type instanceof Name) || !"StopIteration".equals(((Name) h.type).id)
+                || reraises(h.body)) {
+            return null;
+        }
+        Assign a = (Assign) t.body.get(0);
+        if (a.targets.size() != 1 || !(a.targets.get(0) instanceof Name) || !(a.value instanceof Call)) {
+            return null;
+        }
+        Call c = (Call) a.value;
+        if (!(c.func instanceof Name) || !"next".equals(((Name) c.func).id) || c.args.size() != 1
+                || !c.keywords.isEmpty() || !(c.args.get(0) instanceof Name)) {
+            return null;
+        }
+        String v = "$n" + (++counter);
+        Call call = new Call(name("__cn1_next_or_stop__", t)).at(t.line, t.col);
+        call.args.add(c.func);
+        call.args.add(c.args.get(0));
+        List<Stmt> out = new ArrayList<Stmt>();
+        out.add(assign(name(v, t), call, t));
+        Compare test = new Compare(name(v, t)).at(t.line, t.col);
+        test.ops.add("is");
+        test.comparators.add(name("__cn1_stop__", t));
+        List<Stmt> got = new ArrayList<Stmt>();
+        got.add(assign(a.targets.get(0), name(v, t), a));
+        got.addAll(t.orelse);
+        out.add(new If(test, h.body, got).at(t.line, t.col));
+        return new If(new Constant(Constant.Kind.TRUE, null).at(t.line, t.col), out, new ArrayList<Stmt>())
+                .at(t.line, t.col);
+    }
+
+    /// Whether a handler body contains a bare `raise` anywhere.
+    private static boolean reraises(List<Stmt> body) {
+        boolean[] found = new boolean[1];
+        scanRaise(body, found);
+        return found[0];
+    }
+
+    private static void scanRaise(List<Stmt> body, boolean[] found) {
+        for (Stmt s : body) {
+            if (s instanceof Raise && ((Raise) s).exc == null) {
+                found[0] = true;
+            } else if (s instanceof If) {
+                scanRaise(((If) s).body, found);
+                scanRaise(((If) s).orelse, found);
+            } else if (s instanceof While) {
+                scanRaise(((While) s).body, found);
+                scanRaise(((While) s).orelse, found);
+            } else if (s instanceof For) {
+                scanRaise(((For) s).body, found);
+                scanRaise(((For) s).orelse, found);
+            } else if (s instanceof With) {
+                scanRaise(((With) s).body, found);
+            } else if (s instanceof Try) {
+                Try t = (Try) s;
+                scanRaise(t.body, found);
+                for (ExceptHandler x : t.handlers) {
+                    scanRaise(x.body, found);
+                }
+                scanRaise(t.orelse, found);
+                scanRaise(t.finalbody, found);
+            }
+        }
     }
 
     private Stmt exceptStar(Try t) {

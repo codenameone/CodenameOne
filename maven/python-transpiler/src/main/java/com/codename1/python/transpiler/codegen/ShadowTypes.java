@@ -38,17 +38,17 @@ import java.util.Map;
 /// (see `Emitter.shadows`). Nested functions, classes, lambdas and
 /// comprehensions are their own scopes and are not walked.
 final class ShadowTypes {
-    private final Layouts layouts;
+    private final Map<String, List<Layouts.Cls>> owners;
     private final Map<String, Map<Layouts.Cls, Integer>> counts = new HashMap<String, Map<Layouts.Cls, Integer>>();
 
-    private ShadowTypes(Layouts layouts) {
-        this.layouts = layouts;
+    private ShadowTypes(Map<String, List<Layouts.Cls>> owners) {
+        this.owners = owners;
     }
 
     /// Local name -> class, for the names read for a compiled field at
     /// least twice.
-    static Map<String, Layouts.Cls> of(List<Stmt> body, Layouts layouts) {
-        ShadowTypes t = new ShadowTypes(layouts);
+    static Map<String, Layouts.Cls> of(List<Stmt> body, Map<String, List<Layouts.Cls>> owners) {
+        ShadowTypes t = new ShadowTypes(owners);
         for (Stmt s : body) {
             t.walk(s);
         }
@@ -82,15 +82,15 @@ final class ShadowTypes {
         }
         if (o instanceof Attribute && ((Attribute) o).value instanceof Name) {
             Attribute a = (Attribute) o;
-            List<Layouts.Cls> owners = layouts.fieldOwners.get(a.attr);
-            if (owners != null) {
+            List<Layouts.Cls> os = owners.get(a.attr);
+            if (os != null) {
                 String n = ((Name) a.value).id;
                 Map<Layouts.Cls, Integer> m = counts.get(n);
                 if (m == null) {
                     m = new LinkedHashMap<Layouts.Cls, Integer>();
                     counts.put(n, m);
                 }
-                for (Layouts.Cls c : owners) {
+                for (Layouts.Cls c : os) {
                     // A subclass reached through this access counts for the
                     // declaring class too: its instances pass that test.
                     Integer k = m.get(c);

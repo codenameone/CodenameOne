@@ -89,6 +89,10 @@ JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STAT
     return -1;
 }
 
+JAVA_INT com_codename1_backend_Db_stepInlineImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
+    return -1;
+}
+
 JAVA_INT com_codename1_backend_Db_parameterCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
     return 0;
 }
@@ -99,6 +103,10 @@ JAVA_INT com_codename1_backend_Db_columnCountImpl___long_R_int(CODENAME_ONE_THRE
 
 JAVA_OBJECT com_codename1_backend_Db_columnNameImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index) {
     return JAVA_NULL;
+}
+
+JAVA_LONG com_codename1_backend_Db_columnNamePtrImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index) {
+    return 0;
 }
 
 JAVA_INT com_codename1_backend_Db_columnTypeImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index) {
@@ -124,6 +132,9 @@ JAVA_OBJECT com_codename1_backend_Db_columnBlobImpl___long_int_R_byte_1ARRAY(COD
 JAVA_VOID com_codename1_backend_Db_finalizeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
 }
 
+JAVA_VOID com_codename1_backend_Db_resetImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
+}
+
 JAVA_INT com_codename1_backend_Db_changesImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     return 0;
 }
@@ -131,6 +142,22 @@ JAVA_INT com_codename1_backend_Db_changesImpl___long_R_int(CODENAME_ONE_THREAD_S
 JAVA_LONG com_codename1_backend_Db_lastInsertRowIdImpl___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     return 0;
 }
+
+/* SQL functions written in Java need the engine; without it none can be made. */
+JAVA_INT com_codename1_backend_Db_createFunctionImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT name, JAVA_INT argc, JAVA_INT id) {
+    return 1; /* SQLITE_ERROR */
+}
+JAVA_INT com_codename1_backend_Db_valueTypeImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) { return 5; }
+JAVA_LONG com_codename1_backend_Db_valueLongImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) { return 0; }
+JAVA_DOUBLE com_codename1_backend_Db_valueDoubleImpl___long_int_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) { return 0; }
+JAVA_OBJECT com_codename1_backend_Db_valueTextImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) { return JAVA_NULL; }
+JAVA_OBJECT com_codename1_backend_Db_valueBlobImpl___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) { return JAVA_NULL; }
+JAVA_VOID com_codename1_backend_Db_resultNullImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx) { }
+JAVA_VOID com_codename1_backend_Db_resultLongImpl___long_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_LONG v) { }
+JAVA_VOID com_codename1_backend_Db_resultDoubleImpl___long_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_DOUBLE v) { }
+JAVA_VOID com_codename1_backend_Db_resultTextImpl___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_OBJECT v) { }
+JAVA_VOID com_codename1_backend_Db_resultBlobImpl___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_OBJECT v) { }
+JAVA_VOID com_codename1_backend_Db_resultErrorImpl___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_OBJECT v) { }
 
 #else
 
@@ -381,6 +408,32 @@ JAVA_INT com_codename1_backend_Db_stepImpl___long_R_int(CODENAME_ONE_THREAD_STAT
 }
 
 /*
+ * stepImpl ON THE CALLING THREAD, for a connection with SQL functions written in
+ * Java (createFunctionImpl). Such a function is called from inside sqlite3_step,
+ * and cn1BackendJavaFunction re-enters the VM on the thread it runs on -- which
+ * on the offload pool is no VM thread at all, so it would read another thread's
+ * state or none. The thread is yielded as stepImpl yields it, so the collector
+ * runs meanwhile; the function resumes it while it runs Java.
+ */
+JAVA_INT com_codename1_backend_Db_stepInlineImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
+    int rc;
+    if(stmt == NULL) {
+        return -1;
+    }
+    CN1_YIELD_THREAD;
+    rc = sqlite3_step(stmt);
+    CN1_RESUME_THREAD;
+    if(rc == SQLITE_ROW) {
+        return 1;
+    }
+    if(rc == SQLITE_DONE) {
+        return 0;
+    }
+    return -1;
+}
+
+/*
  * How many placeholders the prepared statement has.
  *
  * SQLite leaves an unbound parameter as NULL and says nothing, so a caller that
@@ -396,6 +449,15 @@ JAVA_INT com_codename1_backend_Db_parameterCountImpl___long_R_int(CODENAME_ONE_T
 JAVA_INT com_codename1_backend_Db_columnCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
     return stmt == NULL ? 0 : sqlite3_column_count(stmt);
+}
+
+/* Where SQLite keeps a column's name: the same address for as long as the statement
+   keeps its compiled program, a new one when a schema change re-prepares it (the new
+   program is built before the old one is freed, so the two cannot share an address).
+   Db compares it to skip decoding the same names on every run. */
+JAVA_LONG com_codename1_backend_Db_columnNamePtrImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
+    return stmt == NULL ? 0 : (JAVA_LONG)(intptr_t)sqlite3_column_name(stmt, index);
 }
 
 JAVA_OBJECT com_codename1_backend_Db_columnNameImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
@@ -482,6 +544,16 @@ JAVA_VOID com_codename1_backend_Db_finalizeImpl___long(CODENAME_ONE_THREAD_STATE
     }
 }
 
+/* Readies a cached statement for its next use: back to the start, and the
+ * bound values released (a large blob would otherwise stay held by it). */
+JAVA_VOID com_codename1_backend_Db_resetImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {
+    sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
+    if(stmt != NULL) {
+        sqlite3_reset(stmt);
+        sqlite3_clear_bindings(stmt);
+    }
+}
+
 JAVA_INT com_codename1_backend_Db_changesImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     sqlite3* db = (sqlite3*)(intptr_t)handle;
     return db == NULL ? 0 : sqlite3_changes(db);
@@ -490,6 +562,112 @@ JAVA_INT com_codename1_backend_Db_changesImpl___long_R_int(CODENAME_ONE_THREAD_S
 JAVA_LONG com_codename1_backend_Db_lastInsertRowIdImpl___long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     sqlite3* db = (sqlite3*)(intptr_t)handle;
     return db == NULL ? 0 : (JAVA_LONG)sqlite3_last_insert_rowid(db);
+}
+
+/*
+ * SQL functions written in Java (Database.createFunction). SQLite calls the
+ * trampoline on the thread stepping the statement, which hands the call to
+ * Db.callFunction -- a static Java method taking (long ctx, int id, int argc,
+ * long argv) that reads the arguments and sets the result through the natives
+ * below. The id is the function's slot in Db's table; the engine holds no Java
+ * object. Naming callFunction here is also what keeps it in the binary.
+ *
+ * sqlite3_step runs with the thread YIELDED (stepImpl), so the collector may be
+ * running while the engine is inside a step: the thread is resumed before any
+ * Java runs and yielded again before control goes back to the engine.
+ */
+extern JAVA_VOID com_codename1_backend_Db_callFunction___long_int_int_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_INT id, JAVA_INT argc, JAVA_LONG argv);
+
+static void cn1BackendJavaFunction(sqlite3_context* c, int argc, sqlite3_value** v) {
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    CN1_RESUME_THREAD;
+    com_codename1_backend_Db_callFunction___long_int_int_long(threadStateData, (JAVA_LONG)(intptr_t)c,
+            (JAVA_INT)(intptr_t)sqlite3_user_data(c), argc, (JAVA_LONG)(intptr_t)v);
+    CN1_YIELD_THREAD;
+}
+
+JAVA_INT com_codename1_backend_Db_createFunctionImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT name, JAVA_INT argc, JAVA_INT id) {
+    sqlite3* db = (sqlite3*)(intptr_t)handle;
+    JAVA_ARRAY arr = (JAVA_ARRAY)name;
+    char buf[256];
+    int n;
+    if(db == NULL || name == JAVA_NULL || arr->length <= 0 || arr->length > 255) {
+        return SQLITE_MISUSE;
+    }
+    /* The name arrives as UTF-8 bytes, NUL-free (Db checks), so the copy is the
+       whole name. */
+    n = (int)arr->length;
+    memcpy(buf, CN1_ARRAY_DATA(arr), n);
+    buf[n] = 0;
+    return sqlite3_create_function_v2(db, buf, argc, SQLITE_UTF8, (void*)(intptr_t)id,
+            id < 0 ? NULL : cn1BackendJavaFunction, NULL, NULL, NULL);
+}
+
+JAVA_INT com_codename1_backend_Db_valueTypeImpl___long_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) {
+    return sqlite3_value_type(((sqlite3_value**)(intptr_t)argv)[i]);
+}
+
+JAVA_LONG com_codename1_backend_Db_valueLongImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) {
+    return (JAVA_LONG)sqlite3_value_int64(((sqlite3_value**)(intptr_t)argv)[i]);
+}
+
+JAVA_DOUBLE com_codename1_backend_Db_valueDoubleImpl___long_int_R_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) {
+    return sqlite3_value_double(((sqlite3_value**)(intptr_t)argv)[i]);
+}
+
+JAVA_OBJECT com_codename1_backend_Db_valueTextImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) {
+    sqlite3_value* value = ((sqlite3_value**)(intptr_t)argv)[i];
+    const unsigned char* text = sqlite3_value_text(value);
+    /* Decoded with the value's own length, as columnStringImpl does: TEXT may
+       contain a NUL. */
+    return text == NULL ? JAVA_NULL
+            : newStringFromUtf8Len(threadStateData, (const char*)text, sqlite3_value_bytes(value));
+}
+
+JAVA_OBJECT com_codename1_backend_Db_valueBlobImpl___long_int_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG argv, JAVA_INT i) {
+    sqlite3_value* value = ((sqlite3_value**)(intptr_t)argv)[i];
+    const void* data = sqlite3_value_blob(value);
+    int length = sqlite3_value_bytes(value);
+    JAVA_OBJECT arr;
+    if(data == NULL) {
+        length = 0;
+    }
+    arr = allocArray(threadStateData, length, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    if(length > 0) {
+        memcpy(CN1_ARRAY_DATA((JAVA_ARRAY)arr), data, length);
+    }
+    return arr;
+}
+
+JAVA_VOID com_codename1_backend_Db_resultNullImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx) {
+    sqlite3_result_null((sqlite3_context*)(intptr_t)ctx);
+}
+
+JAVA_VOID com_codename1_backend_Db_resultLongImpl___long_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_LONG v) {
+    sqlite3_result_int64((sqlite3_context*)(intptr_t)ctx, (sqlite3_int64)v);
+}
+
+JAVA_VOID com_codename1_backend_Db_resultDoubleImpl___long_double(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_DOUBLE v) {
+    sqlite3_result_double((sqlite3_context*)(intptr_t)ctx, v);
+}
+
+/* SQLITE_TRANSIENT throughout: SQLite copies, so the array may be collected or
+   moved the moment these return. */
+JAVA_VOID com_codename1_backend_Db_resultTextImpl___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_OBJECT v) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)v;
+    sqlite3_result_text((sqlite3_context*)(intptr_t)ctx, (const char*)CN1_ARRAY_DATA(arr),
+            (int)arr->length, SQLITE_TRANSIENT);
+}
+
+JAVA_VOID com_codename1_backend_Db_resultBlobImpl___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_OBJECT v) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)v;
+    sqlite3_result_blob((sqlite3_context*)(intptr_t)ctx, (const void*)CN1_ARRAY_DATA(arr),
+            (int)arr->length, SQLITE_TRANSIENT);
+}
+
+JAVA_VOID com_codename1_backend_Db_resultErrorImpl___long_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_LONG ctx, JAVA_OBJECT v) {
+    JAVA_ARRAY arr = (JAVA_ARRAY)v;
+    sqlite3_result_error((sqlite3_context*)(intptr_t)ctx, (const char*)CN1_ARRAY_DATA(arr), (int)arr->length);
 }
 
 #endif /* CN1_BACKEND_NO_SQLITE */

@@ -1,0 +1,14 @@
+3999000
+6 12 20 2.5 1.0
+8 6 48
+748500
+TypeError Box.__init__() takes 2 positional arguments but 3 were given
+TypeError Box.__init__() missing 1 required keyword-only argument: 'h'
+TypeError scale() takes 1 positional argument but 2 were given
+TypeError Box.area() takes 1 positional argument but 2 were given
+TypeError Box.grow() takes 2 positional arguments but 3 were given
+TypeError Box.__init__() got an unexpected keyword argument 'q'
+TypeError scale() got an unexpected keyword argument 'zz'
+15 7
+[(99.0, 'dflt', 'a'), (10.0, 'dflt', 'b'), (10.0, 'dflt', 'c'), (99.0, 't', 'd')]
+1

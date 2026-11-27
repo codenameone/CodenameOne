@@ -32,5 +32,6 @@ import java.lang.annotation.Target;
 /// their pixel `int[]`/`byte[]` data.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
+@com.codename1.impl.SharedWithBackend
 public @interface Fused {
 }

@@ -1,0 +1,10 @@
+Text(value='hi')
+None BoldElement(tag_name='b', children=[Element(tag_name='p', children=[Text(value='hi'), Comment('c')], attributes=None)], attributes={'k': 'v'}, weight=7)
+True False True False
+True
+**7<b><p>text:hi#c
+2
+Element(tag_name='div', children=[Text(value='hi'), Comment('c')], attributes=None) False True
+BoldElement(tag_name='b', children=[Element(tag_name='p', children=[Text(value='hi'), Comment('c')], attributes=None)], attributes={'k': 'v'}, weight=1)
+missing argument
+unexpected keyword

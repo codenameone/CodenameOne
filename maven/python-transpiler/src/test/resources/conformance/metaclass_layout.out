@@ -1,0 +1,7 @@
+False {'a': 1, 'b': 2} True 12
+6 6 False hello
+AttributeError missing
+instance does not see metaclass property
+True 1 Config Singleton
+SubSwap True 8 True True True
+Swap 10 Swap

@@ -160,6 +160,41 @@ public final class NativeModule {
         PyModule.registerModule(module);
     }
 
+    private static final java.util.Map<String, PyBuiltin.Positional> REPLACED =
+            new java.util.HashMap<String, PyBuiltin.Positional>();
+
+    /// Gives the Java that runs in place of a Python function the build was
+    /// told to replace (`replace=` in `cn1-python.properties`). `function`
+    /// is its dotted name, `pkg.module.function` or
+    /// `pkg.module.Class.method`. `body` receives the values of the
+    /// function's parameters in the order it declares them -- a `*args`
+    /// parameter as one tuple, a `**kwargs` parameter as one dict -- as
+    /// the runtime holds them, and what it returns is what the call
+    /// answers.
+    public static void replace(String function, PyBuiltin.Positional body) {
+        REPLACED.put(function, body);
+    }
+
+    /// Runs the replacement of the function named by the first argument.
+    static Object replaced(Object[] a) {
+        String name = String.valueOf(a[0]);
+        PyBuiltin.Positional body = REPLACED.get(name);
+        if (body == null) {
+            throw notReplaced(name);
+        }
+        Object[] args = new Object[a.length - 1];
+        System.arraycopy(a, 1, args, 0, args.length);
+        return body.call(args);
+    }
+
+    /// The `NotImplementedError` of a replaced function whose Java was not
+    /// written yet.
+    public static RuntimeException notReplaced(String function) {
+        return Py.error(Py.NOT_IMPLEMENTED_ERROR, function + " is replaced by Java in this build"
+                + " (cn1-python.properties), and the Java is not written yet: fill in the class the build"
+                + " generated for its module under com.codename1.python.ext");
+    }
+
     /// The `NotImplementedError` a generated stub raises until it is filled
     /// in, naming what is missing.
     public static RuntimeException notImplemented(String what) {

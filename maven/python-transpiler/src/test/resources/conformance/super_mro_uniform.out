@@ -1,0 +1,7 @@
+Typed ['Typed', 'Base', 3]
+Conv ['Conv', 'Typed', 'Base', 6]
+Str ['Str', 'Typed', 'Base', 4]
+Text ['Str', 'Conv', 'Typed', 'Base', 8]
+Text2 ['Text2', 'Str', 'Conv', 'Typed', 'Base', 8]
+['Text2', 'Text', 'Str', 'Conv', 'Typed', 'Base', 'object']
+['Text2', 'Str', 'Conv', 'Typed', 'patched', 4] ['Conv', 'Typed', 'patched', 2]

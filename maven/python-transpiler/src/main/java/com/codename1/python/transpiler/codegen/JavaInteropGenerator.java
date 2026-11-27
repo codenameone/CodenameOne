@@ -101,9 +101,32 @@ public final class JavaInteropGenerator {
 
     /// Generates the bridge class source for `trees` (path to tree).
     public static String generate(Map<String, Node.Module> trees, ClassPathReader cp, String pkg) {
+        return generate(trees, cp, pkg, new HashSet<String>());
+    }
+
+    /// As [#generate], adding to `answered` every attribute name a Java
+    /// object of the program answers: a method or field of a class in the
+    /// universe that the Python code names. Only those names can reach
+    /// something other than the program's own methods -- a Python class
+    /// cannot extend a Java one, so Java calls back into Python only
+    /// through a callable it was handed.
+    public static String generate(Map<String, Node.Module> trees, ClassPathReader cp, String pkg,
+            Set<String> answered) {
         JavaInteropGenerator g = new JavaInteropGenerator(cp);
         g.collect(trees);
         g.close();
+        for (String c : g.universe) {
+            for (Member m : g.visibleMethods(c)) {
+                if (g.names.contains(m.name)) {
+                    answered.add(m.name);
+                }
+            }
+            for (Member f : g.visibleFields(c)) {
+                if (g.names.contains(f.name)) {
+                    answered.add(f.name);
+                }
+            }
+        }
         return g.emit(pkg);
     }
 

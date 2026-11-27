@@ -1,0 +1,8 @@
+True False False True True
+Tag(name='div', prefix=None)
+True False 2 False
+Group(tags=(Tag(name='div', prefix=None), Tag(name='div', prefix='svg')), inverse=True)
+Group(tags=(Tag(name='div', prefix=None),), inverse=False)
+['div', 'svg'] False
+2
+False False

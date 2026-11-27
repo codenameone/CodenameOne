@@ -626,6 +626,9 @@ public class BytecodeMethod implements SignatureSet {
     /** Set while emitting: this method is frameless AND contains a try/catch, so its
      *  frame needs the two extra names CN1_FRAMELESS_TRY_FRAME defines. */
     private boolean framelessHasTryCatch;
+    /// The local slots a handler can read, from handlerLiveSlots on the raw
+    /// bytecode; null when it could not tell, and then every local is volatile.
+    private Set<Integer> handlerLiveSlots;
 
     /** @return true if a return in this method must unwind the try-block stack itself. */
     public boolean isFramelessWithTryCatch() {
@@ -702,9 +705,9 @@ public class BytecodeMethod implements SignatureSet {
                 // currentCodenameOneCallStackOffset); CN1_FRAMELESS_TRY_FRAME supplies
                 // both, emitted only into the methods that need them. The setjmp
                 // requirement was already met independently: volatileLocals is set by
-                // the same instruction scan and selects the _VSP frame variant, so the
-                // locals and SP are volatile here exactly as they are in an ordinary
-                // frame.
+                // the same instruction scan, so the locals are volatile here exactly as
+                // they are in an ordinary frame, and CN1_TRY_ENTRY restarts SP after the
+                // setjmp in both.
                 continue;
             }
             if (i instanceof LabelInstruction || i instanceof LineNumber || i instanceof LocalVariable) {
@@ -838,6 +841,20 @@ public class BytecodeMethod implements SignatureSet {
                     return false;
                 }
                 if (!isPrimitiveOnlyDescriptor(((Invoke) i).getDesc())) {
+                    return false;
+                }
+                hasRealInstruction = true;
+                continue;
+            }
+            if (i instanceof LambdaCarriers.IndirectCall) {
+                // The call a lambda carrier's interface method makes through its fn
+                // field: arguments taken off the method-local operand array and the
+                // C parameters, the result pushed back -- self-contained exactly as
+                // an Invoke is, and allowed on the same terms. Unrecognized, it gave
+                // EVERY carrier method a full frame, and every transpiled Python call
+                // goes through one (PyFunction.Body1..BodyN): a frame set up and torn
+                // down per call, to load a field and jump.
+                if (!obj) {
                     return false;
                 }
                 hasRealInstruction = true;
@@ -1846,6 +1863,8 @@ public class BytecodeMethod implements SignatureSet {
         // optimize()'s return fast-paths (plain return, no frame release) so it must
         // be set first.
         frameless = isFramelessEligible();
+        // Before optimize(), which fuses the loads and stores this has to see.
+        handlerLiveSlots = computeHandlerLiveSlots();
         // Phase 1 of frame-exit retirement shares the raw-bytecode requirement, and
         // more strictly: it reads OTHER methods' bodies too, so it cannot run here at
         // all. See freezeRetireCandidates, which Parser calls before any rewrite.
@@ -1916,9 +1935,6 @@ public class BytecodeMethod implements SignatureSet {
                     break;
                 }
             }
-            // Selects the _VSP variant of whichever frame macro is emitted
-            // below; empty for the ordinary ones so nothing else changes.
-            String spVariant = volatileLocals ? "_VSP" : "";
             Set<String> added = new HashSet<String>();
             // Sorted, not in localVariables iteration order: that is a HashSet, so the
             // order of these declarations varied between builds of the same input.
@@ -1932,7 +1948,15 @@ public class BytecodeMethod implements SignatureSet {
                 if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
                     b.append("    ");
-                    if (volatileLocals) {
+                    // A slot no handler can read needs no volatile even here: what
+                    // longjmp leaves in it is indeterminate, but it is written again
+                    // before anything reads it. Most of a loop that catches -- every
+                    // temporary -- is like that, and volatile put each of them in
+                    // memory on every access.
+                    // A slot past maxLocals is one optimize() made up, which the
+                    // bytecode pass never saw: it stays volatile.
+                    if (volatileLocals && (handlerLiveSlots == null || lv.getIndex() >= maxLocals
+                            || handlerLiveSlots.contains(lv.getIndex()))) {
                         b.append("volatile ");
                     }
                     switch (lv.getQualifier()) {
@@ -1972,7 +1996,7 @@ public class BytecodeMethod implements SignatureSet {
                         b.append(".initialized) __STATIC_INITIALIZER_").append(framelessCls);
                         b.append("(threadStateData);\n");
                     }
-                    b.append("    DEFINE_METHOD_STACK_FRAMELESS").append(spVariant).append("(");
+                    b.append("    DEFINE_METHOD_STACK_FRAMELESS").append("(");
                     b.append(maxStack);
                     b.append(", ");
                     b.append(maxLocals);
@@ -1994,12 +2018,12 @@ public class BytecodeMethod implements SignatureSet {
                     if(methodName.equals("__CLINIT__")) {
                         if (useFastMethodStack) {
                             if (usePrimitiveFastFrame) {
-                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append("(");
                             } else {
-                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append("(");
                             }
                         } else {
-                            b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
+                            b.append("    DEFINE_METHOD_STACK").append("(");
                         }
                     } else {
                         // Guard omitted for an eagerly initialized class (see
@@ -2013,23 +2037,23 @@ public class BytecodeMethod implements SignatureSet {
                         }
                         if (useFastMethodStack) {
                             if (usePrimitiveFastFrame) {
-                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_PRIMITIVE").append("(");
                             } else {
-                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
+                                b.append("    DEFINE_METHOD_STACK_FAST_REF").append("(");
                             }
                         } else {
-                            b.append("    DEFINE_METHOD_STACK").append(spVariant).append("(");
+                            b.append("    DEFINE_METHOD_STACK").append("(");
                         }
                     }
                 } else {
                     if (useFastMethodStack) {
                         if (usePrimitiveFastFrame) {
-                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE").append(spVariant).append("(");
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE").append("(");
                         } else {
-                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_REF").append(spVariant).append("(");
+                            b.append("    DEFINE_INSTANCE_METHOD_STACK_FAST_REF").append("(");
                         }
                     } else {
-                        b.append("    DEFINE_INSTANCE_METHOD_STACK").append(spVariant).append("(");
+                        b.append("    DEFINE_INSTANCE_METHOD_STACK").append("(");
                     }
                 }
                 // The frameless branch above already emitted its complete macro
@@ -2049,8 +2073,10 @@ public class BytecodeMethod implements SignatureSet {
                     b.append(");\n");
                 }
             } else {
-                b.append("    struct elementStruct*").append(volatileLocals ? " volatile" : "")
-                        .append(" SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
+                // As CN1_DECLARE_SP: CN1_TRY_ENTRY restarts SP from cn1SpEntry.
+                b.append("    struct elementStruct* const cn1SpEntry CN1_UNUSED = &threadStateData->threadObjectStack[")
+                        .append("threadStateData->threadObjectStackOffset];\n")
+                        .append("    struct elementStruct* SP = cn1SpEntry;\n");
             }
             // Frame-exit retirement scope. Emitted here because `locals` exists from
             // the DEFINE_*_METHOD_STACK macro above, and because a declaration at the
@@ -2749,6 +2775,142 @@ public class BytecodeMethod implements SignatureSet {
         addInstruction(new MultiArray(desc, dims));
     }
     
+    /// The local slots live on entry to any exception handler, by a backward
+    /// liveness pass over the raw bytecode, where every handler is also a
+    /// successor of each instruction its range covers. Answers null -- "all of
+    /// them" -- for anything it does not model: JSR/RET, or an instruction kind
+    /// that is not plain bytecode and might touch a local.
+    private Set<Integer> computeHandlerLiveSlots() {
+        int n = instructions.size();
+        Map<Label, Integer> labelAt = new HashMap<Label, Integer>();
+        List<TryCatch> tries = new ArrayList<TryCatch>();
+        for (int i = 0; i < n; i++) {
+            Instruction ins = instructions.get(i);
+            if (ins instanceof LabelInstruction) {
+                labelAt.put(((LabelInstruction) ins).getLabel(), i);
+            } else if (ins instanceof TryCatch) {
+                tries.add((TryCatch) ins);
+            }
+        }
+        if (tries.isEmpty()) {
+            return new HashSet<Integer>();
+        }
+        int[] handlerOf = new int[tries.size()];
+        int[] fromOf = new int[tries.size()];
+        int[] toOf = new int[tries.size()];
+        for (int t = 0; t < tries.size(); t++) {
+            Integer h = labelAt.get(tries.get(t).getHandler());
+            Integer a = labelAt.get(tries.get(t).getStart());
+            Integer z = labelAt.get(tries.get(t).getEnd());
+            if (h == null || a == null || z == null) {
+                return null;
+            }
+            handlerOf[t] = h;
+            fromOf[t] = a;
+            toOf[t] = z;
+        }
+        int[][] succ = new int[n][];
+        int[] use = new int[n];
+        int[] def = new int[n];
+        for (int i = 0; i < n; i++) {
+            Instruction ins = instructions.get(i);
+            use[i] = -1;
+            def[i] = -1;
+            int[] next = i + 1 < n ? new int[] {i + 1} : new int[0];
+            if (ins instanceof VarOp) {
+                int op = ins.getOpcode();
+                int v = ((VarOp) ins).getIndex();
+                if (op == Opcodes.RET) {
+                    return null;
+                }
+                if (op >= Opcodes.ILOAD && op <= Opcodes.ALOAD) {
+                    use[i] = v;
+                } else if (op >= Opcodes.ISTORE && op <= Opcodes.ASTORE) {
+                    def[i] = v;
+                } else {
+                    return null;
+                }
+            } else if (ins instanceof IInc) {
+                use[i] = ((IInc) ins).getVar();
+            } else if (ins instanceof Jump) {
+                int op = ins.getOpcode();
+                if (op == Opcodes.JSR) {
+                    return null;
+                }
+                Integer target = labelAt.get(((Jump) ins).getLabel());
+                if (target == null) {
+                    return null;
+                }
+                next = op == Opcodes.GOTO ? new int[] {target}
+                        : (i + 1 < n ? new int[] {i + 1, target} : new int[] {target});
+            } else if (ins instanceof SwitchInstruction) {
+                SwitchInstruction sw = (SwitchInstruction) ins;
+                Label[] ls = sw.getLabels();
+                next = new int[ls.length + 1];
+                Integer d = labelAt.get(sw.getDefaultLabel());
+                if (d == null) {
+                    return null;
+                }
+                next[0] = d;
+                for (int k = 0; k < ls.length; k++) {
+                    Integer target = labelAt.get(ls[k]);
+                    if (target == null) {
+                        return null;
+                    }
+                    next[k + 1] = target;
+                }
+            } else if (ins instanceof BasicInstruction) {
+                int op = ins.getOpcode();
+                if ((op >= Opcodes.IRETURN && op <= Opcodes.RETURN) || op == Opcodes.ATHROW) {
+                    next = new int[0];
+                }
+            } else if (!(ins instanceof LabelInstruction || ins instanceof TryCatch
+                    || ins instanceof LineNumber || ins instanceof Invoke
+                    || ins instanceof Field || ins instanceof TypeInstruction
+                    || ins instanceof Ldc || ins instanceof MultiArray)) {
+                return null;
+            }
+            succ[i] = next;
+        }
+        // live[i]: slots live on entry to instruction i. A slot read in a handler
+        // must survive anywhere that handler can be entered from, which is the
+        // handler's own live-in set joined unkilled into each covered instruction.
+        List<Set<Integer>> live = new ArrayList<Set<Integer>>(n);
+        for (int i = 0; i < n; i++) {
+            live.add(new HashSet<Integer>());
+        }
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (int i = n - 1; i >= 0; i--) {
+                Set<Integer> in = new HashSet<Integer>();
+                for (int s : succ[i]) {
+                    in.addAll(live.get(s));
+                }
+                if (def[i] >= 0) {
+                    in.remove(def[i]);
+                }
+                if (use[i] >= 0) {
+                    in.add(use[i]);
+                }
+                for (int t = 0; t < handlerOf.length; t++) {
+                    if (i >= fromOf[t] && i < toOf[t]) {
+                        in.addAll(live.get(handlerOf[t]));
+                    }
+                }
+                if (!in.equals(live.get(i))) {
+                    live.set(i, in);
+                    changed = true;
+                }
+            }
+        }
+        Set<Integer> out = new HashSet<Integer>();
+        for (int h : handlerOf) {
+            out.addAll(live.get(h));
+        }
+        return out;
+    }
+
     public void addTryCatchBlock(Label start, Label end, Label handler, String type) {
         addInstruction(new TryCatch(start, end, handler, type));
     }
@@ -3817,7 +3979,8 @@ public class BytecodeMethod implements SignatureSet {
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0;\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers;\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess;\n");
-        b.append("        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __tryJmp, sizeof(jmp_buf));\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &__tryJmp;\n");
+        b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].handler = 1;\n");
         b.append("        threadStateData->tryBlockOffset++;\n");
         // Emit the actual call
         b.append("        ");
@@ -4170,6 +4333,150 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     private static final int[] NO_HANDLERS = new int[0];
+
+    /**
+     * Bounds checks for a run of constant-index loads of one array, such as the
+     * {@code b[0] & 0xff | (b[1] & 0xff) << 8 | ...} that reads a little-endian word:
+     * the first load checks the run's highest index and the rest are marked safe.
+     *
+     * Checked one at a time, each load carried a cold path that rejoined the fast
+     * one, so clang reloaded the array's length and data offset before every byte
+     * and could not fuse eight adjacent byte loads into one 64-bit load: BLAKE2b's
+     * 128 message bytes cost about 640 instructions where C spends 16 loads.
+     *
+     * Moving a check earlier is only invisible to the program if nothing it could
+     * observe happens in between, so a run is accepted only when
+     * <ul>
+     * <li>the method has no exception handler and no switch (a handler could read
+     *     a local written inside the run; a switch is control flow not modelled);</li>
+     * <li>the indices are non-negative constants, ascending by exactly one, on one
+     *     array local that nothing in the run writes;</li>
+     * <li>everything else in the run is a local load or a primitive local store, a
+     *     constant, a conversion, or arithmetic that cannot throw (no integer
+     *     division), and every label in it is the target of nothing.</li>
+     * </ul>
+     * Then a failure anywhere in the run is the first load at or past
+     * {@code length}, which {@code CN1_ARRAY_RUN_GUARD} reports with that index, and
+     * no write the program could see happened before it.
+     */
+    void analyzeConstantIndexRuns() {
+        if (DISABLE_BCE || isDisableNullAndArrayBoundsChecks()) {
+            return;
+        }
+        java.util.ArrayList<Instruction> r = new java.util.ArrayList<Instruction>(instructions.size());
+        java.util.HashSet<Label> targets = new java.util.HashSet<Label>();
+        for (Instruction in : instructions) {
+            if (in instanceof TryCatch || in instanceof SwitchInstruction || in instanceof CustomJump) {
+                return;
+            }
+            if (in instanceof LineNumber) {
+                continue;
+            }
+            if (in instanceof Jump) {
+                targets.add(((Jump) in).getLabel());
+            }
+            r.add(in);
+        }
+        int n = r.size();
+        for (int i = 2; i < n; i++) {
+            int arr = runLoadArray(r, i);
+            if (arr < 0) {
+                continue;
+            }
+            int first = runConstIndex(r.get(i - 1));
+            int last = first;
+            int lastLoad = i;
+            java.util.ArrayList<Instruction> members = new java.util.ArrayList<Instruction>();
+            members.add(r.get(i));
+            for (int j = i + 1; j < n; j++) {
+                Instruction x = r.get(j);
+                if (runLoadArray(r, j) == arr && j - 2 > lastLoad && runConstIndex(r.get(j - 1)) == last + 1) {
+                    members.add(x);
+                    last++;
+                    lastLoad = j;
+                    continue;
+                }
+                if (!runNeutral(x, arr, targets)) {
+                    break;
+                }
+            }
+            if (members.size() > 1) {
+                members.get(0).setRunGuardBound(last);
+                for (int m = 1; m < members.size(); m++) {
+                    members.get(m).markBoundsSafe();
+                }
+            }
+            i = lastLoad;
+        }
+    }
+
+    // The array local a constant-index load at k reads ({@code ALOAD a; <const>;
+    // xALOAD}), or -1 when the instruction at k is not one.
+    private static int runLoadArray(java.util.List<Instruction> r, int k) {
+        if (k < 2 || !bceIsArrayLoadOpcode(r.get(k).getOpcode()) || r.get(k).isBoundsSafe()) {
+            return -1;
+        }
+        Instruction a = r.get(k - 2);
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || runConstIndex(r.get(k - 1)) < 0) {
+            return -1;
+        }
+        return ((VarOp) a).getIndex();
+    }
+
+    // The value of a non-negative int constant instruction, or -1.
+    private static int runConstIndex(Instruction x) {
+        int op = x.getOpcode();
+        if (op >= Opcodes.ICONST_0 && op <= Opcodes.ICONST_5) {
+            return op - Opcodes.ICONST_0;
+        }
+        if (op == Opcodes.BIPUSH || op == Opcodes.SIPUSH) {
+            // The parser makes these VarOps (the operand is their "index"); a
+            // BasicInstruction carries it as its value.
+            int v = x instanceof VarOp ? ((VarOp) x).getIndex()
+                    : x instanceof BasicInstruction ? ((BasicInstruction) x).getValue() : -1;
+            return v >= 0 ? v : -1;
+        }
+        return -1;
+    }
+
+    // True for an instruction that can sit inside a run: it cannot throw, write
+    // anything but a primitive local, or transfer control.
+    private static boolean runNeutral(Instruction x, int arr, java.util.Set<Label> targets) {
+        if (x instanceof LabelInstruction) {
+            return !targets.contains(((LabelInstruction) x).getLabel());
+        }
+        int op = x.getOpcode();
+        if (x instanceof VarOp) {
+            if (op == Opcodes.BIPUSH || op == Opcodes.SIPUSH) {
+                return true;
+            }
+            if (op >= Opcodes.ILOAD && op <= Opcodes.ALOAD) {
+                return true;
+            }
+            return op >= Opcodes.ISTORE && op <= Opcodes.DSTORE;
+        }
+        if (x instanceof Ldc) {
+            Object v = ((Ldc) x).getValue();
+            return v instanceof Integer || v instanceof Long || v instanceof Float || v instanceof Double;
+        }
+        if (x instanceof IInc) {
+            return true;
+        }
+        if (!(x instanceof BasicInstruction)) {
+            return false;
+        }
+        if (op >= Opcodes.ACONST_NULL && op <= Opcodes.SIPUSH) {
+            return true;
+        }
+        switch (op) {
+            case Opcodes.IDIV: case Opcodes.LDIV: case Opcodes.IREM: case Opcodes.LREM:
+                return false;
+            default:
+                break;
+        }
+        // IADD..LXOR (arithmetic, shifts, bitwise) and I2L..I2S (conversions).
+        return op >= Opcodes.IADD && op <= Opcodes.I2S;
+    }
 
     // True if any exception landing pad sits in [from, to). Linear: a method has a
     // handful of handlers, and the alternative (a sorted array plus a binary search)
@@ -5316,6 +5623,11 @@ public class BytecodeMethod implements SignatureSet {
                 if (op == Opcodes.POP && cur == 0) {
                     break; // alias discarded on this path
                 }
+                if (op == Opcodes.CHECKCAST && cur >= 1) {
+                    // Casts a value above the ref, `sb.append((String) o)`:
+                    // the depth is unchanged and the ref is not touched.
+                    continue;
+                }
                 if (op == Opcodes.ASTORE && cur == 0 && c instanceof VarOp) {
                     int n = ((VarOp) c).getIndex();
                     if (storedLocal == -1) {
@@ -5579,6 +5891,50 @@ public class BytecodeMethod implements SignatureSet {
     // not write are zeroed explicitly by the emitter).
     // Conservative: any deviation from the shape leaves today's memset path.
     // ------------------------------------------------------------------
+    /**
+     * Drops the check from a CHECKCAST whose outcome the code right before it has
+     * already decided: {@code ALOAD n; INSTANCEOF T; IFEQ L; ALOAD n; CHECKCAST T},
+     * where the cast is reached only by falling through the IFEQ. Only line
+     * numbers and labels nothing jumps to may sit between the IFEQ and the second
+     * ALOAD; anything else -- a store, a call, a jump target -- leaves the cast
+     * checked. A null local fails the instanceof, so the cast never sees one.
+     */
+    private void elideProvenCasts() {
+        if (!ByteCodeTranslator.isCheckedCastsEnabled()) {
+            return;
+        }
+        int n = instructions.size();
+        for (int i = 0; i + 4 < n; i++) {
+            Instruction a = instructions.get(i);
+            if (a.getOpcode() != Opcodes.ALOAD || !(a instanceof VarOp)) {
+                continue;
+            }
+            Instruction io = instructions.get(i + 1);
+            Instruction jmp = instructions.get(i + 2);
+            if (io.getOpcode() != Opcodes.INSTANCEOF || !(io instanceof TypeInstruction)
+                    || jmp.getOpcode() != Opcodes.IFEQ || !(jmp instanceof Jump)) {
+                continue;
+            }
+            int j = i + 3;
+            while (j < n && (instructions.get(j) instanceof LineNumber
+                    || instructions.get(j) instanceof LabelInstruction
+                    && !LabelInstruction.isJumpTarget(((LabelInstruction) instructions.get(j)).getLabel()))) {
+                j++;
+            }
+            if (j + 1 >= n) {
+                continue;
+            }
+            Instruction b = instructions.get(j);
+            Instruction cc = instructions.get(j + 1);
+            if (b.getOpcode() == Opcodes.ALOAD && b instanceof VarOp
+                    && ((VarOp) b).getIndex() == ((VarOp) a).getIndex()
+                    && cc.getOpcode() == Opcodes.CHECKCAST && cc instanceof TypeInstruction
+                    && ((TypeInstruction) cc).getTypeName().equals(((TypeInstruction) io).getTypeName())) {
+                ((TypeInstruction) cc).markProvenCast();
+            }
+        }
+    }
+
     private void markInitBeforePublish() {
         for (int idx = 0; idx < instructions.size(); idx++) {
             Instruction ins = instructions.get(idx);
@@ -6187,6 +6543,7 @@ public class BytecodeMethod implements SignatureSet {
         // (the reduction passes below fuse them into opaque CustomIntructions that
         // could hide a write and make the analysis unsound).
         analyzeBoundsChecks();
+        analyzeConstantIndexRuns();
 
         // Scalar-replace non-escaping primitive-only @StackAllocate objects. Runs
         // on the raw (pre-reduction) instruction list so the NEW/DUP/<init>/ASTORE
@@ -6211,6 +6568,10 @@ public class BytecodeMethod implements SignatureSet {
         // sites; the literal-arg folding below is suppressed for them so the
         // <init> stays a plain on-stack Invoke or a receiver-on-stack CustomInvoke.
         markInitBeforePublish();
+
+        // A checked cast that an instanceof of the same local has just proven costs a
+        // second instanceofFunction call for nothing; see elideProvenCasts.
+        elideProvenCasts();
 
         // Mark source lines whose every instruction is non-throwing/non-calling as
         // elidable (their per-line line-info store becomes a no-op in release --
@@ -6241,8 +6602,10 @@ public class BytecodeMethod implements SignatureSet {
                     // instruction here means TypeInstruction never gets to emit anything for it,
                     // so implementing the BC_CHECKCAST macro alone would have had no effect.
                     // Under -Dcn1.checkedCasts=true the instruction is kept, at the cost of the
-                    // optimizations this removal was protecting.
-                    if(ByteCodeTranslator.isCheckedCastsEnabled()) {
+                    // optimizations this removal was protecting -- except a cast an
+                    // instanceof has already proved, which is removed either way.
+                    if(ByteCodeTranslator.isCheckedCastsEnabled()
+                            && !(current instanceof TypeInstruction && ((TypeInstruction) current).isProvenCast())) {
                         break;
                     }
                     instructions.remove(iter);

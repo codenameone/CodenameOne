@@ -88,16 +88,8 @@ def _getstate(obj):
     state = getattr(obj, "__dict__", None) if _has_dict(t) else None
     if state is not None:
         state = dict(state) if len(state) else None
-    slots = _slotnames(t)
-    if slots:
-        slotstate = {}
-        for name in slots:
-            try:
-                slotstate[name] = getattr(obj, name)
-            except AttributeError:
-                pass
-        if slotstate:
-            return (state, slotstate)
+    # Slot values are not gathered: reading them by name is reflection, so a
+    # slotted class that must be copied or pickled defines __getstate__ itself.
     return state
 
 

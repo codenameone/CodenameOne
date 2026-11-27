@@ -1,0 +1,2 @@
+main:24 class Counting has no layout: its body binds __getattribute__
+main:6 class Fallback has no layout: its body binds __getattribute__

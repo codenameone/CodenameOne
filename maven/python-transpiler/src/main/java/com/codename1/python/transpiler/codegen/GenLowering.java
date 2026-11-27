@@ -27,6 +27,7 @@ import com.codename1.python.transpiler.api.PythonSyntaxError;
 import com.codename1.python.transpiler.ast.Node.Assign;
 import com.codename1.python.transpiler.ast.Node.Await;
 import com.codename1.python.transpiler.ast.Node.Break;
+import com.codename1.python.transpiler.ast.Node.Call;
 import com.codename1.python.transpiler.ast.Node.ClassDef;
 import com.codename1.python.transpiler.ast.Node.Continue;
 import com.codename1.python.transpiler.ast.Node.ExceptHandler;
@@ -45,14 +46,16 @@ import com.codename1.python.transpiler.ast.Node.WithItem;
 import com.codename1.python.transpiler.ast.Node.Yield;
 import com.codename1.python.transpiler.ast.Scope;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Lowers the body of a generator or coroutine into the `step` method of a
 /// `PyGenerator` subclass: a `switch (pc)` whose cases are the stretches of
 /// the body between suspension points.
 ///
 /// A statement that cannot suspend (and does not jump out of a lowered loop
-/// or `finally`) is emitted by the [Emitter] as it would be anywhere else; the
+/// or `finally`) is emitted by the [GenTarget] as it would be anywhere else; the
 /// rest become states. Exceptions are routed by a table: every state records
 /// the state that handles an exception raised in it (an `except` dispatch, a
 /// `finally`, or none), and the `catch` around the `switch` jumps there with
@@ -69,7 +72,7 @@ final class GenLowering {
 
     private static final int IND = 5;
 
-    private final Emitter em;
+    private final GenTarget em;
     private final String file;
     private final Linearize lin;
     private final StringBuilder fields = new StringBuilder(); //NOPMD AvoidStringBufferField - the generator's output
@@ -111,8 +114,11 @@ final class GenLowering {
 
     /// Whether this is an async generator, whose yields are wrapped.
     boolean asyncGen;
+    /// Whether this is a plain (not async) generator, whose body may resume
+    /// another generator flat outside a handler (see `PyGenerator.nextFlat`).
+    boolean plain;
 
-    GenLowering(Emitter em, String file, Scope scope) {
+    GenLowering(GenTarget em, String file, Scope scope) {
         this.em = em;
         this.file = file;
         this.lin = new Linearize(file, scope);
@@ -131,19 +137,7 @@ final class GenLowering {
         line("    pc = -1;");
         line("    return Py.NONE;");
         line("}");
-        StringBuilder r = new StringBuilder();
-        r.append("                d$: while (true) {\n");
-        r.append("                    try {\n");
-        r.append("                        switch (pc) {\n");
-        r.append(out);
-        r.append("                            }\n");
-        r.append("                            default:\n");
-        r.append("                                throw new IllegalStateException();\n");
-        r.append("                        }\n");
-        r.append("                    } catch (Throwable t$) {\n");
-        r.append("                        final PyException x$ = Py.convert(t$);\n");
-        r.append("                        switch (pc) {\n");
-        boolean any = false;
+        StringBuilder handlers = new StringBuilder();
         for (int h = 0; h < handlerOf.size(); h++) {
             StringBuilder labels = new StringBuilder();
             for (int s = 0; s < handlerOf.size(); s++) {
@@ -152,19 +146,130 @@ final class GenLowering {
                 }
             }
             if (labels.length() > 0) {
-                any = true;
-                r.append(labels).append("                                pc = ").append(h).append(";\n")
+                handlers.append(labels).append("                                pc = ").append(h).append(";\n")
                         .append("                                break;\n");
             }
         }
-        r.append("                            default:\n");
-        r.append("                                throw x$;\n");
-        r.append("                        }\n");
+        StringBuilder r = new StringBuilder();
+        // A body with no except or finally has nothing to route an exception
+        // to, and gets no try: on ParparVM every try costs a setjmp on entry,
+        // which a generator pays on every resumption. What escapes is a Java
+        // exception only where a call raised one, and resume() and the caller
+        // see it exactly as they see one from any other call.
+        boolean any = handlers.length() > 0;
         if (any) {
-            r.append("                        exc = x$;\n");
+            // The try is outside the dispatch loop, not inside it: every jump
+            // between states is a `continue d$`, and with the try in the loop
+            // each one entered it again -- a setjmp per state transition,
+            // several per resumption of a loop with an except in it. Here it
+            // is entered once per resumption and once more after each caught
+            // exception, which the outer loop routes back to the dispatch.
+            // The store before the dispatch loop is not idle: javac starts the
+            // try range at the loop head when nothing precedes it, and
+            // ParparVM sets the handler up at the range's first instruction,
+            // so every `continue d$` would jump back over the setjmp again.
+            r.append("                int entry$ = 0;\n");
+            r.append("                while (true) {\n");
+            r.append("                    try {\n");
+            r.append("                        entry$++;\n");
         }
-        r.append("                    }\n");
+        r.append("                d$: while (true) {\n");
+        r.append("                        switch (pc) {\n");
+        r.append(threadJumps(out.toString()));
+        r.append("                            }\n");
+        r.append("                            default:\n");
+        r.append("                                throw new IllegalStateException();\n");
+        r.append("                        }\n");
         r.append("                }\n");
+        if (any) {
+            r.append("                    } catch (Throwable t$) {\n");
+            r.append("                        final PyException x$ = Py.convert(t$);\n");
+            r.append("                        switch (pc) {\n");
+            r.append(handlers);
+            r.append("                            default:\n");
+            r.append("                                throw x$;\n");
+            r.append("                        }\n");
+            r.append("                        exc = x$;\n");
+            r.append("                    }\n");
+            r.append("                }\n");
+        }
+        return r.toString();
+    }
+
+    /// `True`, whose test the lowering need not emit: `while True:` and the
+    /// `if True:` the linearizer writes for a `try` it removed.
+    private static boolean alwaysTrue(Expr e) {
+        return e instanceof com.codename1.python.transpiler.ast.Node.Constant
+                && ((com.codename1.python.transpiler.ast.Node.Constant) e).kind
+                == com.codename1.python.transpiler.ast.Node.Constant.Kind.TRUE;
+    }
+
+    private static final String CASE = "                            case ";
+    private static final String JUMP = "if (true) { pc = ";
+    private static final String JUMP_END = "; continue d$; }";
+
+    /// Retargets every jump through the states whose whole body is one
+    /// unconditional jump, and drops the jumps behind a test that is never
+    /// false (`if (!(true)) ...`). The lowering opens a state per join point,
+    /// so a loop's back edge went through two or three of them, a trip round
+    /// the dispatch switch each (bs4's `ElementFilter.filter` took four per
+    /// element). Every state is kept: resumption and the handlers enter
+    /// states by number, and a state no jump names any more is just never
+    /// entered that way.
+    static String threadJumps(String out) {
+        String[] lines = out.split("\n", -1);
+        Map<Integer, Integer> forward = new HashMap<Integer, Integer>();
+        int state = -1;
+        int target = -1;
+        int body = 0;
+        for (String l : lines) {
+            if (l.startsWith(CASE) && l.endsWith(": {")) {
+                if (state >= 0 && body == 1 && target >= 0) {
+                    forward.put(Integer.valueOf(state), Integer.valueOf(target));
+                }
+                state = Integer.parseInt(l.substring(CASE.length(), l.length() - 3));
+                target = -1;
+                body = 0;
+                continue;
+            }
+            String t = l.trim();
+            // The case's own closing brace, which begin() writes before the
+            // next case, is not part of its body.
+            if (t.isEmpty() || t.startsWith("/* line ") || "                            }".equals(l)
+                    || t.startsWith("if (!(true)) ")) {
+                continue;
+            }
+            body++;
+            target = t.startsWith(JUMP) && t.endsWith(JUMP_END) ? Integer.parseInt(t.substring(JUMP.length(),
+                    t.length() - JUMP_END.length())) : -1;
+        }
+        StringBuilder r = new StringBuilder(out.length());
+        for (int i = 0; i < lines.length; i++) {
+            String l = lines[i];
+            if (l.trim().startsWith("if (!(true)) ")) {
+                continue;
+            }
+            int at = l.indexOf("pc = ");
+            int end = at < 0 ? -1 : l.indexOf("; continue d$;", at);
+            if (end > 0) {
+                String n = l.substring(at + 5, end);
+                if (!n.isEmpty() && Character.isDigit(n.charAt(0)) && n.chars().allMatch(Character::isDigit)) {
+                    int s = Integer.parseInt(n);
+                    for (int k = 0; k < forward.size() + 1; k++) {
+                        Integer f = forward.get(Integer.valueOf(s));
+                        if (f == null) {
+                            break;
+                        }
+                        s = f.intValue();
+                    }
+                    l = l.substring(0, at + 5) + s + l.substring(end);
+                }
+            }
+            r.append(l);
+            if (i < lines.length - 1) {
+                r.append('\n');
+            }
+        }
         return r.toString();
     }
 
@@ -277,6 +382,17 @@ final class GenLowering {
 
     private void stmt(Stmt s) {
         if (!lowered(s)) {
+            if (flat() && s instanceof Assign && ((Assign) s).targets.size() == 1
+                    && ((Assign) s).value instanceof Call && Emitter.nextOrStop((Call) ((Assign) s).value)) {
+                // The same flat resumption as the suspending form below, for
+                // the `x = next(it)` a generator's own loop makes without a
+                // yield in it (bs4's ElementFilter.filter): it went through
+                // Builtins.nextOrStop and the inner generator's setjmp.
+                Call c = (Call) ((Assign) s).value;
+                em.store(((Assign) s).targets.get(0), "nextOrStopFlat(" + em.expr(c.args.get(0)) + ", "
+                        + em.expr(c.args.get(1)) + ")", out, IND + 2);
+                return;
+            }
             em.stmt(s, out, IND + 2);
             return;
         }
@@ -287,11 +403,29 @@ final class GenLowering {
         }
         if (s instanceof ExprStmt) {
             suspend(((ExprStmt) s).value);
-            line("noop(" + result(((ExprStmt) s).value) + ");");
+            Expr ev = ((ExprStmt) s).value;
+            if (ev instanceof Yield && !((Yield) ev).from) {
+                // A yield whose value is unused: resumed() only matters when
+                // something was sent or thrown in, so test that inline first.
+                line("if (thrown != null || sent != Py.NONE) noop(resumed());");
+            } else {
+                line("noop(" + result(ev) + ");");
+            }
         } else if (s instanceof Assign) {
             Assign a = (Assign) s;
             suspend(a.value);
-            String r = result(a.value);
+            String r;
+            if (flat() && a.value instanceof Call && Emitter.nextOrStop((Call) a.value)) {
+                // The desugared `try: x = next(it) except StopIteration`
+                // outside any handler: a plain generator is resumed flat, as a
+                // for loop over it would be, instead of through resume()'s
+                // setjmp. bs4's ElementFilter.filter does this for every
+                // element find_parent looks at.
+                Call c = (Call) a.value;
+                r = "nextOrStopFlat(" + em.expr(c.args.get(0)) + ", " + em.expr(c.args.get(1)) + ")";
+            } else {
+                r = result(a.value);
+            }
             if (a.targets.size() == 1) {
                 em.store(a.targets.get(0), r, out, IND + 2);
             } else {
@@ -367,10 +501,17 @@ final class GenLowering {
         int k = newState();
         jump(k);
         begin(k);
-        line("final Object r$ = delegateStep();");
+        line("final Object r$ = " + (flat() ? "delegateStepFlat();" : "delegateStep();"));
         line("if (r$ != null) {");
         line("    return r$;");
         line("}");
+    }
+
+    /// Whether a generator resumed here may skip its own handler: nothing in
+    /// this body catches what it raises, so it reaches the `resume` that
+    /// finishes it.
+    private boolean flat() {
+        return plain && handler < 0;
     }
 
     /// Awaits `java`, an awaitable, inside the current state sequence; the
@@ -417,7 +558,9 @@ final class GenLowering {
     private void ifStmt(If s) {
         int end = newState();
         int els = s.orelse.isEmpty() ? end : newState();
-        line("if (!(" + em.cond(s.test) + ")) " + goTo(els));
+        if (!alwaysTrue(s.test)) {
+            line("if (!(" + em.cond(s.test) + ")) " + goTo(els));
+        }
         block(s.body);
         jump(end);
         if (!s.orelse.isEmpty()) {
@@ -434,7 +577,9 @@ final class GenLowering {
         int els = w.orelse.isEmpty() ? end : newState();
         jump(top);
         begin(top);
-        line("if (!(" + em.cond(w.test) + ")) " + goTo(els));
+        if (!alwaysTrue(w.test)) {
+            line("if (!(" + em.cond(w.test) + ")) " + goTo(els));
+        }
         loops.add(new Loop(end, top, fins.size()));
         block(w.body);
         loops.remove(loops.size() - 1);
@@ -476,7 +621,7 @@ final class GenLowering {
             line(it + " = Py.iter(" + em.expr(f.iter) + ");");
             jump(top);
             begin(top);
-            line("final Object " + x + " = " + it + ".next();");
+            line("final Object " + x + " = " + (flat() ? "nextFlat(" + it + ")" : it + ".next()") + ";");
             line("if (" + x + " == null) " + goTo(els));
         }
         em.store(f.target, x, out, IND + 2);
@@ -580,9 +725,9 @@ final class GenLowering {
                 if (h.name != null) {
                     em.storeName(h.name, e + ".value", out, IND + 2);
                 }
-                em.handlers.add(e);
+                em.handlers().add(e);
                 block(h.body);
-                em.handlers.remove(em.handlers.size() - 1);
+                em.handlers().remove(em.handlers().size() - 1);
                 if (h.name != null) {
                     line(em.nameLvalue(h.name) + " = null;");
                 }

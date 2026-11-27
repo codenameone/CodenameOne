@@ -1,0 +1,3 @@
+main:19 add_argument(...) whose destination the build cannot read (a computed option string or dest, *args or **kwargs) on a parser that reaches parse_args or parse_known_args; write the option strings and dest= as literals
+main:21 add_argument(...) whose destination the build cannot read (a computed option string or dest, *args or **kwargs) on a parser that reaches parse_args or parse_known_args; write the option strings and dest= as literals
+main:27 add_argument(...) whose destination the build cannot read (a computed option string or dest, *args or **kwargs) on a parser that reaches parse_args or parse_known_args; write the option strings and dest= as literals

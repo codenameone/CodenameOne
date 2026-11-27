@@ -7,6 +7,8 @@ WRAPPER_ASSIGNMENTS = ("__module__", "__name__", "__qualname__", "__doc__")
 WRAPPER_UPDATES = ("__dict__",)
 _MISSING = object()
 
+from _cn1functools import _lru_cache_wrapper
+
 
 def reduce(function, iterable, initial=_MISSING):
     it = iter(iterable)
@@ -23,6 +25,7 @@ def reduce(function, iterable, initial=_MISSING):
 
 
 class partial:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, func, *args, **keywords):
         if not callable(func):
             raise TypeError("the first argument must be callable")
@@ -56,13 +59,38 @@ class partial:
 
 
 def update_wrapper(wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES):
+    # Each attribute by its own name: a computed getattr/setattr cannot be
+    # typed, and these are the only names a wrapper is given. A name
+    # outside them is refused rather than copied blind.
     for attr in assigned:
+        if attr not in WRAPPER_ASSIGNMENTS:
+            raise TypeError("update_wrapper copies only " + repr(WRAPPER_ASSIGNMENTS))
+    for attr in updated:
+        if attr not in WRAPPER_UPDATES:
+            raise TypeError("update_wrapper updates only " + repr(WRAPPER_UPDATES))
+    if "__module__" in assigned:
         try:
-            value = getattr(wrapped, attr)
-        except AttributeError:
-            continue
+            wrapper.__module__ = wrapped.__module__
+        except (AttributeError, TypeError):
+            pass
+    if "__name__" in assigned:
         try:
-            setattr(wrapper, attr, value)
+            wrapper.__name__ = wrapped.__name__
+        except (AttributeError, TypeError):
+            pass
+    if "__qualname__" in assigned:
+        try:
+            wrapper.__qualname__ = wrapped.__qualname__
+        except (AttributeError, TypeError):
+            pass
+    if "__doc__" in assigned:
+        try:
+            wrapper.__doc__ = wrapped.__doc__
+        except (AttributeError, TypeError):
+            pass
+    if "__dict__" in updated:
+        try:
+            wrapper.__dict__.update(wrapped.__dict__)
         except (AttributeError, TypeError):
             pass
     wrapper.__wrapped__ = wrapped
@@ -101,26 +129,37 @@ def cmp_to_key(mycmp):
     return K
 
 
+def _own(own, base):
+    return own is not None and own is not base
+
+
 def total_ordering(cls):
-    def has(name):
-        own = cls.__dict__.get(name)
-        return own is not None and own is not getattr(object, name, None)
-    roots = [op for op in ("__lt__", "__le__", "__gt__", "__ge__") if has(op)]
+    # Every name is written out: no getattr or setattr with a computed name.
+    d = cls.__dict__
+    roots = []
+    if _own(d.get("__lt__"), getattr(object, "__lt__", None)):
+        roots.append("__lt__")
+    if _own(d.get("__le__"), getattr(object, "__le__", None)):
+        roots.append("__le__")
+    if _own(d.get("__gt__"), getattr(object, "__gt__", None)):
+        roots.append("__gt__")
+    if _own(d.get("__ge__"), getattr(object, "__ge__", None)):
+        roots.append("__ge__")
     if not roots:
         raise ValueError("must define at least one ordering operation: < > <= >=")
     root = roots[0]
 
     def lt_from(self, other):
-        r = getattr(self, root)(other)
-        if r is NotImplemented:
-            return r
         if root == "__lt__":
-            return r
+            return self.__lt__(other)
         if root == "__le__":
-            return r and self != other
+            r = self.__le__(other)
+            return r if r is NotImplemented else (r and self != other)
         if root == "__gt__":
-            return not r and self != other
-        return not r
+            r = self.__gt__(other)
+            return r if r is NotImplemented else (not r and self != other)
+        r = self.__ge__(other)
+        return r if r is NotImplemented else not r
 
     def le(self, other):
         r = lt_from(self, other)
@@ -134,9 +173,14 @@ def total_ordering(cls):
         r = lt_from(self, other)
         return r if r is NotImplemented else not r
 
-    for name, fn in (("__lt__", lt_from), ("__le__", le), ("__gt__", gt), ("__ge__", ge)):
-        if name not in roots:
-            setattr(cls, name, fn)
+    if "__lt__" not in roots:
+        cls.__lt__ = lt_from
+    if "__le__" not in roots:
+        cls.__le__ = le
+    if "__gt__" not in roots:
+        cls.__gt__ = gt
+    if "__ge__" not in roots:
+        cls.__ge__ = ge
     return cls
 
 
@@ -144,28 +188,25 @@ class _CacheInfo(tuple):
     def __new__(cls, hits, misses, maxsize, currsize):
         return tuple.__new__(cls, (hits, misses, maxsize, currsize))
 
-    hits = property(lambda self: self[0])
-    misses = property(lambda self: self[1])
-    maxsize = property(lambda self: self[2])
-    currsize = property(lambda self: self[3])
+    @property
+    def hits(self):
+        return self[0]
+
+    @property
+    def misses(self):
+        return self[1]
+
+    @property
+    def maxsize(self):
+        return self[2]
+
+    @property
+    def currsize(self):
+        return self[3]
+
 
     def __repr__(self):
         return "CacheInfo(hits=%r, misses=%r, maxsize=%r, currsize=%r)" % tuple(self)
-
-
-def _make_key(args, kwds, typed):
-    key = args
-    if kwds:
-        key = key + (_MISSING,)
-        for item in kwds.items():
-            key = key + item
-    if typed:
-        key = key + tuple(type(v) for v in args)
-        if kwds:
-            key = key + tuple(type(v) for v in kwds.values())
-    elif len(key) == 1 and type(key[0]) in (int, str):
-        return key[0]
-    return key
 
 
 def lru_cache(maxsize=128, typed=False):
@@ -175,34 +216,8 @@ def lru_cache(maxsize=128, typed=False):
         maxsize = 0
 
     def decorating(user_function):
-        cache = {}
-        stats = [0, 0]
-
-        def wrapper(*args, **kwds):
-            key = _make_key(args, kwds, typed)
-            if key in cache:
-                stats[0] += 1
-                result = cache.pop(key)
-                cache[key] = result
-                return result
-            stats[1] += 1
-            result = user_function(*args, **kwds)
-            if maxsize != 0:
-                cache[key] = result
-                if maxsize is not None and len(cache) > maxsize:
-                    del cache[next(iter(cache))]
-            return result
-
-        def cache_info():
-            return _CacheInfo(stats[0], stats[1], maxsize, len(cache))
-
-        def cache_clear():
-            cache.clear()
-            stats[0] = 0
-            stats[1] = 0
-
-        wrapper.cache_info = cache_info
-        wrapper.cache_clear = cache_clear
+        wrapper = _lru_cache_wrapper(user_function, maxsize, typed, _CacheInfo)
+        wrapper.cache_parameters = lambda: {"maxsize": maxsize, "typed": typed}
         return update_wrapper(wrapper, user_function)
     return decorating
 
@@ -212,6 +227,7 @@ def cache(user_function):
 
 
 class cached_property:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, func):
         self.func = func
         self.attrname = None
