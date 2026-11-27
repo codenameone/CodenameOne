@@ -1,0 +1,525 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.merchant;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codenameone.examples.bazaar.api.StoreRoleDto;
+import com.codenameone.examples.bazaar.live.LiveChannel;
+import com.codenameone.examples.bazaar.ui.DesktopActions;
+import com.codenameone.examples.bazaar.ui.Lang;
+import com.codenameone.examples.bazaar.ui.Layouts;
+import com.codenameone.examples.bazaar.ui.Ui;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import com.codename1.ui.geom.Dimension;
+
+/// A merchant section: a bar with the store switcher, the section's title and
+/// its actions, over the section's content.
+///
+/// Detail screens open over the content: on a wide screen inside the pane,
+/// with a back arrow in the bar and the sidebar still beside it; on a phone as
+/// a screen of their own. Every pane claims the desktop menu actions it
+/// supports while it is shown and gives them up when it goes, and listens to
+/// the live channel for orders and stock.
+abstract class MerchantPane extends Container {
+    private final Runnable storeChanged = this::storeChanged;
+    private final String title;
+    private final Container bar = new Container(new BorderLayout());
+    private final Container tools = new Container(new FlowLayout(Component.RIGHT));
+    private final Container body = new Container(new BorderLayout());
+    private final List<Object[]> stack = new ArrayList<Object[]>();
+    private final List<Form> screens = new ArrayList<Form>();
+    final boolean wide = Layouts.wide();
+    /// Whether a detail opens beside the list instead of over it.
+    private final boolean split = Layouts.split() && splits();
+    private boolean loaded;
+    /// A tablet: a phone's tab bar and title bar, but room enough that the
+    /// section's actions and the store switcher sit in the title bar instead
+    /// of a row of their own under it, which was a near-empty strip.
+    private final boolean inTitle = Layouts.split() && !wide;
+    /// What the title bar shows on a tablet: the section's name, and its
+    /// actions at the end.
+    private final Container titleBox = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE)) {
+        @Override
+        protected Dimension calcPreferredSize() {
+            // The title bar centres what it is given at its own width; the
+            // whole width puts the actions at the end, not beside the title.
+            Dimension d = super.calcPreferredSize();
+            return new Dimension(CN.getDisplayWidth(), d.getHeight());
+        }
+
+        @Override
+        public void layoutContainer() {
+            super.layoutContainer();
+            // The bar gives this box what its own menu leaves, so centring in
+            // the box put the title left of the screen's centre. Move it to
+            // the screen's centre, short of the actions at the end.
+            Component t = ((BorderLayout) getLayout()).getCenter();
+            Component e = ((BorderLayout) getLayout()).getEast();
+            if (t == null) {
+                return;
+            }
+            int x = CN.getDisplayWidth() / 2 - getAbsoluteX() - t.getWidth() / 2;
+            int limit = (e == null ? getWidth() : e.getX()) - t.getWidth();
+            t.setX(Math.max(0, Math.min(x, limit)));
+        }
+    };
+
+    MerchantPane(String title, String name) {
+        super(new BorderLayout());
+        this.title = title;
+        setName(name);
+        setUIID("MeRoot");
+        bar.setUIID("MeBar");
+        tools.setUIID("Container");
+        add(BorderLayout.NORTH, bar);
+        add(BorderLayout.CENTER, body);
+        body.add(BorderLayout.CENTER, new com.codename1.appkit.Skeleton(6, "SvSkeleton"));
+        paintBar();
+    }
+
+    /// Fills the pane in for the current store. Called when the store is known,
+    /// when the owner switches stores and on Refresh.
+    abstract void load();
+
+    /// The section's content, replacing whatever is shown.
+    final void content(Component c) {
+        stack.clear();
+        c.remove();
+        body.removeAll();
+        body.add(BorderLayout.CENTER, c);
+        paintBar();
+        Ui.relayout(this);
+    }
+
+    /// Adds a button to the bar.
+    final Button tool(char icon, String text, String name, Runnable run) {
+        Button b = new Button(Lang.tr(text), "MeTool");
+        b.setName(name);
+        FontImage.setMaterialIcon(b, icon, 3.4f);
+        if (!wide) {
+            // On a phone the bar has room for icons only.
+            b.setText("");
+        }
+        b.addActionListener(e -> run.run());
+        if (!wide && tools.getComponentCount() >= PHONE_TOOLS) {
+            // A phone bar holds two icons and the store switcher; four or
+            // five icons in a row read as noise and crowd the switcher. The
+            // rest go, with their words, into one menu at the end.
+            if (overflow.isEmpty()) {
+                final Button more = new Button("", "MeTool");
+                more.setName("tools-more");
+                FontImage.setMaterialIcon(more, FontImage.MATERIAL_MORE_HORIZ, 3.4f);
+                more.getSemantics().setLabel(Lang.tr("More actions"));
+                more.addActionListener(e -> com.codename1.ui.ContextMenu.show(more,
+                        more.getWidth() / 2, more.getHeight(),
+                        overflow.toArray(new Command[overflow.size()])));
+                tools.add(more);
+            }
+            overflow.add(Command.create(Lang.tr(text), null, e -> run.run()));
+            return b;
+        }
+        if (!overflow.isEmpty()) {
+            tools.addComponent(tools.getComponentCount() - 1, b);
+        } else {
+            tools.add(b);
+        }
+        return b;
+    }
+
+    /// How many action icons a phone bar shows before the rest go into a menu.
+    private static final int PHONE_TOOLS = 2;
+
+    /// The actions a phone bar had no room for, in the order they were added.
+    private final java.util.List<Command> overflow = new java.util.ArrayList<Command>();
+
+    final void clearTools() {
+        tools.removeAll();
+        overflow.clear();
+    }
+
+    /// Opens a detail screen over the content.
+    ///
+    /// Beside the list, the screen stacks inside the detail pane, and Back
+    /// comes back to what was under it.
+    final void push(String heading, Component detail) {
+        if (split && root != null) {
+            stack.add(new Object[] {heading, detail});
+            beside(detail);
+            return;
+        }
+        if (wide) {
+            stack.add(new Object[] {heading, detail});
+            body.removeAll();
+            body.add(BorderLayout.CENTER, detail);
+            paintBar();
+            Ui.relayout(this);
+            return;
+        }
+        Form form = Ui.form(Lang.tr(heading), "merchant-detail");
+        Ui.back(form, this::pop);
+        form.add(BorderLayout.CENTER, detail);
+        Layouts.dress(form);
+        screens.add(form);
+        form.show();
+    }
+
+    /// Opens what a row of the list was picked for. Beside the list it replaces
+    /// whatever the detail pane held, so Back never walks through rows picked
+    /// before; elsewhere it is [#push(String, Component)].
+    final void pick(String heading, Component detail) {
+        if (split && root != null) {
+            stack.clear();
+        }
+        push(heading, detail);
+    }
+
+    /// What the detail pane shows beside the list before a row is picked.
+    Component emptyDetail() {
+        return Ui.empty(FontImage.MATERIAL_TOUCH_APP, "Nothing selected",
+                "Pick a row from the list to see it here.");
+    }
+
+    /// Goes back from the detail screen on top.
+    final void pop() {
+        if (split && root != null) {
+            if (stack.isEmpty()) {
+                return;
+            }
+            stack.remove(stack.size() - 1);
+            if (stack.isEmpty()) {
+                beside(emptyDetail());
+            } else {
+                beside((Component) stack.get(stack.size() - 1)[1]);
+            }
+            return;
+        }
+        if (wide) {
+            if (stack.isEmpty()) {
+                return;
+            }
+            stack.remove(stack.size() - 1);
+            body.removeAll();
+            if (stack.isEmpty()) {
+                body.add(BorderLayout.CENTER, root == null ? new Label() : root);
+            } else {
+                body.add(BorderLayout.CENTER, (Component) stack.get(stack.size() - 1)[1]);
+            }
+            paintBar();
+            Ui.relayout(this);
+            return;
+        }
+        if (!screens.isEmpty()) {
+            screens.remove(screens.size() - 1);
+        }
+        Form back = screens.isEmpty() ? getComponentForm() : screens.get(screens.size() - 1);
+        if (back != null) {
+            back.showBack();
+        }
+    }
+
+    /// Back to the list after a detail screen saved or deleted something.
+    final void popAll() {
+        if (split && root != null) {
+            stack.clear();
+            beside(emptyDetail());
+            return;
+        }
+        if (wide) {
+            while (!stack.isEmpty()) {
+                pop();
+            }
+            return;
+        }
+        screens.clear();
+        Form home = getComponentForm();
+        if (home != null && CN.getCurrentForm() != home) {
+            home.showBack();
+        }
+    }
+
+    private Component root;
+
+
+    /// Whether this section's root is a list whose rows open a detail, which
+    /// a wide screen shows beside it.
+    boolean splits() {
+        return false;
+    }
+
+    /// The list on the left, two fifths of the width, and `detail` beside it.
+    private void beside(Component detail) {
+        body.removeAll();
+        root.remove();
+        detail.remove();
+        Container side = new Container(new BorderLayout()) {
+            @Override
+            protected Dimension calcPreferredSize() {
+                Dimension d = super.calcPreferredSize();
+                int w = Math.max(CN.convertToPixels(55), MerchantPane.this.getWidth() * 2 / 5);
+                return new Dimension(w, d.getHeight());
+            }
+        };
+        side.setUIID("MeSplitList");
+        side.add(BorderLayout.CENTER, root);
+        Container pair = new Container(new BorderLayout());
+        pair.add(BorderLayout.WEST, side);
+        Container right = new Container(new BorderLayout());
+        right.setUIID("MeSplitDetail");
+        right.add(BorderLayout.CENTER, detail);
+        if (!stack.isEmpty()) {
+            // The back arrow and heading belong to the pane they go back in,
+            // not across the list beside it.
+            right.add(BorderLayout.NORTH, backRow());
+        }
+        pair.add(BorderLayout.CENTER, right);
+        body.add(BorderLayout.CENTER, pair);
+        paintBar();
+        Ui.relayout(this);
+    }
+
+    /// The section's own content, kept to come back to from a detail screen.
+    final void root(Component c) {
+        root = c;
+        content(c);
+        if (split) {
+            // Both panes from the start: the list, and an empty detail that
+            // says what picking a row will show.
+            beside(emptyDetail());
+        }
+    }
+
+    /// A back arrow and the heading of the detail on top of the stack.
+    private Container backRow() {
+        Container row = new Container(BoxLayout.x());
+        Button back = new Button("", "MeTool");
+        back.setName("merchant-back");
+        FontImage.setMaterialIcon(back, FontImage.MATERIAL_ARROW_BACK, 3.6f);
+        back.addActionListener(e -> pop());
+        row.add(back);
+        row.add(Ui.plain(Lang.tr((String) stack.get(stack.size() - 1)[0]), "MeTitle"));
+        return row;
+    }
+
+    private void paintBar() {
+        bar.removeAll();
+        Container start = new Container(BoxLayout.x());
+        if (wide && !(split && root != null) && !stack.isEmpty()) {
+            start.add(backRow());
+        } else if (wide) {
+            start.add(Ui.plain(Lang.tr(title), "MeTitle"));
+        }
+        // On a phone the form's toolbar already names the section, so the bar
+        // is only the section's action icons and the store switcher: a second,
+        // larger copy of the title under the toolbar said the same thing twice.
+        bar.add(BorderLayout.WEST, start);
+        Container end = new Container(BoxLayout.x());
+        if (inTitle) {
+            tools.remove();
+            end.add(tools);
+            Component sw = switcher();
+            if (sw != null) {
+                end.add(sw);
+            }
+            titleBox.removeAll();
+            titleBox.setUIID("Container");
+            titleBox.add(BorderLayout.CENTER, Ui.plain(Lang.tr(title), "Title"));
+            titleBox.add(BorderLayout.EAST, end);
+            // The bar is left only for a detail's back arrow and heading.
+            bar.setHidden(start.getComponentCount() == 0);
+            if (titleBox.getComponentForm() != null) {
+                titleBox.getComponentForm().getToolbar().revalidate();
+            }
+            return;
+        }
+        // The tools outlive the bar: they are still inside the previous
+        // repaint's container, which removeAll only took off the bar, and
+        // adding them again while they have a parent throws. A store change
+        // repaints the bar of a pane that is already showing.
+        tools.remove();
+        if (stack.isEmpty() || split) {
+            end.add(tools);
+        }
+        Component switcher = switcher();
+        if (switcher != null) {
+            end.add(switcher);
+        }
+        bar.add(BorderLayout.EAST, end);
+    }
+
+    /// The store switcher: a button with the store's name that lists the
+    /// merchant's other stores. Nothing when there is only one.
+    private Component switcher() {
+        final List<StoreRoleDto> stores = MerchantState.stores();
+        if (MerchantState.store() == null) {
+            return null;
+        }
+        // A phone has no room for the name beside the section title, so the
+        // switcher is the store icon there; its menu still names every store.
+        Button b = new Button(wide ? MerchantState.store().name() : "", "MeStore");
+        b.setName("store-switcher");
+        FontImage.setMaterialIcon(b, FontImage.MATERIAL_STORE, 3.2f);
+        if (stores.size() < 2) {
+            b.setEnabled(false);
+            return b;
+        }
+        b.addActionListener(e -> {
+            Command[] items = new Command[stores.size() + 1];
+            for (int iter = 0; iter < stores.size(); iter++) {
+                final StoreRoleDto s = stores.get(iter);
+                items[iter] = Command.create(s.store().name() + Ui.DOT + Lang.tr(Words.role(s.role())),
+                        null, ev -> MerchantState.use(s));
+            }
+            items[stores.size()] = Command.create(Lang.tr("Organization overview"), null,
+                    ev -> organization());
+            com.codename1.ui.ContextMenu.show(b, b.getWidth() / 2, b.getHeight(), items);
+        });
+        return b;
+    }
+
+    /// The organization overview: every store the merchant owns, with its orders and
+    /// sales, each in its own currency; a tap on a store switches to it.
+    private void organization() {
+        com.codenameone.examples.bazaar.net.Api.stores().organization(
+                com.codename1.appkit.Net.to(list -> {
+            final com.codename1.ui.Dialog d = new com.codename1.ui.Dialog(
+                    Lang.tr("Organization overview"), BoxLayout.y());
+            for (int iter = 0; iter < list.size(); iter++) {
+                final com.codenameone.examples.bazaar.api.StoreStatsDto s = list.get(iter);
+                // A row per store: its name over its orders and its sales in
+                // its own currency, the whole row one button. A dialog is
+                // narrow, so the sales share the second line with the orders.
+                Container line = Ui.row(FontImage.MATERIAL_STORE, s.name(),
+                        s.orders() + " " + Lang.tr("Orders") + Ui.DOT
+                        + com.codenameone.examples.bazaar.shop.Money.format(
+                                s.gmvCents(), s.currency(), ""), null);
+                // A packed dialog is exactly as wide as its widest row, so the
+                // row carries its own end inset or the name meets the edge.
+                line.setUIID("SvOrgRow");
+                Container row = Ui.tap(line, "org-" + s.handle(), e -> {
+                    d.dispose();
+                    List<StoreRoleDto> mine = MerchantState.stores();
+                    for (int k = 0; k < mine.size(); k++) {
+                        if (mine.get(k).store().id().equals(s.storeId())) {
+                            MerchantState.use(mine.get(k));
+                        }
+                    }
+                });
+                d.add(row);
+            }
+            d.setDisposeWhenPointerOutOfBounds(true);
+            d.showPacked(BorderLayout.CENTER, true);
+        }, (status, message) -> { }));
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        MerchantState.onStore(storeChanged);
+        claim();
+        if (inTitle) {
+            // The shell names the section in the title bar after it adds the
+            // section, so the title goes in once that is done.
+            CN.callSerially(() -> {
+                Form f = getComponentForm();
+                if (f != null && f.getToolbar() != null && titleBox.getParent() == null) {
+                    f.getToolbar().setTitleComponent(titleBox);
+                    f.getToolbar().revalidate();
+                }
+            });
+        }
+        if (!loaded) {
+            loaded = true;
+            MerchantState.whenReady(() -> {
+                paintBar();
+                load();
+            });
+        }
+    }
+
+    @Override
+    protected void deinitialize() {
+        MerchantState.offStore(storeChanged);
+        DesktopActions.clear(DesktopActions.FIND);
+        DesktopActions.clear(DesktopActions.REFRESH);
+        DesktopActions.clear(DesktopActions.EXPORT_CSV);
+        DesktopActions.clear(DesktopActions.IMPORT_CSV);
+        DesktopActions.clear(DesktopActions.NEW_PRODUCT);
+        DesktopActions.clear(DesktopActions.PRINT);
+        super.deinitialize();
+    }
+
+    /// Claims the desktop actions this pane supports. Panes add theirs by
+    /// overriding `actions` and calling `DesktopActions.set`.
+    private void claim() {
+        DesktopActions.set(DesktopActions.REFRESH, this::load);
+        DesktopActions.set(DesktopActions.FIND, this::find);
+        DesktopActions.set(DesktopActions.PRINT, () -> Ui.say("Nothing to print on this screen"));
+        actions();
+        LiveChannel.listen(new LiveChannel.Adapter() {
+            @Override
+            public void orderChanged(String id, String status) {
+                MerchantPane.this.orderChanged(id, status);
+            }
+
+            @Override
+            public void stockChanged(String variantId, String locationId) {
+                MerchantPane.this.stockChanged(variantId, locationId);
+            }
+
+            @Override
+            public void changed(String type, Map<String, Object> frame) {
+                MerchantPane.this.liveChanged(type, frame);
+            }
+        });
+    }
+
+    void actions() {
+    }
+
+    void find() {
+        Ui.say("Nothing to search on this screen");
+    }
+
+    void storeChanged() {
+        paintBar();
+        load();
+    }
+
+    void orderChanged(String id, String status) {
+    }
+
+    void stockChanged(String variantId, String locationId) {
+    }
+
+    /// Any other frame of the live channel (a cart reminded, for one).
+    void liveChanged(String type, Map<String, Object> frame) {
+    }
+}

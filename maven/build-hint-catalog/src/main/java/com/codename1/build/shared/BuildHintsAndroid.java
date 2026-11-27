@@ -155,6 +155,24 @@ final class BuildHintsAndroid {
                 .def("exit")
                 .platform("android"));
 
+        h.add(new Hint("android.debugGuard")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android"));
+
+        h.add(new Hint("android.debugGuard.checks")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("debugger")
+                .platform("android"));
+
+        h.add(new Hint("android.debugGuard.mode")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .def("exit")
+                .platform("android"));
+
         h.add(new Hint("android.activityClassBody")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
@@ -1203,16 +1221,21 @@ final class BuildHintsAndroid {
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
                 .platform("android")
-                .doc("Opts the build into Gradle 9. `9` builds with Gradle 9.8.0 and Android Gradle plugin "
-                        + "9.4.1 instead of the default Gradle 8 toolchain. An explicit 9.x release of 9.6.0 "
-                        + "or newer (the oldest Gradle that plugin runs on) is also accepted, with a difference "
-                        + "between where the build runs: a local build (`android-source`, or Gradle on your "
-                        + "machine) downloads and uses exactly that release, while the Codename One build "
-                        + "cloud has one Gradle 9 installed and builds every accepted 9.x value with its "
-                        + "Gradle 9.8.0. Older 9.x releases and Gradle 10 are refused. Kotlin sources are compiled "
-                        + "by the plugin's built-in Kotlin, so a hint that applies `kotlin-android` itself "
-                        + "fails on this path, and so does any Gradle plugin a hint adds that still uses the "
-                        + "variant API Android Gradle plugin 9 removed."));
+                .doc("Selects the Gradle the Android build runs. Unset, the build uses Gradle 9.8.0 with "
+                        + "Android Gradle plugin 9.4.1 when it can, and otherwise stays on the Gradle 8 "
+                        + "toolchain and says why in the build log: it stays there when `android.topDependency`, "
+                        + "`android.xgradle` or `android.gradlePlugin` adds a Gradle plugin other than "
+                        + "google-services (or one in a form the build can't read), applies `kotlin-android`, pins "
+                        + "google-services below 4.4, sets a non-numeric `maxSdkVersion` on `<uses-sdk>`, "
+                        + "uses Huawei push, turns off `android.useGradle8`, or sets `android.forceJava8Builder`. `8` keeps a build on Gradle "
+                        + "8 regardless. `9` asks for Gradle 9 explicitly, and fails the build with the "
+                        + "reason where an unset value would have fallen back. An explicit 9.x release of "
+                        + "9.6.0 or newer (the oldest Gradle that plugin runs on) is also accepted, with a "
+                        + "difference between where the build runs: a local build (`android-source`, or "
+                        + "Gradle on your machine) downloads and uses exactly that release, while the "
+                        + "Codename One build cloud has one Gradle 9 installed and builds every accepted "
+                        + "9.x value with its Gradle 9.8.0. Older 9.x releases and Gradle 10 are refused. "
+                        + "On Gradle 9, Kotlin sources are compiled by the plugin's built-in Kotlin."));
 
         h.add(new Hint("android.versionCode")
                 .group(HintGroup.ANDROID)

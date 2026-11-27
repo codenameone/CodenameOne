@@ -3563,6 +3563,43 @@
         "url": "https://dev.to/codenameone/windows-kiosks-and-command-line-tools-built-from-java-4mpb",
         "syndicated_at": "2026-11-25T14:18:58+00:00"
       }
+    },
+    "run-an-llm-on-the-phone": {
+      "hashnode": {
+        "url": "https://debugagent.com/run-an-llm-and-whisper-on-the-phone-with-no-server-bill",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b0784a04d0d3c774004f446",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-26T01:01:11+00:00"
+      },
+      "devto": {
+        "id": 5125265,
+        "url": "https://dev.to/codenameone/run-an-llm-and-whisper-on-the-phone-with-no-server-bill-d2m",
+        "syndicated_at": "2026-11-26T14:04:34+00:00"
+      }
+    },
+    "why-my-kids-are-learning-to-program": {
+      "hashnode": {
+        "url": "https://debugagent.com/why-my-kids-are-learning-to-program-the-new-baseline",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b08d61ded3ae624b71f0894",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-27T01:01:09+00:00"
+      },
+      "foojay": {
+        "id": 490,
+        "url": "https://github.com/foojayio/website/pull/490",
+        "pull_request_url": "https://github.com/foojayio/website/pull/490",
+        "status": "submitted",
+        "published": false,
+        "syndicated_at": "2026-11-27T01:01:33+00:00"
+      }
     }
   }
 }

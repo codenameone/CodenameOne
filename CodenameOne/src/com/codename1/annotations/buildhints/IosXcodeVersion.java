@@ -46,10 +46,10 @@ package com.codename1.annotations.buildhints;
 public enum IosXcodeVersion {
     /// Say nothing, and let the build server choose.
     ///
-    /// It prefers its own default and falls back to the newest Xcode it
-    /// actually carries, so a server that has not been re-imaged keeps building
-    /// and logs which Xcode it used. This is the right answer for almost every
-    /// application: pinning a version opts out of that fallback.
+    /// The server builds with the newest release of its default major, Xcode
+    /// 27, and logs which Xcode it used. It never moves an unset build onto a
+    /// newer major by itself. This is the right answer for almost every
+    /// application: pinning a version opts out of the default.
     @HintUnset
     DEFAULT,
 

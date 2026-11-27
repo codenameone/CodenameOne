@@ -30,6 +30,7 @@ import com.codename1.pdf.PdfPage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /// Writes a laid out document as PDF, page for page as `DocumentView` shows it.
@@ -122,6 +123,28 @@ public final class PdfExport {
             }
         }
         return pdf;
+    }
+
+    /// Draws laid out items on a PDF canvas, the way a page of a document is drawn. Callers
+    /// that place text of their own on a page -- a slide's text boxes -- translate the canvas
+    /// to the box and call this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the page, which receives the links of linked text
+    ///
+    /// - `c`: the canvas
+    ///
+    /// - `items`: the items, in points
+    ///
+    /// - `fonts`: the fonts the items were measured with
+    ///
+    /// - `images`: decoded images by picture, shared across calls so each is embedded once
+    public static void drawItems(PdfPage page, PdfCanvas c, List<LayoutItem> items,
+            PdfMeasurer fonts, Map<String, PdfImage> images) {
+        for (LayoutItem it : items) {
+            paint(page, c, it, fonts, images);
+        }
     }
 
     private static void paint(PdfPage page, PdfCanvas c, LayoutItem it, PdfMeasurer fonts,

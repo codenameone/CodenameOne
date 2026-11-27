@@ -71,9 +71,19 @@ public final class AnimationManager {
                 anims.remove(c);
             }
         } else {
-            while (!postAnimations.isEmpty()) {
-                postAnimations.get(0).run();
-                postAnimations.remove(0);
+            // Drain only what was queued before this pass. A task that starts an
+            // animation makes the next one see the manager busy, and flushAnimation
+            // then queues it again; appended to the list being drained, it ran,
+            // re-queued itself and ran again forever with the EDT pinned (a sheet
+            // shown from another sheet's close). Re-queued tasks wait for the next
+            // pass, after the new animation has had its frames.
+            int count = postAnimations.size();
+            for (int iter = 0; iter < count && !postAnimations.isEmpty(); iter++) {
+                Runnable r = postAnimations.remove(0);
+                r.run();
+                if (!anims.isEmpty()) {
+                    break;
+                }
             }
         }
     }

@@ -1,0 +1,4 @@
+# Seeded from the arm64 capture (the x64 runner was lost mid-suite twice);
+# absorbs x64 vs arm64 rasterization differences.
+maxChannelDelta=64
+maxMismatchPercent=4.0

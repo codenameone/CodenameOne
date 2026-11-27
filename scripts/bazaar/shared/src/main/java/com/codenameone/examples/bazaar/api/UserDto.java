@@ -1,0 +1,56 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.api;
+
+import com.codename1.annotations.Mapped;
+
+/// Who is signed in, as the app needs to know it: enough to greet them, to
+/// decide which modes to offer, and to tell whether they still owe a phone
+/// verification.
+///
+/// @param username The sign-in name, which is the e-mail address the account was opened with.
+/// @param customer Every account can shop.
+/// @param admin Granted: the account may run the service.
+/// @param merchant On a store's staff.
+/// @param suspended Blocked by an admin: the account cannot sign in or call the API.
+/// @param flagged Marked by an admin for a closer look. The account still works; `suspended` is
+///     what stops one.
+/// @param flagReason Why it was flagged, for the other admins.
+/// @param language The language the app is shown in: `en`, `es`, `fr`, `de` or `he`.
+/// @param email The account's e-mail address.
+/// @param cashier A CASHIER at one or more stores and nothing more senior anywhere: the app opens
+///     the point of sale first.
+/// @param staffStores The ids of the stores the account works for, in any role.
+@Mapped
+public record UserDto(
+        String username,
+        String displayName,
+        String phone,
+        boolean phoneVerified,
+        boolean customer,
+        boolean admin,
+        boolean merchant,
+        boolean suspended,
+        boolean flagged,
+        String flagReason,
+        String language,
+        String email,
+        boolean cashier,
+        java.util.List<String> staffStores) {
+}

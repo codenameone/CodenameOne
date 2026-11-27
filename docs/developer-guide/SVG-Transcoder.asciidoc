@@ -16,11 +16,13 @@ calls out the parts that differ.
 
 === Motivation
 
-Codename One's older `Image.createSVG()` API depends on a per-platform
-native SVG renderer that ships only on the JavaSE simulator; iOS and
-Android applications fall back to PNG
-multi-image buckets, giving up the resolution-independence that SVG was
-designed for. The
+Codename One's older `Image.createSVG()` API depended on a per-platform
+native SVG renderer that ships only on the JavaSE simulator. It now falls
+back to the software renderer of `com.codename1.art` elsewhere (see
+<<graphics-documents>>), which is
+the right choice for SVG that arrives at run time. For artwork you have
+at build time, this transcoder is still the cheaper path: it does no
+parsing and no software rendering on the device. The
 https://github.com/codenameone/flamingo-svg-transcoder[legacy Flamingo
 SVG transcoder] was a precursor to this work -- a build-time tool that
 emitted Java drawing code from an SVG -- but it pre-dated CN1's affine

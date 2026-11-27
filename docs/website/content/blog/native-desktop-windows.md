@@ -180,6 +180,8 @@ That design has lasted for more than a decade, but unchecked strings have a pred
 [PR #5586](https://github.com/codenameone/CodenameOne/pull/5586) adds compiler-checked annotations for 87 common hints:
 
 ```java
+import com.codename1.annotations.buildhints.*;
+
 @Android(
         themeMode = ThemeMode.MODERN,
         minSdkVersion = AndroidMinSdk.API_24)

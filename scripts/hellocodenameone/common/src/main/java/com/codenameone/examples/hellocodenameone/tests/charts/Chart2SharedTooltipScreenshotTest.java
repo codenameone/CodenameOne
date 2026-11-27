@@ -24,6 +24,7 @@ package com.codenameone.examples.hellocodenameone.tests.charts;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
+import com.codename1.ui.util.UITimer;
 import com.codename1.ui.chart.Chart;
 import com.codename1.ui.chart.ChartContext;
 
@@ -38,7 +39,7 @@ public class Chart2SharedTooltipScreenshotTest extends AbstractChart2ScreenshotT
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         super.registerReadyCallback(parent, new Runnable() {
             @Override
             public void run() {
@@ -51,7 +52,10 @@ public class Chart2SharedTooltipScreenshotTest extends AbstractChart2ScreenshotT
                 int y = c.getAbsoluteY() - c.getY() + ctx.getPlotY() + ctx.getPlotHeight() / 2;
                 c.pointerHover(new int[]{x}, new int[]{y});
                 c.repaint();
-                run.run();
+                // Capture after that repaint lands, never in the same callback: the capture used
+                // to beat it, so goldens were harvested without the tooltip this test exists to
+                // show, and a run where the paint won failed as a mismatch.
+                UITimer.timer(500, false, parent, run);
             }
         });
     }

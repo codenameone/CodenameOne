@@ -22,6 +22,7 @@
  */
 package java.text;
 
+import java.util.Currency;
 import java.util.Locale;
 
 /// The base of the number formats, and the factory for the usual ones.
@@ -33,7 +34,9 @@ import java.util.Locale;
 ///   only the integer part
 /// - `getPercentInstance`: `#,##0%`
 /// - `getCurrencyInstance`: the currency symbol followed by `#,##0.00`, and a
-///   minus sign before the symbol for a negative amount
+///   minus sign before the symbol for a negative amount. The number of
+///   fraction digits is the locale currency's own (none for the yen, three
+///   for the Bahraini dinar); change the currency with [#setCurrency].
 ///
 /// The separators and the currency symbol are those of
 /// [DecimalFormatSymbols]; read there how a locale is honoured.
@@ -42,8 +45,6 @@ import java.util.Locale;
 ///
 /// - Rounding is always half-even, the JDK's default. There is no
 ///   `setRoundingMode`, as the device has no `java.math.RoundingMode`.
-/// - There is no `getCurrency`/`setCurrency`, as the device has no
-///   `java.util.Currency`.
 public abstract class NumberFormat extends Format {
 
     private static final long serialVersionUID = 1L;
@@ -104,7 +105,36 @@ public abstract class NumberFormat extends Format {
 
     public static NumberFormat getCurrencyInstance(Locale inLocale) {
         String pattern = DecimalFormat.CURRENCY_SIGN + "#,##0.00";
-        return new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(inLocale));
+        DecimalFormat format = new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(inLocale));
+        Currency currency = format.getCurrency();
+        if (currency != null) {
+            int digits = currency.getDefaultFractionDigits();
+            if (digits >= 0) {
+                format.setMinimumFractionDigits(digits);
+                format.setMaximumFractionDigits(digits);
+            }
+        }
+        return format;
+    }
+
+    /// The currency this format writes. A subclass that formats no currency
+    /// throws, as the JDK's does.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: unless a subclass implements it
+    public Currency getCurrency() {
+        throw new UnsupportedOperationException();
+    }
+
+    /// Sets the currency this format writes. It does not change the number
+    /// of fraction digits.
+    ///
+    /// #### Throws
+    ///
+    /// - `UnsupportedOperationException`: unless a subclass implements it
+    public void setCurrency(Currency currency) {
+        throw new UnsupportedOperationException();
     }
 
     /// Formats a `Number`: an integral type as a `long`, anything else as a

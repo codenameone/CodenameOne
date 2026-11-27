@@ -168,7 +168,8 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             ~/.codenameone/gradle8
-          key: ${{ runner.os }}-gradle-g8-fidelity-${{ hashFiles('scripts/fidelity-app/**/gradle*') }}
+            ~/.codenameone/gradle9.*
+          key: ${{ runner.os }}-gradle-g8g9-fidelity-${{ hashFiles('scripts/fidelity-app/**/gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Setup workspace

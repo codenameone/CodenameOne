@@ -206,8 +206,27 @@ Each broker has its own details:
   failed record waits in `<topic>.retry.<group>` and never holds up the topic
   itself, which Spring Kafka calls a non-blocking retry. A new group starts at
   the earliest offset; `spring.kafka.consumer.auto-offset-reset=latest` starts
-  it at the end. Gzip-compressed records can be read; snappy, lz4 and zstd
-  can't, and transactions and SASL aren't supported.
+  it at the end. Records compressed with gzip, snappy, lz4 or zstd are read.
+  `spring.kafka.consumer.isolation-level=read_committed` skips the records of
+  aborted transactions. Sending inside a Kafka transaction isn't supported.
+* *Kafka authentication.* SASL `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512` and
+  `AWS_MSK_IAM` are supported, configured with Spring Boot's own keys or with
+  `cn1.messaging.kafka.sasl.*`:
++
+[source,properties]
+----
+include::../demos/backend/src/main/resources/application-confluent.properties[tag=backend-kafka-sasl]
+----
++
+Only the `username` and `password` of the JAAS line are read; the
+`cn1.messaging.kafka.sasl.mechanism`, `.username` and `.password` keys say the
+same thing more plainly. `SASL_SSL` or `SSL` turns TLS on, as `kafkas://`
+does. Confluent Cloud takes `PLAIN` with an API key. Azure Event Hubs takes
+`PLAIN` with the username `$ConnectionString` and the namespace's connection
+string as the password, on port 9093. Amazon MSK takes `SCRAM-SHA-512`, or
+`AWS_MSK_IAM`, whose credentials are found as the S3 client finds them: the
+environment, the container or the instance. The session is renewed before the
+broker's `connections.max.reauth.ms` ends it.
 * *SQS.* `sqs://<region>` addresses AWS, and `sqs://host:port` a compatible
   service such as ElasticMQ or LocalStack, signed for `cn1.messaging.sqs.region`.
   Credentials come from the environment, the container or the instance, as

@@ -3454,3 +3454,179 @@ The last 3 arguments seem weird but they also make sense once you understand the
 - The most position of the split - 3/4 of available space
 
 The units don't have to be percentages they can be mm (millimeters) or px (pixels).
+
+[[range-slider-section]]
+=== RangeSlider
+
+https://www.codenameone.com/javadoc/com/codename1/components/RangeSlider.html[RangeSlider] is a slider with two thumbs that picks a range, such as a price band or an age range. Drag either thumb, or tap the track to move the nearer one. The thumbs can't cross: a dragged thumb stops at the other one.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=range-slider,indent=0]
+----
+
+.A price range slider with both thumbs
+image::img/generated/components-range-slider.png[A price range slider with both thumbs,scaledwidth=30%]
+
+`setStep` snaps values to a multiple of the step. Listeners fire while the user drags; `isAdjusting()` is true until the finger lifts, so a listener that runs a search can wait for the final value. The arrow keys move the whole range by one step.
+
+The look comes from the UIIDs `RangeSlider`, `RangeSliderTrack` and `RangeSliderFill`. A theme that doesn't style them gets the colors of the theme's `Slider`.
+
+[[chip-section]]
+=== Chip and ChipInput
+
+https://www.codenameone.com/javadoc/com/codename1/components/Chip.html[Chip] is a compact pill with a label: a filter, a choice or a tag. A selectable chip toggles on tap and shows a check mark when selected; a removable one shows a close button.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=chips,indent=0]
+----
+
+.Selectable, removable and plain chips
+image::img/generated/components-chip.png["Selectable, removable and plain chips",scaledwidth=30%]
+
+https://www.codenameone.com/javadoc/com/codename1/components/ChipInput.html[ChipInput] is a text field that turns each entry into a removable chip, for tags, keywords, or recipients. An entry becomes a chip when the user presses Done or types a separator, a comma by default:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=chip-input,indent=0]
+----
+
+.A recipient field holding three chips
+image::img/generated/components-chip-input.png[A recipient field holding three chips,scaledwidth=30%]
+
+Empty entries are dropped, and a value that's already there is refused unless `setAllowDuplicates(true)` allows it. `getValues()` returns the values in the order the user added them.
+
+The UIIDs are `Chip`, `ChipSelected`, `ChipText` and `ChipRemove` for a chip, and `ChipInput` and `ChipInputField` for the input. Unstyled, a chip is a rounded pill in the theme's slider colors.
+
+[[color-picker-section]]
+=== ColorPicker
+
+https://www.codenameone.com/javadoc/com/codename1/components/ColorPicker.html[ColorPicker] picks a color from a saturation and brightness square, a hue strip and an optional row of preset swatches. It shows the result beside its hex value.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=color-picker,indent=0]
+----
+
+.The color picker with its saturation area, hue strip and presets
+image::img/generated/components-color-picker.png["The color picker with its saturation area, hue strip and presets",scaledwidth=35%]
+
+To ask for a color in a dialog, use the static method; it returns `null` when the user cancels:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=color-picker-dialog,indent=0]
+----
+
+Colors are `0xRRGGBB` values. `hsvToRgb`, `rgbToHsv` and `toHex` are public static helpers.
+
+[[circular-progress-section]]
+=== CircularProgress
+
+https://www.codenameone.com/javadoc/com/codename1/components/CircularProgress.html[CircularProgress] is a ring that fills to a percentage, with the value in its center. Use it when the progress is known. For a spinner with no value, use `InfiniteProgress`.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=circular-progress,indent=0]
+----
+
+.Circular progress rings with and without a label
+image::img/generated/components-circular-progress.png[Circular progress rings with and without a label,scaledwidth=30%]
+
+The UIIDs are `CircularProgress` for the text, `CircularProgressFill` for the arc and `CircularProgressTrack` for the ring under it. `setShowText(false)` hides the label.
+
+[[audio-waveform-section]]
+=== AudioWaveform
+
+https://www.codenameone.com/javadoc/com/codename1/components/AudioWaveform.html[AudioWaveform] draws a recording as a row of bars, with the played part in the accent color. It's the voice message bubble of a chat app. The user can tap or drag across it to seek; listeners fire once, when the finger lifts, and `isSeeking()` is true while the finger is down, so skip playback updates then.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=audio-waveform,indent=0]
+----
+
+.A voice message waveform, partly played
+image::img/generated/components-audio-waveform.png["A voice message waveform, partly played",scaledwidth=30%]
+
+`levelsFromPcm` reduces 16-bit samples to the number of bars you ask for. You can also pass levels between 0 and 1 that you computed yourself, or got from a server.
+
+[[expandable-text-section]]
+=== ExpandableText
+
+https://www.codenameone.com/javadoc/com/codename1/components/ExpandableText.html[ExpandableText] shows the first lines of a long text with a *Read more* link that expands it, and a *Show less* link that collapses it again. The link only shows when the text is longer than the limit.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=expandable-text,indent=0]
+----
+
+.A collapsed paragraph with a More link
+image::img/generated/components-expandable-text.png[A collapsed paragraph with a More link,scaledwidth=30%]
+
+The UIIDs are `ExpandableText`, `ExpandableTextBody` and `ExpandableTextLink`.
+
+[[activity-timeline-section]]
+=== ActivityTimeline
+
+https://www.codenameone.com/javadoc/com/codename1/components/ActivityTimeline.html[ActivityTimeline] is a vertical list of steps joined by a line: order tracking, a delivery status or an activity log. Each step has a title, optional text and a time, and is done, current, or pending.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=activity-timeline,indent=0]
+----
+
+.An order timeline with done, current and pending steps
+image::img/generated/components-activity-timeline.png["An order timeline with done, current and pending steps",scaledwidth=30%]
+
+Done steps show a filled dot, the current step a ring, and pending steps a faint dot. The UIIDs are `ActivityTimeline`, `ActivityTimelineTitle`, `ActivityTimelineText`, `ActivityTimelineTime` and `ActivityTimelineMarker`.
+
+[[emoji-picker-section]]
+=== EmojiPicker
+
+https://www.codenameone.com/javadoc/com/codename1/components/EmojiPicker.html[EmojiPicker] is a panel of emoji by category, with a search field and a tab of the emoji used most recently. `bindTo` inserts each picked emoji into a text field at the cursor:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=emoji-picker,indent=0]
+----
+
+.The emoji picker with its search field and category tabs
+image::img/generated/components-emoji-picker.png[The emoji picker with its search field and category tabs,scaledwidth=35%]
+
+The search matches the emoji names, so "heart" finds every heart. The platform's emoji font draws the emoji, so they look like the ones on the device keyboard. The recent tab is kept in `Preferences`; `setRecentsEnabled(false)` turns it off.
+
+[[mention-field-section]]
+=== MentionField
+
+https://www.codenameone.com/javadoc/com/codename1/components/MentionField.html[MentionField] is a text field that suggests names while the user types an `@` mention, and completes the name when one is tapped:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=mention-field,indent=0]
+----
+
+.A text field suggesting names after an at sign
+image::img/generated/components-mention-field.png[A text field suggesting names after an at sign,scaledwidth=30%]
+
+A name matches when it, or any word in it, starts with what follows the `@`, ignoring case. An `@` inside a word, as in an email address, doesn't start a mention. `setTrigger('#')` makes it a tag field. For a directory too large to pass up front, override `suggest(String)` and return the matches for the query.
+
+[[masonry-layout-section]]
+=== MasonryLayout
+
+https://www.codenameone.com/javadoc/com/codename1/ui/layouts/MasonryLayout.html[MasonryLayout] arranges components in columns of equal width and places each one at the top of the shortest column. The tiles keep their own heights, so the rows don't line up: the photo grid of Pinterest. `GridLayout` and `TableLayout` differ by giving a whole row the height of its tallest cell.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=masonry,indent=0]
+----
+
+.Tiles of different heights packed into two columns
+image::img/generated/components-masonry-layout.png[Tiles of different heights packed into two columns,scaledwidth=35%]
+
+To let the number of columns follow the screen width, set a minimum column width. The layout then uses as many columns as fit, and never fewer than the count passed to the constructor:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/InputAndProgressSnippets.java[tag=masonry-adaptive,indent=0]
+----

@@ -26,6 +26,9 @@ import com.codename1.junit.UITestBase;
 import com.codename1.components.InteractionDialog;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.Display;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -194,6 +197,21 @@ class SecureKeyboardTest extends UITestBase {
         TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
         f.add(tf);
         SecureKeyboard kb = SecureKeyboard.install(tf);
+        // An instant show. A form an earlier test in this JVM left current can carry a
+        // transition out, which ends on the clock while every flush below takes no time at all:
+        // the bounded retries were all spent before the form had a size, and the test failed
+        // in a full suite run while passing alone. Transitions are not what this test covers.
+        Form previous = Display.getInstance().getCurrent();
+        if (previous != null) {
+            previous.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        }
+        f.setTransitionInAnimator(CommonTransitions.createEmpty());
+        // Sized as setCurrent would size it. setCurrent is what gives a form its size, and a form
+        // an earlier test left current or mid-transition can hold that back past every retry,
+        // so the form stayed 0x0 and was never laid out. The content is still not laid out
+        // here, which is the case under test.
+        f.setSize(new Dimension(Display.getInstance().getDisplayWidth(),
+                Display.getInstance().getDisplayHeight()));
         f.show();
         // Straight after show(), as a show listener would: nothing is laid out yet.
         kb.show();
@@ -203,7 +221,11 @@ class SecureKeyboardTest extends UITestBase {
             flushSerialCalls();
         }
         flushSerialCalls();
-        assertTrue(kb.isShowing(), "a show before layout is retried once the form has a size");
+        Form cur = Display.getInstance().getCurrent();
+        assertTrue(kb.isShowing(), "a show before layout is retried once the form has a size; current="
+                + (cur == null ? "null" : cur.getTitle()) + " inTransition=" + Display.getInstance().isInTransition()
+                + " form=" + f.getWidth() + "x" + f.getHeight() + " content=" + f.getContentPane().getHeight()
+                + " fieldOnForm=" + (tf.getComponentForm() == f) + " kbParent=" + kb.getParent());
         assertEquals(f.getContentPane().getAbsoluteY() + f.getContentPane().getHeight(),
                 kb.getAbsoluteY() + kb.getHeight(), "docked to the bottom, not the top");
         kb.hide();

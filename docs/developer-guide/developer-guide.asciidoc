@@ -73,6 +73,8 @@ include::Scheduling-And-Gantt.asciidoc[]
 
 include::Data-Grid.asciidoc[]
 
+include::Presentations.asciidoc[]
+
 include::Node-Graphs.asciidoc[]
 
 include::Kanban-Board.asciidoc[]
@@ -94,6 +96,8 @@ include::css.asciidoc[]
 include::graphics.asciidoc[]
 
 include::SVG-Transcoder.asciidoc[]
+
+include::Graphics-Documents.asciidoc[]
 
 include::3D-Graphics.asciidoc[]
 
@@ -176,6 +180,14 @@ include::Wayline-Implementors-Guide.asciidoc[]
 include::Savor-Users-Guide.asciidoc[]
 
 include::Savor-Implementors-Guide.asciidoc[]
+
+include::Bazaar-Users-Guide.asciidoc[]
+
+include::Bazaar-Implementors-Guide.asciidoc[]
+
+include::Extending-Bazaar.asciidoc[]
+
+include::Bazaar-Feature-Comparison.asciidoc[]
 
 
 include::Skirmish-Implementors-Guide.asciidoc[]

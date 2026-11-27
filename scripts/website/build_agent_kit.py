@@ -52,7 +52,7 @@ BOOTSTRAP = ROOT / 'scripts/agent-kit/bootstrap'
 # BAREBONES project (the usual first run) fetches a ~1 MB generator rather than
 # every template: they are most of the 24 MB, one game alone is 23. The preview
 # images are for the web page's gallery and ship nowhere.
-SPLIT_TEMPLATES = ('wayline', 'savor', 'skirmish', 'dash', 'splat', 'papercut', 'parley', 'bastion',
+SPLIT_TEMPLATES = ('wayline', 'savor', 'bazaar', 'skirmish', 'dash', 'splat', 'papercut', 'parley', 'bastion',
                    'reel', 'pulse', 'slate')
 
 

@@ -9747,7 +9747,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             + "Display|DoubleProperty|DynamicImage|EditField|Editable|EncodedImage|FloatProperty|FlowLayout|"
             + "Font|FontImage|Form|GeneratedSVGImage|Gradient|Graphics|GridBagConstraints|GridBagLayout|"
             + "GridLayout|GroupLayout|IconHolder|Image|ImageFactory|InfiniteContainer|InputComponent|Insets|"
-            + "InstantUI|IntProperty|InterFormContainer|Label|LayeredLayout|Layout|LayoutStyle|LinearGradient|"
+            + "InstantUI|IntProperty|InterFormContainer|Label|LayeredLayout|Layout|LayoutStyle|LinearGradient|MasonryLayout|"
             + "LinearGradientPaint|List|ListProperty|LongProperty|MapAdapter|MapProperty|MenuBar|Monitor|"
             + "MultipleGradientPaint|NativeDragAndDrop|NativeDragOperation|NativeDropEvent|NavigationCommand|"
             + "NumericProperty|Paint|Painter|PeerComponent|PickerComponent|PreferencesObject|Property|"

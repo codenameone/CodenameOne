@@ -14288,6 +14288,35 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return nativeInstance.getCurrencySymbol();
                 }
 
+                @Override
+                public String getCurrencyCode() {
+                    String code = nativeInstance.getCurrencyCode();
+                    if (code == null || code.length() == 0) {
+                        return super.getCurrencyCode();
+                    }
+                    try {
+                        // A code newer than java.util.Currency's table would make
+                        // every call that takes the answer back throw.
+                        java.util.Currency.getInstance(code);
+                        return code;
+                    } catch (IllegalArgumentException e) {
+                        return super.getCurrencyCode();
+                    }
+                }
+
+                @Override
+                public String formatCurrency(double amount, String currencyCode) {
+                    // Throws for an unknown code, as on every other port.
+                    java.util.Currency.getInstance(currencyCode);
+                    return nativeInstance.formatCurrencyCode(amount, currencyCode);
+                }
+
+                @Override
+                public String getCurrencySymbol(String currencyCode) {
+                    java.util.Currency.getInstance(currencyCode);
+                    return nativeInstance.getCurrencySymbolForCode(currencyCode);
+                }
+
                 public void setLocale(String locale, String language) {
                     super.setLocale(locale, language);
                     Locale l = new Locale(language, locale);

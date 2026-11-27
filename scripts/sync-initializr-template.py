@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Keep an Initializr full-stack template aligned with its sample (--write to update).
 
-    python3 scripts/sync-initializr-template.py wayline|savor|skirmish|dash|splat|papercut|parley|bastion|reel|pulse|slate|fieldline [--write]
+    python3 scripts/sync-initializr-template.py wayline|savor|bazaar|skirmish|dash|splat|papercut|parley|bastion|reel|pulse|slate|fieldline [--write]
 
 scripts/<name> is the project CI builds and tests. The Initializr offers the same
 project as a template, from five resources this script derives from it:
@@ -48,7 +48,7 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 # The samples the Initializr offers as full-stack templates. Each is a project
 # under scripts/ whose Java package is com.codenameone.examples.<name>.
-SAMPLES = ('wayline', 'savor', 'skirmish', 'dash', 'splat', 'papercut', 'parley', 'bastion', 'reel', 'pulse', 'slate', 'fieldline')
+SAMPLES = ('wayline', 'savor', 'bazaar', 'skirmish', 'dash', 'splat', 'papercut', 'parley', 'bastion', 'reel', 'pulse', 'slate', 'fieldline')
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 if len(args) != 1 or args[0] not in SAMPLES:
     raise SystemExit('usage: sync-initializr-template.py ' + '|'.join(SAMPLES) + ' [--write]')
@@ -59,7 +59,7 @@ resources = root / 'scripts/initializr/common/src/main/resources'
 # What the generator rewrites as text; the rest is copied as bytes.
 # Exactly the files the generator rewrites too (GeneratorModel.isTextFile): a
 # `myappname` written into any other would stay in the generated project.
-TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json', '.txt', '.sql')
+TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json', '.txt', '.sql', '.html', '.js')
 
 HEADER = re.compile(r'\A/\*\n \* Copyright \(c\) .*?\*/\n', re.S)
 HASH_HEADER = re.compile(r'\A((?:#!.*\n)?)(?:#\n)?# Copyright \(c\) .*?(?=^[^#]|\Z)', re.S | re.M)
@@ -122,10 +122,18 @@ def expected():
     # and join the template once a release reads those directories.
     modules.update(tree(sample / 'backend', 'backend/', skip=(
         'target', 'src/main/resources/db/migration/oracle',
-        'src/main/resources/db/migration/sqlserver')))
+        'src/main/resources/db/migration/sqlserver',
+        # Bazaar's end-to-end test of its sample third-party app; it builds
+        # only beside ../sample-app, which the template does not carry.
+        'src/sample-app-test')))
     # Logic both halves run (a game's simulation) lives in `shared`, never in a
     # module of its own: a sample with any other module is refused below.
+    # A sample third-party app (Bazaar's) is a separate server that only talks
+    # to the sample over HTTP; it teaches app developers and is not part of the
+    # application a generated project starts from, so it stays out.
     for extra in sorted(p.name for p in sample.iterdir() if (p / 'pom.xml').is_file()):
+        if extra == 'sample-app':
+            continue
         if extra not in ('shared', 'backend', 'common', 'android', 'ios', 'javase',
                          'javascript', 'win', 'linux', 'mac', 'cn1libs'):
             raise SystemExit('scripts/' + name + '/' + extra + ' is a module the template '

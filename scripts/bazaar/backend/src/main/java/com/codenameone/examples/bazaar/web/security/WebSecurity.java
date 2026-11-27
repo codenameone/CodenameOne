@@ -1,0 +1,355 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.web.security;
+
+import com.codename1.backend.Config;
+import com.codename1.backend.DataSource;
+import com.codename1.backend.HttpServer;
+import com.codename1.backend.annotations.Bean;
+import com.codename1.backend.annotations.Configuration;
+import com.codename1.backend.annotations.Order;
+import com.codename1.backend.annotations.Value;
+import com.codename1.backend.security.AntPathRequestMatcher;
+import com.codename1.backend.security.CsrfFilter;
+import com.codename1.backend.security.HttpSecurity;
+import com.codename1.backend.security.RateLimitFilter;
+import com.codename1.backend.security.SavedRequestAwareAuthenticationSuccessHandler;
+import com.codename1.backend.security.SecurityExchange;
+import com.codename1.backend.security.SecurityFilter;
+import com.codename1.backend.security.SecurityFilterChain;
+import com.codename1.backend.security.SessionCreationPolicy;
+import com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository;
+import com.codename1.backend.security.mfa.JdbcTotpRepository;
+import com.codename1.backend.security.mfa.RecoveryCodeService;
+import com.codename1.backend.security.mfa.TotpService;
+import com.codename1.backend.security.ratelimit.RateLimitKeys;
+import com.codenameone.examples.bazaar.web.ErrorPages;
+
+import java.io.IOException;
+
+/// The browser-native web app's security: three chains beside the app's own two
+/// ([com.codenameone.examples.bazaar.SecurityConfig]).
+///
+/// - **Assets** (`/static/**`): a file whose name carries its content hash
+///   (`app.1a2b3c4d.css`) never changes, so it is cached for a year as
+///   immutable; anything else keeps the server's `no-cache`.
+/// - **The back office** (`/admin/**`, `/platform/**`): there is no page there.
+///   The merchant and platform back offices are the Bazaar app's own screens,
+///   served at `/app/`, so an old bookmark is redirected there.
+/// - **Signed-in pages** (`/auth/**`, `/account/**`, checkout and order pages): a session cookie from a password form (and an
+///   authenticator code once enrolled), CSRF tokens on every state-changing
+///   request, the session id replaced at sign-in, sign-out by POST only, and the
+///   password guarded per address by rate ([Throttle] `signin`) and by failure
+///   lockouts ([Throttle]): `signin-failures` per account and address,
+///   `signin-failures-ip` per address across accounts, and the looser
+///   `signin-failures-account` per account from every address.
+/// - **Storefront** (`/`, `/s/**`, `/track/**`, `/review/**`, `/consent/**`): public, no
+///   session needed to read; the cart forms keep their same-site check.
+///
+/// Every page of the last two gets [WebHeaders] -- a nonce CSP, HSTS,
+/// `nosniff`, a referrer policy, a permissions policy and no framing -- and
+/// [PageEtags], which answers a repeated request for unchanged HTML with 304.
+///
+/// The paths are not the app's: `/login`, `/logout` and `/signin/code` belong
+/// to the app's authorization-server chain, which answers JSON and keeps CSRF
+/// off for the app's own screens. A web page signs in at `/auth/signin`.
+@Configuration
+public class WebSecurity {
+    public static final String SIGN_IN = "/auth/signin";
+    public static final String SECOND_FACTOR = "/auth/2fa";
+    public static final String SIGN_OUT = "/auth/signout";
+
+    /// Authenticator-app codes, kept sealed in the security schema's table.
+    @Bean
+    public TotpService totp(DataSource db, Config config) {
+        return new TotpService(JdbcTotpRepository.fromConfig(db, config), "Bazaar");
+    }
+
+    /// Ten single-use codes for a lost authenticator app, hashed in the security
+    /// schema's table. The second-factor page accepts one in place of a code;
+    /// the account's security page makes them.
+    @Bean
+    public RecoveryCodeService recoveryCodes(DataSource db) {
+        return new RecoveryCodeService(new JdbcRecoveryCodeRepository(db));
+    }
+
+    @Bean
+    @Order(0)
+    public SecurityFilterChain assetChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/static/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .addFilterBefore(new ImmutableAssets(), CsrfFilter.class);
+        return http.build();
+    }
+
+    /// Old back-office addresses: answered with a permanent redirect to the
+    /// app (`/app/`), which carries the merchant and platform back offices.
+    /// Stateless, and nothing is read from the request but its path.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain backOfficeChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/admin", "/admin/**", "/platform", "/platform/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .addFilterBefore(new SecurityFilter() {
+                @Override
+                public HttpServer.Response doFilter(HttpServer.Request request,
+                        com.codename1.backend.security.FilterChain chain) {
+                    return HttpServer.Response.text(301, "")
+                            .header("Location", "/app/")
+                            .header("Cache-Control", "public, max-age=3600");
+                }
+            }, CsrfFilter.class);
+        return http.build();
+    }
+
+    /// App slot widgets (`/w/{id}`): stateless, so the framed document never
+    /// reads or makes a session and no cookie is set on its response. The
+    /// route writes its own policy (a sandbox), so no page headers filter here.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain widgetChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/w/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    /// The app proxy (`/s/{handle}/apps/...`, `extensions.AppProxyPages`):
+    /// an app's answer on the store's address, so no session is read or made
+    /// for it -- the shopper's cookie never reaches the app -- and the route
+    /// writes its own sandbox policy in place of the page headers.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain appProxyChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/s/*/apps/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    /// The buy button (StoreSite.embed): framed by other sites, so none of
+    /// the default headers (X-Frame-Options above all) and no session; the
+    /// route writes its own policy.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain embedChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/s/*/embed/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(h -> h.defaultsDisabled())
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(3)
+    public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,
+            RecoveryCodeService recoveryCodes, final Throttle throttle, BotGuard bots,
+            @Value("${bazaar.web.hsts:true}") boolean hsts,
+            com.codenameone.examples.bazaar.staff.SsoProviders sso,
+            com.codenameone.examples.bazaar.marketing.Campaigns campaigns,
+            com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager users)
+            throws IOException {
+        final KnownDevices devices = new KnownDevices(campaigns, users);
+        final boolean secureCookie = hsts;
+        final SavedRequestAwareAuthenticationSuccessHandler saved =
+                new SavedRequestAwareAuthenticationSuccessHandler();
+        saved.setDefaultTargetUrl("/account");
+        http.securityMatcher("/auth/**", "/account", "/account/**",
+                    "/s/*/checkout", "/s/*/checkout/**",
+                    "/s/*/orders/**")
+            .sessionManagement(s -> s.sessionFixation(f -> f.changeSessionId()))
+            .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
+            .addFilterBefore(new WebHeaders(hsts), CsrfFilter.class)
+            .addFilterBefore(new PageEtags(), CsrfFilter.class)
+            .addFilterBefore(lockout(throttle, devices), CsrfFilter.class)
+            .addFilterAfter(bots.filter(), CsrfFilter.class)
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", SIGN_IN),
+                    RateLimitKeys.clientAddress(), throttle.limiter("signin"))
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/s/*/checkout/**"),
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    throttle.limiter("checkout"))
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/s/*/orders/**"),
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    throttle.limiter("checkout"))
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/auth/sms/**"),
+                    RateLimitKeys.clientAddress(), throttle.limiter("sms"))
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/auth/**").permitAll()
+                    // Guests check out and open their order by its link token.
+                    .requestMatchers("/s/*/checkout", "/s/*/checkout/**", "/s/*/orders/**")
+                        .permitAll()
+                    .anyRequest().authenticated())
+            .formLogin(form -> form
+                    .loginPage(SIGN_IN)
+                    .loginProcessingUrl(SIGN_IN)
+                    .successHandler((request, who) -> {
+                        throttle.succeed("signin-failures", key(request));
+                        throttle.succeed("signin-failures-account", account(request));
+                        // This browser now knows the account: its later
+                        // attempts skip the account-wide lockout (KnownDevices).
+                        // The framework calls this handler only for a sign-in
+                        // with no second factor pending (SessionSignIn holds a
+                        // TOTP user back before it); mfa() below sets the
+                        // cookie when the code completes the sign-in.
+                        rememberDevice(devices, account(request), secureCookie);
+                        return saved.onAuthenticationSuccess(request, who);
+                    })
+                    .failureHandler((request, refused) -> {
+                        throttle.fail("signin-failures", key(request));
+                        throttle.fail("signin-failures-ip", Throttle.client(request));
+                        throttle.fail("signin-failures-account", account(request));
+                        return HttpServer.Response.text(303, "")
+                                .header("Location", SIGN_IN + "?error=1")
+                                .header("Cache-Control", "no-store");
+                    }))
+            // Staff single sign-on through a store's OpenID Connect provider:
+            // PKCE, state, nonce and the ID token's signature are the
+            // framework's; who the user is, is SsoProviders'. Under /auth, so
+            // the authorization server's /oauth2 paths stay its own. mfa()
+            // below holds these sign-ins back for a code as it does passwords.
+            .oauth2Login(o -> o.clientRegistrationRepository(sso)
+                    .oidcUserService(sso)
+                    .loginPage(SIGN_IN)
+                    .authorizationEndpointBaseUri(
+                            com.codenameone.examples.bazaar.staff.SsoProviders.START)
+                    .redirectionEndpointBaseUri(
+                            com.codenameone.examples.bazaar.staff.SsoProviders.CALLBACK)
+                    .defaultSuccessUrl("/app/")
+                    .failureUrl(SIGN_IN + "?error=sso"))
+            .mfa(mfa -> mfa.totpService(totp).recoveryCodeService(recoveryCodes)
+                    .secondFactorPage(SECOND_FACTOR)
+                    .processingUrl(SECOND_FACTOR)
+                    .successHandler((request, who) -> {
+                        // Fully signed in only now; the password step set no
+                        // cookie. SSO (oauth2Login above) and passkeys keep
+                        // their own success handling and set none: no single
+                        // hook there knows the folded account without
+                        // replacing their redirects, and the lockout guards
+                        // only password attempts.
+                        rememberDevice(devices, Ascii.lower(who.getName().trim()), secureCookie);
+                        return saved.onAuthenticationSuccess(request, who);
+                    }))
+            .logout(logout -> logout
+                    .logoutRequestMatcher(AntPathRequestMatcher.antMatcher("POST", SIGN_OUT))
+                    .logoutSuccessUrl("/"));
+        return http.build();
+    }
+
+    @Bean
+    @Order(4)
+    public SecurityFilterChain shopChain(HttpSecurity http,
+            @Value("${bazaar.web.hsts:true}") boolean hsts,
+            com.codenameone.examples.bazaar.web.StorefrontRedirects redirects, Throttle throttle)
+            throws IOException {
+        http.securityMatcher("/", "/s/**", "/collections/**", "/products/**", "/search",
+                "/cart", "/track/**", "/review/**", "/consent", "/consent/**",
+                "/lang")
+            .csrf(c -> c.disable())
+            // A review posted through an e-mailed link ([ReviewLinks]): the
+            // link is the only credential, so it is held per address and per
+            // link: the second also bounds one link posted from many places
+            // (and is the one a request without an address still meets).
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/review/*"),
+                    RateLimitKeys.clientAddress(), throttle.limiter("review"))
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/review/*"),
+                    request -> "link:" + linkOf(request.getTarget()), throttle.limiter("review"))
+            .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
+            .addFilterBefore(redirects.filter(), RateLimitFilter.class)
+            .addFilterBefore(new WebHeaders(hsts, true), CsrfFilter.class)
+            .addFilterBefore(new PageEtags(), CsrfFilter.class)
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    /// The path of a review link, without its query, as a rate-limit key.
+    static String linkOf(String target) {
+        if (target == null) {
+            return "";
+        }
+        int q = target.indexOf('?');
+        return q < 0 ? target : target.substring(0, q);
+    }
+
+    /// The account a sign-in attempt names, folded, with the client address, as
+    /// the lockout's key.
+    static String key(HttpServer.Request request) {
+        return account(request) + "|" + Throttle.client(request);
+    }
+
+    /// The account a sign-in attempt names, folded. The key of the
+    /// `signin-failures-account` lockout, which bounds guessing one account
+    /// from many addresses. Anyone can trip it by failing on purpose from
+    /// enough addresses, so it binds only browsers that have not signed in
+    /// to the account before: an attempt carrying a valid known-device cookie
+    /// for the account ([KnownDevices]) skips it, and its owner keeps signing
+    /// in from their own browsers while a new browser is refused.
+    /// Sets the known-device cookie for `account` on the current response.
+    static void rememberDevice(KnownDevices devices, String account, boolean secure) {
+        try {
+            String c = devices.cookie(account, secure);
+            if (c != null) {
+                SecurityExchange.current().addResponseHeader("Set-Cookie", c);
+            }
+        } catch (IOException noSecret) {
+            // Signed in all the same; the browser stays unknown.
+        }
+    }
+
+    static String account(HttpServer.Request request) {
+        String u;
+        try {
+            u = request.param("username");
+        } catch (RuntimeException malformed) {
+            u = null;
+        }
+        // Keyed on the account AND the address it is tried from: an account
+        // alone would let anyone who knows a username keep its owner locked
+        // out by failing five times every quarter hour. Guessing across many
+        // accounts from one address is held by "signin-failures-ip", and one
+        // account from many addresses by "signin-failures-account", which a
+        // browser with the account's known-device cookie skips.
+        return u == null ? "" : Ascii.lower(u.trim());
+    }
+
+    /// Refuses a password for an account with too many wrong ones lately --
+    /// before the password is even looked at, so a right guess during the
+    /// lockout is no different from a wrong one. The account-wide rule is
+    /// skipped for a browser holding the account's known-device cookie; the
+    /// per account and address rule and the per address rule never are.
+    static SecurityFilter lockout(final Throttle throttle, final KnownDevices devices) {
+        return (request, chain) -> {
+            if ("POST".equals(request.getMethod()) && SIGN_IN.equals(request.pathFrom(0))
+                    && (throttle.lockout("signin-failures", key(request))
+                    || throttle.lockout("signin-failures-ip", Throttle.client(request))
+                    || (throttle.lockout("signin-failures-account", account(request))
+                        && !devices.known(request, account(request))))) {
+                SecurityExchange.current().setResponseHeader("Cache-Control", "no-store");
+                return HttpServer.Response.text(303, "").header("Location", SIGN_IN + "?locked=1");
+            }
+            return chain.doFilter(request);
+        };
+    }
+}

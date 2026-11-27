@@ -395,6 +395,29 @@ public final class XmlScanner {
         }
     }
 
+    /// The number of attributes of the element that START was just answered for.
+    public int attrCount() {
+        return attrCount;
+    }
+
+    /// The name, prefix included, of the attribute at `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: 0 to `attrCount() - 1`
+    public String attrName(int index) {
+        return attrNames[index];
+    }
+
+    /// The value of the attribute at `index`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: 0 to `attrCount() - 1`
+    public String attrValue(int index) {
+        return attrValues[index];
+    }
+
     /// The value of an attribute of the element that START was just answered for, null when
     /// it has none of that name. A name with a prefix has to match whole; one without matches
     /// whatever prefix the attribute has, the first such attribute winning.
