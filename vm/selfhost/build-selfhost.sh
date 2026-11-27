@@ -185,6 +185,11 @@ fi
 #    java.util.HashMap's getImpl/putImpl/removeImpl/containsKeyImpl/clearImpl and
 #    the two helpers only they call, and the native translator emitted seven
 #    methods as empty stubs that the JVM one emitted in full.
+#
+#    DevicePush and InterpBundleFiles are the desktop half of the device runtime
+#    (the push server, sockets, HMAC). Nothing in the translator calls them, and
+#    they need JDK networking and crypto JavaAPI does not have, so they are left
+#    out like the other standalone mains.
 SRC="$REPO/vm/ByteCodeTranslator/src"
 STUBS="$REPO/vm/selfhost/stubs"
 STUBBED=$(cd "$STUBS" && find . -name '*.java' | sed 's|.*/||;s|\.java$||' | tr '\n' '|' | sed 's/|$//')
@@ -192,7 +197,8 @@ SRCLIST="$OUT/sources.txt"
 find "$SRC" -name '*.java' \
   | grep -vE "/($STUBBED)\.java$" \
   | grep -v '/CastSemanticsVerifier\.java$' \
-  | grep -v '/NativeSignatureVerifierCli\.java$' > "$SRCLIST"
+  | grep -v '/NativeSignatureVerifierCli\.java$' \
+  | grep -vE '/(DevicePush|InterpBundleFiles)\.java$' > "$SRCLIST"
 find "$STUBS" -name '*.java' >> "$SRCLIST"
 native_list "$SRCLIST" > "$SRCLIST.args"
 

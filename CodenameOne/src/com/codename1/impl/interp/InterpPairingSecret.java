@@ -124,7 +124,7 @@ public final class InterpPairingSecret {
         mac.update(new byte[]{0});
         byte[] c = utf8(challenge);
         mac.update(new byte[]{(byte) (c.length >>> 24), (byte) (c.length >>> 16),
-            (byte) (c.length >>> 8), (byte) c.length});
+                (byte) (c.length >>> 8), (byte) c.length});
         mac.update(c);
         if (payload != null) {
             mac.update(payload);

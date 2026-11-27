@@ -22,21 +22,17 @@
  */
 package com.codenameone.developerguide.snippets;
 
-import com.codename1.impl.interp.InterpRuntime;
-
 /**
  * Snippets for the device runtime chapter of the developer guide.
  */
 class DeviceRuntimeSnippets {
-    InterpRuntime runtime;
-
-    void limits() {
-        // tag::device-runtime-limits[]
+    // tag::device-runtime-limits[]
+    void limits(com.codename1.impl.interp.InterpRuntime runtime) {
         runtime.setEdtBudgetMs(2000);   // 0 disables the check
         runtime.setMaxDepth(512);
         runtime.requestCancel();        // safe from another thread
-        // end::device-runtime-limits[]
     }
+    // end::device-runtime-limits[]
 
     void whichDeviceAmIOn() {
         // tag::device-runtime-which-device[]
