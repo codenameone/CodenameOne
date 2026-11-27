@@ -59,7 +59,10 @@ if [ -n "${PY_JAVA_SOURCES:-}" ]; then
     APPCP=":$W/appclasses"
 fi
 # Java imports resolve against JavaAPI, the class library the binary links.
-"$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE$APPCP" "$W/src" "$W/gen" "$K"
+# PY_MAIN set to the empty string transpiles as a library: every module is kept,
+# not only what the main module imports. A driver that runs several programs as
+# roots of their own (conformance_parparvm.sh) needs that.
+"$J17/bin/java" -cp "$TRANSPILER" com.codename1.python.transpiler.api.Main -cp "$JAVAAPI:$CORE$APPCP" "$W/src" "$W/gen" ${PY_MAIN-"$K"}
 # PY_DRIVER replaces the entry point: the conformance suite runs every
 # program from one binary rather than building one each.
 if [ -n "${PY_DRIVER:-}" ]; then

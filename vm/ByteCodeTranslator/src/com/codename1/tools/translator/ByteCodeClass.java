@@ -2537,6 +2537,9 @@ public class ByteCodeClass {
         return !isInterface && base != null && !base.isInterface
                 && !"java_lang_Class".equals(clsName) && !"java_lang_Class".equals(base.clsName)
                 && !m.isVirtualOverriden()
+                // A base whose vtable was never built (a class generated on its
+                // own, outside a whole translation) shares no thunk.
+                && base.virtualMethodList != null
                 && slot < base.virtualMethodList.size()
                 && base.virtualMethodList.get(slot) == m //NOPMD CompareObjectsWithEquals - the same method object is an inherited one
                 && Parser.canReceiveTagged(clsName) == Parser.canReceiveTagged(base.clsName);

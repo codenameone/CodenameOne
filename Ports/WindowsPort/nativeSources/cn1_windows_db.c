@@ -29,7 +29,7 @@
 #include "cn1_db_sqlite_impl.h"
 
 CN1_DB_DEFINE_NATIVES(cn1DbWindowsEngine)
-CN1_DB_DEFINE_FUNCTION_NATIVES(cn1DbWindowsEngine, com_codename1_impl_windows_WindowsDatabase_sqlFunctionCall___long_int_int_long)
+CN1_DB_DEFINE_FUNCTION_NATIVES(cn1DbWindowsEngine, com_codename1_impl_windows_WindowsNative_sqlFunctionCall___long_int_int_long)
 
 /*
  * The entry points, spelled out rather than pasted together.

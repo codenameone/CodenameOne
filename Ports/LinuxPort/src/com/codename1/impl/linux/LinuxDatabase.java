@@ -103,9 +103,14 @@ class LinuxDatabase extends Database {
         }
     };
 
-    /// Called by the engine (cn1_linux_db.c) while a statement calls a Java function.
-    static void sqlFunctionCall(long ctx, int id, int argc, long argv) {
-        FUNCTIONS.call(ctx, id, argc, argv);
+    static {
+        // The engine's calls arrive at LinuxNative.sqlFunctionCall, which forwards them here.
+        LinuxNative.sqlFunctionHandler = new LinuxNative.SqlFunctionHandler() {
+            @Override
+            public void call(long ctx, int id, int argc, long argv) {
+                FUNCTIONS.call(ctx, id, argc, argv);
+            }
+        };
     }
 
 

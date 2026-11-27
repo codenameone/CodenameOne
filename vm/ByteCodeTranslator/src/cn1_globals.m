@@ -1213,9 +1213,6 @@ static inline int cn1GcIsOld(JAVA_OBJECT o, int m) {
 // Because grace no longer covers every fresh object, the barriers stop filtering fresh
 // references (cn1GcFreshFilter): a released thread moving a pre-cycle fresh object from
 // an unscanned container into a scanned one must be logged, exactly as an old object is.
-// Concurrent cycles take the pre-cycle pages the same way (cn1GcHybridBeginConcurrent) but
-// keep the filter, narrowed: it no longer skips a fresh object on a pre-cycle page
-// (CN1_SATB_ON_PRE_CYCLE_PAGE), and every other fresh object still has its grace.
 //
 // "One core" is the online CPU count, or the core count the scaling matrix emulates with
 // CN1_GC_MARK_THREADS=1. Evaluated once; the mode cannot change within a process.
@@ -1366,8 +1363,9 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
 // once the thread filled and retired that page or once a stop-the-world cycle held it
 // (cn1BibopRetireHeldThreadPages), on 1 and 4 markers, on master and before #5940 alike.
 // The root is the allocation page, not a stack word. It is not avoidable in a concurrent
-// cycle: the owner bumps that page while the cycle runs, so an unmarked fresh slot on it
-// may have been allocated after the roots were scanned and freeing it would be unsound -- and the clear must match what the sweep frees. It
+// cycle: the owner bumps that page while the cycle runs, and the barriers filter fresh
+// references there (cn1GcFreshFilter) on the strength of grace, so freeing an unmarked
+// fresh slot on it would be unsound -- and the clear must match what the sweep frees. It
 // is bounded: one page per size class per thread, released at the next page fill or the
 // next stop-the-world hold. A test that asserts a weak referent clears must therefore
 // retire the page first (or use a referent off the page heap), never just wait.
@@ -1383,7 +1381,8 @@ static inline int cn1GcSweepReclaimsObj(JAVA_OBJECT o, int mark) {
         return 1;
     }
 #ifndef CN1_DISABLE_BIBOP
-    if(CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS && CN1_OBJ_CLASS(o) != 0) {
+    if(cn1GcStwCycle && CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS
+       && CN1_OBJ_CLASS(o) != 0) {
         CN1BibopPage* pg = (CN1BibopPage*)((uintptr_t)o & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         return pg->gcPreCycle;
     }
@@ -4121,7 +4120,7 @@ static inline int cn1SatbNeedsEnqueue(JAVA_OBJECT object) {
     int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_acquire);
     int mark = CN1_OBJ_MARK_LOAD(object, __ATOMIC_ACQUIRE);
 #ifndef CN1_SATB_LOG_FRESH
-    if(mark == -1 && cn1GcFreshFilter && !CN1_SATB_ON_PRE_CYCLE_PAGE(object)) return 0;
+    if(mark == -1 && cn1GcFreshFilter) return 0;
 #endif
     if(mark == epoch && epoch == atomic_load_explicit(&bibopGcEpoch, memory_order_acquire)) {
 #ifdef CN1_GC_CONFORM
@@ -5594,7 +5593,7 @@ static void gcMarkGraceWalkPages(CODENAME_ONE_THREAD_STATE) {
             continue;   // another marker claimed this page
         }
         }
-        // A pre-cycle page's fresh slots get no grace, so they are not
+        // Single-core mode: a pre-cycle page's fresh slots get no grace, so they are not
         // roots either; the reachable ones were marked by the root drain.
         if(gp->gcPreCycle) {
             continue;
@@ -9175,30 +9174,14 @@ static JAVA_BOOLEAN cn1GcHybridDecide(void) {
     return cn1GcHybridGen ? JAVA_TRUE : JAVA_FALSE;
 }
 
-// A CONCURRENT cycle. It takes the pre-cycle pages exactly as a stop-the-world cycle does:
-// every page retired before the cycle began (the whole sweep stack) loses grace, and the
-// barriers log a fresh reference to an object on one of those pages like any other
-// (CN1_SATB_ON_PRE_CYCLE_PAGE). The filter itself stays on for every other fresh object,
-// which keeps its grace: logging those is issue 5537's runaway log.
-//
-// WHY A CONCURRENT CYCLE CAN DO THIS. Grace exists for objects the mark may not have seen
-// because they were allocated WHILE it ran. A retired page takes no allocation until a
-// sweep hands it back, so every fresh slot on a page retired before this cycle began
-// predates the cycle: reachable, it is reached from the roots or through the snapshot the
-// barrier keeps -- the same two guarantees every old object already lives on -- and
-// unreachable, it is garbage now. Objects allocated during the cycle land on pages their
-// threads own, which no sweep touches, or on pages retired during it, which go onto the
-// NEW sweep stack unflagged and keep the ordinary grace.
-//
-// What the old rule cost, measured on a 600k-element generator pipeline with ~5MB live:
-// grace kept every object allocated since the previous sweep, so each trigger's worth of
-// garbage survived one whole extra cycle and was traced as a root in it. The first two
-// cycles reclaimed 0KB and 1.2MB, the heap settled at about three triggers (75MB of pages
-// for 5MB live), and the grace pass traced 3.65M dead objects over six cycles.
-//
-// Being a full trace, it also discards the remembered set. A stop-the-world cycle turned
-// concurrent before it began marking (the virtual-thread handshake) comes through here
-// too, and keeps the pages that start already detached: nothing has been scanned yet.
+// A CONCURRENT cycle in a process that runs stop-the-world cycles too (outside a
+// generational phase). Two things a stop-the-world cycle changed are restored: the
+// fresh-reference filter, sound only while every fresh object gets grace, and any pages
+// still flagged pre-cycle because a stop-the-world sweep was skipped -- they go back on the
+// sweep stack with their grace. Being a full trace, it also discards the remembered set.
+// A stop-the-world cycle turned concurrent before it began marking (the virtual-thread
+// handshake). The concurrent restore below undoes what the stop-the-world start did: the
+// fresh filter, the pre-cycle pages, and a set taken for a major (discarded with the rest).
 static void cn1GcHybridAbandonStw(void) {
     cn1GcHybridGen = 0;
     cn1GcHybridBeginConcurrent();
@@ -9208,7 +9191,16 @@ static void cn1GcHybridBeginConcurrent(void) {
     cn1GcHybridLastWasMinor = JAVA_FALSE;
     cn1GcHybridLastWasMajor = JAVA_FALSE;
     cn1GcFreshFilter = JAVA_TRUE;
-    cn1BibopDetachPreCycle();
+    while(cn1GcPreCycleList != 0) {
+        CN1BibopPage* l = cn1GcPreCycleList;
+        cn1GcPreCycleList = l->nextPool;
+        l->gcPreCycle = JAVA_FALSE;
+        CN1BibopPage* sh = atomic_load_explicit(&bibopSweepStack, memory_order_relaxed);
+        do {
+            l->nextPool = sh;
+        } while(!atomic_compare_exchange_weak_explicit(&bibopSweepStack, &sh, l,
+                    memory_order_release, memory_order_relaxed));
+    }
     // The barrier stays armed once a phase has run (it records into a set this discards
     // every concurrent cycle, a full trace). The next phase still opens with a major.
     if(cn1GcGenBarrier) {
@@ -17502,14 +17494,14 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // grace pass traces at all (an old object reachable ONLY through a fresh one).
     // Embedded primitives returned above, so nothing reference-bearing is lost.
     //
-    // Not for a child on a PRE-CYCLE page: that page is neither
+    // Not for a child on a PRE-CYCLE page in single-core mode: that page is neither
     // walked nor graced (its unmarked fresh slots are freed), so the skip's premise --
     // "kept and traced on its own account anyway" -- is false there, and skipping left a
     // kept object pointing at a freed child. The verifier caught it on the first cycle.
     if(cn1GcGraceTraceFresh && !force && markSnapshot == -1
        && CN1_OBJ_HEAPPOS(obj) == CN1_BIBOP_HEAP_POS
-       && !((CN1BibopPage*)((uintptr_t)obj
-                & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle) {
+       && !(cn1GcStwCycle && ((CN1BibopPage*)((uintptr_t)obj
+                & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle)) {
 #ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1GraceFreshSkipped, 1, memory_order_relaxed);
 #endif

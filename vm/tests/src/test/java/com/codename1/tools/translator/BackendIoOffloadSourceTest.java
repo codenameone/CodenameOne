@@ -67,6 +67,13 @@ class BackendIoOffloadSourceTest {
     /// Helpers that are not themselves jobs but are only ever called from one.
     private static final Set<String> JOB_HELPERS = new HashSet<>(Arrays.asList(
             "cn1OpenReadPath", "cn1BackendDanglingLinkIn"));
+    /// Blocking calls that must stay on the calling thread. A connection with
+    /// SQL functions written in Java steps here: such a function runs inside
+    /// sqlite3_step and re-enters the VM on the thread it is called on, which
+    /// an offload pool thread is not. The thread is yielded around the step,
+    /// so the collector is not held up.
+    private static final Set<String> INLINE_BY_DESIGN = new HashSet<>(Arrays.asList(
+            "com_codename1_backend_Db_stepInlineImpl___long_R_int"));
 
     @Test
     void everyBlockingCallInTheIoNativesRunsInAnOffloadJob() throws Exception {
@@ -95,7 +102,7 @@ class BackendIoOffloadSourceTest {
                     continue;
                 }
                 if (function.endsWith("Job") || function.endsWith("JobRun")
-                        || JOB_HELPERS.contains(function)) {
+                        || JOB_HELPERS.contains(function) || INLINE_BY_DESIGN.contains(function)) {
                     continue;
                 }
                 violations.add(name + ":" + (i + 1) + " in " + function + ": " + line.trim());

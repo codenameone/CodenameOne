@@ -69,7 +69,7 @@ MARK="@@CN1CONF@@"
 } > "$STAGE/PyBench.java"
 extra=""
 for p in $progs; do extra="$extra $CONF/$p.py"; done
-if ! PY_SOURCES="$STAGE" PY_EXTRA_FILES="$extra" PY_DRIVER="$STAGE/PyBench.java" PY_OPT="${PY_OPT:--O1}" \
+if ! PY_MAIN="" PY_SOURCES="$STAGE" PY_EXTRA_FILES="$extra" PY_DRIVER="$STAGE/PyBench.java" PY_OPT="${PY_OPT:--O1}" \
         "$HERE/build_parparvm.sh" "$K" > "$STAGE/build.log" 2>&1; then
     tail -40 "$STAGE/build.log"
     echo "BUILD FAILED"

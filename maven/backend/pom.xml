@@ -116,6 +116,15 @@
 
     <build>
         <sourceDirectory>${backend.dir}/src</sourceDirectory>
+        <resources>
+            <!-- The ServiceLoader entry for impl/javase-sqlite's SqliteJdbcFunctions. -->
+            <resource>
+                <directory>${backend.dir}/impl/javase-sqlite</directory>
+                <includes>
+                    <include>META-INF/services/**</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -183,6 +192,9 @@
                                                     <present present="both" targetdir="${core.src.dir}"/>
                                                 </fileset>
                                                 <fileset dir="${backend.dir}/impl/javase" includes="**/*.java">
+                                                    <present present="both" targetdir="${core.src.dir}"/>
+                                                </fileset>
+                                                <fileset dir="${backend.dir}/impl/javase-sqlite" includes="**/*.java">
                                                     <present present="both" targetdir="${core.src.dir}"/>
                                                 </fileset>
                                                 <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java">
@@ -325,6 +337,7 @@
                     <sourceDirectories>
                         <sourceDirectory>${backend.dir}/src</sourceDirectory>
                         <sourceDirectory>${backend.dir}/impl/javase</sourceDirectory>
+                        <sourceDirectory>${backend.dir}/impl/javase-sqlite</sourceDirectory>
                         <sourceDirectory>${backend.dir}/impl/parparvm</sourceDirectory>
                         <sourceDirectory>${backend.dir}/engines</sourceDirectory>
                     </sourceDirectories>
@@ -377,6 +390,8 @@
                         <configuration>
                             <sources>
                                 <source>${backend.dir}/impl/javase</source>
+                                <!-- Db.createFunction on sqlite-jdbc (optional dependency), found by ServiceLoader. -->
+                                <source>${backend.dir}/impl/javase-sqlite</source>
                                 <source>${backend.shared.dir}</source>
                             </sources>
                         </configuration>

@@ -343,7 +343,7 @@ For `replace=`, the build writes a class per module into the project's Java
 sources, `com.codename1.python.ext.<Module>Shims`, with a stub for each
 function. The comment over a stub lists the values it receives:
 
-[source,java]
+[source,java,role=cn1-no-try]
 ----
 public final class SqliteUtilsUtilsShims {
     public static void install() {

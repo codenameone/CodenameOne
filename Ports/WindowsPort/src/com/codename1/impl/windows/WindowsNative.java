@@ -1296,8 +1296,27 @@ public final class WindowsNative {
     public static native double sqlColDouble(long stmtPeer, int col) throws java.io.IOException;
     public static native long sqlColLong(long stmtPeer, int col) throws java.io.IOException;
     // SQL functions written in Java (Database.createFunction). The engine calls back into
-    // the port's database class (sqlFunctionCall), which reads the arguments and sets the
-    // result through these while sqlite3_step waits.
+    // sqlFunctionCall below, which hands the call to the port's database class; that reads the
+    // arguments and sets the result through these while sqlite3_step waits.
+    /// Where the engine's SQL function calls go. Installed by WindowsDatabase when it loads,
+    /// which is before any function can be registered, so it is never null when called.
+    interface SqlFunctionHandler {
+        void call(long ctx, int id, int argc, long argv);
+    }
+
+    static SqlFunctionHandler sqlFunctionHandler;
+
+    /// Called by the engine (cn1_windows_db.c) while a statement calls a Java function. It lives
+    /// here rather than in WindowsDatabase because the C that calls it is compiled into every
+    /// translation, and a translation that never names the database class would otherwise
+    /// fail to link.
+    static void sqlFunctionCall(long ctx, int id, int argc, long argv) {
+        SqlFunctionHandler h = sqlFunctionHandler;
+        if (h != null) {
+            h.call(ctx, id, argc, argv);
+        }
+    }
+
     public static native int sqlDbCreateFunction(long dbPeer, byte[] nameUtf8, int argCount, int id);
     public static native int sqlValueType(long argv, int index);
     public static native long sqlValueLong(long argv, int index);

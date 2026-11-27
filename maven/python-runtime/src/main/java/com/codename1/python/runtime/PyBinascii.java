@@ -132,7 +132,8 @@ final class PyBinascii {
     }
 
     static long crc32(byte[] d, long start) {
-        int c = ~(int) start;
+        // CRC-32 is 32 bits wide: CPython takes the starting value modulo 2**32 too.
+        int c = ~Long.valueOf(start & 0xFFFFFFFFL).intValue();
         for (byte b : d) {
             c = CRC[(c ^ b) & 0xff] ^ (c >>> 8);
         }

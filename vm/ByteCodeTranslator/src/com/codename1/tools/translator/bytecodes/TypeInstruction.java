@@ -276,6 +276,17 @@ public class TypeInstruction extends Instruction {
             }
             ByteCodeClass.addArrayType(actualType, 1);
         }
+        if((opcode == Opcodes.CHECKCAST || opcode == Opcodes.INSTANCEOF) && t != null && type.startsWith("[")) {
+            // Both compare against cn1_array_<n>_id_<type>, and Parser defines that id only
+            // for an array class the program has. A cast or test of an array type nothing
+            // allocates (Struct[] in a method that only receives one) would otherwise name
+            // an id that does not exist, and the C compile fails on an undeclared identifier.
+            int dim = 1;
+            while(type.charAt(dim) == '[') {
+                dim++;
+            }
+            ByteCodeClass.addArrayType(actualType, dim);
+        }
     }
     
     

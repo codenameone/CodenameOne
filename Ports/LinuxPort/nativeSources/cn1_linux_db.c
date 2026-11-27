@@ -29,7 +29,7 @@
 #include "cn1_db_sqlite_impl.h"
 
 CN1_DB_DEFINE_NATIVES(cn1DbLinuxEngine)
-CN1_DB_DEFINE_FUNCTION_NATIVES(cn1DbLinuxEngine, com_codename1_impl_linux_LinuxDatabase_sqlFunctionCall___long_int_int_long)
+CN1_DB_DEFINE_FUNCTION_NATIVES(cn1DbLinuxEngine, com_codename1_impl_linux_LinuxNative_sqlFunctionCall___long_int_int_long)
 
 /*
  * The entry points, spelled out rather than pasted together.

@@ -307,80 +307,27 @@ public final class Db {
     }
 
     /// Registers a scalar SQL function; see Database.createFunction. The
-    /// packaged binary's twin calls sqlite3_create_function_v2 directly;
-    /// here sqlite-jdbc does, and the values cross the same way.
+    /// packaged binary's twin calls sqlite3_create_function_v2 directly; here
+    /// sqlite-jdbc does, through SqliteJdbcFunctions (impl/javase-sqlite). That
+    /// class is a ServiceLoader provider rather than code in this file because
+    /// sqlite-jdbc is an optional dependency: this twin is also compiled with the
+    /// JDK alone, where SQL functions are simply unavailable.
     public synchronized boolean createFunction(String name, int argc,
             final java.util.function.Function<Object[], Object> body) throws IOException {
         if (name.indexOf('\0') >= 0) {
             throw new IOException("a function name cannot contain NUL");
         }
         Connection c = live(); //NOPMD CloseResource - the Db owns its connection; close() releases it
+        SqlFunctionRegistrar registrar = SqlFunctionRegistrar.Holder.INSTANCE;
+        if (registrar == null) {
+            throw new IOException("SQL functions need sqlite-jdbc on the class path");
+        }
         try {
-            org.sqlite.Function.create(c, name, new SqlFunction(body), argc, 0);
+            registrar.register(c, name, argc, body);
         } catch (SQLException err) {
             throw new IOException("could not register " + name + ": " + err.getMessage(), err);
         }
         return true;
-    }
-
-    private static final class SqlFunction extends org.sqlite.Function {
-        /// SQLite's value type codes, SQLITE_INTEGER through SQLITE_BLOB.
-        private static final int TYPE_INTEGER = 1;
-        private static final int TYPE_FLOAT = 2;
-        private static final int TYPE_TEXT = 3;
-        private static final int TYPE_BLOB = 4;
-
-        private final java.util.function.Function<Object[], Object> body;
-
-        SqlFunction(java.util.function.Function<Object[], Object> body) {
-            this.body = body;
-        }
-
-        @Override
-        protected void xFunc() throws SQLException {
-            int argc = args();
-            Object[] values = new Object[argc];
-            for (int i = 0; i < argc; i++) {
-                switch (value_type(i)) {
-                    case TYPE_INTEGER:
-                        values[i] = Long.valueOf(value_long(i));
-                        break;
-                    case TYPE_FLOAT:
-                        values[i] = Double.valueOf(value_double(i));
-                        break;
-                    case TYPE_TEXT:
-                        values[i] = value_text(i);
-                        break;
-                    case TYPE_BLOB:
-                        values[i] = value_blob(i);
-                        break;
-                    default:
-                        values[i] = null;
-                        break;
-                }
-            }
-            Object r;
-            try {
-                r = body.apply(values);
-            } catch (RuntimeException err) {
-                String message = err.getMessage();
-                error(message == null ? err.toString() : message);
-                return;
-            }
-            if (r == null) {
-                result();
-            } else if (r instanceof Double || r instanceof Float) {
-                result(((Number) r).doubleValue());
-            } else if (r instanceof Number) {
-                result(((Number) r).longValue());
-            } else if (r instanceof Boolean) {
-                result(((Boolean) r).booleanValue() ? 1 : 0);
-            } else if (r instanceof byte[]) {
-                result((byte[]) r);
-            } else {
-                result(r.toString());
-            }
-        }
     }
 
     private Connection live() throws IOException {

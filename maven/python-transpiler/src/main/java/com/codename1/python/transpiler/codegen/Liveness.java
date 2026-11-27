@@ -281,6 +281,14 @@ public final class Liveness {
     /// never run; their bodies are left alone.
     public static Set<String> prune(Map<String, List<Stmt>> bodies, Set<String> packages, String main,
             Collection<String> keep, Set<String> runtimeNames) {
+        return prune(bodies, packages, java.util.Collections.singleton(main), keep, runtimeNames);
+    }
+
+    /// [#prune] from several roots, each kept whole: the application's own
+    /// modules of a build with no main module (library mode). What they
+    /// import is pruned as it is from a main.
+    public static Set<String> prune(Map<String, List<Stmt>> bodies, Set<String> packages, Collection<String> roots,
+            Collection<String> keep, Set<String> runtimeNames) {
         Liveness l = new Liveness();
         l.pruneMembers = runtimeNames != null;
         if (runtimeNames != null) {
@@ -301,7 +309,9 @@ public final class Liveness {
             }
         }
         l.effects();
-        l.full(l.mods.get(main));
+        for (String root : roots) {
+            l.full(l.mods.get(root));
+        }
         for (String r : RUNTIME_MODULES) {
             l.full(l.mods.get(r));
         }

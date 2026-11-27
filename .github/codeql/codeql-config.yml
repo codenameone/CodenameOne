@@ -41,3 +41,7 @@ paths-ignore:
   # CodeQL treats a `new byte[n]` filled in another method as a static IV and
   # reports this sink for each of them.
   - 'maven/compat-testing/src/main/java/com/codename1/compat/testing/HeadlessAes.java'
+  # The python-transpiler tests' JDBC stand-in for the sqlite3 bridge, a test
+  # double: like any database driver it runs the statement it is handed, which
+  # the conformance program under test wrote. Reported as SQL injection.
+  - 'maven/python-transpiler/src/test/java/com/codename1/python/transpiler/JvmSql.java'

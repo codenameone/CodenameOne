@@ -782,10 +782,12 @@ public final class Database {
             refuseNulInTextParameters(params);
             return hit.rendered;
         }
-        if (sql.indexOf('?') < 0 && atMostOneFinalSemicolon(sql)) {
+        if (sql.indexOf('?') < 0 && atMostOneFinalSemicolon(sql) && !mayBeConditionalDdl(sql)) {
             // NEITHER SCAN CAN CHANGE THIS ONE: with no ? there is nothing to
-            // render ([Dialect#bind] passes such a statement through
-            // untouched), and with no ; but a final one there is no second
+            // render, and Dialect.bind's other rewrite -- CREATE ... IF NOT
+            // EXISTS and DROP ... IF EXISTS in the spelling of an engine that
+            // lacks them, SQL Server and Oracle -- only applies to a statement
+            // mayBeConditionalDdl lets through to it; with no ; but a final one there is no second
             // statement for hasTrailingStatement to find, whatever is quoted.
             // sqlite-utils names every savepoint afresh -- SAVEPOINT
             // sqlite_utils_<random> -- so these never repeat, never hit the
@@ -827,6 +829,23 @@ public final class Database {
             seen[slot] = hash;
         }
         return rendered;
+    }
+
+    /// False only for a statement that cannot be CREATE or DROP: one starting,
+    /// after blanks, with neither verb nor a comment that could precede one.
+    private static boolean mayBeConditionalDdl(String sql) {
+        int i = 0;
+        int n = sql.length();
+        while (i < n && sql.charAt(i) <= ' ') {
+            i++;
+        }
+        if (i >= n) {
+            return false;
+        }
+        char c = sql.charAt(i);
+        return c == '-' || c == '/' || c == '#'
+                || sql.regionMatches(true, i, "CREATE", 0, 6)
+                || sql.regionMatches(true, i, "DROP", 0, 4);
     }
 
     /// True when `sql` holds no `;`, or exactly one as its last character

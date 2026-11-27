@@ -1872,20 +1872,11 @@ struct TryBlock {
 #define CN1_SATB_FRESH_INLINE(o) 0
 #else
 // The filter is only sound while the sweep grants EVERY fresh object a cycle of grace.
-// Every BiBOP cycle reclaims the unmarked fresh objects on PRE-CYCLE pages -- pages retired
-// before it began (cn1GcHybridBeginConcurrent in cn1_globals.m) -- so a fresh reference to
-// an object on one of those is logged like any other. Every other fresh object keeps its
-// grace and stays filtered, which is what keeps a concurrent mark's log sized by the live
-// set rather than by the allocation rate (issue 5537: 2.7M fresh references logged in one
-// cycle when all of them were). A stop-the-world cycle parks the mutators while the barrier
-// is armed, so it turns the filter off outright (cn1GcFreshFilter) and also frees fresh
-// legacy objects.
+// Single-core mode (see cn1GcSingleCore in cn1_globals.m) reclaims fresh objects that
+// were allocated before the cycle began, so there a fresh reference is logged like any
+// other; cn1GcFreshFilter is set once, at the first collection, and never changes.
 extern JAVA_BOOLEAN cn1GcFreshFilter;
-#define CN1_SATB_ON_PRE_CYCLE_PAGE(o) (CN1_OBJ_HEAPPOS(o) == CN1_BIBOP_HEAP_POS \
-        && __atomic_load_n(&((CN1BibopPage*)((uintptr_t)(o) \
-               & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcPreCycle, __ATOMIC_RELAXED))
-#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_IS_FRESH((o), __ATOMIC_RELAXED) \
-        && !CN1_SATB_ON_PRE_CYCLE_PAGE(o))
+#define CN1_SATB_FRESH_INLINE(o) (cn1GcFreshFilter && CN1_OBJ_MARK_IS_FRESH((o), __ATOMIC_RELAXED))
 #endif
 // Two halves share the gate. The SATB half runs only while a mark is in progress. The
 // GENERATIONAL half (single-core mode only, see cn1GcSingleCore) runs always: a young
@@ -3514,12 +3505,30 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
     SP = cn1SpEntry; \
     __asm__ __volatile__("" : : "r"(cn1SpEntry) : "memory");
 
+// The restore variable is assigned when its try is entered, and only a throw
+// from inside that try sets cn1TryCaught to this handler's constant, so the
+// read below never sees it unassigned. The compiler cannot follow the longjmp
+// and reports it as uninitialized at every handler; it is silenced here rather
+// than paid for with an initializing store on every call of the method.
+#if defined(__clang__)
+#define CN1_UNINIT_READ_BEGIN _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wuninitialized\"")
+#define CN1_UNINIT_READ_END _Pragma("clang diagnostic pop")
+#elif defined(__GNUC__)
+#define CN1_UNINIT_READ_BEGIN _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wuninitialized\"") _Pragma("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
+#define CN1_UNINIT_READ_END _Pragma("GCC diagnostic pop")
+#else
+#define CN1_UNINIT_READ_BEGIN
+#define CN1_UNINIT_READ_END
+#endif
+
 #define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) \
     enum { destinationJump = __COUNTER__ + 2 }; \
 { \
     if(cn1TryCaught == destinationJump) { \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
+        CN1_UNINIT_READ_BEGIN \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
+        CN1_UNINIT_READ_END \
         SP = &stack[1]; \
         stack[0].data.o = threadStateData->exception; \
         stack[0].type = CN1_TYPE_OBJECT; \

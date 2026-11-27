@@ -311,6 +311,18 @@ public final class WholeProgram {
         this.main = main;
     }
 
+    private Set<String> libraryRoots;
+
+    /// The application's own modules, the roots of a build with no main
+    /// module (library mode). Every one of them is an entry point, but a
+    /// module bundled with the runtime or taken from PyPI runs only when one
+    /// of them imports it, as in a build with a main: taking every module of
+    /// the program as live judged, and emitted, classes of the bundled
+    /// modules that nothing uses.
+    public void libraryRoots(Set<String> modules) {
+        this.libraryRoots = modules;
+    }
+
     /// Whether module `name` runs, and so is emitted.
     public boolean isLive(String name) {
         Infer m = types.modules.get(name);
@@ -318,9 +330,18 @@ public final class WholeProgram {
     }
 
     public void infer() {
-        if (main != null && types.modules.containsKey(main) && types.runtimeNames != null) {
+        boolean library = main == null && libraryRoots != null && !libraryRoots.isEmpty();
+        if ((library || main != null && types.modules.containsKey(main)) && types.runtimeNames != null) {
             types.allLive = false;
-            types.markLive(main);
+            if (library) {
+                for (String n : libraryRoots) {
+                    if (types.modules.containsKey(n)) {
+                        types.markLive(n);
+                    }
+                }
+            } else {
+                types.markLive(main);
+            }
             // What the runtime imports by name (Py.importModule).
             for (String n : new String[] {"builtins", "copyreg", "io"}) {
                 types.markLive(n);

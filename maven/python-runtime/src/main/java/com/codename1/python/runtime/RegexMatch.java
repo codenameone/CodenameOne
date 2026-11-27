@@ -95,15 +95,16 @@ final class RegexMatch extends PyObject {
         if (pos > endpos) {
             return Py.NONE;
         }
-        int start = at < 0 ? (int) pos : at;
+        // pos and endpos are clamped to [0, n] above, so neither conversion can fail.
+        int start = at < 0 ? Math.toIntExact(pos) : at;
         if (start > endpos) {
             return Py.NONE;
         }
-        int[] regs = Regex.run(p, text, pairs, start, (int) endpos, mode, forbid);
+        int[] regs = Regex.run(p, text, pairs, start, Math.toIntExact(endpos), mode, forbid);
         if (regs.length == 0) {
             return Py.NONE;
         }
-        return new RegexMatch(pattern, string, text, isBytes, (int) pos, (int) endpos, p.groups, regs);
+        return new RegexMatch(pattern, string, text, isBytes, Math.toIntExact(pos), Math.toIntExact(endpos), p.groups, regs);
     }
 
     /// The str or bytes a subject is: a str or bytes subclass (bs4's

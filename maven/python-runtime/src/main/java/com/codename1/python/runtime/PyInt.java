@@ -478,7 +478,12 @@ public class PyInt extends PyObject {
         if (big == null && n < 63 && (value == 0 || Math.abs(value) < (1L << (62 - n)))) {
             return of(value << n);
         }
-        return of(toBig().shiftLeft((int) n));
+        if (n > Integer.MAX_VALUE) {
+            // A cast would wrap the count, and a negative one makes shiftLeft
+            // shift right. CPython cannot build such a number either.
+            throw Py.overflowError("too many digits in integer");
+        }
+        return of(toBig().shiftLeft(Math.toIntExact(n)));
     }
 
     @Override
@@ -493,7 +498,11 @@ public class PyInt extends PyObject {
         if (big == null) {
             return of(n >= 64 ? (value < 0 ? -1 : 0) : value >> n);
         }
-        return of(big.shiftRight((int) n));
+        if (n > Integer.MAX_VALUE) {
+            // Past every bit of any representable number: what is left is the sign.
+            return of(big.signum() < 0 ? -1 : 0);
+        }
+        return of(big.shiftRight(Math.toIntExact(n)));
     }
 
     @Override
