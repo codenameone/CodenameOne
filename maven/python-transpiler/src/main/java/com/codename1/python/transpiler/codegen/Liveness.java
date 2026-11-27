@@ -127,13 +127,6 @@ public final class Liveness {
     private final Deque<Runnable> work = new ArrayDeque<Runnable>();
     private final Map<Stmt, Mod> homeOf = new IdentityHashMap<Stmt, Mod>();
     private boolean distributionsRead;
-    private static final boolean WHY = System.getProperty("cn1.python.whyLive") != null;
-    private String cause = "root";
-    private static final String WHY_MEMBER = System.getProperty("cn1.python.whyMember");
-    /// `-Dcn1.python.whyAttr=name`: where the attribute name was first read.
-    private static final String WHY_ATTR = System.getProperty("cn1.python.whyAttr");
-    /// The module being visited, for #WHY_ATTR.
-    private String visiting = "";
     /// Every attribute name live code reads (and every identifier of its
     /// strings, and what the Java runtime looks up by name): a method of a
     /// kept class whose name is in none of them is never called.
@@ -347,13 +340,6 @@ public final class Liveness {
                 l.replaceImports(m.body);
             }
         }
-        if (WHY_MEMBER != null) {
-            for (ClassDef c : l.classes) {
-                if (WHY_MEMBER.contains("," + c.name + ",")) {
-                    System.err.println("class kept " + c.name + ":" + c.line);
-                }
-            }
-        }
         if (l.pruneMembers) {
             for (ClassDef c : l.classes) {
                 c.body.removeIf(s -> s instanceof FunctionDef && prunable((FunctionDef) s) && !l.members.contains(s));
@@ -361,10 +347,6 @@ public final class Liveness {
                     c.body.add(new Pass());
                 }
             }
-        }
-        if (System.getProperty("cn1.python.whyLive") != null) {
-            System.err.println("liveness: " + l.live.size() + " of " + l.mods.size() + " modules, "
-                    + l.kept.size() + " statements kept");
         }
         return dead;
     }
@@ -444,9 +426,6 @@ public final class Liveness {
         if (id.length() < 2 || !namePrefixes.add(id)) {
             return;
         }
-        if (WHY_ATTR != null && WHY_ATTR.startsWith(id)) {
-            System.err.println("prefix " + id + " <- " + cause + " in " + visiting);
-        }
         for (String n : new ArrayList<String>(waiting.keySet())) {
             if (n.startsWith(id)) {
                 wake(waiting.remove(n));
@@ -517,9 +496,6 @@ public final class Liveness {
         if (!attrs.add(n)) {
             return;
         }
-        if (WHY_ATTR != null && WHY_ATTR.equals(n)) {
-            System.err.println("attr " + n + " <- " + cause + " in " + visiting);
-        }
         wake(waiting.remove(n));
     }
 
@@ -533,9 +509,6 @@ public final class Liveness {
             @SuppressWarnings("unchecked")
             Map<String, String> local = (Map<String, String>) w[2];
             if (members.add(f)) {
-                if (WHY_MEMBER != null && WHY_MEMBER.equals(m.name)) {
-                    System.err.println("member " + f.name + " of " + m.name + ":" + f.line);
-                }
                 work.add(() -> {
                     localImports(m, f, local, false);
                     visit(m, f, local);
@@ -1137,9 +1110,6 @@ public final class Liveness {
         if (m == null || !live.add(m)) {
             return;
         }
-        if (WHY) {
-            System.err.println("live " + m.name + " <- " + cause);
-        }
         // A package's __init__ runs before any module under it.
         int dot = m.name.lastIndexOf('.');
         if (dot > 0) {
@@ -1265,7 +1235,6 @@ public final class Liveness {
 
     /// Follows everything kept top-level statement `s` of `m` reads.
     private void reads(Mod m, Stmt s) {
-        cause = m.name + ":" + s.line;
         Map<String, String> local = new HashMap<String, String>();
         localImports(m, s, local, s instanceof Import || s instanceof ImportFrom);
         if (s instanceof Import || s instanceof ImportFrom) {
@@ -1568,7 +1537,6 @@ public final class Liveness {
     }
 
     private void visitNode(Mod m, Object o, Map<String, String> local) {
-        visiting = m.name;
         if (o instanceof If && typeChecking(((If) o).test)) {
             visit(m, ((If) o).test, local);
             for (Stmt x : ((If) o).orelse) {
@@ -1936,7 +1904,6 @@ public final class Liveness {
             for (Stmt x : table.body) {
                 String g = EntryPointTable.registers(x);
                 if (g != null && attrs.contains(g) && keptGroups.add(g)) {
-                    cause = "entry point group " + g;
                     keep(table, x);
                     any = true;
                 }
@@ -1957,7 +1924,6 @@ public final class Liveness {
                 if (t == null) {
                     continue;
                 }
-                cause = "entry point group " + e.getKey();
                 if (colon < 0) {
                     full(t);
                 } else {

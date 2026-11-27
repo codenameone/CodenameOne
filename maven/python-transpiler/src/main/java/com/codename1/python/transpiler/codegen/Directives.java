@@ -63,7 +63,7 @@ import java.util.TreeSet;
 /// in the original module, so it reads that module's globals and imports
 /// as the original did. It is how a third-party function that uses
 /// reflection -- `getattr(self, "convert_" + tag)` -- is compiled under
-/// `cn1.python.strict` without editing the package.
+/// strict mode without editing the package.
 ///
 /// A name is the module's dotted name followed by the function's, or by a
 /// class's and a method's. `remove` also takes a class (none of its methods

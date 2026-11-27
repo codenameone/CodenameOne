@@ -246,7 +246,14 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
             // position beyond the row count. Only an explicit rewind clears this.
             return false;
         }
-        if (advance()) {
+        boolean first = position < 0;
+        boolean row = advance();
+        if (first) {
+            // A port's cached statement is re-prepared for a schema change
+            // only by its first step; a count read before it is the old one.
+            knownColumnCount = -1;
+        }
+        if (row) {
             position++;
             onRow = true;
             return true;

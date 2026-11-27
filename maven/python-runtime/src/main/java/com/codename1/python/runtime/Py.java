@@ -2808,20 +2808,6 @@ public final class Py {
         return isTrue(call(f, o, t));
     }
 
-    /// `typing.cast(t, o)` where typed code holds the result as `t`'s
-    /// compiled class: `o` when it is None or passes `isinstance(o, t)`,
-    /// TypeError otherwise -- never a wrongly typed object.
-    public static Object castChecked(Object o, Object t) {
-        if (o == null || o == NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
-            // The typed caller holds a nullable T, whose None is null.
-            return null;
-        }
-        if (isinstance(o, t)) {
-            return o;
-        }
-        throw typeError("cast() to " + toStr(t) + " got " + toStr(typeOf(o)));
-    }
-
     public static boolean isinstance(Object o, Object t) {
         if (t instanceof PyType) {
             // The common case first: a class, not a tuple or a union.

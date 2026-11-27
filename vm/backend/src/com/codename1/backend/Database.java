@@ -122,7 +122,6 @@ public final class Database {
         this.describedAs = describedAs;
         this.dialect = dialect;
         this.boundStatements = boundStatementsFor(dialect);
-        this.gate = sqlite != null ? sqlite : new Object();
     }
 
     /// The server engines this application can open, by canonical name. The
@@ -1088,14 +1087,7 @@ public final class Database {
     /// at a time, and a transaction reserved to its caller -- is a flag, taken and
     /// given back under a monitor held only for that instant. A virtual thread
     /// waiting for it naps; anything else waits on the monitor, as before.
-    ///
-    /// On SQLite the gate's monitor IS the engine's: [Db] synchronizes every
-    /// method on itself, so a statement that finds the gate free takes the flag,
-    /// runs and gives it back inside one hold of that monitor -- the engine call
-    /// inside is a reentrant entry -- instead of three separate monitor entries
-    /// ([#sqliteQueryIfFree], [#sqliteExecuteIfFree]). That is no wider than the
-    /// engine's own lock already was: the statement held it for its whole run.
-    private final Object gate;
+    private final Object gate = new Object();
     private Object gateOwner;
     private int gateHolds;
 

@@ -86,7 +86,7 @@ import java.util.Set;
 /// program passes to a method of that name, each assigned as a plain
 /// attribute. The pass is all or nothing: if any descriptor or call site
 /// cannot be evaluated, the program is left untouched and the reason is
-/// reported (`-Dcn1.python.oxml.report=true`).
+/// recorded in the pass's report.
 public final class OxmlDeclarative {
 
     private static final Set<String> KINDS = new HashSet<String>(Arrays.asList("OptionalAttribute",
@@ -135,11 +135,6 @@ public final class OxmlDeclarative {
             d.modules.put(m.replace('/', '.'), e.getValue());
         }
         d.run();
-        if (Boolean.getBoolean("cn1.python.oxml.report")) {
-            for (String r : d.report) {
-                System.err.println("oxml: " + r); //NOPMD SystemPrintln - opt-in diagnostics
-            }
-        }
         return new ArrayList<String>(d.report);
     }
 

@@ -613,9 +613,6 @@ public final class Emitter {
         if (!stmts.isEmpty() && isDocstring(stmts.get(0))) {
             body.append("        G[1] = ").append(constant((Constant) ((ExprStmt) stmts.get(0)).value)).append(";\n");
         }
-        if (System.getProperty("cn1.python.dumpTypes") != null) {
-            System.err.println(infer.dump());
-        }
         if (typedEmit == null) {
             planTyped();
             planBodies();

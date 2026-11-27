@@ -234,13 +234,6 @@ public final class DeclarativeMap {
             trees.put(SerialisableMethods.MODULE_PATH, Parser.parse(SerialisableMethods.moduleSource(),
                     SerialisableMethods.MODULE_PATH));
         }
-        if (Boolean.getBoolean("cn1.python.declmap.report")) {
-            System.err.println("declmap: lowered " + d.lowered + " fields, " + d.aliases //NOPMD SystemPrintln - opt-in diagnostics
-                    + " aliases, synthesized " + d.synthesized + " classes; left " + d.report.size());
-            for (String r : d.report) {
-                System.err.println("declmap: " + r); //NOPMD SystemPrintln - opt-in diagnostics
-            }
-        }
         return new ArrayList<String>(d.report);
     }
 
@@ -267,7 +260,7 @@ public final class DeclarativeMap {
             changed = false;
             for (String k : new ArrayList<String>(allowed)) {
                 for (String ch : children.getOrDefault(k, new ArrayList<String>())) {
-                    if (!allowed.contains(ch) || Boolean.getBoolean("cn1.python.declmap.leafOnly")) {
+                    if (!allowed.contains(ch)) {
                         allowed.remove(k);
                         changed = true;
                         break;

@@ -72,9 +72,10 @@ public final class Db {
         boolean busy;
         boolean cached;
         long used;
-        /// The column names last read, and where SQLite kept each one then.
+        /// The column names last read, and the statement's re-prepare count
+        /// then (sqlite3_stmt_status SQLITE_STMTSTATUS_REPREPARE).
         String[] names;
-        long[] namePtrs;
+        int namesAt;
 
         Stmt(String sql, long handle) {
             this.sql = sql;
@@ -305,10 +306,18 @@ public final class Db {
         Stmt st = prepare(sql, params);
         long stmt = st.handle;
         try {
-            int columns = columnCountImpl(stmt);
-            String[] names = columnNames(st, columns);
+            // AFTER THE FIRST STEP: a cached statement is re-prepared for a
+            // schema change only inside sqlite3_step, so before it the count
+            // and names are the old program's -- an ALTER TABLE ADD COLUMN
+            // between two runs of `SELECT *` would drop the new column.
+            int columns = -1;
+            String[] names = null;
             while (true) {
                 int rc = step(stmt);
+                if (columns < 0 && rc >= 0) {
+                    columns = columnCountImpl(stmt);
+                    names = columnNames(st, columns);
+                }
                 if (rc < 0) {
                     throw new IOException("Query failed: " + errorImpl(handle) + " [" + sql + "]");
                 }
@@ -553,8 +562,11 @@ public final class Db {
                 closePending = true;
                 return;
             }
+            // Taken in the same section as the check: a caller entering
+            // between the two would make this close wait instead of deferring.
+            gateOwner = me;
+            gateHolds++;
         }
-        enter();
         try {
             closeLocked();
         } finally {
@@ -615,17 +627,6 @@ public final class Db {
                 finalizeImpl(readHold);
                 readHold = 0;
             }
-            if (file != null) {
-                synchronized (OPEN) {
-                    java.util.ArrayList<Db> list = OPEN.get(file);
-                    if (list != null) {
-                        list.remove(this);
-                        if (list.isEmpty()) {
-                            OPEN.remove(file);
-                        }
-                    }
-                }
-            }
             // sqlite3_close answers SQLITE_BUSY while any statement is alive,
             // so the cached ones go first.
             // A busy one is mid-step under a re-entrant call; release() finalizes it
@@ -640,6 +641,19 @@ public final class Db {
             if (closeImpl(handle) == 0) {
                 handle = 0;
                 releaseFunctions();
+                // Only once closed: a connection that stays open is still
+                // one of the file's.
+                if (file != null) {
+                    synchronized (OPEN) {
+                        java.util.ArrayList<Db> list = OPEN.get(file);
+                        if (list != null) {
+                            list.remove(this);
+                            if (list.isEmpty()) {
+                                OPEN.remove(file);
+                            }
+                        }
+                    }
+                }
             } else {
                 // Not silent. The handle is deliberately kept so a later close can
                 // retry, but a connection that will not close is worth a line:
@@ -671,24 +685,17 @@ public final class Db {
     /// run, and they change only when SQLite re-prepares the statement after a
     /// schema change -- which moves where it keeps them, so the addresses tell.
     private static String[] columnNames(Stmt st, int columns) {
+        int at = reprepareCountImpl(st.handle);
         String[] names = st.names;
-        long[] ptrs = st.namePtrs;
-        boolean same = names != null && names.length == columns;
-        for (int iter = 0 ; same && iter < columns ; iter++) {
-            long ptr = columnNamePtrImpl(st.handle, iter);
-            same = ptr != 0 && ptr == ptrs[iter];
-        }
-        if (same) {
+        if (names != null && names.length == columns && st.namesAt == at) {
             return names;
         }
         names = new String[columns];
-        ptrs = new long[columns];
         for (int iter = 0 ; iter < columns ; iter++) {
-            ptrs[iter] = columnNamePtrImpl(st.handle, iter);
             names[iter] = columnNameImpl(st.handle, iter);
         }
         st.names = names;
-        st.namePtrs = ptrs;
+        st.namesAt = at;
         return names;
     }
 
@@ -982,10 +989,11 @@ public final class Db {
     private static native int stepImpl(long stmt);
 
     private static native int stepInlineImpl(long stmt);
+
     private static native int parameterCountImpl(long stmt);
     private static native int columnCountImpl(long stmt);
     private static native String columnNameImpl(long stmt, int index);
-    private static native long columnNamePtrImpl(long stmt, int index);
+    private static native int reprepareCountImpl(long stmt);
     private static native int columnTypeImpl(long stmt, int index);
     private static native String columnStringImpl(long stmt, int index);
     private static native long columnLongImpl(long stmt, int index);

@@ -316,6 +316,8 @@ class LinuxDatabase extends Database {
         peer = 0;
         try {
             LinuxNative.sqlDbClose(closing);
+            // Only once the engine is gone: a statement it still ran could call one.
+            FUNCTIONS.release(this);
         } finally {
             // Last, not first: see the iOS port. The claim covers the handle, not the intent to
             // close. In a finally because the native close can fail and the handle has already
@@ -348,8 +350,9 @@ class LinuxDatabase extends Database {
     @Override
     public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         checkOpen();
-        int id = function == null ? -1 : FUNCTIONS.register(function);
-        if (LinuxNative.sqlDbCreateFunction(peer, com.codename1.util.StringUtil.getBytes(name), argCount, id) != 0) {
+        byte[] utf8 = SqlFunctionBridge.functionName(name);
+        int id = function == null ? -1 : FUNCTIONS.register(this, function);
+        if (LinuxNative.sqlDbCreateFunction(peer, utf8, argCount, id) != 0) {
             throw new IOException("Could not create the SQL function " + name);
         }
     }

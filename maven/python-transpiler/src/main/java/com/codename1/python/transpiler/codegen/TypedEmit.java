@@ -586,9 +586,6 @@ final class TypedEmit {
                     deps.put(f, calls);
                     gdeps.put(f, callsGroups);
                 } catch (Unsupported u) {
-                    if (System.getProperty("cn1.python.dumpTypes") != null) {
-                        System.err.println("untyped " + f.def.name + ": " + u.getMessage());
-                    }
                     ok.remove(f);
                     typed.remove(f);
                     changed = true;
@@ -7662,15 +7659,7 @@ final class TypedEmit {
 
     private E call(Call c) {
         if (in.isCast(c, sc)) {
-            Layouts.Cls o = in.castClass(c, sc);
             E v = expr(c.args.get(1));
-            if (o != null) {
-                // A T, checked (Infer#castClass): TypeError, never a wrong object.
-                // Nullable whatever v was inferred to be: a cast answers None
-                // unchanged, and Py.castChecked hands it back as null.
-                Ty t = Ty.inst(o, true);
-                return new E("((" + jt(t) + ") Py.castChecked(" + box(v) + ", " + box(expr(c.args.get(0))) + "))", t);
-            }
             // typing.cast(T, v) is v (Infer#isCast).
             return v;
         }

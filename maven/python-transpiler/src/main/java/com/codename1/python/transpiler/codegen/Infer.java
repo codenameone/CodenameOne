@@ -59,26 +59,10 @@ import java.util.Set;
 /// the pass cannot follow escapes: a function or class used as a value gets
 /// `OBJECT` parameters, and a list that escapes gets `OBJECT` elements.
 final class Infer {
-    /// `cn1.python.strict`: the closed-world build errors (a computed
-    /// attribute name, a class with no layout) fail the build; the property
-    /// only narrows them to some module prefixes. See [#strictErrors].
-    static final String[] STRICT = strictPrefixes(System.getProperty("cn1.python.strict"));
+    /// The Python line the pass is walking.
+    private int line;
 
-    /// Strict mode is always on. The property only narrows the report to some modules while one is
-    /// being worked on; unset, every module of the program is held to it.
-    private static String[] strictPrefixes(String v) {
-        if (v == null || v.trim().isEmpty()) {
-            return new String[0];
-        }
-        String[] s = v.split(",");
-        for (int i = 0; i < s.length; i++) {
-            s[i] = s[i].trim();
-        }
-        return s;
-    }
-
-    /// The Python line the pass is walking, for [#cause].
-    private int line;    /// Strict mode: the expressions that make untyped values from typed    /// Strict mode: reflection found in this module (an attribute named by
+    /// Strict mode: reflection found in this module (an attribute named by
     /// a string the build cannot enumerate), reported by [#strictErrors].
     private final Set<String> reflective = new LinkedHashSet<String>();
 
@@ -156,8 +140,6 @@ final class Infer {
             this.store = !what.startsWith("reads");
         }
     }
-
-    static final boolean WHY_LIVE = System.getProperty("cn1.python.whyLive") != null;
 
     static final class Program {
         /// Every compiled class a `CLS` type has named, by id (see
@@ -386,8 +368,6 @@ final class Infer {
         /// then on a string of a live module that names a module, or a
         /// constant prefix of a formatted one, makes it live too.
         boolean computedImports;
-        /// What made the next module live, for `-Dcn1.python.whyLive`.
-        String cause = "root";
 
         /// Makes module `name` and each package above it live.
         void markLive(String name) {
@@ -400,9 +380,6 @@ final class Infer {
                 Infer m = modules.get(dot < 0 ? name : name.substring(0, dot));
                 if (m != null && live.add(m)) {
                     changed = true;
-                    if (WHY_LIVE) {
-                        System.err.println("live " + m.moduleName + " <- " + cause);
-                    }
                     if ("importlib".equals(m.moduleName) || "_cn1imp".equals(m.moduleName)) {
                         computedImports = true;
                         for (Infer l : new ArrayList<Infer>(live)) {
@@ -802,13 +779,6 @@ final class Infer {
                             f.ret = Ty.OBJECT;
                         }
                     }
-                    if (System.getProperty("cn1.python.dumpProblems") != null) {
-                        for (Problem q : problems.values()) {
-                            System.err.println("problem " + q.module + ":" + q.line + " " + q.function + ": " + q.what);
-                        }
-                        System.err.println("live " + (allLive ? modules.size() : live.size()) + " of " + modules.size() + " modules");
-                        System.err.println("reached " + reached.size() + " of " + fns.size() + " functions; loose " + loose.size() + " of " + home.size() + " classes, " + looseModules.size() + " modules");
-                    }
                     for (Infer in : modules.values()) {
                         in.localize();
                     }
@@ -1006,9 +976,6 @@ final class Infer {
     private boolean noCallReached(Fn f) {
         if (f.params.length < 2 || p.unseenArgs.containsKey(f) || p.objectArgs.contains(f)) {
             // A call passing values of no known type reached it.
-            return false;
-        }
-        if (f.params.length < 2) {
             return false;
         }
         for (int i = 1; i < f.params.length; i++) {
@@ -1347,7 +1314,6 @@ final class Infer {
         if (p.allLive || typeCheckingDepth > 0) {
             return;
         }
-        p.cause = moduleName + ":" + s.line;
         if (s instanceof Import) {
             for (Alias a : ((Import) s).names) {
                 p.markLive(a.name);
@@ -1355,7 +1321,6 @@ final class Infer {
             return;
         }
         ImportFrom f = (ImportFrom) s;
-        p.cause = moduleName + ":" + s.line;
         String base = f.level == 0 ? f.module : relative(f.level, f.module);
         if (base == null) {
             return;
@@ -1461,7 +1426,6 @@ final class Infer {
         List<String> prefixes = new ArrayList<String>(pendingPrefixes);
         pendingExact.clear();
         pendingPrefixes.clear();
-        p.cause = "a string of " + moduleName;
         for (String t : exact) {
             for (String tok : tokens(t)) {
                 String n = absolute(tok);
@@ -3337,6 +3301,13 @@ final class Infer {
     /// of its analysed parent. A base is matched by name, which may refuse
     /// more than it must.
     private boolean layoutHolds(Layouts.Cls o) {
+        for (Layouts.Cls x = o; x != null; x = x.parent) {
+            if (definesMethod(x, "__subclasshook__") || definesMethod(x, "__instancecheck__")) {
+                // An ABC's __subclasshook__ passes isinstance for any class
+                // it accepts -- `hasattr(C, "get")` -- of whatever Java class.
+                return false;
+            }
+        }
         if (ProtocolChecks.isProtocol(o.def)) {
             // A protocol passes any instance with its members
             // (ProtocolChecks), of whatever Java class.
@@ -3382,6 +3353,24 @@ final class Infer {
             }
         }
         return true;
+    }
+
+    /// Whether `c`'s own class body defines or assigns `name`.
+    private static boolean definesMethod(Layouts.Cls c, String name) {
+        for (Stmt st : c.def.body) {
+            if (st instanceof FunctionDef && name.equals(((FunctionDef) st).name)) {
+                return true;
+            }
+            if (st instanceof Assign) {
+                // `__subclasshook__ = classmethod(_hook)`
+                for (Expr t : ((Assign) st).targets) {
+                    if (t instanceof Name && name.equals(((Name) t).id)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /// The names `X.register(...)` (an ABC's virtual subclass) is called
@@ -10413,30 +10402,6 @@ final class Infer {
         return false;
     }
 
-    /// The compiled class `typing.cast(T, v)` names as `T`, when every
-    /// instance passing `isinstance(_, T)` has its Java layout, or null.
-    /// The typed emitter guards such a cast with that `isinstance` test
-    /// (Py.castChecked, TypeError on a mismatch), so the call answers a `T`
-    /// -- or None -- whatever `v` was inferred to be.
-    Layouts.Cls castClass(Call c, Scope sc) {
-        if (!isCast(c, sc) || !(c.args.get(0) instanceof Name)) {
-            return null;
-        }
-        Ty k = type(c.args.get(0), null, sc);
-        if (k.k != Ty.K.CLS || k.opt || k.sites.length != 1) {
-            return null;
-        }
-        Layouts.Cls o = classesOf(k).get(0);
-        // typing's classes (BinaryIO, TextIO, IO) describe a value, they
-        // are not what it is made as: markitdown's `cast(BinaryIO,
-        // BytesIO(...))` is a promise CPython never checks.
-        Infer home = p.home.get(o);
-        if (home != null && "typing".equals(home.moduleName)) {
-            return null;
-        }
-        return o.compiled && layoutHolds(o) ? o : null;
-    }
-
     /// The call [#call0] is typing, so [#callFn] can tell which argument
     /// was a guess: no evidence of what the call passes there.
     private Call curCall;
@@ -10453,9 +10418,11 @@ final class Infer {
 
     private Ty call00(Call c, Fn fn, Scope sc) {
         if (isCast(c, sc)) {
-            Ty v = type(c.args.get(1), fn, sc);
-            Layouts.Cls o = castClass(c, sc);
-            return o == null ? v : Ty.inst(o, v.nullable());
+            // typing.cast(T, v) is v: CPython never checks it, and a
+            // duck-typed cast (`cast(Base, proxy)`) is common, so T says
+            // nothing about the value's layout.
+            type(c.args.get(0), fn, sc);
+            return type(c.args.get(1), fn, sc);
         }
         if (c.func instanceof Attribute && sysModules(((Attribute) c.func).value, sc) && c.keywords.isEmpty()
                 && !c.args.isEmpty() && !anyStarred(c.args)
@@ -12532,9 +12499,6 @@ final class Infer {
     /// value may be anything, and the generated code handles it as such.
     List<String> strictErrors() {
         List<String> out = new ArrayList<String>();
-        if (!strictModule(moduleName)) {
-            return out;
-        }
         out.addAll(reflective);
         refusals(body, out);
         for (Map.Entry<ClassDef, String> r : layouts.refused.entrySet()) {
@@ -12705,9 +12669,6 @@ final class Infer {
     /// time, which is reflection again, so the build refuses it; the fix is
     /// code that names the attribute, or an `override=` of the function.
     private void reflection(String what, Expr name, Fn fn, Scope sc) {
-        if (STRICT == null || !strictModule(moduleName)) {
-            return;
-        }
         java.util.Collection<String> one = constStrings(name, fn, sc);
         if (one != null && one.size() == 1 || foldedString(name, fn, sc, 0) != null) {
             return;
@@ -12766,18 +12727,6 @@ final class Infer {
             return ((Name) e).id;
         }
         return e.getClass().getSimpleName();
-    }
-
-    static boolean strictModule(String m) {
-        if (STRICT.length == 0) {
-            return true;
-        }
-        for (String s : STRICT) {
-            if (m.equals(s) || m.startsWith(s + ".")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     String dump() {

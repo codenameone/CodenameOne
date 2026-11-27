@@ -25,16 +25,17 @@ package com.codename1.impl;
 import java.util.function.Function;
 import com.codename1.util.StringUtil;
 
-import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// What every port whose database is SQLite in C shares to call a
 /// [Function]: the table that turns the id SQLite holds into the function,
 /// and the conversion of arguments and the result. A port supplies only the
 /// natives that read an argument and set the result.
 ///
-/// The engine calls back on the thread that steps the statement, and a
-/// connection is used by one thread at a time, so the table is never touched
-/// by two threads at once.
+/// The table is shared by every connection of the port, and connections may
+/// be used from different threads, so it is an immutable array behind an
+/// [AtomicReference]: a callback reads one snapshot, and a registration or a
+/// release replaces the whole array.
 public abstract class SqlFunctionBridge {
     /// `sqlite3_value_type`: SQLITE_INTEGER.
     public static final int SQLITE_INTEGER = 1;
@@ -45,25 +46,72 @@ public abstract class SqlFunctionBridge {
     /// `sqlite3_value_type`: SQLITE_BLOB.
     public static final int SQLITE_BLOB = 4;
 
-    private final ArrayList<Function<Object[], Object>> functions = new ArrayList<Function<Object[], Object>>();
+    private static final Object[] EMPTY = new Object[0];
 
-    /// The id the engine is handed for a function. Ids are never reused, so a
-    /// statement still holding an old one cannot reach a later function.
-    public int register(Function<Object[], Object> function) {
-        functions.add(function);
-        return functions.size() - 1;
+    /// Pairs of (owner, function), indexed by id * 2.
+    private final AtomicReference<Object[]> table = new AtomicReference<Object[]>(EMPTY);
+
+    /// The id the engine is handed for a function registered by connection
+    /// `owner`. Ids are never reused, so a statement still holding an old one
+    /// cannot reach a later function.
+    public int register(Object owner, Function<Object[], Object> function) {
+        while (true) {
+            Object[] cur = table.get();
+            Object[] next = new Object[cur.length + 2];
+            System.arraycopy(cur, 0, next, 0, cur.length);
+            next[cur.length] = owner;
+            next[cur.length + 1] = function;
+            if (table.compareAndSet(cur, next)) {
+                return cur.length / 2;
+            }
+        }
+    }
+
+    /// Drops every function `owner` registered; called once its connection
+    /// is closed, so a closed database does not keep its functions alive.
+    public void release(Object owner) {
+        while (true) {
+            Object[] cur = table.get();
+            Object[] next = null;
+            for (int i = 0; i < cur.length; i += 2) {
+                if (cur[i] == owner) {
+                    if (next == null) {
+                        next = new Object[cur.length];
+                        System.arraycopy(cur, 0, next, 0, cur.length);
+                    }
+                    next[i] = null;
+                    next[i + 1] = null;
+                }
+            }
+            if (next == null || table.compareAndSet(cur, next)) {
+                return;
+            }
+        }
+    }
+
+    /// The UTF-8 name SQLite is given, refusing one the native would cut:
+    /// it copies into a 256-byte buffer.
+    public static byte[] functionName(String name) throws java.io.IOException {
+        byte[] b = StringUtil.getBytes(name);
+        if (b.length > 255) {
+            throw new java.io.IOException("SQL function name is longer than 255 bytes: " + name);
+        }
+        return b;
     }
 
     /// Called from the native trampoline, while the engine waits, to compute
     /// one value of function `id` and hand it back through `ctx`.
     public void call(long ctx, int id, int argc, long argv) {
-        // Looked up outside the try: the cast the generic get carries must not
+        // Looked up outside the try: the cast must not
         // sit under a handler (ParparVM does not check it, see check-cast-semantics.sh).
-        Function<Object[], Object> f = id >= 0 && id < functions.size() ? functions.get(id) : null;
-        if (f == null) {
+        Object[] t = table.get();
+        Object o = id >= 0 && id * 2 + 1 < t.length ? t[id * 2 + 1] : null;
+        if (!(o instanceof Function)) {
             resultError(ctx, StringUtil.getBytes("no such function"));
             return;
         }
+        @SuppressWarnings("unchecked")
+        Function<Object[], Object> f = (Function<Object[], Object>) o;
         try {
             Object[] args = new Object[argc];
             for (int i = 0; i < argc; i++) {

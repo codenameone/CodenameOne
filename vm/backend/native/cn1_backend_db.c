@@ -105,7 +105,7 @@ JAVA_OBJECT com_codename1_backend_Db_columnNameImpl___long_int_R_java_lang_Strin
     return JAVA_NULL;
 }
 
-JAVA_LONG com_codename1_backend_Db_columnNamePtrImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt, JAVA_INT index) {
+JAVA_INT com_codename1_backend_Db_reprepareCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmt) {
     return 0;
 }
 
@@ -451,13 +451,12 @@ JAVA_INT com_codename1_backend_Db_columnCountImpl___long_R_int(CODENAME_ONE_THRE
     return stmt == NULL ? 0 : sqlite3_column_count(stmt);
 }
 
-/* Where SQLite keeps a column's name: the same address for as long as the statement
-   keeps its compiled program, a new one when a schema change re-prepares it (the new
-   program is built before the old one is freed, so the two cannot share an address).
-   Db compares it to skip decoding the same names on every run. */
-JAVA_LONG com_codename1_backend_Db_columnNamePtrImpl___long_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {
+/* How many times SQLite has re-prepared the statement for a schema change. Db
+   keeps a cached statement's decoded column names while this is unchanged; an
+   address of a name could be reused for a different name after a re-prepare. */
+JAVA_INT com_codename1_backend_Db_reprepareCountImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle) {
     sqlite3_stmt* stmt = (sqlite3_stmt*)(intptr_t)stmtHandle;
-    return stmt == NULL ? 0 : (JAVA_LONG)(intptr_t)sqlite3_column_name(stmt, index);
+    return stmt == NULL ? 0 : sqlite3_stmt_status(stmt, SQLITE_STMTSTATUS_REPREPARE, 0);
 }
 
 JAVA_OBJECT com_codename1_backend_Db_columnNameImpl___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG stmtHandle, JAVA_INT index) {

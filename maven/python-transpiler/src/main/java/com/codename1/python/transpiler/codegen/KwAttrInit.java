@@ -544,9 +544,6 @@ public final class KwAttrInit {
             }
         }
         if (c.refusal != null) {
-            if (System.getenv("CN1_PY_KWATTR_DEBUG") != null) {
-                System.err.println("KwAttrInit: " + root.name + " in " + path + " refused: " + c.refusal);
-            }
             return;
         }
         String kw = init.args.kwarg.name;
@@ -798,9 +795,6 @@ public final class KwAttrInit {
             return;
         } else if ((isName(o, name) || o instanceof Attribute && ((Attribute) o).attr.equals(name))
                 && !ok.containsKey(o)) {
-            if (!r[0] && System.getenv("CN1_PY_KWATTR_DEBUG") != null) {
-                System.err.println("KwAttrInit: " + name + " escapes: " + ConstArgSpecialize.dump(o) + " line " + ((Node) o).line);
-            }
             r[0] = true;
         }
         Infer.children(o, x -> escapes(x, name, ok, r, c));

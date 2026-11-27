@@ -124,8 +124,9 @@ class DatabaseImpl extends Database {
     @Override
     public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         checkOpen();
-        int id = function == null ? -1 : FUNCTIONS.register(function);
-        if (IOSImplementation.nativeInstance.sqlDbCreateFunction(peer, com.codename1.util.StringUtil.getBytes(name), argCount, id) != 0) {
+        byte[] utf8 = SqlFunctionBridge.functionName(name);
+        int id = function == null ? -1 : FUNCTIONS.register(this, function);
+        if (IOSImplementation.nativeInstance.sqlDbCreateFunction(peer, utf8, argCount, id) != 0) {
             throw new IOException("Could not create the SQL function " + name);
         }
     }
@@ -325,6 +326,8 @@ class DatabaseImpl extends Database {
         peer = 0;
         try {
             IOSImplementation.nativeInstance.sqlDbClose(closing);
+            // Only once the engine is gone: a statement it still ran could call one.
+            FUNCTIONS.release(this);
         } finally {
             // Last, not first: until the native handle is gone this connection still holds and
             // locks the file, and giving the claim back sooner lets another connection start

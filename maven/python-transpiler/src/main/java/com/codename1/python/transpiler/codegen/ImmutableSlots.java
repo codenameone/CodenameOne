@@ -101,11 +101,6 @@ public final class ImmutableSlots {
                 d.module(e.getKey(), e.getValue(), trees);
             }
         }
-        if (Boolean.getBoolean("cn1.python.immutable.report")) {
-            for (String r : d.report) {
-                System.err.println("immutable: " + r); //NOPMD SystemPrintln - opt-in diagnostics
-            }
-        }
         return new ArrayList<String>(d.report);
     }
 

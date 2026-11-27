@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -92,9 +91,12 @@ public final class EnumLowering {
     private static final String ENUM_PATH = "enum.py";
     private static final String HELPER = "_cn1_enum";
 
-    /// Member names of each lowered class, in definition order.
+    /// Member names of each lowered class, in definition order. Weak: a
+    /// build daemon transpiles many programs in one JVM, and a strong map
+    /// kept every build's syntax trees alive for good. ClassDef keeps
+    /// Object's identity equals, so this is still an identity map.
     private static final Map<ClassDef, List<String>> MEMBERS = Collections.synchronizedMap(
-            new IdentityHashMap<ClassDef, List<String>>());
+            new java.util.WeakHashMap<ClassDef, List<String>>());
 
     private final Map<String, Module> trees;
     private final Set<String> enums = new HashSet<String>();
