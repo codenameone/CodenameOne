@@ -1225,7 +1225,7 @@ final class BuildHintsAndroid {
                         + "Android Gradle plugin 9.4.1 when it can, and otherwise stays on the Gradle 8 "
                         + "toolchain and says why in the build log: it stays there when `android.topDependency`, "
                         + "`android.xgradle` or `android.gradlePlugin` adds a Gradle plugin other than "
-                        + "google-services (or one in a form the build cannot read), applies `kotlin-android`, pins "
+                        + "google-services (or one in a form the build can't read), applies `kotlin-android`, pins "
                         + "google-services below 4.4, sets a non-numeric `maxSdkVersion` on `<uses-sdk>`, "
                         + "uses Huawei push, turns off `android.useGradle8`, or sets `android.forceJava8Builder`. `8` keeps a build on Gradle "
                         + "8 regardless. `9` asks for Gradle 9 explicitly, and fails the build with the "
