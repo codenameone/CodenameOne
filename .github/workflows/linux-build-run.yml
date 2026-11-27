@@ -31,7 +31,7 @@
 # golden-capture.sh dispatches this file for scripts/linux and scripts/windows;
 # a capture runs only the screenshot legs whose rendering is the golden (the
 # Linux legs and the native Windows x64 leg).
-name: Native ParparVM (Linux + Windows) build, run and tests
+name: Linux native build + run (GTK3, x64 + arm64)
 
 on:
   workflow_dispatch:
@@ -459,7 +459,10 @@ jobs:
         # A timed-out CMake parent can leave compiler children running. Do not
         # measure performance after a failed build/suite with that extra load.
         # The earlier failure still fails this job and its logs are uploaded.
-        if: success()
+        # Not in a capture either: that run renders goldens, and the gate's
+        # timing runs pushed the x64 capture past the job timeout, so the
+        # compare job never got its screenshots.
+        if: ${{ success() && inputs.cn1ss_capture == '' }}
         # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
         # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
         env:
