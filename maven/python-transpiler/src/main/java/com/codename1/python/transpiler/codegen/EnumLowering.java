@@ -98,6 +98,23 @@ public final class EnumLowering {
     private static final Map<ClassDef, List<String>> MEMBERS = Collections.synchronizedMap(
             new java.util.WeakHashMap<ClassDef, List<String>>());
 
+    /// Descriptors are attributes of an Enum, never members: a property,
+    /// a static or class method, or a method bound again under another name.
+    private static final Set<String> DESCRIPTORS = new HashSet<String>(Arrays.asList("property",
+            "staticmethod", "classmethod", "cached_property"));
+
+    private static boolean descriptor(Expr v, Set<String> fnNames) {
+        if (v instanceof Name) {
+            return fnNames.contains(((Name) v).id);
+        }
+        if (v instanceof Call) {
+            Expr f = ((Call) v).func;
+            String last = f instanceof Name ? ((Name) f).id : f instanceof Attribute ? ((Attribute) f).attr : null;
+            return last != null && DESCRIPTORS.contains(last);
+        }
+        return false;
+    }
+
     private final Map<String, Module> trees;
     private final Set<String> enums = new HashSet<String>();
 
@@ -380,6 +397,7 @@ public final class EnumLowering {
         List<Expr> values = new ArrayList<Expr>();
         List<Boolean> isMember = new ArrayList<Boolean>();
         Set<String> bodyNames = new HashSet<String>();
+        Set<String> fnNames = new HashSet<String>();
         Set<String> memberSoFar = new HashSet<String>();
         List<Stmt> kept = new ArrayList<Stmt>();
         for (Stmt s : c.body) {
@@ -402,8 +420,9 @@ public final class EnumLowering {
             }
             if (s instanceof FunctionDef) {
                 bodyNames.add(((FunctionDef) s).name);
+                fnNames.add(((FunctionDef) s).name);
             }
-            if (n == null || excluded(c.name, n) || v instanceof Lambda) {
+            if (n == null || excluded(c.name, n) || v instanceof Lambda || descriptor(v, fnNames)) {
                 if (n != null) {
                     bodyNames.add(n);
                 }

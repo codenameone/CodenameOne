@@ -28,8 +28,6 @@ _fast_execute = _cn1sql.execute
 _fast_fetchone = _cn1sql.fetchone
 # A cursor's rows still to read let the connection keep its read lock between
 # statements, as CPython's pending statement does (PySql.Connection.pending).
-_pending = _cn1sql.pending
-_drained = _cn1sql.drained
 
 apilevel = "2.0"
 threadsafety = 1
@@ -454,8 +452,6 @@ class Cursor:
 
     def close(self):
         self._closed = True
-        if self._rows and not self.connection._closed:
-            _drained(self.connection._handle, self._rows)
         self._rows = _NO_ROWS
 
     def setinputsizes(self, sizes):
@@ -628,8 +624,6 @@ class Cursor:
                                            % (i + 1, type(v).__name__)) from None
             bound = tuple(bound)
         query, control, dml, ddl, inserts, query_word = _kind(stmt)
-        if self._rows:
-            _drained(conn._handle, self._rows)
         self._rows = _NO_ROWS
         self._pos = 0
         if control:
@@ -658,8 +652,6 @@ class Cursor:
         if cols:
             self.description = tuple((self._colname(c), None, None, None, None, None, None) for c in cols)
             self._rows = self._convert(stmt, cols, rows)
-            if self._rows:
-                _pending(conn._handle, self._rows)
             self.rowcount = -1 if query_word else len(rows)
         else:
             self.description = None
@@ -726,10 +718,6 @@ class Cursor:
         self._check()
         rows = self._rows
         if self._pos >= len(rows):
-            # Asked past the end, which is where CPython's statement finishes
-            # and lets the lock go; a for loop always asks once more.
-            if rows:
-                _drained(self.connection._handle, rows)
             return None
         r = rows[self._pos]
         self._pos += 1
@@ -752,8 +740,6 @@ class Cursor:
         rows = self._rows
         pos = self._pos
         self._pos = len(rows)
-        if rows:
-            _drained(self.connection._handle, rows)
         rest = rows[pos:]
         rf = self.row_factory
         if rf is None:

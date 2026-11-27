@@ -565,7 +565,6 @@ discard
 dist
 divmod
 doc
-drained
 dropwhile
 dumps
 e
@@ -898,7 +897,6 @@ pattern_fullmatch
 pattern_match
 pattern_search
 pbkdf2
-pending
 perf_counter
 perf_counter_ns
 perm

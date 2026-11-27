@@ -121,6 +121,21 @@ class DatabaseImpl extends Database {
         return true;
     }
 
+    /// A cached statement for `sql`, its parameters back to NULL, or 0.
+    /// sqlite3_reset keeps the last run's bindings, and a legacy call that
+    /// passes fewer values than placeholders must see NULL in the rest, as a
+    /// freshly prepared statement would.
+    private long takeCached(String sql) throws IOException {
+        long stmt = statements.take(sql);
+        if (stmt != 0) {
+            int count = IOSImplementation.nativeInstance.sqlStmtParameterCount(stmt);
+            for (int iter = 1; iter <= count; iter++) {
+                IOSImplementation.nativeInstance.sqlStmtBindNull(stmt, iter);
+            }
+        }
+        return stmt;
+    }
+
     @Override
     public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         checkOpen();
@@ -435,7 +450,7 @@ class DatabaseImpl extends Database {
             return;
         }
         try {
-            long stmt = statements.take(sql);
+            long stmt = takeCached(sql);
             if (stmt == 0) {
                 stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
             }
@@ -517,7 +532,7 @@ class DatabaseImpl extends Database {
     }
 
     private long prepareCached(String sql) throws IOException {
-        long stmt = statements.take(sql);
+        long stmt = takeCached(sql);
         return stmt != 0 ? stmt : IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
     }
 

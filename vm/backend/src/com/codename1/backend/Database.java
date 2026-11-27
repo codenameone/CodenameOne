@@ -320,25 +320,6 @@ public final class Database {
         }
     }
 
-    /// Keeps an SQLite connection's read lock between statements, or lets it
-    /// go; nothing on a server database. A caller turns it on while it still has
-    /// rows of a query to work through and runs more queries meanwhile -- the
-    /// lock is then taken once instead of once per query, as it is under a
-    /// pending CPython cursor. Purely a saving: the connection lets go by itself
-    /// before any statement the lock would get in the way of, and while another
-    /// connection is open on the same file.
-    public void holdRead(boolean on) {
-        if (sqlite == null) {
-            return;
-        }
-        enter();
-        try {
-            sqlite.holdRead(on);
-        } finally {
-            exit();
-        }
-    }
-
     /// Registers a scalar SQL function `name` taking `argc` arguments (-1 for
     /// any number) on this connection; a later registration of the same name
     /// and count replaces it. The body receives null, `Long`, `Double`,

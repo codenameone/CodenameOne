@@ -808,22 +808,6 @@ public final class StdModules {
             return Py.tuple(new PyTuple(cols), new PyList(rows), PyInt.of(r.changes),
                 PyInt.of(r.lastRowId), new PyTuple(kinds));
         }));
-        // pending(handle, rows) / drained(handle, rows): a cursor was handed rows it
-        // has yet to read, or is done with them (PySql.Connection.pending).
-        m.setAttr("pending", PyBuiltin.positional("pending", a -> {
-            PySql.Connection c = SQL.get(Long.valueOf(Py.asLong(a[0])));
-            if (c != null) {
-                c.pending(a[1]);
-            }
-            return Py.NONE;
-        }));
-        m.setAttr("drained", PyBuiltin.positional("drained", a -> {
-            PySql.Connection c = SQL.get(Long.valueOf(Py.asLong(a[0])));
-            if (c != null && c.anyPending()) {
-                c.drained(a[1]);
-            }
-            return Py.NONE;
-        }));
         m.setAttr("create_function", PyBuiltin.positional("create_function", a -> {
             PySql.Connection c = sqlConnection(a[0]);
             Object body = a[3];
@@ -1239,10 +1223,6 @@ public final class StdModules {
         }
         // Everything checked: from here on the call is this one's to finish.
         cursor.storeAt(cf[C_POS], "_pos", PyInt.of(0));
-        if (c.anyPending()) {
-            // The rows this cursor was working through, if it was: done with now.
-            c.drained(cursor.ownAt(cf[C_ROWS], "_rows"));
-        }
         // No handler from here down: a failure comes back as the engine's message, which the
         // caller raises. A frame with a handler pays for it on every call, thrown or not.
         if (plan.dml && autocommit instanceof Long && ((Long) autocommit).longValue() == sqliteLegacy
@@ -1276,9 +1256,6 @@ public final class StdModules {
             cursor.storeAt(cf[C_DESCRIPTION], "description", sqliteDescription(plan, r.columns));
             PyList list = new PyList(rows);
             cursor.storeAt(cf[C_ROWS], "_rows", list);
-            if (rows.length > 0) {
-                c.pending(list);
-            }
             cursor.storeAt(cf[C_ROWCOUNT], "rowcount", PyInt.of(plan.queryWord ? -1 : rows.length));
         } else {
             // Only ever read, by the sqlite3 module as well: one shared empty tuple.

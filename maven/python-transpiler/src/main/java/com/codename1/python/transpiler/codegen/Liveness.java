@@ -783,11 +783,14 @@ public final class Liveness {
     }
 
     private boolean effectful(Mod m, Stmt s) {
+        pureIn = m;
         if (EntryPointTable.MODULE.equals(m.name) && EntryPointTable.registers(s) != null) {
             // Kept by #entryPoints once live code spells the group.
             return false;
         }
-        if (s instanceof Pass || s instanceof Global || s instanceof Raise || s instanceof Assert) {
+        // A raise or an assert at import time is an effect: a module that
+        // raises ImportError is how a caller's fallback import is chosen.
+        if (s instanceof Pass || s instanceof Global) {
             return false;
         }
         if (s instanceof ExprStmt) {
@@ -799,8 +802,25 @@ public final class Liveness {
             return !pureDecorators(f.decorators) || !pure(f.args) || f.returns != null && !pure(f.returns);
         }
         if (s instanceof ClassDef) {
-            // The body builds the class; bases and keywords name types.
-            return !pureDecorators(((ClassDef) s).decorators);
+            ClassDef c = (ClassDef) s;
+            if (!pureDecorators(c.decorators) || !c.keywords.isEmpty()) {
+                // A metaclass= (or any class keyword) runs code of its own.
+                return true;
+            }
+            for (Expr b : c.bases) {
+                if (!pure(b) || hooked().contains(lastName(b))) {
+                    // A base's __init_subclass__ runs for every subclass made.
+                    return true;
+                }
+            }
+            for (Stmt st : c.body) {
+                // Methods only build functions; anything else in the body
+                // runs now (a print, a __set_name__ descriptor, a call).
+                if (!(st instanceof FunctionDef) && effectful(m, st)) {
+                    return true;
+                }
+            }
+            return false;
         }
         if (s instanceof Assign) {
             for (Expr t : ((Assign) s).targets) {
@@ -948,7 +968,7 @@ public final class Liveness {
         return false;
     }
 
-    private static boolean returnsOnly(FunctionDef f) {
+    private boolean returnsOnly(FunctionDef f) {
         if (f.isAsync || !f.decorators.isEmpty()) {
             return false;
         }
@@ -1029,7 +1049,7 @@ public final class Liveness {
         return false;
     }
 
-    private static boolean pureDecorators(List<Expr> ds) {
+    private boolean pureDecorators(List<Expr> ds) {
         for (Expr d : ds) {
             Expr f = d instanceof Call ? ((Call) d).func : d;
             String last = lastName(f);
@@ -1039,6 +1059,71 @@ public final class Liveness {
             }
         }
         return true;
+    }
+
+    /// The module whose statement [#pure] is judging.
+    private Mod pureIn;
+    /// Classes whose subclassing runs code; see [#hooked].
+    private Set<String> hooked;
+
+    /// Whether `name` is a function or class the judged module defines
+    /// itself: a user `def get()` is not dict.get, whatever PURE_CALLS says.
+    private boolean definedHere(String name) {
+        List<Stmt> b = pureIn == null ? null : pureIn.binders.get(name);
+        if (b != null) {
+            for (Stmt st : b) {
+                if (st instanceof FunctionDef || st instanceof ClassDef) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Names of the program's classes whose subclasses run code when made:
+    /// one defining `__init_subclass__`, made with a `metaclass=`, or below
+    /// such a class.
+    private Set<String> hooked() {
+        if (hooked != null) {
+            return hooked;
+        }
+        Set<String> out = new HashSet<String>();
+        List<ClassDef> all = new ArrayList<ClassDef>();
+        for (Mod m : mods.values()) {
+            for (Stmt st : m.body) {
+                if (st instanceof ClassDef) {
+                    all.add((ClassDef) st);
+                }
+            }
+        }
+        for (ClassDef c : all) {
+            if (!c.keywords.isEmpty()) {
+                out.add(c.name);
+            }
+            for (Stmt st : c.body) {
+                if (st instanceof FunctionDef && "__init_subclass__".equals(((FunctionDef) st).name)) {
+                    out.add(c.name);
+                }
+            }
+        }
+        boolean grew = true;
+        while (grew) {
+            grew = false;
+            for (ClassDef c : all) {
+                if (out.contains(c.name)) {
+                    continue;
+                }
+                for (Expr b : c.bases) {
+                    if (out.contains(lastName(b))) {
+                        out.add(c.name);
+                        grew = true;
+                        break;
+                    }
+                }
+            }
+        }
+        hooked = out;
+        return out;
     }
 
     private static String lastName(Expr e) {
@@ -1052,7 +1137,7 @@ public final class Liveness {
         return e instanceof Name ? ((Name) e).id : null;
     }
 
-    private static boolean pureArgs(Call c) {
+    private boolean pureArgs(Call c) {
         for (Expr a : c.args) {
             if (!pure(a)) {
                 return false;
@@ -1067,7 +1152,7 @@ public final class Liveness {
     }
 
     /// Whether evaluating `o` only computes a value.
-    private static boolean pure(Object o) {
+    private boolean pure(Object o) {
         if (o == null) {
             return true;
         }
@@ -1081,10 +1166,16 @@ public final class Liveness {
         if (o instanceof Call) {
             Call c = (Call) o;
             String last = lastName(c.func);
-            if (last == null || !PURE_CALLS.contains(last) || !pure(c.func)) {
+            if (last == null || !PURE_CALLS.contains(last) || !pure(c.func) || definedHere(last)) {
                 return false;
             }
             return pureArgs(c);
+        }
+        if (o instanceof Subscript && ((Subscript) o).index instanceof Constant
+                && ((Constant) ((Subscript) o).index).kind != Constant.Kind.NONE) {
+            // CONFIG["key"] raises KeyError at import when the key is absent;
+            // a type subscript (Optional[int]) names a type, not a constant.
+            return false;
         }
         final boolean[] ok = {true};
         Infer.children(o, c -> ok[0] &= pure(c));

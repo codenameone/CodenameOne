@@ -95,107 +95,8 @@ public final class Db {
     /// The slots this connection registered, released by close().
     private int[] functionIds = new int[0];
 
-    /// A statement stepped to its first row and left there while [#holdRead] is
-    /// on, so the connection keeps the shared lock it took; 0 until first used.
-    private long readHold;
-    private boolean holding;
-
-    /// The file this connection opened, or null for one that is never held (an
-    /// in-memory database takes no file locks to save).
-    private final String file;
-
-    /// The connections open on each file, for [#holdRead]: a lock one of them
-    /// keeps would stand in the way of another's commit.
-    private static final HashMap<String, java.util.ArrayList<Db>> OPEN =
-            new HashMap<String, java.util.ArrayList<Db>>();
-
-    private Db(long handle, String file) {
+    private Db(long handle) {
         this.handle = handle;
-        this.file = file;
-    }
-
-    /// Keeps the connection's read transaction open between statements, or lets
-    /// it go.
-    ///
-    /// Every statement SQLite runs outside a transaction takes the file's shared
-    /// lock and reads the header to see whether its page cache is still good, and
-    /// gives the lock up when it finishes: four fcntl calls and a read. While a
-    /// statement is still pending -- a Python cursor whose rows are not all read --
-    /// CPython's sqlite3 keeps it un-reset, so the lock stays taken and every
-    /// statement run meanwhile skips all of that. A loop that reads a row and
-    /// queries for its details, which is how llm builds its log rows, measured
-    /// 40% slower on CPython once that was taken away. Our cursors have read
-    /// their rows already, so a held statement of our own does the same, and
-    /// letting it go at any moment changes nothing a caller can see.
-    ///
-    /// Held only while this is the one connection open on its file, and let go
-    /// before any statement but a query, a SAVEPOINT or a RELEASE: a pending read
-    /// makes DROP TABLE, VACUUM and a journal mode change fail, and would hold up
-    /// another connection's commit. Another PROCESS writing the file waits for it
-    /// as it waits for CPython's pending cursor.
-    public void holdRead(boolean on) {
-        enter();
-        try {
-            holdReadLocked(on);
-        } finally {
-            exit();
-        }
-    }
-
-    private void holdReadLocked(boolean on) {
-        if (!on) {
-            dropHold();
-            return;
-        }
-        if (holding || handle == 0 || file == null || !alone()) {
-            return;
-        }
-        if (readHold == 0) {
-            readHold = prepareImpl(handle, "SELECT count(*) FROM sqlite_schema");
-            if (readHold == 0) {
-                return;
-            }
-        }
-        if (step(readHold) == 1) {
-            holding = true;
-        } else {
-            resetImpl(readHold);
-        }
-    }
-
-    private void dropHold() {
-        if (holding) {
-            holding = false;
-            resetImpl(readHold);
-        }
-    }
-
-    private boolean alone() {
-        synchronized (OPEN) {
-            java.util.ArrayList<Db> list = OPEN.get(file);
-            return list != null && list.size() == 1;
-        }
-    }
-
-    /// Whether `sql` begins, after blanks and comments, with `word`.
-    static boolean startsWith(String sql, String word) {
-        int n = sql.length();
-        int i = 0;
-        while (i < n) {
-            char c = sql.charAt(i);
-            if (c <= ' ') {
-                i++;
-            } else if (c == '-' && i + 1 < n && sql.charAt(i + 1) == '-') {
-                int end = sql.indexOf('\n', i);
-                i = end < 0 ? n : end + 1;
-            } else if (c == '/' && i + 1 < n && sql.charAt(i + 1) == '*') {
-                int end = sql.indexOf("*/", i + 2);
-                i = end < 0 ? n : end + 2;
-            } else {
-                break;
-            }
-        }
-        return sql.regionMatches(true, i, word, 0, word.length());
     }
 
     /// Opens (or creates) the database at the given path. ":memory:" gives a
@@ -228,27 +129,7 @@ public final class Db {
         if (h == 0) {
             throw new IOException("Could not open database at " + path);
         }
-        String file = opened == null || opened.length() == 0 || ":memory:".equals(opened)
-                || opened.regionMatches(true, 0, "file::memory:", 0, 13) ? null : opened;
-        Db db = new Db(h, file);
-        if (file != null) {
-            java.util.ArrayList<Db> others;
-            synchronized (OPEN) {
-                java.util.ArrayList<Db> list = OPEN.get(file);
-                if (list == null) {
-                    list = new java.util.ArrayList<Db>(1);
-                    OPEN.put(file, list);
-                }
-                others = new java.util.ArrayList<Db>(list);
-                list.add(db);
-            }
-            // Outside the registry's lock, and holding no connection's monitor:
-            // a connection mid-statement finishes it first.
-            for (int i = 0; i < others.size(); i++) {
-                others.get(i).holdRead(false);
-            }
-        }
-        return db;
+        return new Db(h);
     }
 
     /// A path for a message, cut at the NUL so the part that would have been
@@ -262,9 +143,6 @@ public final class Db {
     /// With `lastInsertId`, also stores [#lastInsertId] into `lastInsertId[0]`
     /// under the same hold of the gate.
     private int executeLocked(String sql, Object[] params, long[] lastInsertId) throws IOException {
-        if (holding && !startsWith(sql, "SAVEPOINT") && !startsWith(sql, "RELEASE")) {
-            dropHold();
-        }
         Stmt st = prepare(sql, params);
         long stmt = st.handle;
         try {
@@ -300,9 +178,6 @@ public final class Db {
     }
 
     private String[] run(String sql, Object[] params, boolean positional, List rows) throws IOException {
-        if (holding && !startsWith(sql, "SELECT") && !startsWith(sql, "WITH") && !startsWith(sql, "VALUES")) {
-            dropHold();
-        }
         Stmt st = prepare(sql, params);
         long stmt = st.handle;
         try {
@@ -622,11 +497,6 @@ public final class Db {
     /// connection as its query ends.
     private void closeLocked() {
         if (handle != 0) {
-            dropHold();
-            if (readHold != 0) {
-                finalizeImpl(readHold);
-                readHold = 0;
-            }
             // sqlite3_close answers SQLITE_BUSY while any statement is alive,
             // so the cached ones go first.
             // A busy one is mid-step under a re-entrant call; release() finalizes it
@@ -641,19 +511,6 @@ public final class Db {
             if (closeImpl(handle) == 0) {
                 handle = 0;
                 releaseFunctions();
-                // Only once closed: a connection that stays open is still
-                // one of the file's.
-                if (file != null) {
-                    synchronized (OPEN) {
-                        java.util.ArrayList<Db> list = OPEN.get(file);
-                        if (list != null) {
-                            list.remove(this);
-                            if (list.isEmpty()) {
-                                OPEN.remove(file);
-                            }
-                        }
-                    }
-                }
             } else {
                 // Not silent. The handle is deliberately kept so a later close can
                 // retry, but a connection that will not close is worth a line:

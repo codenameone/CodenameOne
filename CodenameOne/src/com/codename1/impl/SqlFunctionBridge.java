@@ -52,17 +52,25 @@ public abstract class SqlFunctionBridge {
     private final AtomicReference<Object[]> table = new AtomicReference<Object[]>(EMPTY);
 
     /// The id the engine is handed for a function registered by connection
-    /// `owner`. Ids are never reused, so a statement still holding an old one
-    /// cannot reach a later function.
+    /// `owner`. A slot freed by [#release] is reused: only a closed
+    /// connection's slots are freed, and its statements are gone with it, so
+    /// nothing still holds the old id.
     public int register(Object owner, Function<Object[], Object> function) {
         while (true) {
             Object[] cur = table.get();
-            Object[] next = new Object[cur.length + 2];
+            int at = cur.length;
+            for (int i = 0; i < cur.length; i += 2) {
+                if (cur[i] == null) {
+                    at = i;
+                    break;
+                }
+            }
+            Object[] next = new Object[Math.max(cur.length, at + 2)];
             System.arraycopy(cur, 0, next, 0, cur.length);
-            next[cur.length] = owner;
-            next[cur.length + 1] = function;
+            next[at] = owner;
+            next[at + 1] = function;
             if (table.compareAndSet(cur, next)) {
-                return cur.length / 2;
+                return at / 2;
             }
         }
     }
@@ -104,8 +112,8 @@ public abstract class SqlFunctionBridge {
     public void call(long ctx, int id, int argc, long argv) {
         // Looked up outside the try: the cast must not
         // sit under a handler (ParparVM does not check it, see check-cast-semantics.sh).
-        Object[] t = table.get();
-        Object o = id >= 0 && id * 2 + 1 < t.length ? t[id * 2 + 1] : null;
+        Object[] slots = table.get();
+        Object o = id >= 0 && id * 2 + 1 < slots.length ? slots[id * 2 + 1] : null;
         if (!(o instanceof Function)) {
             resultError(ctx, StringUtil.getBytes("no such function"));
             return;

@@ -347,6 +347,40 @@ class LinuxDatabase extends Database {
         return true;
     }
 
+    /// A cached statement for `sql`, its parameters back to NULL, or 0.
+    /// sqlite3_reset keeps the last run's bindings, and a legacy call that
+    /// passes fewer values than placeholders must see NULL in the rest, as a
+    /// freshly prepared statement would.
+    private long takeCached(String sql) throws IOException {
+        long stmt = statements.take(sql);
+        if (stmt != 0) {
+            int count = LinuxNative.sqlStmtParameterCount(stmt);
+            for (int iter = 1; iter <= count; iter++) {
+                LinuxNative.sqlStmtBindNull(stmt, iter);
+            }
+        }
+        return stmt;
+    }
+
+    /// [#takeCached] for a path with no handler on the way: a statement that
+    /// cannot be cleared is finalized, and the caller prepares a fresh one.
+    private long takeCachedStatus(String sql) {
+        long stmt = statements.take(sql);
+        if (stmt == 0) {
+            return 0;
+        }
+        try {
+            int count = LinuxNative.sqlStmtParameterCount(stmt);
+            for (int iter = 1; iter <= count; iter++) {
+                LinuxNative.sqlStmtBindNull(stmt, iter);
+            }
+            return stmt;
+        } catch (IOException e) {
+            LinuxNative.sqlStmtFinalizeStatus(stmt);
+            return 0;
+        }
+    }
+
     @Override
     public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
         checkOpen();
@@ -437,7 +471,7 @@ class LinuxDatabase extends Database {
         reserveAttachments(sql, params);
         requireSingleStatement(sql);
         try {
-            long stmt = statements.take(sql);
+            long stmt = takeCached(sql);
             if (stmt == 0) {
                 stmt = LinuxNative.sqlStmtPrepare(peer, sql);
             }
@@ -473,7 +507,7 @@ class LinuxDatabase extends Database {
         if (peer == 0 || params == null || !isPlainStatement(sql)) {
             return super.executeStatus(sql, params, counts);
         }
-        long stmt = statements.take(sql);
+        long stmt = takeCachedStatus(sql);
         if (stmt == 0) {
             stmt = LinuxNative.sqlStmtPrepareStatus(peer, sql);
             if (stmt == 0) {
@@ -556,7 +590,7 @@ class LinuxDatabase extends Database {
     }
 
     private long prepareCached(String sql) throws IOException {
-        long stmt = statements.take(sql);
+        long stmt = takeCached(sql);
         return stmt != 0 ? stmt : LinuxNative.sqlStmtPrepare(peer, sql);
     }
 

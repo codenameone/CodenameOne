@@ -282,15 +282,6 @@ public final class Db {
         execute("PRAGMA busy_timeout=" + millis, null);
     }
 
-    /// Synchronized with close for the reason the translated arm gives.
-    /// The production arm keeps SQLite's shared lock between statements while
-    /// this is on (see its `holdRead`), which only saves system calls. The JDBC
-    /// driver here gives no hold on a statement that would do it, and the
-    /// development loop does not need the saving, so this changes nothing.
-    public void holdRead(boolean on) {
-        // Deliberately nothing: see above.
-    }
-
     public synchronized long lastInsertId() {
         return lastInsertId;
     }
