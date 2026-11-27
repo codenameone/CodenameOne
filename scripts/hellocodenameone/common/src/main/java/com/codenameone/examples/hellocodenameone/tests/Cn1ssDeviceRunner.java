@@ -139,6 +139,7 @@ import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SunburstScre
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SankeyScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FunnelScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SparklinesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SharedTooltipScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BrushScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GrowInAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DataChangeAnimationScreenshotTest;
