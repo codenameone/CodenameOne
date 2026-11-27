@@ -479,8 +479,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Chart2SankeyScreenshotTest(),
             new Chart2FunnelScreenshotTest(),
             new Chart2SparklinesScreenshotTest(),
-            // Disabled: its capture raced the hover repaint and the goldens never showed the tooltip.
-            // new Chart2SharedTooltipScreenshotTest(),
+            new Chart2SharedTooltipScreenshotTest(),
             new Chart2BrushScreenshotTest(),
             new Chart2FlameGraphScreenshotTest(),
             new Chart2LineStylesScreenshotTest(),

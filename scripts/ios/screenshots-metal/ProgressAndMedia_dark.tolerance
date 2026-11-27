@@ -1,4 +1,0 @@
-# Seeded from the iOS 27 Metal capture (the Metal leg timed out before
-# capturing); absorbs iOS 26 vs 27 system rendering differences.
-maxChannelDelta=64
-maxMismatchPercent=4.0

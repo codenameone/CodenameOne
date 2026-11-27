@@ -1,6 +1,0 @@
-# Seeded from the screenshots-metal-27 capture: the Metal leg timed out at the
-# job limit. Measured against the Metal leg's own render of this test, 0.14% of
-# pixels differ, all anti-aliased edges (under 0.002% by more than 16 per
-# channel); this bound absorbs that and still fails on a layout change.
-maxChannelDelta=32
-maxMismatchPercent=1.0
