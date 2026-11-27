@@ -12095,7 +12095,13 @@ public class AndroidGradleBuilder extends Executor {
                 continue;
             }
             java.util.regex.Matcher m = classpathPattern.matcher(line);
-            String id = m.find() ? m.group(1) : null;
+            String id = null;
+            while (m.find()) {
+                id = m.group(1);
+                if (!"com.google.gms:google-services".equals(id)) {
+                    break;
+                }
+            }
             if (!"com.google.gms:google-services".equals(id)) {
                 return "android.topDependency adds the Gradle plugin "
                         + (id != null ? id : "'" + line.trim() + "'")
@@ -12106,6 +12112,10 @@ public class AndroidGradleBuilder extends Executor {
         java.util.regex.Pattern pluginPattern = java.util.regex.Pattern.compile(
                 "(?:apply\\s*\\(?\\s*plugin\\s*[:=]|\\bid)\\s*\\(?\\s*['\"]([^'\"]+)['\"]");
         for (String line : x.split("\n")) {
+            if (line.matches(".*\\bapply\\s*\\(?\\s*from\\b.*") || line.contains("pluginManager")) {
+                return "a build hint applies a script or plugin the build cannot inspect ('"
+                        + line.trim() + "').";
+            }
             boolean applies = line.matches(".*\\bapply\\s*\\(?\\s*plugin\\b.*")
                     || line.matches("^\\s*id[\\s(].*") || line.contains("plugins {")
                     || line.contains("plugins{");
@@ -12113,7 +12123,13 @@ public class AndroidGradleBuilder extends Executor {
                 continue;
             }
             java.util.regex.Matcher m = pluginPattern.matcher(line);
-            String id = m.find() ? m.group(1) : null;
+            String id = null;
+            while (m.find()) {
+                id = m.group(1);
+                if (!"com.google.gms.google-services".equals(id)) {
+                    break;
+                }
+            }
             if (id == null && (line.contains("plugins {") || line.contains("plugins{"))
                     && !line.contains("id")) {
                 continue;

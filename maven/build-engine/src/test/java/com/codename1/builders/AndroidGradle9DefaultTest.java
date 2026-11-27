@@ -68,6 +68,12 @@ class AndroidGradle9DefaultTest {
                 .contains("classpath group"));
         assertTrue(block("", "apply plugin: SomePluginClass", "").contains("SomePluginClass"));
         assertTrue(block("", "apply(plugin = \"com.example.kts\")", "").contains("com.example.kts"));
+        assertTrue(block("", "apply plugin: 'com.google.gms.google-services'; apply plugin: 'other.plugin'", "")
+                .contains("other.plugin"));
+        assertTrue(block("classpath 'com.google.gms:google-services:4.5.0'; classpath 'a.b:c:1'", "", "")
+                .contains("a.b:c"));
+        assertTrue(block("", "apply from: 'extra.gradle'", "").contains("extra.gradle"));
+        assertTrue(block("", "project.pluginManager.apply('x')", "").contains("pluginManager"));
         // android.gradlePlugin reaches the generated build.gradle too; the caller joins it to
         // android.xgradle before asking.
         assertTrue(block("", "\n" + "apply plugin: 'kotlin-android'", "").contains("kotlin-android"));
