@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-26T12:21:23Z",
-  "commit": "21d1a7c42047abb06010b0c313c4fe19ba2802d1",
+  "generated_at": "2026-11-27T11:36:36Z",
+  "commit": "15f550f5d92cf201afe43fde5035384e4e67cdcf",
   "browsers": [
     {
       "id": "chromium",
