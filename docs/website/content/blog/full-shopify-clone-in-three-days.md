@@ -210,7 +210,7 @@ That sounds like a lot until you look at what's in it.
 
 The 431 shared files average 45 lines each: they are the request and response records the app and the server both compile. The client is 50,000 lines for four apps on six platforms. A native team would write each of those screens twice before it reached a desktop, and a third time for the web.
 
-I don't know how big Shopify's code is, but I know they have a large mobile team. I'd bet their code runs to millions of lines. To be fair, it's more complete than Bazaar, but I doubt that closes an order of magnitude.
+I don't know how big Shopify's code is, but I know they have a large mobile team. I'd bet their code runs to millions of lines. To be fair, it covers more than Bazaar does, but I doubt that closes an order of magnitude.
 
 Yes, I could have pointed an agent at any stack and eventually gotten something that demos well. Not in three days, though: on many stacks the compile and test cycle alone eats that. Agents generate code in every language. The question is what happens on day four. Who tests it on every device? Who keeps the iOS and Android copies of the register in sync when a tax rule changes? Who reviews 260,000 lines spread over three languages and two UI toolkits?
 
