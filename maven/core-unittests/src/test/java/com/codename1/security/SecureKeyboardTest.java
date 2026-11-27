@@ -221,7 +221,11 @@ class SecureKeyboardTest extends UITestBase {
             flushSerialCalls();
         }
         flushSerialCalls();
-        assertTrue(kb.isShowing(), "a show before layout is retried once the form has a size");
+        Form cur = Display.getInstance().getCurrent();
+        assertTrue(kb.isShowing(), "a show before layout is retried once the form has a size; current="
+                + (cur == null ? "null" : cur.getTitle()) + " inTransition=" + Display.getInstance().isInTransition()
+                + " form=" + f.getWidth() + "x" + f.getHeight() + " content=" + f.getContentPane().getHeight()
+                + " fieldOnForm=" + (tf.getComponentForm() == f) + " kbParent=" + kb.getParent());
         assertEquals(f.getContentPane().getAbsoluteY() + f.getContentPane().getHeight(),
                 kb.getAbsoluteY() + kb.getHeight(), "docked to the bottom, not the top");
         kb.hide();
