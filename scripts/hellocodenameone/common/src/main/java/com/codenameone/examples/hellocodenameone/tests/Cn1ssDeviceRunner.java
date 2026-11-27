@@ -139,7 +139,6 @@ import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SunburstScre
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SankeyScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FunnelScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SparklinesScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SharedTooltipScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BrushScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GrowInAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DataChangeAnimationScreenshotTest;
@@ -480,7 +479,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Chart2SankeyScreenshotTest(),
             new Chart2FunnelScreenshotTest(),
             new Chart2SparklinesScreenshotTest(),
-            new Chart2SharedTooltipScreenshotTest(),
+            // Disabled: its capture raced the hover repaint and the goldens never showed the tooltip.
+            // new Chart2SharedTooltipScreenshotTest(),
             new Chart2BrushScreenshotTest(),
             new Chart2FlameGraphScreenshotTest(),
             new Chart2LineStylesScreenshotTest(),
@@ -567,6 +567,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new CenteredDialogTitleScreenshotTest(),
             new CenteredInteractionDialogTitleScreenshotTest(),
             new LoadingPlaceholdersScreenshotTest(),
+            new PickersAndInputsScreenshotTest(),
+            new ProgressAndMediaScreenshotTest(),
+            new MasonryGridScreenshotTest(),
+            new EmojiAndMentionScreenshotTest(),
             new CoachMarksScreenshotTest(),
             new AppReviewDialogScreenshotTest(),
             new FloatingActionButtonThemeScreenshotTest(),

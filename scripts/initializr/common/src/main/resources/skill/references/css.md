@@ -333,6 +333,21 @@ Source directories: `common/src/main/lottie/` for Lottie, or drop next to `theme
 
 For the full Lottie feature matrix and troubleshooting, point users to `docs/developer-guide/SVG-Transcoder.asciidoc`.
 
+### Rive -- a `.riv` file is an image too
+
+Drop the Rive export next to `theme.css` (it is translated at build time and played in pure Java, no native runtime):
+
+```css
+JuiceStyle { background: url(juice.riv); cn1-background-type: cn1-image-scaled-fit; }
+```
+
+```java
+Image juice = Resources.getGlobalResources().getImage("juice.riv");
+form.add(BorderLayout.CENTER, new ScaleImageLabel(juice));
+```
+
+It plays the first artboard's first state machine (or first animation). Drive a state machine with `image.setAnimationInput("isOn", true)` / `setAnimationInput("level", 3f)`, read and write data-bound view models with `setAnimationProperty` / `getAnimationProperty`, and receive the file's events with `addAnimationListener` (`AnimationEvent`). `scaled(w, h)` gives an independent copy, so one file can play in several places. Details: `docs/developer-guide/SVG-Transcoder.asciidoc`, "Rive animations".
+
 ### Custom TTF fonts
 
 **`.ttf` and `.otf` both work**, upper-case or lower-case — every port loads both formats through its own font API (Core Text, Typeface, DirectWrite, FontConfig, java.awt, FontFace), so there's no need to convert an OpenType font. Web-only formats like `.woff` are not supported and **fail the build**. The compiler also parses each font at build time, so a corrupt file — or one with no PostScript name, which iOS needs to resolve it — fails the build rather than rendering fine in the simulator and falling back to the system font on an iPhone.

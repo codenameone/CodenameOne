@@ -1147,6 +1147,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 ".agent-skills/codename-one/references/build-hints.md",
                 ".agent-skills/codename-one/references/java-api-subset.md",
                 ".agent-skills/codename-one/references/ui-components.md",
+                ".agent-skills/codename-one/references/component-catalog.md",
                 ".agent-skills/codename-one/references/css.md",
                 ".agent-skills/codename-one/references/swing-comparison.md",
                 ".agent-skills/codename-one/references/html-css-cheatsheet.md",

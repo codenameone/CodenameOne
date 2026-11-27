@@ -437,6 +437,17 @@ jobs:
           CN1_TRANSLATION_RECORD: ${{ github.workspace }}/artifacts/linux-port/raw/translation-record.jsonl
         run: |
           set -e
+          # Cap the suite's Ninja build by memory. Ninja defaults to cores+2 jobs, and
+          # with full DWARF (CN1_LINUX_FULL_DEBUG) some translation units need several
+          # GB each: x64 runners went silent in `cmake --build` and lost the runner
+          # ("lost communication with the server") even with the swap above. One job
+          # per 3G of RAM, at least 1 and at most the core count.
+          mem_gb=$(awk '/MemTotal/ {print int($2/1048576)}' /proc/meminfo)
+          jobs=$(( mem_gb / 3 ))
+          [ "$jobs" -lt 1 ] && jobs=1
+          [ "$jobs" -gt "$(nproc)" ] && jobs=$(nproc)
+          export CMAKE_BUILD_PARALLEL_LEVEL=$jobs
+          echo "C build: ${jobs} parallel jobs (${mem_gb}G RAM, $(nproc) cores)"
           # Not silenced, and the outcome is stated. The hang dump attaches gdb from
           # inside the test JVM, so an install that quietly failed here produced a
           # hang-stacks.txt with nothing but sample headers -- which is how four
