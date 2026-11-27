@@ -28,6 +28,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.Display;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -205,6 +206,12 @@ class SecureKeyboardTest extends UITestBase {
             previous.setTransitionOutAnimator(CommonTransitions.createEmpty());
         }
         f.setTransitionInAnimator(CommonTransitions.createEmpty());
+        // Sized as setCurrent would size it. setCurrent is what gives a form its size, and a form
+        // an earlier test left current or mid-transition can hold that back past every retry,
+        // so the form stayed 0x0 and was never laid out. The content is still not laid out
+        // here, which is the case under test.
+        f.setSize(new Dimension(Display.getInstance().getDisplayWidth(),
+                Display.getInstance().getDisplayHeight()));
         f.show();
         // Straight after show(), as a show listener would: nothing is laid out yet.
         kb.show();
