@@ -942,8 +942,9 @@ public final class KwAttrInit {
         String base = module.replace('.', '/');
         for (String p : paths) {
             String q = p.replace('\\', '/');
-            if (q.equals(base + ".py") || q.endsWith("/" + base + ".py")
-                    || q.equals(base + "/__init__.py") || q.endsWith("/" + base + "/__init__.py")) {
+            // Exact: a suffix match would take an outside `config` for a
+            // program's `pkg/config.py`.
+            if (q.equals(base + ".py") || q.equals(base + "/__init__.py")) {
                 return true;
             }
         }

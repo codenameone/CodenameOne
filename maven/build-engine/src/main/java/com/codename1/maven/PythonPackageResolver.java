@@ -689,6 +689,11 @@ public final class PythonPackageResolver {
                 b.append("\\n");
             } else if (c == '\r') {
                 b.append("\\r");
+            } else if (Character.isHighSurrogate(c) && i + 1 < s.length()
+                    && Character.isLowSurrogate(s.charAt(i + 1))) {
+                // One Python character: a pair of escapes would be two lone surrogates.
+                b.append(String.format("\\U%08x", s.codePointAt(i)));
+                i++;
             } else if (c < 0x20 || c > 0x7e) {
                 b.append(String.format("\\u%04x", (int) c));
             } else {

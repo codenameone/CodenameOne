@@ -300,24 +300,21 @@ public final class OxmlDeclarative {
             // The generated adder sets attributes in one order and lxml keeps
             // insertion order, so call sites that order them differently would
             // serialize differently from CPython: those are refused.
-            List<String> known = new ArrayList<String>();
-            for (Keyword k : c.keywords) {
-                if (k.arg != null && ks.contains(k.arg)) {
-                    known.add(k.arg);
-                }
-            }
-            List<String> prior = new ArrayList<String>(ks);
-            prior.retainAll(known);
-            if (!prior.equals(known)) {
-                ks.add(null);
-            }
+            List<String> call = new ArrayList<String>();
             for (Keyword k : c.keywords) {
                 if (k.arg == null) {
                     // A spread: the names are not known here.
                     ks.add(null);
                 } else {
+                    call.add(k.arg);
                     ks.add(k.arg);
                 }
+            }
+            // Every call's keywords must appear in the adder's order.
+            List<String> order = new ArrayList<String>(ks);
+            order.retainAll(call);
+            if (!order.equals(call)) {
+                ks.add(null);
             }
         }
         Infer.children(o, this::collectAdders);
