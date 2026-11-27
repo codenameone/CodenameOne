@@ -387,7 +387,6 @@
         "Chart2PieScreenshotTest",
         "Chart2RadarScreenshotTest",
         "Chart2SankeyScreenshotTest",
-        "Chart2SharedTooltipScreenshotTest",
         "Chart2SparklinesScreenshotTest",
         "Chart2SunburstScreenshotTest",
         "Chart2TreemapScreenshotTest",
@@ -1586,10 +1585,6 @@
     {
       "pattern": "chart2-sparklines",
       "test": "Chart2SparklinesScreenshotTest"
-    },
-    {
-      "pattern": "chart2-shared-tooltip",
-      "test": "Chart2SharedTooltipScreenshotTest"
     },
     {
       "pattern": "chart2-brush",
