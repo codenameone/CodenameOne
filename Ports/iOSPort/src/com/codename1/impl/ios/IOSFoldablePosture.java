@@ -105,6 +105,14 @@ class IOSFoldablePosture {
         }
     }
 
+    /// True when the last hinge update said partially or fully open. Never
+    /// blocks: it reads the cached status and does not probe for a hinge, so it
+    /// is safe on hot paths such as isTablet(). False until the first update.
+    static boolean isOpenFromPushedState() {
+        int status = nativeInstance().getHingeStatus();
+        return status == HINGE_STATUS_PARTIALLY_OPEN || status == HINGE_STATUS_FULLY_OPEN;
+    }
+
     static int getHingeAngle() {
         if (!isFoldable()) {
             return -1;

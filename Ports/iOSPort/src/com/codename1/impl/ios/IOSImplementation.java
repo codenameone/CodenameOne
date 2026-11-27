@@ -417,12 +417,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private static boolean isOpenFoldablePhone() {
-        if (!IOSFoldablePosture.isFoldable()) {
-            return false;
-        }
-        int posture = IOSFoldablePosture.getPosture();
-        return posture == com.codename1.ui.DevicePosture.POSTURE_FLAT
-                || posture == com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED;
+        // Reads only the pushed hinge state, never IOSFoldablePosture.isFoldable():
+        // that probe hops to the main queue and can wait up to 300ms on a phone
+        // with no hinge, and isTablet() is called by every app, early and often.
+        // Only a real hinge ever reports an open status, so this needs no probe.
+        return IOSFoldablePosture.isOpenFromPushedState();
     }
 
     @Override

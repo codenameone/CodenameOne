@@ -880,7 +880,9 @@ public class CN extends CN1Constants {
 
     /// Indicates whether the device is a tablet, notice that this is often a guess. An open
     /// foldable phone counts as a tablet, since its inner display is tablet sized; use
-    /// `#isOpenFoldable()` to tell the two apart.
+    /// `#isOpenFoldable()` to tell the two apart. On such a device the answer changes when it is
+    /// folded or unfolded, so code that decides once (when a form is built) should listen for
+    /// posture changes and rebuild.
     ///
     /// #### Returns
     ///

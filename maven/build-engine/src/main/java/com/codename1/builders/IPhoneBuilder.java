@@ -7235,11 +7235,15 @@ public class IPhoneBuilder extends Executor {
             stopwatch.split("ParparVM Execution");
             try {
                 String orientations = request.getArg("ios.interface_orientation", null);
-                if (orientations != null) {
+                if (orientations != null || plistKeyNamed(plistWithoutComments(
+                        request.getArg("ios.plistInject", "")),
+                        "UISupportedInterfaceOrientations~iphone", 0) >= 0) {
                     // The template carries a UISupportedInterfaceOrientations~iphone
                     // array without upside-down, which an iPhone reads instead of
                     // the base array. An explicit hint is the developer's own list
-                    // for every device, so the phone-only default goes.
+                    // for every device, so the phone-only default goes; so does a
+                    // project that injects its own ~iphone array, which would
+                    // otherwise leave the key in the plist twice.
                     File plist = new File(tmpFile, "dist/" + request.getMainClass() + "-src/" + request.getMainClass() + "-Info.plist");
                     replaceInFile(plist, IPHONE_DEFAULT_ORIENTATIONS, "");
                 }
