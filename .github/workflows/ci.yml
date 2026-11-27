@@ -10,7 +10,6 @@ name: CI
 #   select     which member workflows the change touches, from each member's
 #              old `paths` filter (.github/ci/ci-members.json,
 #              scripts/ci/select-ci-members.py).
-#   unity      the Unity gallery archive, once for the whole run.
 #   members    the selected workflows, as reusable calls in this same run, so
 #              they share its artifacts instead of each rebuilding them.
 #
@@ -69,7 +68,6 @@ jobs:
       check-doc-snippets: ${{ steps.select.outputs.check-doc-snippets }}
       cn1playground-language: ${{ steps.select.outputs.cn1playground-language }}
       blog-prose: ${{ steps.select.outputs.blog-prose }}
-      unity: ${{ steps.select.outputs.unity }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -86,26 +84,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/ci/select-ci-members.py --event "$EVENT" --base "$BASE" --head HEAD
-          unity=false
-          for m in linux-build-run scripts-android scripts-ios scripts-javascript; do
-            if grep -qx "$m=true" "$GITHUB_OUTPUT"; then unity=true; fi
-          done
-          echo "unity=$unity" >> "$GITHUB_OUTPUT"
-
-  # Once per run: every member that builds the application downloads it. The
-  # members still call unity-gallery-prebuilt.yml themselves (so each works
-  # when dispatched alone); in this run those calls find the archive and
-  # return at once.
-  unity-gallery:
-    needs: [golden-plan, source-gates, check-workflows, select]
-    if: ${{ needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.unity == 'true' }}
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-    permissions:
-      contents: read
 
   scripts-ios:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-ios == 'true' && needs.unity-gallery.result == 'success' }}
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-ios == 'true' }}
     uses: ./.github/workflows/scripts-ios.yml
     secrets: inherit
     permissions:
@@ -116,8 +98,8 @@ jobs:
       packages: read
 
   scripts-android:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-android == 'true' && needs.unity-gallery.result == 'success' }}
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-android == 'true' }}
     uses: ./.github/workflows/scripts-android.yml
     secrets: inherit
     permissions:
@@ -128,8 +110,8 @@ jobs:
       packages: read
 
   scripts-javascript:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-javascript == 'true' && needs.unity-gallery.result == 'success' }}
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-javascript == 'true' }}
     uses: ./.github/workflows/scripts-javascript.yml
     secrets: inherit
     permissions:
@@ -152,8 +134,8 @@ jobs:
       packages: read
 
   linux-build-run:
-    needs: [golden-plan, source-gates, check-workflows, select, unity-gallery]
-    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.linux-build-run == 'true' && needs.unity-gallery.result == 'success' }}
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.linux-build-run == 'true' }}
     uses: ./.github/workflows/linux-build-run.yml
     secrets: inherit
     permissions:

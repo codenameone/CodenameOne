@@ -36,14 +36,6 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    needs: [select]
-    if: ${{ (needs.select.outputs.any == 'true') }}
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   select:
     runs-on: ubuntu-24.04
     outputs:
@@ -114,8 +106,8 @@ jobs:
     # own leg flag from `select`), and a suite's later steps need only its own
     # build. Wall time grows; runners on the scarce `xcode-27` preview image
     # (actions/runner-images#14404) drop from five to one.
-    if: ${{ needs.select.outputs.any == 'true' && needs.build-port.result == 'success' && needs.unity-gallery.result == 'success' }}
-    needs: [select, build-port, unity-gallery]
+    if: ${{ needs.select.outputs.any == 'true' && needs.build-port.result == 'success' }}
+    needs: [select, build-port]
     permissions:
       contents: read
       pull-requests: write
@@ -252,11 +244,6 @@ jobs:
             "$XCODEBUILD" -downloadComponent MetalToolchain
           done
         timeout-minutes: 15
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Enter golden capture mode
         uses: ./.github/actions/cn1ss-capture
@@ -968,21 +955,19 @@ jobs:
           if-no-files-found: ignore
 
   native:
-    needs: [select, build-port, unity-gallery]
+    needs: [select, build-port]
     # Not a screenshot suite: a golden capture skips it.
     if: ${{ (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.native == 'true') }}
     uses: ./.github/workflows/scripts-ios-native.yml
     with:
       port_prepared: true
-      unity_prepared: true
     secrets: inherit
 
   packaging:
-    needs: [select, build-port, unity-gallery]
+    needs: [select, build-port]
     # Not a screenshot suite: a golden capture skips it.
     if: ${{ (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.packaging == 'true') }}
     uses: ./.github/workflows/ios-packaging.yml
     with:
       port_prepared: true
-      unity_prepared: true
     secrets: inherit

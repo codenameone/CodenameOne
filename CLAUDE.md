@@ -120,9 +120,9 @@ its own on JDK 17 (it compiles at release 17), then enforces the result in
 `unity-compat` (the Unity compatibility translator and runtime) are held to the
 same script with SpotBugs, PMD and Checkstyle all three, but in
 `.github/workflows/unity-compat.yml`: they build only with the .NET SDK, and
-the Java 8 leg must not need one. That workflow's `paths` name both modules,
-the core's `pmd.xml` and `checkstyle.xml` and the report script, so a change to
-any of them cannot skip it.
+the Java 8 leg must not need one. That workflow is nightly; on a pull request
+it runs only when the Unity tree itself changes, so a change to the core's
+`pmd.xml`, `checkstyle.xml` or the report script is judged there overnight.
 
 - **SpotBugs is a zero-findings gate.** *Any* finding of *any* pattern in *any*
   of those projects fails the build, and a project that produces no SpotBugs
@@ -1135,69 +1135,17 @@ Traps that have already cost a fix:
   application build never restores anything: its generated project turns the
   implicit framework reference off and names the three assemblies by path.
 
-#### The screenshot suite's Unity gallery is prebuilt, once, on Linux
+#### Unity is tested nightly, not on every pull request
 
-`scripts/hellocodenameone` compiles `scripts/unity-compat-samples/gallery`
-(`compile-unity` in `common/pom.xml`) for the `UnityCompat*` screenshot tests,
-so every job that builds the application would need the .NET SDK and both
-Unity modules. None has them. One Linux job per workflow run does:
+`unity-compat.yml` runs every night (`cron: '11 0 * * *'`) and on a pull
+request only when the Unity tree changes: the two modules, their integration
+scripts, the Unity goals of the build tools and `scripts/unity-compat-samples`.
+`scripts/hellocodenameone` does **not** compile the Unity gallery and has no
+`UnityCompat*` screenshot tests: that made every device suite depend on a
+.NET build, and a Unity failure stopped iOS, Android, JavaScript and the native
+suites alike. Do not add Unity back to the screenshot app or to a `ci.yml`
+member; the gallery is still built and run by `unity-compat-test.sh`.
 
-- **`.github/workflows/unity-gallery-prebuilt.yml`** (reusable) builds the
-  plugin and the two modules, runs the application's common module to
-  `generate-sources`, and uploads what `scripts/unity-gallery-prebuilt.sh pack`
-  writes as the artifact `unity-gallery-prebuilt`: the `codenameone-unity-compat`
-  and `codenameone-cil-translator` artifacts plus `common/target/unity` and
-  `common/target/generated-sources/unity`. The archive is cached on a hash of
-  everything that can change a byte of it, so most runs only upload it again.
-- **`.github/actions/unity-gallery-prebuilt`** downloads and unpacks it.
-  `compile-unity` then finds a matching content digest and never starts
-  `dotnet`.
-
-Traps:
-
-- **A new job that builds the application must use both**: a job that
-  `uses:` the workflow, `needs:` on it, and the action after everything that
-  fills the local Maven repository and before the first build of the
-  application. Without them the job fails in `compile-unity` with ".NET SDK,
-  which was not found", naming the gallery directory.
-- **A consumer must not build the Unity jars itself**, or install them from
-  anywhere else. The digest covers every class of the runtime, the references
-  and the translator, so output is good only with the archive's own jars. When
-  they differ the failure adds "does not match these sources or jars" -- that,
-  not a missing SDK, is the thing to fix. `state.txt` records a digest per
-  part under the whole one, and the message names the part that differs and,
-  within it, the first entry: read that before guessing.
-- **The translator's class path is its runtime scope and nothing more**
-  (`CompileUnityMojo.resolve`). Maven's legacy resolver also hands back a
-  pom's test-scoped dependencies unless it is filtered; that once put the
-  consumer's own `codenameone-core` jar into the digest, which a Linux job
-  rebuilds byte for byte and a Windows one does not, so every Windows consumer
-  refused an archive that was good.
-- **A hand-assembled translation takes the application's libraries from
-  `common/target/translation-libs`**, which the application's own pom stages
-  from its runtime class path in `process-classes`. The native Linux and
-  Windows translations (`vm/tests`, `helloSuiteLibraryClasses`) and the
-  JavaScript build script read it; a list of class directories per workflow
-  is how the Unity runtime was missing from three of them.
-- **The artifact name is fixed, so the archive is made once per run.**
-  `ci.yml` builds it before any member; a member's own call then finds the
-  archive already in the run (the workflow's first step asks the API) and
-  returns at once. `scripts-ios-native.yml` and `ios-packaging.yml` also take
-  `unity_prepared` and skip their call outright.
-- **Anything new that determines the archive goes into the cache key** in the
-  reusable workflow. A stale cached archive is not refused downstream -- it is
-  self-consistent -- it is simply used.
-- **Every PR-gating workflow that builds the application lists the gallery, both
-  modules, the script, the workflow and the action in its `paths`** (for a
-  `ci.yml` member, its entry in `.github/ci/ci-members.json`), and
-  `.github/ci/apple-checks.json` lists them for the Apple suites.
-  A nightly suite (see *Nightly CI*) lists only its own tree and is exempt.
-- **`unpack` after `mvn clean` on the application, never before**: the output
-  lives under `common/target`.
-- `unity-compat.yml`'s `unity-gallery-consumer` job is the end-to-end test:
-  it unpacks into a job that built neither module, builds the common module
-  with an SDK setting that names nothing, and then checks that a stale
-  `state.txt` is refused by name.
 ### Desktop compatibility: Swing and JavaFX apps as Codename One apps
 
 A desktop project's `src/main` dropped into `common/src/main/desktop` (or
@@ -1472,8 +1420,7 @@ workflows of the samples, cn1libs and feature trees; nothing else.
   producer, and Android fidelity runs inside `scripts-android.yml`. Do not split
   a suite back out into its own workflow or runner; the `xcode-27` image is
   scarce and every extra job is another wait.
-- **One run shares its artifacts.** The Unity gallery is built once per run.
-  Inside a member `github.workflow` is `CI`, so each member's concurrency group
+- **One run shares its artifacts.** Inside a member `github.workflow` is `CI`, so each member's concurrency group
   starts with its own file name; keep that on a new one.
 - **Check names are `CI / <member> / <job>`.** Branch protection and anything
   that looks a PR run up by workflow name must use them; `golden-harvest.sh`

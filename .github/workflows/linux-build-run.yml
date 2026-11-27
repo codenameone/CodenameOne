@@ -2,7 +2,7 @@
 # ParparVM JVM tests, in one workflow so the inputs they share are built once.
 #
 # prepare-suite (Linux x64) is the one build of the hellocodenameone
-# application: the plugin, the Unity gallery, the common module, the libraries
+# application: the plugin, the common module, the libraries
 # it ships (translation-libs) and the CI test server, uploaded as
 # linux-suite-classes. Those are bytecode and a runnable java copy, so every
 # leg below downloads them instead of rebuilding them -- on Linux and Windows.
@@ -15,7 +15,7 @@
 # `mvn -pl tests -am`, and the native toolchain output.
 #
 # Jobs:
-#   unity-gallery, prepare-suite      -> the shared suite build (Linux x64)
+#   prepare-suite                     -> the shared suite build (Linux x64)
 #   build-run (x64 + arm64), build-run-musl, compare-comment
 #                                     -> Linux GTK3 port, translate + run + capture
 #   wincross-build, wincross-run, wincross-compare-comment
@@ -73,20 +73,12 @@ env:
   # compile must not see it.
 
 jobs:
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    if: ${{ github.event_name != 'release' }}
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   # Build the codenameone maven plugin (it needs CEF, which is x64-only on Linux)
   # and the hellocodenameone screenshot suite, then publish the suite *.class
   # and the *.class of the libraries it ships (common/target/translation-libs:
-  # the mock ad provider, the Unity runtime). These are architecture-independent (they are translated to C later),
+  # the mock ad provider). These are architecture-independent (they are translated to C later),
   # so both arch legs translate from these same classes.
   prepare-suite:
-    needs: [unity-gallery]
     name: build suite classes (x64)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -126,11 +118,6 @@ jobs:
           JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
             mvn -B -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,rive-runtime,backend,backend-test -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Enter golden capture mode
         uses: ./.github/actions/cn1ss-capture
@@ -2776,7 +2763,7 @@ jobs:
           if (!(Test-Path $port)) { Write-Error "port classes missing after download: $port"; exit 1 }
           if (!(Test-Path $common)) { Write-Error "common classes missing after download: $common"; exit 1 }
           $libs = "scripts/hellocodenameone/common/target/translation-libs"
-          foreach ($lib in "com/codename1/ads/mock/MockAdProvider.class", "com/codename1/unitycompat/unityengine/UnityRuntime.class") {
+          foreach ($lib in "com/codename1/ads/mock/MockAdProvider.class") {
             if (!(Test-Path "$libs/$lib")) { Write-Error "application libraries missing after download: $libs/$lib"; exit 1 }
           }
           Write-Host "Restored core + Windows port + common classes OK"

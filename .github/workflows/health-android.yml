@@ -47,17 +47,9 @@ jobs:
     permissions:
       contents: read
 
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   health-android:
     if: needs.golden-plan.outputs.run == 'true'
-    needs: [golden-plan, unity-gallery]
+    needs: [golden-plan]
     name: Health Connect Android
     permissions:
       contents: read
@@ -99,10 +91,6 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
         run: ./scripts/build-android-port.sh -q -DskipTests
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Make the smoke app a health app
         run: |

@@ -2,14 +2,6 @@
   "scripts-ios": {
     "pull_request": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         ".github/workflows/scripts-ios.yml",
         ".github/workflows/_build-ios-port.yml",
         "scripts/setup-workspace.sh",
@@ -85,14 +77,6 @@
     },
     "push": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         ".github/workflows/scripts-ios.yml",
         ".github/workflows/_build-ios-port.yml",
         "scripts/setup-workspace.sh",
@@ -166,17 +150,9 @@
   "scripts-android": {
     "pull_request": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
         "maven/compose-compat/**",
         "maven/rive-runtime/**",
         "maven/rive-schema-gen/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         ".github/workflows/scripts-android.yml",
         "scripts/setup-workspace.sh",
         "scripts/ci/retry.sh",
@@ -219,17 +195,9 @@
     },
     "push": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
         "maven/compose-compat/**",
         "maven/rive-runtime/**",
         "maven/rive-schema-gen/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         ".github/workflows/scripts-android.yml",
         "scripts/setup-workspace.sh",
         "scripts/ci/retry.sh",
@@ -277,17 +245,9 @@
   "scripts-javascript": {
     "pull_request": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
         "maven/compose-compat/**",
         "maven/rive-runtime/**",
         "maven/rive-schema-gen/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         "scripts/ci/retry.sh",
         ".github/workflows/scripts-javascript.yml",
         "scripts/run-javascript-browser-tests.sh",
@@ -325,17 +285,9 @@
     },
     "push": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
         "maven/compose-compat/**",
         "maven/rive-runtime/**",
         "maven/rive-schema-gen/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         "scripts/ci/retry.sh",
         ".github/workflows/scripts-javascript.yml",
         "scripts/run-javascript-browser-tests.sh",
@@ -405,15 +357,7 @@
   "linux-build-run": {
     "pull_request": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
         "maven/compose-compat/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         ".github/workflows/linux-build-run.yml",
         "scripts/ci/apt-get-install.sh",
         "scripts/ci/apt-get-update.sh",
@@ -518,15 +462,7 @@
     },
     "push": {
       "paths": [
-        "scripts/unity-compat-samples/gallery/**",
-        "maven/cil-translator/**",
-        "maven/unity-compat/**",
         "maven/compose-compat/**",
-        "maven/build-engine/src/main/java/com/codename1/maven/Unity*",
-        "maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*",
-        "scripts/unity-gallery-prebuilt.sh",
-        ".github/workflows/unity-gallery-prebuilt.yml",
-        ".github/actions/unity-gallery-prebuilt/**",
         ".github/workflows/linux-build-run.yml",
         "scripts/ci/apt-get-install.sh",
         "scripts/ci/apt-get-update.sh",

@@ -154,9 +154,8 @@ if [ -d "$COMMON_DEPS_DIR" ]; then
 fi
 
 # Stage the libraries the application ships besides its own classes: the
-# deterministic mock-ads provider (AdsScreenshotTest) and the Unity compatibility
-# runtime (the UnityCompat* tests). The COMMON_DEPS_DIR allowlist above only
-# extracts kotlin/annotations, so neither would reach the translator
+# deterministic mock-ads provider (AdsScreenshotTest). The COMMON_DEPS_DIR
+# allowlist above only extracts kotlin/annotations, so it would not reach the translator
 # ("Unknown class com_codename1_ads_mock_MockAdProvider" at runtime). The common
 # module unpacks them itself (stage-translation-libs in its pom), from its own
 # dependency list: the native Linux and Windows suites read the same directory,
@@ -167,7 +166,7 @@ if [ ! -d "$COMMON_LIBS_DIR" ]; then
   bj_log "Missing $COMMON_LIBS_DIR: build the common module to process-classes or later" >&2
   exit 1
 fi
-for required in com/codename1/ads/mock/MockAdProvider.class com/codename1/unitycompat/unityengine/UnityRuntime.class; do
+for required in com/codename1/ads/mock/MockAdProvider.class; do
   if [ ! -f "$COMMON_LIBS_DIR/$required" ]; then
     bj_log "$COMMON_LIBS_DIR has no $required" >&2
     exit 1

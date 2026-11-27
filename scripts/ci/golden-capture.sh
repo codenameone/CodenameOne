@@ -11,7 +11,7 @@
 # Needs GH_TOKEN (actions: write), DISPATCH_TOKEN (CN1SS_GH_TOKEN) and
 # GITHUB_REPOSITORY. Each dispatch is a run
 # of its own, so the workflows' concurrency groups and fixed artifact names
-# (the Unity gallery, the port bundles) cannot collide as they would if they
+# (the port bundles) cannot collide as they would if they
 # were called inside one run.
 set -euo pipefail
 

@@ -25,94 +25,34 @@ name: Unity compatibility
 #                              modules, enforced by the script PR CI uses for
 #                              the rest of the tree, and the ClassCastException
 #                              gate over the runtime, which ParparVM translates
-#   unity-gallery-consumer     the archive unity-gallery-prebuilt.yml makes for
-#                              the screenshot workflows, unpacked into a job
-#                              that built neither Unity module and has no SDK
-#                              it may use: the application's common module has
-#                              to build from it, and a stale archive has to be
-#                              refused by name
 #
 # The static analysis gates run HERE and not in pr.yml's Java 8 leg, where the
 # other modules are judged. Both modules build only with the .NET SDK, and
 # putting them in that leg would make every pull request in the repository
-# install .NET and build C# to analyse code it did not touch. Nothing is lost
-# by keeping them apart: the `paths` below name both modules, the rulesets and
-# the scripts that do the judging, so no change to any of them can merge
-# without this workflow running, and the report script fails on a module that
-# produced no report rather than reading the absence as clean.
+# install .NET and build C# to analyse code it did not touch. A change to the
+# rulesets or the report script is judged by the nightly run, and the report
+# script fails on a module that produced no report rather than reading the
+# absence as clean.
+# Nightly, and on a pull request only when the Unity tree itself changes: a
+# change to core, the VM, the archetype or the quality rulesets is covered by
+# the night's run rather than by every pull request. The screenshot app no
+# longer compiles the Unity gallery, so no PR workflow needs .NET either.
 on:
   pull_request:
     branches: [ master ]
     paths:
       - 'maven/cil-translator/**'
       - 'maven/unity-compat/**'
-      - 'maven/pom.xml'
       - 'maven/integration-tests/unity-compat-test.sh'
       - 'maven/integration-tests/unity-compat-project-test.sh'
       - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
       - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/AppSupport.java'
       - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/tasks/CompileUnityTask.java'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/GradleConversion.java'
-      - 'maven/cn1app-archetype/**'
-      - 'maven/integration-tests/inc/**'
       - 'scripts/unity-compat-samples/**'
-      - 'CodenameOne/src/com/codename1/gaming/**'
-      # The platform the offscreen check of the game view runs on.
-      - 'maven/core-unittests/src/test/java/com/codename1/testing/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'vm/JavaAPI/**'
-      - 'vm/selfhost/js/**'
-      # What judges the two modules: a change that weakens a gate has to run it.
-      - '.github/scripts/generate-quality-report.py'
-      - 'maven/core-unittests/pmd.xml'
-      - 'maven/core-unittests/checkstyle.xml'
-      - 'scripts/check-cast-semantics.sh'
-      - 'scripts/cast-semantics-baseline.txt'
-      # The archive the screenshot workflows build the application from,
-      # and the one job here that proves a job without the SDK can use it.
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - 'scripts/hellocodenameone/pom.xml'
-      - 'scripts/hellocodenameone/common/pom.xml'
       - '.github/workflows/unity-compat.yml'
-  push:
-    branches: [ master ]
-    paths:
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/pom.xml'
-      - 'maven/integration-tests/unity-compat-test.sh'
-      - 'maven/integration-tests/unity-compat-project-test.sh'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/AppSupport.java'
-      - 'maven/codenameone-gradle-plugin/src/main/java/com/codename1/gradle/tasks/CompileUnityTask.java'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/GradleConversion.java'
-      - 'maven/cn1app-archetype/**'
-      - 'maven/integration-tests/inc/**'
-      - 'scripts/unity-compat-samples/**'
-      - 'CodenameOne/src/com/codename1/gaming/**'
-      # The platform the offscreen check of the game view runs on.
-      - 'maven/core-unittests/src/test/java/com/codename1/testing/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'vm/JavaAPI/**'
-      - 'vm/selfhost/js/**'
-      # What judges the two modules: a change that weakens a gate has to run it.
-      - '.github/scripts/generate-quality-report.py'
-      - 'maven/core-unittests/pmd.xml'
-      - 'maven/core-unittests/checkstyle.xml'
-      - 'scripts/check-cast-semantics.sh'
-      - 'scripts/cast-semantics-baseline.txt'
-      # The archive the screenshot workflows build the application from,
-      # and the one job here that proves a job without the SDK can use it.
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - 'scripts/hellocodenameone/pom.xml'
-      - 'scripts/hellocodenameone/common/pom.xml'
-      - '.github/workflows/unity-compat.yml'
+  schedule:
+    - cron: '11 0 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -310,89 +250,3 @@ jobs:
             maven/integration-tests/build/unity-compat-project/*.err
             maven/integration-tests/build/unity-compat-project/app/common/target/unity/*.log
           if-no-files-found: ignore
-
-  # The screenshot workflows build scripts/hellocodenameone, which has a Unity
-  # project in it, on runners with no .NET SDK: one Linux job compiles the
-  # project and they unpack what it made. This is that job, and below it the
-  # only test of the handoff that does not cost a Mac.
-  unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
-  unity-gallery-consumer:
-    if: needs.golden-plan.outputs.run == 'true'
-    needs: [golden-plan, unity-gallery]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      # An SDK setting that names nothing is an error, never a reason to look
-      # elsewhere, so with this no step below can compile C# -- whatever the
-      # runner image has on its PATH.
-      NO_DOTNET: -Dcn1.unity.dotnet=/no/such/dotnet
-    steps:
-      - uses: actions/checkout@v6
-      # Installed FIRST so the JDK 8 below is the one JAVA_HOME names.
-      - name: Set up JDK 17 for the application build
-        uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      - name: Use Google's copy of Maven Central first
-        uses: ./.github/actions/maven-central-mirror
-      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
-      - name: Set up JDK 8
-        uses: actions/setup-java@v5
-        with:
-          java-version: '8'
-          distribution: 'temurin'
-          cache: 'maven'
-      - name: Use Google's copy of Maven Central first
-        uses: ./.github/actions/maven-central-mirror
-      # xvfb for the CSS compiler, which opens an AWT frame.
-      - name: Install xvfb
-        run: bash scripts/ci/apt-get-install.sh xvfb
-      # What a screenshot job builds of the framework: no -Dunity-compat. The
-      # two artifacts are removed first because the Maven cache above is shared
-      # with the jobs of this workflow that do build them.
-      - name: Build the framework without the Unity modules
-        run: |
-          rm -rf ~/.m2/repository/com/codenameone/codenameone-unity-compat ~/.m2/repository/com/codenameone/codenameone-cil-translator
-          cd maven
-          bash ../scripts/ci/retry.sh xvfb-run -a mvn -B install -Plocal-dev-javase -DskipTests -Darchetype.test.skip=true -Dmaven.javadoc.skip=true -pl codenameone-maven-plugin,cn1-ads-mock,compose-compat,rive-runtime,android-compat -am
-          test ! -e ~/.m2/repository/com/codenameone/codenameone-unity-compat
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
-      - name: Build the application's common module from the archive
-        run: |
-          set -euo pipefail
-          export JAVA_HOME="$JDK_17_HOME"
-          export PATH="$JAVA_HOME/bin:$PATH"
-          mkdir -p "$HOME/.codenameone"
-          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
-          common=scripts/hellocodenameone/common
-          cp "$common/target/unity/state.txt" "$RUNNER_TEMP/unity-state.txt"
-          bash scripts/ci/retry.sh xvfb-run -a mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests -Dmaven.javadoc.skip=true "$NO_DOTNET"
-          cmp "$RUNNER_TEMP/unity-state.txt" "$common/target/unity/state.txt"
-          test ! -e "$common/target/unity/dotnet.log"
-          test -f "$common/target/classes/com/codename1/generated/unity/UnityAppImpl.class"
-      # The other half: output that does not belong to these sources and jars
-      # is not used, and the failure says that rather than only asking for an
-      # SDK. This is what a screenshot job prints when its archive is stale.
-      - name: A stale archive is refused by name
-        run: |
-          set -uo pipefail
-          export JAVA_HOME="$JDK_17_HOME"
-          export PATH="$JAVA_HOME/bin:$PATH"
-          echo stale > scripts/hellocodenameone/common/target/unity/state.txt
-          # The step runs under "bash -e": the build is meant to fail, so its
-          # status is taken with "||" or the step would stop before judging it.
-          status=0
-          xvfb-run -a mvn -B -f scripts/hellocodenameone/pom.xml -pl common generate-sources -DskipTests "$NO_DOTNET" > "$RUNNER_TEMP/stale.log" 2>&1 || status=$?
-          tail -n 30 "$RUNNER_TEMP/stale.log"
-          if [ "$status" -eq 0 ]; then
-            echo "::error::A build with a stale state.txt and no .NET SDK succeeded."
-            exit 1
-          fi
-          grep -q 'does not match these sources or jars' "$RUNNER_TEMP/stale.log"
-          grep -q 'unity-compat-samples/gallery' "$RUNNER_TEMP/stale.log"
