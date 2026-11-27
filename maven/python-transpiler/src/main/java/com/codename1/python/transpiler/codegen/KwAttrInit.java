@@ -34,6 +34,7 @@ import com.codename1.python.transpiler.ast.Node.Keyword;
 import com.codename1.python.transpiler.ast.Node.Name;
 import com.codename1.python.transpiler.ast.Node.Stmt;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -531,6 +532,12 @@ public final class KwAttrInit {
                             || c.keys.contains(((FunctionDef) s).name)
                             && !((FunctionDef) s).decorators.isEmpty())) {
                         c.refusal = k.name + " binds " + ((FunctionDef) s).name;
+                    } else if (s instanceof Node.AnnAssign && ((Node.AnnAssign) s).value != null
+                            && ((Node.AnnAssign) s).target instanceof Name
+                            && c.keys.contains(((Name) ((Node.AnnAssign) s).target).id)
+                            && !inert(((Node.AnnAssign) s).value, all)) {
+                        c.refusal = k.name + " binds " + ((Name) ((Node.AnnAssign) s).target).id
+                                + " to a possible descriptor";
                     } else if (s instanceof Node.Assign && !inert(((Node.Assign) s).value, all)) {
                         // Anything but a constant may be a descriptor (property(...), a
                         // family or foreign descriptor instance) whose store runs code.
@@ -599,7 +606,7 @@ public final class KwAttrInit {
                 || param != null && isName(e, param);
     }
 
-    private static final Set<String> INSPECT = new HashSet<String>(java.util.Arrays.asList(
+    private static final Set<String> INSPECT = new HashSet<String>(Arrays.asList(
             "isinstance", "issubclass", "hasattr", "str", "repr", "id", "callable", "print"));
 
     /// Checks every read of a stored family class in `o`. A read may test
@@ -822,51 +829,64 @@ public final class KwAttrInit {
         return false;
     }
 
+    private static final Set<String> BUILTIN_TYPES = new HashSet<String>(Arrays.asList(
+            "bool", "int", "float", "complex", "str", "bytes", "bytearray", "list", "dict", "tuple",
+            "set", "frozenset", "object", "type"));
+
     /// Whether a class-body value cannot be a descriptor: a constant, an
-    /// operator over such values, `type(...)` of one, or a name no module
-    /// binds to a call (a builtin type, a string constant). A call, or a name
-    /// some module binds to one, may make a property whose store runs code.
+    /// operator over such values, `type(...)` of one, a builtin type, or a
+    /// name every module-level binding of which is itself inert. A name found
+    /// bound nowhere (an import, a parameter) may be anything, so it is not.
     private static boolean inert(Expr v, List<Node.Module> all) {
-        if (v instanceof Constant) {
-            return true;
+        return inert(v, all, new HashSet<String>());
+    }
+
+    private static boolean inert(Expr v, List<Node.Module> all, Set<String> seen) {
+        if (v == null || v instanceof Constant) {
+            return v != null;
         }
         if (v instanceof Node.UnaryOp) {
-            return inert(((Node.UnaryOp) v).operand, all);
+            return inert(((Node.UnaryOp) v).operand, all, seen);
         }
         if (v instanceof Node.BinOp) {
-            return inert(((Node.BinOp) v).left, all) && inert(((Node.BinOp) v).right, all);
+            return inert(((Node.BinOp) v).left, all, seen) && inert(((Node.BinOp) v).right, all, seen);
         }
         if (v instanceof Call && ((Call) v).func instanceof Name && "type".equals(((Name) ((Call) v).func).id)
                 && ((Call) v).args.size() == 1 && ((Call) v).keywords.isEmpty()) {
-            return inert(((Call) v).args.get(0), all);
+            return inert(((Call) v).args.get(0), all, seen);
         }
-        if (v instanceof Name) {
-            String id = ((Name) v).id;
-            for (Node.Module m : all) {
-                for (Stmt t : m.body) {
-                    if (t instanceof Node.Assign && !(((Node.Assign) t).value instanceof Constant)) {
-                        for (Expr x : ((Node.Assign) t).targets) {
-                            if (x instanceof Name && id.equals(((Name) x).id)
-                                    && !inertLiteral(((Node.Assign) t).value)) {
+        if (!(v instanceof Name)) {
+            return false;
+        }
+        String id = ((Name) v).id;
+        if (!seen.add(id)) {
+            return false;
+        }
+        boolean bound = false;
+        for (Node.Module m : all) {
+            for (Stmt t : m.body) {
+                if (t instanceof Node.Assign) {
+                    for (Expr x : ((Node.Assign) t).targets) {
+                        if (x instanceof Name && id.equals(((Name) x).id)) {
+                            if (!inert(((Node.Assign) t).value, all, seen)) {
+                                seen.remove(id);
                                 return false;
                             }
+                            bound = true;
                         }
                     }
+                } else if (t instanceof Node.AnnAssign && ((Node.AnnAssign) t).target instanceof Name
+                        && id.equals(((Name) ((Node.AnnAssign) t).target).id)) {
+                    if (!inert(((Node.AnnAssign) t).value, all, seen)) {
+                        seen.remove(id);
+                        return false;
+                    }
+                    bound = true;
                 }
             }
-            return true;
         }
-        return false;
-    }
-
-    private static boolean inertLiteral(Expr v) {
-        if (v instanceof Constant || v instanceof Name) {
-            return true;
-        }
-        if (v instanceof Node.UnaryOp) {
-            return inertLiteral(((Node.UnaryOp) v).operand);
-        }
-        return v instanceof Node.BinOp && inertLiteral(((Node.BinOp) v).left) && inertLiteral(((Node.BinOp) v).right);
+        seen.remove(id);
+        return bound || BUILTIN_TYPES.contains(id);
     }
 
     private static boolean isTop(Map<String, Node.Module> trees, ClassDef k) {
