@@ -121,7 +121,7 @@ wins: re-read it at <https://developer.apple.com/app-store/review/guidelines/>.
 - **Personal data sent to a third-party AI service** (OpenAI, Anthropic,
   Google, ...): disclose it on screen and get the user's opt-in before the
   first request, name the provider in the privacy policy, and list it in the
-  privacy labels. This is enforced since November 2025.
+  privacy labels. Apple added this to guideline 5.1.2(i) in November 2025.
 - Analytics and crash SDKs: list what they collect in the privacy labels and
   in Google's Data safety form; never send emails, names or free text in
   analytics events.
@@ -157,17 +157,17 @@ An app where users post content others see (chat, reviews, photos, profiles)
 needs all four: a way to report content, a way to block users, a filter or
 moderation for objectionable content, and published contact information.
 Messaging and social templates (Parley) need these wired to the backend.
-Apple expects action on a report within 24 hours. Since June 2026 App Store
-Connect also asks whether the app has social-media features; answer it
-before submitting, or the build is held.
+Apple expects action on a report within 24 hours. If App Store Connect asks
+whether the app has social-media features, answer it from what the code
+does before submitting.
 
 ## F. Age rating, age assurance and kids (Apple 2.3.6, 1.3)
 
 Answer the age-rating questionnaire from what the code does: user-generated
 content, unrestricted web access (`BrowserComponent` on arbitrary URLs),
-gambling, mature themes. Apple replaced the questionnaire in 2026 (13+, 16+
-and 18+ ratings and new questions); an app rated under the old one must
-answer the new one before its next update. Google removes apps with no
+gambling, mature themes. Apple announced a new questionnaire in 2025 (13+,
+16+ and 18+ ratings and new questions), required from early 2026; an app
+rated under the old one must answer the new one before its next update. Google removes apps with no
 content rating. The answers go to the user to submit; mismatches are
 rejected. Do not put the app in the Kids category unless the user asks, which
 also forbids third-party analytics and ads.
@@ -350,7 +350,7 @@ The short form, for a quick pass:
       permissions without a declaration (Google Play).
 - [ ] Generative AI: consent, moderation and reporting (C).
 - [ ] Age rating on the 2026 questionnaire, content rating on Play,
-      social-media declaration (E, F).
+      social-media question (E, F).
 - [ ] `StoreAudit.java` exits 0.
 - [ ] The user approved the listing text, screenshots, privacy labels, Data
       safety answers and age rating.

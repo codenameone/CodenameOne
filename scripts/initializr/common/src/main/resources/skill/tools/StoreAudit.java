@@ -324,7 +324,7 @@ public class StoreAudit {
             add(Sev.HIGH, "UGC-MODERATION", at(ugc.get(0)),
                     "Content users post for others appears to lack " + (!report ? "a report action" : "")
                     + (!report && !block ? " and " : "") + (!block ? "a block action" : "") + " (Apple 1.2).",
-                    "Add report and block, filter objectionable content, act on reports within 24 hours, and publish contact information. Declare the social-media capability in App Store Connect.");
+                    "Add report and block, filter objectionable content, act on reports within 24 hours, and publish contact information. Answer App Store Connect's social-media question if it is asked.");
         }
     }
 
@@ -339,8 +339,8 @@ public class StoreAudit {
                 continue; // an OAuth redirect the app intercepts, never fetched
             }
             add(Sev.BLOCKER, "LOCAL-BACKEND", at(h),
-                    "The app talks to a local address the reviewer cannot reach.",
-                    "Deploy the backend and point the release build at its public https URL.");
+                    "The app talks to a local address the reviewer cannot reach. Every full-stack template ships this way, for development.",
+                    "Deploy the backend and point the release build at its public https URL (the template's AppConfig.DEFAULT_SERVER).");
         }
         for (Hit h : grep("(?i)https?://[^\"\\s]*\\b(staging|stage|dev|test|sandbox|ngrok|trycloudflare)\\b[^\"\\s]*")) {
             if (h.text.contains("sandbox.itunes") || h.text.contains("sandbox.paypal")) {
@@ -383,15 +383,17 @@ public class StoreAudit {
         for (Hit h : grep("(?i)(Preferences\\.set|Storage\\.getInstance\\(\\)\\.writeObject)\\(\\s*\"[^\"]*(token|password|secret|session|jwt|apikey|api_key|credential)")) {
             add(Sev.HIGH, "INSECURE-TOKEN", at(h),
                     "A credential is stored in Preferences/Storage, which is plain and is backed up.",
-                    "Keep tokens in SecureStorage (com.codename1.io.SecureStorage).");
+                    "Keep tokens in SecureStorage (com.codename1.security.SecureStorage).");
         }
         for (Hit h : grep("(?i)Log\\.p\\(.*(password|token|email|ssn|creditcard)")) {
             add(Sev.NOTE, "LOGS-PII", at(h),
                     "A log line may print personal data or credentials.",
                     "Remove it from the release build.");
         }
-        List<Hit> deep = grep("\\bgetAppArg\\(\\)|AppArg");
-        if (!deep.isEmpty() && !grep("(?i)(delete|transfer|pay|purchase|reset|login|token)").isEmpty()) {
+        List<Hit> deep = grep("\\bgetAppArg\\(\\)");
+        boolean sensitive = deep.stream().anyMatch(h -> lines.get(h.file).stream()
+                .anyMatch(l -> l.matches("(?i).*\\b(delete\\w*|transfer\\w*|pay(ment)?|purchase\\w*|resetPassword|logout|signIn)\\(.*")));
+        if (sensitive) {
             add(Sev.NOTE, "DEEPLINK-VALIDATE", at(deep.get(0)),
                     "The app reads deep-link arguments. A link must never perform a sensitive action (pay, delete, sign in) without validating it and asking the user.",
                     "Parse the link, validate it, and confirm sensitive actions on screen.");
@@ -427,10 +429,11 @@ public class StoreAudit {
             }
         }
         if ("true".equals(hints.getProperty("codename1.arg.android.onDeviceDebug"))
-                || "true".equals(hints.getProperty("codename1.arg.android.debuggable"))) {
+                || hints.getProperty("codename1.arg.android.xapplication_attr", "")
+                        .matches("(?s).*android\\\\?:debuggable\\\\?=\\\\?\"true.*")) {
             add(Sev.BLOCKER, "ANDROID-DEBUGGABLE", "codenameone_settings.properties",
-                    "An on-device debugging hint is set; the build is debuggable and is not a release.",
-                    "Remove android.onDeviceDebug before the store build.");
+                    "The build is debuggable (android.onDeviceDebug, or android:debuggable in android.xapplication_attr) and is not a release.",
+                    "Remove the hint before the store build.");
         }
         if (!"false".equals(hints.getProperty("codename1.arg.android.allowBackup")) && grep("\\bSecureStorage\\b").isEmpty()
                 && features.contains("accounts")) {
@@ -444,8 +447,12 @@ public class StoreAudit {
                     "android.targetSDKVersion is pinned to " + target + "; Play refuses uploads below its current required level.",
                     "Remove the hint so the build targets the level Play requires.");
         }
-        String orient = hints.getProperty("codename1.arg.android.screenOrientation", "")
-                + hints.getProperty("codename1.arg.ios.interface_orientation", "");
+        // Android has no orientation hint of its own; a lock there comes from
+        // code (Display.lockOrientation), so only the iOS hint is read.
+        String orient = hints.getProperty("codename1.arg.ios.interface_orientation", "");
+        if (!grep("\\blockOrientation\\(").isEmpty()) {
+            orient += " portrait";
+        }
         if (orient.matches("(?i).*(portrait|landscape).*") && !orient.matches("(?i).*(sensor|unspecified|full).*")) {
             add(Sev.NOTE, "ORIENTATION-LOCK", "codenameone_settings.properties",
                     "Orientation is locked. Android 16+ ignores the lock on large screens and Play's large-screen quality tiers expect a resizable layout.",
@@ -561,7 +568,7 @@ public class StoreAudit {
         List<String> m = new ArrayList<>();
         m.add("Privacy policy URL in both listings and reachable inside the app; it names every SDK/AI provider that receives data.");
         m.add("Apple privacy labels and Google Data safety form answered from the same inventory of collected data.");
-        m.add("Apple age-rating questionnaire (2026 version) and Google content rating completed; an unrated app is removed from Play.");
+        m.add("Apple age-rating questionnaire (the current one, with 13+/16+/18+) and Google content rating completed; an unrated app is removed from Play.");
         m.add("Age assurance: if the app is offered in US states with App Store Accountability Acts, read the store's age signal (Declared Age Range / Play Age Signals) only for age-gating, and handle consent being revoked.");
         m.add("Screenshots and preview video show the real app, every button in them works, no device frames in the video, no Apple hardware images.");
         m.add("Support and marketing URLs load (run with --network --url ...).");
@@ -590,7 +597,7 @@ public class StoreAudit {
             m.add("AI: consent screen names the provider and the data; output can be reported; Play image/video generators have intimate-imagery safeguards and a full-access test account.");
         }
         if (features.contains("ugc")) {
-            m.add("User content: report, block, filtering, action on reports within 24 hours, published contact; App Store Connect social-media capability declared.");
+            m.add("User content: report, block, filtering, action on reports within 24 hours, published contact; social-media question in App Store Connect answered if asked.");
         }
         if (features.contains("tracking")) {
             m.add("ATT prompt shown before any tracking SDK starts; features not gated on Allow; labels say Data Used to Track You.");
