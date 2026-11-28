@@ -202,11 +202,12 @@ final class PurchaseStoreKit2Tests: XCTestCase {
         XCTAssertFalse(all.contains { $0.hasPrefix("receipt ") && !$0.contains(" jws:") },
                        "a receipt without the StoreKit 2 JWS: \(all)")
 
-        // An upgrade within the group: the yearly plan is a purchase. The
-        // monthly transaction it replaces comes back marked upgraded; it is
-        // finished, but is neither a purchase nor a second receipt -- its
-        // receipt was posted when it was bought, and the receipt store drops
-        // a transaction id it already has.
+        // An upgrade within the group: the yearly plan is a purchase, and the
+        // monthly plan it replaces is neither a second purchase nor a second
+        // receipt. This cannot tell whether the bridge saw the monthly
+        // transaction come back marked upgraded: it was finished before, and
+        // the receipt store drops a transaction id it already has, so the
+        // bridge's "superseded" path is not exercised here.
         let receiptsBefore = events().filter { $0.hasPrefix("receipt ") }.count
         command("subscribe:\(yearly)")
         waitFor("itemPurchased \(yearly)")

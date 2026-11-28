@@ -142,10 +142,11 @@ final class CN1StoreKit2: NSObject {
             return
         }
         lock.lock()
-        let t = unfinished.removeValue(forKey: transactionId) as? Transaction
-        if let t = t {
-            rememberFinished(CN1StoreKit2.finishKey(t))
+        let states = (unfinished.removeValue(forKey: transactionId) as? [Any] ?? []).compactMap { $0 as? Transaction }
+        for s in states {
+            rememberFinished(CN1StoreKit2.finishKey(s))
         }
+        let t = states.last
         lock.unlock()
         if let t = t {
             Task.detached { await t.finish() }
@@ -323,7 +324,10 @@ final class CN1StoreKit2: NSObject {
                 return
             }
             reported.insert(key)
-            unfinished[id] = t
+            // Every state of the transaction delivered before Java finished
+            // it: a purchase and its refund share the id, and finishing must
+            // remember both keys or the later state is reported again.
+            unfinished[id] = ((unfinished[id] as? [Any]) ?? []) + [t]
             lock.unlock()
             var e = describe(t, jws: result.jwsRepresentation)
             if t.revocationDate != nil {
