@@ -3599,6 +3599,23 @@
         "status": "submitted",
         "published": false,
         "syndicated_at": "2026-11-27T01:01:33+00:00"
+      },
+      "devto": {
+        "id": 5133305,
+        "url": "https://dev.to/codenameone/why-my-kids-are-learning-to-program-the-new-baseline-1349",
+        "syndicated_at": "2026-11-27T14:23:23+00:00"
+      }
+    },
+    "a-million-rows-and-live-excel-formulas": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-million-rows-and-live-excel-formulas-inside-your-own-app",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b0a279f2de803213f9c1921",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-28T01:01:10+00:00"
       }
     }
   }
