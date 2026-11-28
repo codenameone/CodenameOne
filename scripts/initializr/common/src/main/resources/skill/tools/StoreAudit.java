@@ -164,7 +164,7 @@ public class StoreAudit {
         {"contacts", "\\bContactsManager\\b|\\bgetAllContacts\\(|\\bgetContactById\\(", "ios.NSContactsUsageDescription"},
         {"biometrics", "\\bBiometrics\\b|\\bFingerprintScanner\\b", "ios.NSFaceIDUsageDescription"},
         {"bluetooth", "\\bBluetooth[A-Z]?\\w*\\b|\\bBluetoothLE\\b", "ios.NSBluetoothAlwaysUsageDescription"},
-        {"calendar", "\\bDeviceCalendar\\b|\\bCalendarManager\\b", "ios.NSCalendarsFullAccessUsageDescription"},
+        {"calendar", "\\bCalendarManager\\b", "ios.NSCalendarsFullAccessUsageDescription"},
     };
 
     static final Pattern VAGUE = Pattern.compile(
@@ -238,7 +238,7 @@ public class StoreAudit {
                         "In-app purchases with no call to restore() (Apple 3.1.1).",
                         "Add a visible \"Restore purchases\" button that calls Purchase.getInAppPurchase().restore().");
             }
-            boolean subs = !grep("\\bsubscribe\\(|\\bisSubscriptionSupported\\(|\\bReceipt\\b").isEmpty();
+            boolean subs = !grepCode("\\bsubscribe\\(|\\bisSubscriptionSupported\\(|\\bReceipt\\b").isEmpty();
             if (subs) {
                 features.add("subscriptions");
                 if (grepCode("\\bmanageSubscriptions\\(").isEmpty()) {
@@ -435,7 +435,7 @@ public class StoreAudit {
                     "The build is debuggable (android.onDeviceDebug, or android:debuggable in android.xapplication_attr) and is not a release.",
                     "Remove the hint before the store build.");
         }
-        if (!"false".equals(hints.getProperty("codename1.arg.android.allowBackup")) && grep("\\bSecureStorage\\b").isEmpty()
+        if (!"false".equals(hints.getProperty("codename1.arg.android.allowBackup")) && grepCode("\\bSecureStorage\\b").isEmpty()
                 && features.contains("accounts")) {
             add(Sev.NOTE, "ANDROID-BACKUP", "codenameone_settings.properties",
                     "android:allowBackup is on (the default) in an app with accounts; anything in Storage is copied to the user's cloud backup.",
@@ -462,7 +462,7 @@ public class StoreAudit {
 
     static void checkIos() {
         if (hints.getProperty("codename1.arg.ios.appUsesNonExemptEncryption") == null
-                && grep("\\b(Cipher|AESGCM|ChaCha|Rsa|com\\.codename1\\.security)\\b").isEmpty()) {
+                && grepCode("\\b(Cipher|AESGCM|ChaCha|Rsa|com\\.codename1\\.security)\\b").isEmpty()) {
             add(Sev.NOTE, "EXPORT-COMPLIANCE", "codenameone_settings.properties",
                     "ios.appUsesNonExemptEncryption is not set, so each upload may wait on the encryption question.",
                     "Set codename1.arg.ios.appUsesNonExemptEncryption=false when the app uses only HTTPS and OS crypto.");
@@ -482,7 +482,7 @@ public class StoreAudit {
                     "Background location mode declared without location use (Apple 2.5.4).",
                     "Remove it.");
         }
-        List<Hit> track = grep("(?i)\\b(AppTrackingTransparency|requestTrackingAuthorization|advertisingIdentifier|AdMob|FacebookAds|AppsFlyer|Adjust\\b|Branch\\b)");
+        List<Hit> track = grepCode("(?i)\\b(AppTrackingTransparency|requestTrackingAuthorization|advertisingIdentifier|AdMob|FacebookAds|AppsFlyer|Adjust\\b|Branch\\b)");
         if (!track.isEmpty()) {
             features.add("tracking");
             if (hints.getProperty("codename1.arg.ios.NSUserTrackingUsageDescription") == null) {
@@ -684,10 +684,25 @@ public class StoreAudit {
                 boolean javaLike = !e.getKey().toString().endsWith(".properties");
                 List<String> out = new ArrayList<>();
                 boolean block = false;
+                boolean text = false; // inside a """ text block / raw string
                 for (String l : e.getValue()) {
                     StringBuilder sb = new StringBuilder();
                     for (int i = 0; i < l.length() && javaLike; i++) {
                         char c = l.charAt(i);
+                        if (text) {
+                            if (l.startsWith("\"\"\"", i)) {
+                                text = false;
+                                sb.append('"');
+                                i += 2;
+                            }
+                            continue;
+                        }
+                        if (l.startsWith("\"\"\"", i)) {
+                            text = true;
+                            sb.append('"');
+                            i += 2;
+                            continue;
+                        }
                         if (block) {
                             if (c == '*' && i + 1 < l.length() && l.charAt(i + 1) == '/') {
                                 block = false;
