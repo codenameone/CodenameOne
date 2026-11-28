@@ -40,7 +40,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -149,7 +151,169 @@ public final class ConstArgSpecialize {
             }
             refused.add(name);
         }
+        if (specializeLocal(trees, sources, made, refused)) {
+            refused.clear();
+            return true;
+        }
         return specializeModuleFns(trees, sources, made, refused);
+    }
+
+    /// The same, judged on one module's definitions and calls alone, for a
+    /// method name whose every other mention -- definition, call or any
+    /// other naming -- is in a module unconnected to it. Two of the
+    /// program's modules are connected when one imports the other (a
+    /// relative import connects a whole directory), closed transitively:
+    /// without an import a module cannot name anything of another, so the
+    /// other's classes and objects reach it only through a third that
+    /// imports both. The bundled library modules are not among these
+    /// trees; one that held an object of one module for another to call
+    /// a method of the same name on is the case this does not cover. Two unrelated modules that each
+    /// define and call their own `_inherited` otherwise counted as one
+    /// name defined twice and neither was specialized. A clone's name is
+    /// checked against its own module.
+    private static boolean specializeLocal(Map<String, Node.Module> trees, Map<String, String> sources,
+            Map<FunctionDef, Text> made, Set<String> refused) {
+        Map<String, Map<String, Integer>> defs = new HashMap<String, Map<String, Integer>>();
+        Map<String, Map<String, Method>> meths = new HashMap<String, Map<String, Method>>();
+        Map<String, Map<String, List<Call>>> callsOf = new HashMap<String, Map<String, List<Call>>>();
+        Map<String, Set<String>> escapedIn = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> mentionedIn = new HashMap<String, Set<String>>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String path = e.getKey();
+            Map<String, Integer> d = new HashMap<String, Integer>();
+            Map<String, Method> m = new HashMap<String, Method>();
+            Map<String, List<Call>> c = new HashMap<String, List<Call>>();
+            Set<String> esc = new LinkedHashSet<String>();
+            index(path, e.getValue(), null, d, m, c, esc, new IdentityHashMap<Object, Boolean>());
+            defs.put(path, d);
+            meths.put(path, m);
+            callsOf.put(path, c);
+            escapedIn.put(path, esc);
+            Set<String> all = new HashSet<String>(d.keySet());
+            all.addAll(c.keySet());
+            all.addAll(esc);
+            for (String n : all) {
+                Set<String> in = mentionedIn.get(n);
+                if (in == null) {
+                    in = new HashSet<String>();
+                    mentionedIn.put(n, in);
+                }
+                in.add(path);
+            }
+        }
+        Map<String, String> comp = components(trees);
+        for (Map.Entry<String, Map<String, Method>> pe : meths.entrySet()) {
+            String path = pe.getKey();
+            Map<String, Integer> d = defs.get(path);
+            for (Map.Entry<String, Method> e : pe.getValue().entrySet()) {
+                String name = e.getKey();
+                String key = "local:" + path + ":" + name;
+                List<Call> cs = callsOf.get(path).get(name);
+                boolean alone = true;
+                for (String other : mentionedIn.get(name)) {
+                    if (!other.equals(path) && comp.get(other).equals(comp.get(path))) {
+                        alone = false;
+                    }
+                }
+                if (refused.contains(key) || !alone || escapedIn.get(path).contains(name)
+                        || d.get(name).intValue() != 1 || cs == null || cs.isEmpty()) {
+                    continue;
+                }
+                if (specialize(e.getValue(), cs, d, sources, made)
+                        || specializeSeq(trees, e.getValue(), cs, d, sources, made)) {
+                    return true;
+                }
+                refused.add(key);
+            }
+        }
+        return false;
+    }
+
+    /// Labels each module with a representative of its connected group (see
+    /// [#specializeLocal]).
+    private static Map<String, String> components(Map<String, Node.Module> trees) {
+        Map<String, String> parent = new HashMap<String, String>();
+        Map<String, String> modName = new HashMap<String, String>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String path = e.getKey();
+            parent.put(path, path);
+            String m = path.endsWith(".py") ? path.substring(0, path.length() - 3) : path;
+            m = m.replace('/', '.');
+            if (m.endsWith(".__init__")) {
+                m = m.substring(0, m.length() - ".__init__".length());
+            }
+            modName.put(path, m);
+        }
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String a = e.getKey();
+            Set<String> imports = new HashSet<String>();
+            boolean[] relative = {false};
+            importsOf(e.getValue(), imports, relative);
+            String dir = a.lastIndexOf('/') < 0 ? "" : a.substring(0, a.lastIndexOf('/'));
+            for (String b : trees.keySet()) {
+                if (a.equals(b)) {
+                    continue;
+                }
+                String mb = modName.get(b);
+                boolean link = false;
+                for (String i : imports) {
+                    if (i.equals(mb) || i.startsWith(mb + ".") || mb.startsWith(i + ".")) {
+                        link = true;
+                    }
+                }
+                String bdir = b.lastIndexOf('/') < 0 ? "" : b.substring(0, b.lastIndexOf('/'));
+                if (relative[0] && (bdir.equals(dir) || bdir.startsWith(dir + "/") || dir.startsWith(bdir + "/"))) {
+                    link = true;
+                }
+                if (link) {
+                    parent.put(find(parent, a), find(parent, b));
+                }
+            }
+        }
+        Map<String, String> r = new HashMap<String, String>();
+        for (String p : trees.keySet()) {
+            r.put(p, find(parent, p));
+        }
+        return r;
+    }
+
+    /// Each module of `trees` mapped to the label of its connected group
+    /// (see [#specializeLocal]); two modules with different labels share no
+    /// object or call.
+    static IdentityHashMap<Node.Module, String> groups(Map<String, Node.Module> trees) {
+        Map<String, String> comp = components(trees);
+        IdentityHashMap<Node.Module, String> r = new IdentityHashMap<Node.Module, String>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            r.put(e.getValue(), comp.get(e.getKey()));
+        }
+        return r;
+    }
+
+    private static String find(Map<String, String> parent, String p) {
+        String q = p;
+        while (!parent.get(q).equals(q)) {
+            q = parent.get(q);
+        }
+        return q;
+    }
+
+    private static void importsOf(Object o, Set<String> out, boolean[] relative) {
+        if (o instanceof Node.Import) {
+            for (Node.Alias a : ((Node.Import) o).names) {
+                out.add(a.name);
+            }
+        } else if (o instanceof Node.ImportFrom) {
+            Node.ImportFrom f = (Node.ImportFrom) o;
+            if (f.level > 0) {
+                relative[0] = true;
+            } else if (f.module != null) {
+                out.add(f.module);
+                for (Node.Alias a : f.names) {
+                    out.add(f.module + "." + a.name);
+                }
+            }
+        }
+        Infer.children(o, x -> importsOf(x, out, relative));
     }
 
     /// The same specialization for a module-level function called by name
@@ -163,6 +327,30 @@ public final class ConstArgSpecialize {
     /// provably a call of it. No name-dispatch code is generated.
     private static boolean specializeModuleFns(Map<String, Node.Module> trees, Map<String, String> sources,
             Map<FunctionDef, Text> made, Set<String> refused) {
+        // Judged per connected group of modules (see [#specializeLocal]):
+        // two unrelated modules that each define their own `fill` no
+        // longer refuse each other's.
+        Map<String, String> comp = components(trees);
+        Map<String, Map<String, Node.Module>> groups = new LinkedHashMap<String, Map<String, Node.Module>>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String g = comp.get(e.getKey());
+            Map<String, Node.Module> m = groups.get(g);
+            if (m == null) {
+                m = new LinkedHashMap<String, Node.Module>();
+                groups.put(g, m);
+            }
+            m.put(e.getKey(), e.getValue());
+        }
+        for (Map.Entry<String, Map<String, Node.Module>> g : groups.entrySet()) {
+            if (specializeModuleFnsIn(g.getKey(), g.getValue(), sources, made, refused)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean specializeModuleFnsIn(String group, Map<String, Node.Module> trees,
+            Map<String, String> sources, Map<FunctionDef, Text> made, Set<String> refused) {
         final Map<String, Integer> defCount = new HashMap<String, Integer>();
         final Set<String> bad = new LinkedHashSet<String>();
         final Map<String, List<Call>> calls = new HashMap<String, List<Call>>();
@@ -178,7 +366,7 @@ public final class ConstArgSpecialize {
                     continue;
                 }
                 FunctionDef f = (FunctionDef) body.get(i);
-                String key = "fn:" + f.name;
+                String key = "fn:" + group + ":" + f.name;
                 List<Call> cs = calls.get(f.name);
                 if (refused.contains(key) || bad.contains(f.name) || defCount.get(f.name).intValue() != 1
                         || cs == null || cs.isEmpty() || !e.getKey().equals(callPath.get(f.name))) {
@@ -558,7 +746,7 @@ public final class ConstArgSpecialize {
         if (!used[0] || rebinds(f.body, p)) {
             return false;
         }
-        Map<String, String> values = new java.util.LinkedHashMap<String, String>();
+        Map<String, String> values = new LinkedHashMap<String, String>();
         List<String> keyOf = new ArrayList<String>();
         for (Call c : cs) {
             if (!c.keywords.isEmpty() || c.args.size() != n - 1 && c.args.size() != n - 2) {

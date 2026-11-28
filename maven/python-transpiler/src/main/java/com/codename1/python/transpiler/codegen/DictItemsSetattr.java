@@ -85,10 +85,22 @@ public final class DictItemsSetattr {
         for (Node.Module m : libTrees) {
             all.add(m);
         }
+        // A module function is named only by modules that import its own:
+        // one of another connected group of the program
+        // (ConstArgSpecialize.groups), or a bundled library, which imports
+        // no program module, means its own `fill` and does not count
+        // against this one's.
+        IdentityHashMap<Node.Module, String> groups = ConstArgSpecialize.groups(trees);
         for (Node.Module m : trees.values()) {
+            List<Node.Module> reach = new ArrayList<Node.Module>();
+            for (Node.Module o : trees.values()) {
+                if (groups.get(o).equals(groups.get(m))) {
+                    reach.add(o);
+                }
+            }
             for (int i = 0; i < m.body.size(); i++) {
                 Stmt s = m.body.get(i);
-                if (s instanceof FunctionDef && moduleFn(m, (FunctionDef) s, all)) {
+                if (s instanceof FunctionDef && moduleFn(m, (FunctionDef) s, reach)) {
                     i--;
                 } else if (s instanceof ClassDef) {
                     ClassDef c = (ClassDef) s;

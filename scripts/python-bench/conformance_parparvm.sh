@@ -28,8 +28,11 @@ progs="$*"
 # cli_* are command-line tools and run on the backend's console, which this
 # client build does not link (a client has no terminal); the native console
 # is driven under a real pty by scripts/check-cli-console.py instead.
+# A program with a .strict file is one strict mode must refuse (ConformanceTest
+# holds the refusals), so it never becomes an executable.
 [ -n "$progs" ] || progs=$(cd "$CONF" && ls *.py | sed 's/\.py$//' \
-    | grep -vE '^(cli_|http_|java_interop|pil_|sqlalchemy_|guide_sqlalchemy$|sqlite3_$)')
+    | grep -vE '^(cli_|http_|java_interop|pil_|sqlalchemy_|guide_sqlalchemy$|sqlite3_$)' \
+    | while read -r p; do [ -f "$CONF/$p.strict" ] || echo "$p"; done)
 K=conformance_all
 STAGE="$HERE/target/$K-stage"
 mkdir -p "$STAGE"

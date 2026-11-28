@@ -94,12 +94,111 @@ public final class ClassArgSpecialize {
         final Set<String> escaped = new LinkedHashSet<String>();
         final Map<String, List<Call>> callSites = new HashMap<String, List<Call>>();
         final Map<String, Integer> fieldStores = new HashMap<String, Integer>();
+        IdentityHashMap<Object, Object> home = new IdentityHashMap<Object, Object>();
+        NAME_ESCAPES.set(new HashMap<String, List<Name>>());
         for (Object m : all) {
             scan(m, classes, allowed, escaped, callSites, fieldStores);
+            homes(m, m, home);
         }
-        for (Object m : trees.values()) {
-            candidates(m, classes, escaped, callSites, fieldStores);
+        HOME.set(home);
+        try {
+            for (Object m : trees.values()) {
+                candidates(m, classes, escaped, callSites, fieldStores);
+            }
+        } finally {
+            HOME.remove();
+            NAME_ESCAPES.remove();
         }
+    }
+
+    /// The module each class is defined in, while [#rewrite] runs. Classes
+    /// are matched by simple name, so two modules that each define a
+    /// `Holder` share one list in `classes`; the call sites, escapes and
+    /// stores of both are pooled, which only ever adds constraints. What
+    /// must not be pooled is the class itself and its subclasses: see
+    /// [#unique] and [#family].
+    private static final ThreadLocal<IdentityHashMap<Object, Object>> HOME =
+            new ThreadLocal<IdentityHashMap<Object, Object>>();
+
+    /// Bare names used other than to call, subclass or test a class, by
+    /// name, while [#rewrite] runs; [#escapes] reads them with their module.
+    private static final ThreadLocal<Map<String, List<Name>>> NAME_ESCAPES =
+            new ThreadLocal<Map<String, List<Name>>>();
+
+    /// Whether class `k` may escape: its name as an attribute or a string
+    /// anywhere, or as a bare name in a module where that name can mean
+    /// `k` -- not one that defines its own class of the name
+    /// (`Holder[int](6)` in an unrelated program let no `Holder` fold).
+    private static boolean escapes(ClassDef k, Set<String> escaped, Map<String, List<ClassDef>> classes) {
+        if (escaped.contains(k.name)) {
+            return true;
+        }
+        List<Name> l = NAME_ESCAPES.get() == null ? null : NAME_ESCAPES.get().get(k.name);
+        if (l == null) {
+            return false;
+        }
+        for (Name n : l) {
+            if (!definesOther(n, k, classes)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void homes(Object o, Object module, IdentityHashMap<Object, Object> home) {
+        if (o instanceof ClassDef || o instanceof Call || o instanceof Name) {
+            home.put(o, module);
+        }
+        Infer.children(o, x -> homes(x, module, home));
+    }
+
+    /// Whether `c` is the only class of its name in its own module. A class
+    /// of the same name in another module is a different class: a bare
+    /// class `Holder` in an unrelated program used to stop the fold of this
+    /// one, and strict mode then refused its `setattr`.
+    private static boolean unique(ClassDef c, Map<String, List<ClassDef>> classes) {
+        IdentityHashMap<Object, Object> home = HOME.get();
+        for (ClassDef o : classes.get(c.name)) {
+            if (o != c && (home == null || home.get(o) == home.get(c))) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Whether a base named `c.name` in class `k` may mean another class of
+    /// that name: a class of `k`'s module, or (with no import resolution
+    /// here) any class of the name when it is not unique program wide.
+    private static boolean ambiguousBase(ClassDef c, ClassDef k, Map<String, List<ClassDef>> classes) {
+        IdentityHashMap<Object, Object> home = HOME.get();
+        return classes.get(c.name).size() != 1 && (home == null || home.get(k) != home.get(c)); //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// Whether call `c` of a bare name constructs a class other than `k`:
+    /// its module defines its own class of `k`'s name, which is what the
+    /// name means there. Counting such a call against `k` refused the fold
+    /// whenever an unrelated module built its own `Holder`.
+    private static boolean constructsOther(Call c, ClassDef k, Map<String, List<ClassDef>> classes) {
+        return c.func instanceof Name && definesOther(c, k, classes);
+    }
+
+    /// Whether the module of node `n` defines a class of `k`'s name other
+    /// than `k`, which a bare use of the name there means.
+    private static boolean definesOther(Object n, ClassDef k, Map<String, List<ClassDef>> classes) {
+        IdentityHashMap<Object, Object> home = HOME.get();
+        if (home == null) {
+            return false;
+        }
+        Object m = home.get(n);
+        if (m == null || m == home.get(k)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return false;
+        }
+        for (ClassDef o : classes.get(k.name)) {
+            if (o != k && home.get(o) == m) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void scan(Object o, Map<String, List<ClassDef>> classes, IdentityHashMap<Object, Boolean> allowed,
@@ -174,7 +273,12 @@ public final class ClassArgSpecialize {
             stores(((Node.WithItem) o).vars, fieldStores);
         } else if (o instanceof Name) {
             if (!allowed.containsKey(o)) {
-                escaped.add(((Name) o).id);
+                List<Name> l = NAME_ESCAPES.get().get(((Name) o).id);
+                if (l == null) {
+                    l = new ArrayList<Name>();
+                    NAME_ESCAPES.get().put(((Name) o).id, l);
+                }
+                l.add((Name) o);
             }
         } else if (o instanceof Attribute) {
             if (!allowed.containsKey(o)) {
@@ -294,7 +398,7 @@ public final class ClassArgSpecialize {
 
     private static void fold(ClassDef c, Map<String, List<ClassDef>> classes, Set<String> escaped,
             Map<String, List<Call>> callSites, Map<String, Integer> fieldStores) {
-        if (escaped.contains(c.name) || classes.get(c.name).size() != 1 || !c.decorators.isEmpty()) {
+        if (escapes(c, escaped, classes) || !unique(c, classes) || !c.decorators.isEmpty()) {
             return;
         }
         FunctionDef init = method(c, "__init__");
@@ -386,8 +490,13 @@ public final class ClassArgSpecialize {
                         return false;
                     }
                     if (named) {
-                        if (k.bases.size() != 1 || !k.keywords.isEmpty() || escaped.contains(k.name)
-                                || l.size() != 1 || !family(k, classes, escaped, out)) {
+                        if (ambiguousBase(c, k, classes)) {
+                            // A subclass elsewhere may extend the other class
+                            // of the name; not knowing which, refuse.
+                            return false;
+                        }
+                        if (k.bases.size() != 1 || !k.keywords.isEmpty() || escapes(k, escaped, classes)
+                                || !unique(k, classes) || !family(k, classes, escaped, out)) {
                             return false;
                         }
                     }
@@ -481,6 +590,9 @@ public final class ClassArgSpecialize {
         List<Call> cs = callSites.get(k.name);
         if (cs != null) {
             for (Call c : cs) {
+                if (constructsOther(c, k, classes)) {
+                    continue;
+                }
                 if (!bind(c, init, p, 1, out)) {
                     return false;
                 }

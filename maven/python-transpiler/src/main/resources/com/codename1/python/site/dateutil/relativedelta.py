@@ -211,10 +211,16 @@ class relativedelta:
                 month += 12
         day = min(monthrange(year, month)[1], self.day or other.day)
         repl = {"year": year, "month": month, "day": day}
-        for attr in ("hour", "minute", "second", "microsecond"):
-            value = getattr(self, attr)
-            if value is not None:
-                repl[attr] = value
+        # Named one by one, not by getattr in a loop: a computed name is
+        # reflection, which strict mode refuses wherever this is live.
+        if self.hour is not None:
+            repl["hour"] = self.hour
+        if self.minute is not None:
+            repl["minute"] = self.minute
+        if self.second is not None:
+            repl["second"] = self.second
+        if self.microsecond is not None:
+            repl["microsecond"] = self.microsecond
         days = self.days
         if self.leapdays and month > 2 and isleap(year):
             days += self.leapdays

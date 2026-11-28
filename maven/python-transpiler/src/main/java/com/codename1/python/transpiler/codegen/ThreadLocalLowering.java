@@ -190,9 +190,13 @@ public final class ThreadLocalLowering {
     /// Whether another module could reach `x`: it imports a name `x` or
     /// `*`, or reads an attribute named `x` of anything.
     private static boolean escapes(String x, Node.Module self, Map<String, Node.Module> trees) {
+        // Only a module connected to this one by imports
+        // (ConstArgSpecialize.groups) can name its global `x`: an unrelated
+        // module's own `request.data` is not a read of it.
+        java.util.IdentityHashMap<Node.Module, String> groups = ConstArgSpecialize.groups(trees);
         boolean[] hit = {false};
         for (Node.Module t : trees.values()) {
-            if (t != self) { //NOPMD CompareObjectsWithEquals - identity is meant
+            if (t != self && groups.get(t).equals(groups.get(self))) { //NOPMD CompareObjectsWithEquals - identity is meant
                 reaches(t, x, hit);
                 if (hit[0]) {
                     return true;

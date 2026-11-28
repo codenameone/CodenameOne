@@ -612,7 +612,14 @@ public final class LoopUnroll {
             for (Cls x : l) {
                 if (x.unlinked && !out.contains(x)) {
                     for (Expr b : x.def.bases) {
-                        if (mentions(b, names)) {
+                        // A plain name base was resolved by [#build] in x's
+                        // own module: x is in the family through its
+                        // subclass links when it names one of these, and
+                        // a same-named class of another module is not this
+                        // family -- unless the name is ambiguous there.
+                        if (b instanceof Name ? names.contains(((Name) b).id)
+                                && find(w, ((Name) b).id, x.path) == AMBIGUOUS //NOPMD CompareObjectsWithEquals - sentinel
+                                : mentions(b, names)) {
                             return null;
                         }
                     }

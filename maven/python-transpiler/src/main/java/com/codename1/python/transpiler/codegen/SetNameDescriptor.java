@@ -35,6 +35,8 @@ import com.codename1.python.transpiler.ast.Node.Stmt;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -74,6 +76,26 @@ public final class SetNameDescriptor {
 
     /// Folds every qualifying descriptor and starred base list in `trees`.
     public static void rewrite(Map<String, Node.Module> trees) {
+        // Judged per connected group of modules (ConstArgSpecialize.groups):
+        // an unrelated module's own `self.name = name` is no second store of
+        // this descriptor's field.
+        IdentityHashMap<Node.Module, String> groups = ConstArgSpecialize.groups(trees);
+        Map<String, Map<String, Node.Module>> parts = new LinkedHashMap<String, Map<String, Node.Module>>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String g = groups.get(e.getValue());
+            Map<String, Node.Module> part = parts.get(g);
+            if (part == null) {
+                part = new LinkedHashMap<String, Node.Module>();
+                parts.put(g, part);
+            }
+            part.put(e.getKey(), e.getValue());
+        }
+        for (Map<String, Node.Module> part : parts.values()) {
+            rewriteGroup(part);
+        }
+    }
+
+    private static void rewriteGroup(Map<String, Node.Module> trees) {
         final Map<String, List<ClassDef>> classes = new HashMap<String, List<ClassDef>>();
         final Map<String, Integer> nameUses = new HashMap<String, Integer>();
         final Map<String, Integer> attrStores = new HashMap<String, Integer>();

@@ -1765,7 +1765,12 @@ final class Infer {
             // A global another module stores (`mod.n = v`), or any global
             // of a module that hands its namespace out as a dict, is bound
             // more often than this module shows and holds anything.
-            if (facts.namespace || facts.patched(n)) {
+            // [WholeProgram.Module#globalStored], not every store of an
+            // attribute named `n`: `self.n = v` in any class used to. A
+            // loose attribute name still counts: `I = RegexFlag.IGNORECASE`
+            // reads a class attribute an enum metaclass replaced, whose
+            // type the class body does not tell.
+            if (facts.namespace || facts.globalStored(n) || facts.deletedName(n) || facts.looseName(n)) {
                 moduleBindings.put(n, Integer.valueOf(99));
                 globals.put(n, Ty.OBJECT);
             }
@@ -2493,7 +2498,19 @@ final class Infer {
     /// and no module stores it as an attribute or through a namespace.
     boolean fixedGlobal(String n) {
         return moduleScope.resolve(n) == Scope.Binding.GLOBAL && !moduleScope.hasStarImport
-                && moduleScope.assigned.contains(n) && stable(n) && !facts.attrStored(n);
+                && moduleScope.assigned.contains(n) && stable(n) && !moduleStored(n);
+    }
+
+    /// Whether a store elsewhere may rebind global `n` of this module as
+    /// `mod.n = v`: one the source shows on a receiver other than a method's
+    /// own `self` ([WholeProgram.Module#globalStored]) whose receiver the
+    /// pass did not find to be an instance or a known class ([#storeField]
+    /// files those in `dynStored`; a module object is neither). A top-level
+    /// `c.n = "8"` on an instance in an unrelated program no longer made
+    /// every global `n` unknown. The set only grows, and a growth reruns
+    /// the pass.
+    private boolean moduleStored(String n) {
+        return facts.globalStored(n) && p.dynStored.contains(n);
     }
 
     boolean constantGlobal(String n) {
@@ -2502,7 +2519,7 @@ final class Infer {
 
     private boolean constantGlobal(String n, int depth) {
         if (depth > 8 || moduleScope.hasStarImport || !moduleScope.assigned.contains(n) || !stable(n)
-                || facts.attrStored(n)) {
+                || moduleStored(n)) {
             return false;
         }
         for (Stmt s : body) {
@@ -8432,9 +8449,18 @@ final class Infer {
                     p.clsStored.put(recv.cls, s);
                 }
                 s.add(attr);
-            } else if (p.dynStored.add(attr)) {
-                // [#objectInit] reads it.
-                p.changed = true;
+            } else if (recv.k != Ty.K.CLS || recv.sites == null) {
+                // Not a store on a class object the pass knows: [#store] has
+                // filed those under their classes (clsStored), and one must
+                // not count as a store on an object of no known class, which
+                // would reach every loose class of the program --
+                // `cls.__init__ = f` in a class decorator applied to one
+                // class then untyped the `__init__` of unrelated ones, and
+                // strict mode refused their reads.
+                if (p.dynStored.add(attr)) {
+                    // [#objectInit] reads it.
+                    p.changed = true;
+                }
             }
         }
         List<Layouts.Cls> owners = p.fieldOwners.get(attr);

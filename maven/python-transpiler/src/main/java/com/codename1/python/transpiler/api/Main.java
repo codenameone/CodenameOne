@@ -103,7 +103,7 @@ public final class Main {
         Map<String, String> out;
         List<String> deferred = new ArrayList<String>();
         try {
-            out = PythonTranspiler.transpile(sources, args.length == 3 ? args[2] : null, classPath,
+            out = PythonTranspiler.transpile(sources, args.length == 3 && !args[2].isEmpty() ? args[2] : null, classPath,
                     java.util.Collections.<String, String>emptyMap(), stack, libraries, deferred);
         } catch (PythonSyntaxError e) {
             System.err.println(e.getMessage());

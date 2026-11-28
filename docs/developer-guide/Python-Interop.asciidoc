@@ -291,14 +291,13 @@ with the program, so a function that uses one and is reached fails the
 build. The error lists every such place at once, and ends with the line
 that fixes it:
 
-[source,text]
-----
+....
 mytool/cli.py:4424:9: a translated program cannot run or inspect code that was not compiled with it, and this one reaches code that does:
   mytool/cli.py:4424:9: exec() in mytool.cli._tools_from_code
-  sqlite_utils/utils.py:534:9: exec() in sqlite_utils.utils._compile_code
+  mytool/rows.py:534:9: exec() in mytool.rows._compile_code
 Name each of those functions in cn1-python.properties, beside the Python sources. To leave them out (each then raises if it is called):
-  remove=mytool.cli._tools_from_code,sqlite_utils.utils._compile_code
-----
+  remove=mytool.cli._tools_from_code,mytool.rows._compile_code
+....
 
 `cn1-python.properties` sits in `src/main/python`. Each line names
 functions as `module.function` or `module.Class.method`, separated by
@@ -343,17 +342,16 @@ For `replace=`, the build writes a class per module into the project's Java
 sources, `com.codename1.python.ext.<Module>Shims`, with a stub for each
 function. The comment over a stub lists the values it receives:
 
-[source,java,role=cn1-no-try]
-----
-public final class SqliteUtilsUtilsShims {
+....
+public final class MytoolRowsShims {
     public static void install() {
         // args: code, imports, column
-        NativeModule.replace("sqlite_utils.utils._compile_code", args -> {
-            throw NativeModule.notReplaced("sqlite_utils.utils._compile_code");
+        NativeModule.replace("mytool.rows._compile_code", args -> {
+            throw NativeModule.notReplaced("mytool.rows._compile_code");
         });
     }
 }
-----
+....
 
 The file is yours. The build writes it once and never overwrites it. Until
 you fill a stub in, calling its function raises `NotImplementedError` with

@@ -127,6 +127,11 @@ public final class WholeProgram {
         /// Every attribute name the whole program stores or deletes by
         /// name, on any receiver (shared by every module's view).
         Set<String> storedAttrs = new HashSet<String>();
+        /// [#storedAttrs] less the stores on the receiver of the method they
+        /// are in (`self.n = n`): what may rebind a module global as
+        /// `mod.n = v`. An instance is no module, so a class anywhere with a
+        /// field `n` no longer made every global `n` of the program unknown.
+        Set<String> globalStores = new HashSet<String>();
         /// Every class statement of a module with a computed attribute
         /// store (`setattr(o, name, v)` with `name` not a literal): such a
         /// site may rebind any of those classes' attributes unseen (shared
@@ -218,6 +223,23 @@ public final class WholeProgram {
         /// Whether any module stores or deletes attribute `name` by name.
         boolean attrStored(String name) {
             return storedAttrs.contains(name);
+        }
+
+        /// Whether any module may store global `name` of a module as an
+        /// attribute: [#attrStored] without the stores on a method's own
+        /// receiver.
+        boolean globalStored(String name) {
+            return globalStores.contains(name);
+        }
+
+        /// Whether `name` is an attribute of a class with no fixed layout.
+        boolean looseName(String name) {
+            return loose.contains(name);
+        }
+
+        /// Whether any module deletes attribute `name` by name.
+        boolean deletedName(String name) {
+            return deleted.contains(name);
         }
 
         /// Whether a computed attribute store of the program may reach the
@@ -396,6 +418,7 @@ public final class WholeProgram {
         Map<String, Integer> count = new HashMap<String, Integer>();
         Set<String> deleted = new HashSet<String>();
         Set<String> storedAttrs = new HashSet<String>();
+        Set<String> globalStores = new HashSet<String>();
         Set<String> setattrAttrs = new HashSet<String>();
         Set<String> named = new HashSet<String>();
         Set<String> baseNames = new HashSet<String>();
@@ -403,6 +426,7 @@ public final class WholeProgram {
         Set<ClassDef> computedStoreClasses = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<ClassDef, Boolean>());
         for (List<Stmt> b : bodies.values()) {
             attrStores(b, storedAttrs);
+            globalStores(b, null, instanceGlobals(b), globalStores);
             boolean[] computed = new boolean[1];
             List<ClassDef> classes = new ArrayList<ClassDef>();
             computedStores(b, computed, classes);
@@ -415,6 +439,7 @@ public final class WholeProgram {
             Module m = new Module();
             m.deleted = deleted;
             m.storedAttrs = storedAttrs;
+            m.globalStores = globalStores;
             m.computedStoreClasses = computedStoreClasses;
             m.baseNames = baseNames;
             m.dynamicBases = dynamicBases;
@@ -656,6 +681,326 @@ public final class WholeProgram {
             return c.args.get(2);
         }
         return null;
+    }
+
+    /// [#attrStores] for [Module#globalStores]: the same names, except a
+    /// store whose receiver is `self`, the first parameter of the method
+    /// (a function of a class body) the store is in, when the method never
+    /// binds that name again. A function nested in the method keeps its
+    /// `self` unless one of its own parameters is named so.
+    static void globalStores(Object o, String self, Set<String> insts, Set<String> out) {
+        if (o instanceof FunctionDef && ((FunctionDef) o).dataclassInit) {
+            return;
+        }
+        if (o instanceof ClassDef) {
+            ClassDef k = (ClassDef) o;
+            for (Expr b : k.bases) {
+                globalStores(b, self, insts, out);
+            }
+            for (Stmt st : k.body) {
+                String r = null;
+                if (st instanceof FunctionDef && !((FunctionDef) st).args.positional.isEmpty()) {
+                    r = ((FunctionDef) st).args.positional.get(0).name;
+                    if (bindsName(((FunctionDef) st).body, r)) {
+                        r = null;
+                    }
+                    globalStores(st, r, insts, out, true);
+                } else {
+                    globalStores(st, self, insts, out);
+                }
+            }
+            return;
+        }
+        globalStores(o, self, insts, out, false);
+    }
+
+    private static void globalStores(Object o, String self, Set<String> insts, Set<String> out, boolean method) {
+        String in = self;
+        if (!method && o instanceof FunctionDef && self != null) {
+            for (Arg x : ((FunctionDef) o).args.positional) {
+                if (x.name.equals(self)) {
+                    in = null;
+                }
+            }
+        }
+        if (o instanceof Assign && !Layouts.trailingStore(o)) {
+            for (Expr t : ((Assign) o).targets) {
+                globalTarget(t, in, insts, out);
+            }
+        } else if (o instanceof AugAssign) {
+            globalTarget(((AugAssign) o).target, in, insts, out);
+        } else if (o instanceof AnnAssign) {
+            globalTarget(((AnnAssign) o).target, in, insts, out);
+        } else if (o instanceof Delete) {
+            for (Expr t : ((Delete) o).targets) {
+                globalTarget(t, in, insts, out);
+            }
+        } else if (o instanceof For) {
+            globalTarget(((For) o).target, in, insts, out);
+        } else if (o instanceof WithItem) {
+            globalTarget(((WithItem) o).vars, in, insts, out);
+        } else if (o instanceof Comprehension) {
+            globalTarget(((Comprehension) o).target, in, insts, out);
+        } else if (o instanceof Call) {
+            Call c = (Call) o;
+            String f = c.func instanceof Name ? ((Name) c.func).id
+                    : c.func instanceof Attribute ? ((Attribute) c.func).attr : null;
+            if ("setattr".equals(f) || "delattr".equals(f) || "__setattr__".equals(f) || "__delattr__".equals(f)) {
+                // The receiver: the first argument of setattr(o, n, v), else
+                // what o.__setattr__ is called on. A store on an instance
+                // writes no global, and neither does object.__setattr__ (or
+                // __delattr__): CPython refuses to apply it to a module.
+                boolean objectSlot = c.func instanceof Attribute && ((Attribute) c.func).value instanceof Name
+                        && "object".equals(((Name) ((Attribute) c.func).value).id);
+                Expr recv = c.func instanceof Name ? (c.args.isEmpty() ? null : c.args.get(0))
+                        : ((Attribute) c.func).value;
+                boolean instance = objectSlot || recv instanceof Name && instanceName(((Name) recv).id, in, insts);
+                for (Expr a : c.args) {
+                    if (!instance && a instanceof Constant && ((Constant) a).kind == Constant.Kind.STR) {
+                        out.add(((Constant) a).text);
+                    }
+                }
+            }
+        }
+        final String next = in;
+        final Set<String> inner = o instanceof FunctionDef ? localInstances((FunctionDef) o, next, insts) : insts;
+        Infer.children(o, x -> globalStores(x, next, inner, out));
+    }
+
+    private static void globalTarget(Expr t, String self, Set<String> insts, Set<String> out) {
+        if (t instanceof Attribute) {
+            Expr v = ((Attribute) t).value;
+            boolean instance = v instanceof Name && instanceName(((Name) v).id, self, insts);
+            if (!instance) {
+                out.add(((Attribute) t).attr);
+            }
+        } else if (t instanceof TupleExpr) {
+            for (Expr x : ((TupleExpr) t).elts) {
+                globalTarget(x, self, insts, out);
+            }
+        } else if (t instanceof ListExpr) {
+            for (Expr x : ((ListExpr) t).elts) {
+                globalTarget(x, self, insts, out);
+            }
+        } else if (t instanceof Starred) {
+            globalTarget(((Starred) t).value, self, insts, out);
+        }
+    }
+
+    /// The globals of module `body` that hold an instance: bound once at
+    /// the top level, as `n = K(...)` with `K` a class the module's top
+    /// level defines, and nowhere else (no other binding, `global n` or
+    /// `del`). A store `n.attr = v` then writes an instance, never a
+    /// module's global.
+    static Set<String> instanceGlobals(List<Stmt> body) {
+        Set<String> classes = new HashSet<String>();
+        for (Stmt st : body) {
+            if (st instanceof ClassDef) {
+                classes.add(((ClassDef) st).name);
+            }
+        }
+        Set<String> r = new HashSet<String>();
+        for (Stmt st : body) {
+            if (st instanceof Assign && ((Assign) st).targets.size() == 1 && ((Assign) st).targets.get(0) instanceof Name
+                    && ((Assign) st).value instanceof Call && ((Call) ((Assign) st).value).func instanceof Name
+                    && classes.contains(((Name) ((Call) ((Assign) st).value).func).id)) {
+                r.add(((Name) ((Assign) st).targets.get(0)).id);
+            }
+        }
+        Set<String> drop = new HashSet<String>();
+        for (String n : r) {
+            int[] binds = {0};
+            countBinds(body, n, binds);
+            if (binds[0] != 1 || classes.contains(n)) {
+                drop.add(n);
+            }
+        }
+        r.removeAll(drop);
+        return r;
+    }
+
+    /// Counts the bindings of module global `n` under `o`: those of the
+    /// module's own scope, plus two for any nested scope that declares
+    /// `global n` (which then binds it where the count cannot see). A
+    /// class body's or function's own `n` is another variable.
+    private static void countBinds(Object o, String n, int[] binds) {
+        boolean[] hit = {false};
+        bindsHere(o, n, hit);
+        if (hit[0]) {
+            binds[0]++;
+        }
+        if (o instanceof FunctionDef || o instanceof ClassDef || o instanceof Lambda) {
+            Infer.children(o, x -> declaresGlobal(x, n, binds));
+            return;
+        }
+        Infer.children(o, x -> countBinds(x, n, binds));
+    }
+
+    private static void declaresGlobal(Object o, String n, int[] binds) {
+        if (o instanceof Global && !((Global) o).nonlocal && ((Global) o).names.contains(n)) {
+            binds[0] += 2;
+        }
+        Infer.children(o, x -> declaresGlobal(x, n, binds));
+    }
+
+    /// Whether `n` names an instance: the method's receiver, one of
+    /// `insts`, or a `_cn1_` name a lowering generated (argparse's
+    /// `lambda _cn1_n, _cn1_v: setattr(_cn1_n, "n", _cn1_v)` stores on the
+    /// namespace object; no generated helper is handed a module).
+    private static boolean instanceName(String n, String self, Set<String> insts) {
+        return n.equals(self) || insts.contains(n) || n.startsWith("_cn1_");
+    }
+
+    /// The instance names inside function `f`: the enclosing ones it does
+    /// not rebind (a parameter or local of the same name is another
+    /// variable), plus its locals bound only as `n = K.__new__(...)` or as
+    /// a call reached through the method's own receiver `self` (dateutil's
+    /// `inst = cls._cache.get(key)`, then `inst = tzinfo.__new__(cls)`),
+    /// as datetime's `self = tzinfo.__new__(cls)` in a classmethod. A store
+    /// `n.attr = v` on either writes an instance, never a module.
+    private static Set<String> localInstances(FunctionDef f, String self, Set<String> outer) {
+        Set<String> r = new HashSet<String>();
+        Set<String> params = new HashSet<String>();
+        for (Arg x : f.args.positional) {
+            params.add(x.name);
+        }
+        for (Arg x : f.args.kwonly) {
+            params.add(x.name);
+        }
+        if (f.args.vararg != null) {
+            params.add(f.args.vararg.name);
+        }
+        if (f.args.kwarg != null) {
+            params.add(f.args.kwarg.name);
+        }
+        for (String n : outer) {
+            if (!params.contains(n) && !bindsName(f.body, n)) {
+                r.add(n);
+            }
+        }
+        Set<String> made = new HashSet<String>();
+        newBound(f.body, made);
+        for (String n : made) {
+            int[] all = {0};
+            int[] fromNew = {0};
+            bindCount(f.body, n, self, all, fromNew);
+            if (!params.contains(n) && all[0] == fromNew[0]) {
+                r.add(n);
+            }
+        }
+        return r;
+    }
+
+    private static boolean isNewCall(Expr v) {
+        return v instanceof Call && ((Call) v).func instanceof Attribute
+                && "__new__".equals(((Attribute) ((Call) v).func).attr);
+    }
+
+    /// `self.a.b(...)`: a call reached through the receiver `self`.
+    private static boolean selfCall(Expr v, String self) {
+        if (self == null || !(v instanceof Call) || !(((Call) v).func instanceof Attribute)) {
+            return false;
+        }
+        Expr r = ((Attribute) ((Call) v).func).value;
+        while (r instanceof Attribute) {
+            r = ((Attribute) r).value;
+        }
+        return r instanceof Name && ((Name) r).id.equals(self);
+    }
+
+    private static void newBound(Object o, Set<String> out) {
+        if (o instanceof FunctionDef || o instanceof ClassDef || o instanceof Lambda) {
+            return;
+        }
+        if (o instanceof Assign && ((Assign) o).targets.size() == 1 && ((Assign) o).targets.get(0) instanceof Name
+                && isNewCall(((Assign) o).value)) {
+            out.add(((Name) ((Assign) o).targets.get(0)).id);
+        }
+        Infer.children(o, x -> newBound(x, out));
+    }
+
+    /// Counts the bindings of `n` in a function body (`all`, a `global` or
+    /// `nonlocal` as two, nested scopes left out) and how many of them are
+    /// `n = K.__new__(...)`.
+    private static void bindCount(Object o, String n, String self, int[] all, int[] fromNew) {
+        if (o instanceof Global && ((Global) o).names.contains(n)) {
+            all[0] += 2;
+        }
+        boolean[] hit = {false};
+        bindsHere(o, n, hit);
+        if (hit[0]) {
+            all[0]++;
+            if (o instanceof Assign && ((Assign) o).targets.size() == 1 && ((Assign) o).targets.get(0) instanceof Name
+                    && (isNewCall(((Assign) o).value) || selfCall(((Assign) o).value, self))) {
+                fromNew[0]++;
+            }
+        }
+        if (o instanceof FunctionDef || o instanceof ClassDef || o instanceof Lambda) {
+            return;
+        }
+        Infer.children(o, x -> bindCount(x, n, self, all, fromNew));
+    }
+
+    /// Whether `body` stores the name `n` anywhere.
+    private static boolean bindsName(Object body, String n) {
+        boolean[] hit = {false};
+        bindsName(body, n, hit);
+        return hit[0];
+    }
+
+    private static void bindsName(Object o, String n, boolean[] hit) {
+        if (hit[0]) {
+            return;
+        }
+        bindsHere(o, n, hit);
+        if (hit[0]) {
+            return;
+        }
+        Infer.children(o, x -> bindsName(x, n, hit));
+    }
+
+    /// Whether statement or expression `o` itself (not what it holds)
+    /// binds `n`.
+    private static void bindsHere(Object o, String n, boolean[] hit) {
+        Expr[] ts = o instanceof Assign ? ((Assign) o).targets.toArray(new Expr[0])
+                : o instanceof AugAssign ? new Expr[] {((AugAssign) o).target}
+                : o instanceof AnnAssign ? new Expr[] {((AnnAssign) o).target}
+                : o instanceof For ? new Expr[] {((For) o).target}
+                : o instanceof WithItem ? new Expr[] {((WithItem) o).vars}
+                : o instanceof Comprehension ? new Expr[] {((Comprehension) o).target}
+                : o instanceof Delete ? ((Delete) o).targets.toArray(new Expr[0])
+                : o instanceof NamedExpr ? new Expr[] {((NamedExpr) o).target} : new Expr[0];
+        for (Expr t : ts) {
+            if (namesTarget(t, n)) {
+                hit[0] = true;
+                return;
+            }
+        }
+        if (o instanceof FunctionDef && ((FunctionDef) o).name.equals(n)
+                || o instanceof ClassDef && ((ClassDef) o).name.equals(n)) {
+            hit[0] = true;
+        } else if (o instanceof Import || o instanceof ImportFrom) {
+            for (Alias a : o instanceof Import ? ((Import) o).names : ((ImportFrom) o).names) {
+                String bound = a.asname != null ? a.asname : a.name;
+                if (bound.equals(n) || bound.startsWith(n + ".") || "*".equals(a.name)) {
+                    hit[0] = true;
+                }
+            }
+        }
+    }
+
+    private static boolean namesTarget(Expr t, String n) {
+        if (t instanceof Name) {
+            return ((Name) t).id.equals(n);
+        }
+        if (t instanceof TupleExpr || t instanceof ListExpr) {
+            for (Expr x : t instanceof TupleExpr ? ((TupleExpr) t).elts : ((ListExpr) t).elts) {
+                if (namesTarget(x, n)) {
+                    return true;
+                }
+            }
+        }
+        return t instanceof Starred && namesTarget(((Starred) t).value, n);
     }
 
     private static void attrTarget(Expr t, Set<String> out) {
