@@ -220,7 +220,7 @@ public class StoreAudit {
         // A pre-permission screen whose button reads "Allow" (5.1.1(iv)).
         for (Hit h : grep("\"(Allow|Allow Access|Allow access)\"")) {
             add(Sev.HIGH, "PREPROMPT-ALLOW", at(h),
-                    "A button labelled \"Allow\" -- on a screen shown before a system permission prompt this is rejected under 5.1.1(iv).",
+                    "A button labelled \"Allow\" -- on a screen shown before a system permission prompt this is read as steering consent (Apple 5.1.1(iv)).",
                     "Label the explanation screen's button \"Continue\" or \"Next\"; only the system prompt says Allow.");
         }
     }
@@ -406,7 +406,7 @@ public class StoreAudit {
         {"MANAGE_EXTERNAL_STORAGE", "All-files access is refused unless the app is a file manager or similar."},
         {"QUERY_ALL_PACKAGES", "QUERY_ALL_PACKAGES needs a Play declaration; declare <queries> for the packages you need instead."},
         {"READ_MEDIA_IMAGES|READ_MEDIA_VIDEO", "Broad photo/video access is allowed only when that is the app's core purpose; use the system photo picker (Display.openGallery) instead."},
-        {"READ_CONTACTS", "On API 37 Play expects the contact picker when the app needs only some contacts."},
+        {"READ_CONTACTS", "Play asks why; use the system contact picker when the app needs only the contacts the user picks."},
         {"SCHEDULE_EXACT_ALARM|USE_EXACT_ALARM", "Exact alarms need a declaration; only alarm/calendar apps get USE_EXACT_ALARM."},
         {"BIND_ACCESSIBILITY_SERVICE", "Accessibility services may only be used to help users with disabilities."},
         {"SYSTEM_ALERT_WINDOW", "Overlays draw over other apps; Play restricts them."},
@@ -455,7 +455,7 @@ public class StoreAudit {
         }
         if (orient.matches("(?i).*(portrait|landscape).*") && !orient.matches("(?i).*(sensor|unspecified|full).*")) {
             add(Sev.NOTE, "ORIENTATION-LOCK", "codenameone_settings.properties",
-                    "Orientation is locked. Android 16+ ignores the lock on large screens and Play's large-screen quality tiers expect a resizable layout.",
+                    "Orientation is locked. From API 36 Android ignores the lock on large screens and Play's large-screen quality tiers expect a resizable layout.",
                     "Check the layout on a tablet/foldable skin in both orientations.");
         }
     }
@@ -474,7 +474,7 @@ public class StoreAudit {
         String bg = hints.getProperty("codename1.arg.ios.background_modes", "");
         if (bg.contains("remote-notification") && !push) {
             add(Sev.HIGH, "UNUSED-ENTITLEMENT", "codenameone_settings.properties",
-                    "Push background mode declared but the app never registers for push (Apple 2.4.5).",
+                    "Push background mode declared but the app never registers for push; reviewers reject unused capabilities.",
                     "Remove the capability, or wire push up.");
         }
         if (bg.contains("location") && !features.contains("location")) {

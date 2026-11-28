@@ -90,15 +90,16 @@ wins: re-read it at <https://developer.apple.com/app-store/review/guidelines/>.
 - **Ask in context**: request a permission when the user starts the feature
   that needs it, after a one-line explanation screen, never at launch. The
   explanation screen's button says "Continue", never "Allow" -- a custom
-  screen that imitates the system prompt is rejected under 5.1.1(iv). Handle
+  screen that imitates the system prompt reads as steering consent, which
+  5.1.1(iv) forbids. Handle
   "denied": the feature says how to turn the permission on in the system
   Settings, and the rest of the app keeps working.
 - **Data minimization**: use the system pickers when you only need what the
   user picks (`Display.openGallery` instead of full photo library access).
   Google Play enforces this: `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` need a
   declaration and are refused unless media access is the app's core purpose,
-  and for apps targeting API 37 `READ_CONTACTS` is expected only when the
-  contact picker cannot do the job. Never add them through
+  and `READ_CONTACTS` invites the same question: use the system contact
+  picker when the app needs only the contacts the user picks. Never add them through
   `android.xpermissions` for a feature that only picks one item.
 - **Purpose strings must describe this app.** A string copied from another
   app or template ("where your order is delivered" in a chat app) is as
@@ -157,7 +158,7 @@ An app where users post content others see (chat, reviews, photos, profiles)
 needs all four: a way to report content, a way to block users, a filter or
 moderation for objectionable content, and published contact information.
 Messaging and social templates (Parley) need these wired to the backend.
-Apple expects action on a report within 24 hours. If App Store Connect asks
+Apple's rejection notes ask for action on a report within 24 hours. If App Store Connect asks
 whether the app has social-media features, answer it from what the code
 does before submitting.
 
@@ -195,11 +196,13 @@ claims has nothing to do here.
 - Ask for a rating with the system prompt only, never with a custom
   "rate 5 stars" screen or an incentive.
 - No Apple product images or the Apple logo in the app or screenshots, and
-  no device frames around the app in a preview video (2.3.4).
+  a preview video shows only screen captures of the app (2.3.4), so no
+  device frames around it.
 - No text criticising Apple or its review process in the app or listing.
 - Declare only the capabilities the app uses: a push or location background
   mode, iCloud or another entitlement with no feature behind it is rejected
-  (2.4.5). `ios.background_modes` is the usual culprit.
+  in review. `ios.background_modes` is the usual culprit (2.5.4 for
+  background modes).
 - A Live Activity shows the state of one thing the user started, not ads or
   a stream of promotions (4.5.3).
 
@@ -277,8 +280,9 @@ only what passes.
 - **Developer verification**: Google requires the package name to be
   registered to a verified developer; an unregistered one cannot be
   installed on certified devices. Apps in regulated categories (finance,
-  health, gambling, VPN, government) need an **organization** account, not a
-  personal one.
+  health, gambling, VPN, government) are expected to come from an
+  **organization** account; check Play Console's current requirements
+  before publishing one from a personal account.
 - **Payments**: digital goods use Play Billing (`Purchase`) as on iOS.
   Donations to the developer go through Play Billing too; links to Patreon
   or PayPal for that are refused. An AI agent in the app must not complete a
@@ -292,8 +296,8 @@ only what passes.
   location, SMS, call log, all-files access, exact alarms, query all
   packages, accessibility service, overlays, photo/video, contacts) need a
   declaration form in Play Console and are often refused; avoid them.
-- **Large screens**: Android 16 ignores orientation locks on tablets and
-  foldables. Check the layout on a tablet skin in both orientations.
+- **Large screens**: from API 36 (which Play requires) Android ignores
+  orientation locks on tablets and foldables, games excepted. Check the layout on a tablet skin in both orientations.
 - **Restore Credentials**: Play's quality guidance expects a signed-in user to
   stay signed in after moving to a new device; at least keep sign-in quick.
 - Content rating questionnaire and the target audience section, answered from
