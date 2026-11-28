@@ -1,0 +1,68 @@
+{
+ "pr": 6347,
+ "rebaseline": {
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.584,
+      "time": 1.221,
+      "tolerance": {
+       "memory": 0.45,
+       "time": 0.45
+      }
+     },
+     "memory": 0.584,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources since the row was set (ab3505beb1). The fixed-workload translator benchmark is unchanged on every platform while hello rose everywhere (linux-x64 0.92->1.20, macos 0.96->1.11); measured over 19 windows-x64 runs across master and five branches.",
+     "runs": 6,
+     "time": 1.784,
+     "tolerance": {
+      "memory": 0.45
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.816,
+      "time": 1.375,
+      "tolerance": {
+       "memory": 0.4,
+       "time": 0.5
+      }
+     },
+     "memory": 0.816,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources since the row was set (ab3505beb1). The fixed-workload translator benchmark is unchanged on every platform while hello rose everywhere (linux-x64 0.92->1.20, macos 0.96->1.11); measured over 19 windows-x64 runs across master and five branches.",
+     "runs": 7,
+     "time": 1.891,
+     "tolerance": {
+      "memory": 0.4
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.684,
+      "time": 1.41,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.5
+      }
+     },
+     "memory": 0.684,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources since the row was set (ab3505beb1). The fixed-workload translator benchmark is unchanged on every platform while hello rose everywhere (linux-x64 0.92->1.20, macos 0.96->1.11); measured over 19 windows-x64 runs across master and five branches.",
+     "runs": 6,
+     "time": 2.147,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  }
+ }
+}
