@@ -36,13 +36,23 @@ class _Codes:
             405: ("method_not_allowed",), 409: ("conflict",), 410: ("gone",), 418: ("im_a_teapot", "teapot"),
             422: ("unprocessable_entity",), 429: ("too_many_requests",), 500: ("internal_server_error",),
             502: ("bad_gateway",), 503: ("service_unavailable", "unavailable"), 504: ("gateway_timeout",)}
+        # A table read by name: every code is an int, and `codes.ok` comes
+        # through __getattr__ typed as one, where an attribute per name set
+        # by a computed setattr could hold anything.
+        self._by_name = {}
         for code, names in table.items():
             for n in names:
-                setattr(self, n, code)
-                setattr(self, n.upper(), code)
+                self._by_name[n] = code
+                self._by_name[n.upper()] = code
+
+    def __getattr__(self, name):
+        code = self._by_name.get(name)
+        if code is None:
+            raise AttributeError(name)
+        return code
 
     def __getitem__(self, name):
-        return getattr(self, name, None)
+        return self._by_name.get(name)
 
 
 codes = _Codes()
@@ -65,7 +75,10 @@ class Response:
         self.reason = None
         self.url = None
         self.headers = CaseInsensitiveDict()
-        self._content = b""
+        # None until read: a Response built by hand may carry its body in
+        # .raw, a file-like object, as one requests itself would return.
+        self._content = None
+        self.raw = None
         self.encoding = None
         self.history = []
         self.request = None
@@ -74,6 +87,8 @@ class Response:
 
     @property
     def content(self):
+        if self._content is None:
+            self._content = self.raw.read() if self.raw is not None else b""
         return self._content
 
     @property
@@ -84,9 +99,9 @@ class Response:
     def text(self):
         enc = self.encoding or "utf-8"
         try:
-            return self._content.decode(enc, "replace")
+            return self.content.decode(enc, "replace")
         except LookupError:
-            return self._content.decode("utf-8", "replace")
+            return self.content.decode("utf-8", "replace")
 
     def json(self, **kwargs):
         try:
@@ -125,14 +140,14 @@ class Response:
             raise HTTPError(msg, response=self)
 
     def iter_content(self, chunk_size=1, decode_unicode=False):
-        data = self.text if decode_unicode else self._content
+        data = self.text if decode_unicode else self.content
         if chunk_size is None:
             chunk_size = len(data) or 1
         for i in range(0, len(data), chunk_size):
             yield data[i:i + chunk_size]
 
     def iter_lines(self, chunk_size=512, decode_unicode=False, delimiter=None):
-        data = self.text if decode_unicode else self._content
+        data = self.text if decode_unicode else self.content
         lines = data.split(delimiter) if delimiter is not None else data.splitlines()
         for line in lines:
             yield line

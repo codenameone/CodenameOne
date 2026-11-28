@@ -1,0 +1,13 @@
+[0, 10, 'ValueError: boom']
+[] []
+[10, 'RuntimeError: generator raised StopIteration']
+[0, 1, 2, 'ValueError: boom']
+done
+[1, 'RuntimeError: generator raised StopIteration']
+[0, 'caught boom']
+[0, 10, 'caught boomcaught boomcaught boomcaught boomcaught boomcaught boomcaught boomcaught boomcaught boomcaught boom']
+0
+raised boom
+finished
+['ValueError: generator already executing']
+1000

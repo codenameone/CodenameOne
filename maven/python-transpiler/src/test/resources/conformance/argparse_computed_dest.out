@@ -1,0 +1,11 @@
+usage: h [-h] [--alpha ALPHA] [--beta BETA]
+
+options:
+  -h, --help     show this help message and exit
+
+g:
+  --alpha ALPHA
+  --beta BETA
+
+Namespace(fixed=None, alpha=None, beta=None, late=None)
+ArgumentParser(prog='e', usage=None, description=None, formatter_class=<class 'argparse.HelpFormatter'>, conflict_handler='error', add_help=True)

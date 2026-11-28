@@ -187,6 +187,20 @@ public class TypeInstruction extends Instruction {
         this.stackAllocId = id;
     }
 
+    private boolean provenCast;
+
+    /**
+     * Marks this CHECKCAST as decided by an INSTANCEOF of the same value just
+     * before it (BytecodeMethod.elideProvenCasts): it emits the unchecked form.
+     */
+    public void markProvenCast() {
+        provenCast = true;
+    }
+
+    public boolean isProvenCast() {
+        return provenCast;
+    }
+
     public String getTypeName() {
         return type;
     }
@@ -261,6 +275,17 @@ public class TypeInstruction extends Instruction {
                 return;
             }
             ByteCodeClass.addArrayType(actualType, 1);
+        }
+        if((opcode == Opcodes.CHECKCAST || opcode == Opcodes.INSTANCEOF) && t != null && type.startsWith("[")) {
+            // Both compare against cn1_array_<n>_id_<type>, and Parser defines that id only
+            // for an array class the program has. A cast or test of an array type nothing
+            // allocates (Struct[] in a method that only receives one) would otherwise name
+            // an id that does not exist, and the C compile fails on an undeclared identifier.
+            int dim = 1;
+            while(type.charAt(dim) == '[') {
+                dim++;
+            }
+            ByteCodeClass.addArrayType(actualType, dim);
         }
     }
     
@@ -419,8 +444,8 @@ public class TypeInstruction extends Instruction {
                 b.append("(threadStateData, SP[0].data.i));\n");
                 break;
             case Opcodes.CHECKCAST:
-                if(!ByteCodeTranslator.isCheckedCastsEnabled()) {
-                    // Legacy shape: the macro expands to nothing, so the argument is
+                if(!ByteCodeTranslator.isCheckedCastsEnabled() || provenCast) {
+                    // Legacy shape (or a cast an instanceof already proved): the macro expands to nothing, so the argument is
                     // discarded and the raw type name is fine.
                     b.append("BC_CHECKCAST(");
                     b.append(type);

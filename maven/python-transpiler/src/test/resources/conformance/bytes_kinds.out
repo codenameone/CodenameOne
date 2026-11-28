@@ -1,0 +1,34 @@
+2 b s
+a.xml bytes True
+a.xml bytes True
+b.bin bytes True
+b.bin bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+bytes True
+True
+True
+TypeError cannot use a string pattern on a bytes-like object
+TypeError cannot use a bytes pattern on a string-like object
+b'ab-7-   cd|e   |b"q\'"|\'\\xe9\'|Az|ff|%'
+bytearray(b'[mv]')
+b'key=3'
+b'<custom>'
+TypeError %b requires a bytes-like object, or an object that implements __bytes__, not 'str'
+TypeError %b requires a bytes-like object, or an object that implements __bytes__, not 'int'
+TypeError %b requires a bytes-like object, or an object that implements __bytes__, not 'float'
+alpha Nav True
+['alpha', 'beta'] ['alpha', 'beta'] ['alpha', 'beta']
+'X X' 'ALPHA BETA' True
+True blphb betb
+[b'ab', b'cd'] [b'ef', b'gh'] [b'ij', b'kl']
+b'- -' [b'x', b'y']
+TypeError expected string or bytes-like object, got 'int'
+TypeError expected string or bytes-like object, got 'NoneType'

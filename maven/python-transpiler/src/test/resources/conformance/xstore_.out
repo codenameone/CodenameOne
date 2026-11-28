@@ -1,0 +1,5 @@
+1 h:1
+'many' 7
+TypeError str
+TypeError describe
+[1, 2] h:0

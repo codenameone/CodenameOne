@@ -1,6 +1,26 @@
-# Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
-# Licensed under the GNU General Public License version 2 with the Classpath
-# exception, as the rest of the Codename One Python runtime.
+# Copyright (c) 2017-2021 Ingy döt Net
+# Copyright (c) 2006-2016 Kirill Simonov
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# Derived from PyYAML's lib/yaml. Changes: combined into one module and rewritten
+# for the Codename One Python runtime.
 """YAML 1.1 loading and dumping with the interface of the PyYAML package.
 
 This is an independent implementation written from the YAML 1.1 specification
@@ -1803,21 +1823,20 @@ class _LoaderCore(_Scanner):
 
 
 def _std_constructors():
-    c = _LoaderCore
     return {
-        "tag:yaml.org,2002:null": c.construct_yaml_null,
-        "tag:yaml.org,2002:bool": c.construct_yaml_bool,
-        "tag:yaml.org,2002:int": c.construct_yaml_int,
-        "tag:yaml.org,2002:float": c.construct_yaml_float,
-        "tag:yaml.org,2002:binary": c.construct_yaml_binary,
-        "tag:yaml.org,2002:timestamp": c.construct_yaml_timestamp,
-        "tag:yaml.org,2002:omap": c.construct_yaml_omap,
-        "tag:yaml.org,2002:pairs": c.construct_yaml_pairs,
-        "tag:yaml.org,2002:set": c.construct_yaml_set,
-        "tag:yaml.org,2002:str": c.construct_yaml_str,
-        "tag:yaml.org,2002:seq": c.construct_yaml_seq,
-        "tag:yaml.org,2002:map": c.construct_yaml_map,
-        None: c.construct_undefined,
+        "tag:yaml.org,2002:null": _LoaderCore.construct_yaml_null,
+        "tag:yaml.org,2002:bool": _LoaderCore.construct_yaml_bool,
+        "tag:yaml.org,2002:int": _LoaderCore.construct_yaml_int,
+        "tag:yaml.org,2002:float": _LoaderCore.construct_yaml_float,
+        "tag:yaml.org,2002:binary": _LoaderCore.construct_yaml_binary,
+        "tag:yaml.org,2002:timestamp": _LoaderCore.construct_yaml_timestamp,
+        "tag:yaml.org,2002:omap": _LoaderCore.construct_yaml_omap,
+        "tag:yaml.org,2002:pairs": _LoaderCore.construct_yaml_pairs,
+        "tag:yaml.org,2002:set": _LoaderCore.construct_yaml_set,
+        "tag:yaml.org,2002:str": _LoaderCore.construct_yaml_str,
+        "tag:yaml.org,2002:seq": _LoaderCore.construct_yaml_seq,
+        "tag:yaml.org,2002:map": _LoaderCore.construct_yaml_map,
+        None: _LoaderCore.construct_undefined,
     }
 
 
@@ -2887,21 +2906,20 @@ class _DumperCore:
 
 
 def _std_representers(full):
-    c = _DumperCore
     table = {
-        type(None): c.represent_none,
-        str: c.represent_str,
-        bytes: c.represent_binary,
-        bool: c.represent_bool,
-        int: c.represent_int,
-        float: c.represent_float,
-        list: c.represent_list,
-        tuple: c.represent_tuple if full else c.represent_list,
-        dict: c.represent_dict,
-        set: c.represent_set,
-        datetime.date: c.represent_date,
-        datetime.datetime: c.represent_datetime,
-        None: c.represent_undefined,
+        type(None): _DumperCore.represent_none,
+        str: _DumperCore.represent_str,
+        bytes: _DumperCore.represent_binary,
+        bool: _DumperCore.represent_bool,
+        int: _DumperCore.represent_int,
+        float: _DumperCore.represent_float,
+        list: _DumperCore.represent_list,
+        tuple: _DumperCore.represent_tuple if full else _DumperCore.represent_list,
+        dict: _DumperCore.represent_dict,
+        set: _DumperCore.represent_set,
+        datetime.date: _DumperCore.represent_date,
+        datetime.datetime: _DumperCore.represent_datetime,
+        None: _DumperCore.represent_undefined,
     }
     return table
 
@@ -3022,45 +3040,73 @@ def warnings(settings=None):
 
 
 # Submodule-style namespaces, so that yaml.constructor.ConstructorError and
-# friends resolve as they do in PyYAML.
-error = _NS()
-error.YAMLError = YAMLError
-error.MarkedYAMLError = MarkedYAMLError
-error.Mark = Mark
-reader = _NS()
-reader.ReaderError = ReaderError
-scanner = _NS()
-scanner.ScannerError = ScannerError
-parser = _NS()
-parser.ParserError = ParserError
-composer = _NS()
-composer.ComposerError = ComposerError
-constructor = _NS()
-constructor.ConstructorError = ConstructorError
-constructor.SafeConstructor = SafeLoader
-constructor.FullConstructor = FullLoader
-constructor.Constructor = Loader
-representer = _NS()
-representer.RepresenterError = RepresenterError
-representer.SafeRepresenter = SafeDumper
-representer.Representer = Dumper
-emitter = _NS()
-emitter.EmitterError = EmitterError
-serializer = _NS()
-serializer.SerializerError = SerializerError
-nodes = _NS()
-nodes.Node = Node
-nodes.ScalarNode = ScalarNode
-nodes.CollectionNode = CollectionNode
-nodes.SequenceNode = SequenceNode
-nodes.MappingNode = MappingNode
-loader = _NS()
-loader.Loader = Loader
-loader.SafeLoader = SafeLoader
-loader.FullLoader = FullLoader
-loader.BaseLoader = BaseLoader
-loader.UnsafeLoader = UnsafeLoader
-dumper = _NS()
-dumper.Dumper = Dumper
-dumper.SafeDumper = SafeDumper
-dumper.BaseDumper = BaseDumper
+# friends resolve as they do in PyYAML. Each is a class whose body binds its
+# names: `loader.SafeLoader = SafeLoader` stored on an instance was an
+# attribute store named SafeLoader, which the build must take as one that may
+# rebind the global -- and a global that may be rebound is no base a class of
+# another module can be laid out over (`class MyLoader(yaml.SafeLoader)`).
+class error:
+    YAMLError = YAMLError
+    MarkedYAMLError = MarkedYAMLError
+    Mark = Mark
+
+
+class reader:
+    ReaderError = ReaderError
+
+
+class scanner:
+    ScannerError = ScannerError
+
+
+class parser:
+    ParserError = ParserError
+
+
+class composer:
+    ComposerError = ComposerError
+
+
+class constructor:
+    ConstructorError = ConstructorError
+    SafeConstructor = SafeLoader
+    FullConstructor = FullLoader
+    Constructor = Loader
+
+
+class representer:
+    RepresenterError = RepresenterError
+    SafeRepresenter = SafeDumper
+    Representer = Dumper
+
+
+class emitter:
+    EmitterError = EmitterError
+
+
+class serializer:
+    SerializerError = SerializerError
+
+
+class nodes:
+    Node = Node
+    ScalarNode = ScalarNode
+    CollectionNode = CollectionNode
+    SequenceNode = SequenceNode
+    MappingNode = MappingNode
+
+
+class loader:
+    Loader = Loader
+    SafeLoader = SafeLoader
+    FullLoader = FullLoader
+    BaseLoader = BaseLoader
+    UnsafeLoader = UnsafeLoader
+
+
+class dumper:
+    Dumper = Dumper
+    SafeDumper = SafeDumper
+    BaseDumper = BaseDumper
+
+

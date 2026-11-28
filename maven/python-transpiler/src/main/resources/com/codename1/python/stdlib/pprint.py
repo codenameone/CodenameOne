@@ -1,6 +1,9 @@
-# Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
-# Licensed under the GNU General Public License version 2 with the Classpath
-# exception, as the rest of the Codename One Python runtime.
+# Copyright (c) 2001 Python Software Foundation; All Rights Reserved
+# Licensed under the Python Software Foundation License Version 2; the full
+# text is in maven/python-transpiler/third-party/cpython/LICENSE.txt.
+#
+# Derived from CPython's Lib/pprint.py. Changes: rewritten for the Codename One Python runtime, trimmed to what the
+# transpiler supports; output layout is CPython's.
 """Pretty printing of data structures, laid out as CPython's pprint does."""
 
 import collections as _collections
@@ -135,7 +138,7 @@ class PrettyPrinter:
     def _pprint_dataclass(self, object, stream, indent, allowance, context, level):
         cls_name = object.__class__.__name__
         indent += len(cls_name) + 1
-        items = [(f.name, getattr(object, f.name)) for f in _dataclasses.fields(object) if f.repr]
+        items = object.__cn1_repr_items__()
         stream.write(cls_name + "(")
         self._format_namespace_items(items, stream, indent, allowance, context, level)
         stream.write(")")

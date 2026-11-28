@@ -1,0 +1,13 @@
+0 1 300 bytes
+True
+ValueError
+True
+0 True
+True
+5 True
+True a
+True
+NotImplementedError
+NotImplementedError
+12 24 0 0
+4 True

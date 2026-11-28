@@ -42,15 +42,21 @@ public final class PyException extends RuntimeException {
         // A raised exception has a traceback. The translated program has no
         // frame objects, so it is an empty `traceback` instance: what
         // `traceback.format_exception` reads to print the header.
-        if (value instanceof PyInstance && ((PyInstance) value).getAttrOrNull("__traceback__") == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
-            ((PyInstance) value).setAttrDirect("__traceback__", new PyInstance(Py.TRACEBACK_TYPE));
+        // Only the instance's own attribute is read: the class's is None,
+        // and a generic lookup on every raise cost more than the raise.
+        if (value instanceof PyInstance) {
+            PyInstance i = (PyInstance) value;
+            Object tb = i.own("__traceback__");
+            if (tb == null || tb == Py.NONE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                i.setAttrDirect("__traceback__", new PyInstance(Py.TRACEBACK_TYPE));
+            }
         }
     }
 
     /// `isinstance(value, type)`, where `type` may be a tuple of types.
     public boolean matches(Object type) {
         if (type instanceof PyTuple) {
-            Object[] items = ((PyTuple) type).items;
+            Object[] items = ((PyTuple) type).arr();
             for (Object item : items) {
                 if (matches(item)) {
                     return true;

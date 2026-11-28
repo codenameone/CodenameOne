@@ -211,10 +211,16 @@ class relativedelta:
                 month += 12
         day = min(monthrange(year, month)[1], self.day or other.day)
         repl = {"year": year, "month": month, "day": day}
-        for attr in ("hour", "minute", "second", "microsecond"):
-            value = getattr(self, attr)
-            if value is not None:
-                repl[attr] = value
+        # Named one by one, not by getattr in a loop: a computed name is
+        # reflection, which strict mode refuses wherever this is live.
+        if self.hour is not None:
+            repl["hour"] = self.hour
+        if self.minute is not None:
+            repl["minute"] = self.minute
+        if self.second is not None:
+            repl["second"] = self.second
+        if self.microsecond is not None:
+            repl["microsecond"] = self.microsecond
         days = self.days
         if self.leapdays and month > 2 and isleap(year):
             days += self.leapdays
@@ -330,12 +336,14 @@ class relativedelta:
 
     def __repr__(self):
         parts = []
-        for attr in ("years", "months", "days", "leapdays", "hours", "minutes", "seconds", "microseconds"):
-            value = getattr(self, attr)
+        for attr, value in (("years", self.years), ("months", self.months), ("days", self.days),
+                            ("leapdays", self.leapdays), ("hours", self.hours), ("minutes", self.minutes),
+                            ("seconds", self.seconds), ("microseconds", self.microseconds)):
             if value:
                 parts.append("%s=%+g" % (attr, value))
-        for attr in ("year", "month", "day", "weekday", "hour", "minute", "second", "microsecond"):
-            value = getattr(self, attr)
+        for attr, value in (("year", self.year), ("month", self.month), ("day", self.day),
+                            ("weekday", self.weekday), ("hour", self.hour), ("minute", self.minute),
+                            ("second", self.second), ("microsecond", self.microsecond)):
             if value is not None:
                 parts.append("%s=%s" % (attr, repr(value)))
         return "%s(%s)" % (self.__class__.__name__, ", ".join(parts))

@@ -138,6 +138,7 @@ class WeakMethod:
 
 
 class WeakValueDictionary:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, other=(), /, **kw):
         self.data = {}
         self.update(other, **kw)
@@ -263,6 +264,7 @@ class WeakValueDictionary:
 
 
 class WeakKeyDictionary:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, dict=None):
         self.data = {}
         if dict is not None:
@@ -354,6 +356,7 @@ class WeakKeyDictionary:
 
 
 class WeakSet:
+    __class_getitem__ = classmethod(type(list[int]))
     def __init__(self, data=None):
         self.data = set()
         if data is not None:

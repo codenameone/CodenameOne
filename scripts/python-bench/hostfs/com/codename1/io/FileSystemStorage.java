@@ -109,4 +109,30 @@ public final class FileSystemStorage {
     public long getLastModified(String url) {
         return file(url).lastModified();
     }
+
+    /// No caches directory: a caller (ConnectionRequest's download cache) falls back
+    /// to the application home, as on a port without one.
+    public boolean hasCachesDir() {
+        return false;
+    }
+
+    public String getCachesDir() {
+        return null;
+    }
+
+    public char getFileSystemSeparator() {
+        return '/';
+    }
+
+    public boolean isHidden(String url) {
+        return file(url).getName().startsWith(".");
+    }
+
+    public String[] getRoots() {
+        return new String[] {SCHEME + "/"};
+    }
+
+    public String toNativePath(String url) {
+        return file(url).getPath();
+    }
 }

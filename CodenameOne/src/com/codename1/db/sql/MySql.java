@@ -674,15 +674,13 @@ public final class MySql extends ServerSession {
         readPacket(); // EOF ending the definitions
         if (rows != null) {
             String[] kinds = new String[resultColumns];
+            String[] names = new String[resultColumns];
             for (int iter = 0 ; iter < resultColumns ; iter++) {
                 kinds[iter] = kind(resultDefinitions[iter].type);
+                names[iter] = resultDefinitions[iter].name;
             }
             rows.setColumnTypes(kinds);
-            String[] labels = new String[resultColumns];
-            for (int iter = 0 ; iter < resultColumns ; iter++) {
-                labels[iter] = resultDefinitions[iter].name;
-            }
-            rows.setColumnNames(labels);
+            rows.setColumnNames(names);
         }
         while (true) {
             Packet packet = readPacket();

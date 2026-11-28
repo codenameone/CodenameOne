@@ -1,0 +1,22 @@
+unittest.mock:139 class NonCallableMock has no layout: its body binds __setattr__
+unittest.mock:158 setattr with a computed name is reflection; write override = unittest.mock.NonCallableMock.__init__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock.NonCallableMock.__init__.py
+unittest.mock:206 hasattr with a computed name is reflection; write override = unittest.mock.NonCallableMock.__getattr__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock.NonCallableMock.__getattr__.py
+unittest.mock:245 getattr with a computed name is reflection; write override = unittest.mock.NonCallableMock.configure_mock in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock.NonCallableMock.configure_mock.py
+unittest.mock:246 setattr with a computed name is reflection; write override = unittest.mock.NonCallableMock.configure_mock in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock.NonCallableMock.configure_mock.py
+unittest.mock:393 class Mock has no layout: base NonCallableMock has no layout
+unittest.mock:404 class MagicMock has no layout: base Mock has no layout
+unittest.mock:486 getattr with a computed name is reflection; write override = unittest.mock._resolve in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._resolve.py
+unittest.mock:507 hasattr with a computed name is reflection; write override = unittest.mock._Patch.__enter__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__enter__.py
+unittest.mock:510 getattr with a computed name is reflection; write override = unittest.mock._Patch.__enter__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__enter__.py
+unittest.mock:515 setattr with a computed name is reflection; write override = unittest.mock._Patch.__enter__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__enter__.py
+unittest.mock:522 setattr with a computed name is reflection; write override = unittest.mock._Patch.__exit__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__exit__.py
+unittest.mock:524 delattr with a computed name is reflection; write override = unittest.mock._Patch.__exit__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__exit__.py
+unittest.mock:527 delattr with a computed name is reflection; write override = unittest.mock._Patch.__exit__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__exit__.py
+unittest.mock:529 setattr with a computed name is reflection; write override = unittest.mock._Patch.__exit__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__exit__.py
+unittest.mock:530 getattr with a computed name is reflection; write override = unittest.mock._Patch.__exit__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__exit__.py
+unittest.mock:531 setattr with a computed name is reflection; write override = unittest.mock._Patch.__exit__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__exit__.py
+unittest.mock:543 getattr with a computed name is reflection; write override = unittest.mock._Patch.__call__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__call__.py
+unittest.mock:545 setattr with a computed name is reflection; write override = unittest.mock._Patch.__call__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.mock._Patch.__call__.py
+unittest:265 getattr with a computed name is reflection; write override = unittest.TestCase.__init__ in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestCase.__init__.py
+unittest:341 getattr with a computed name is reflection; write override = unittest.TestCase.run in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestCase.run.py
+unittest:966 getattr with a computed name is reflection; write override = unittest.TestLoader.getTestCaseNames in cn1-python.properties and its compliant body in cn1-python-overrides/unittest.TestLoader.getTestCaseNames.py

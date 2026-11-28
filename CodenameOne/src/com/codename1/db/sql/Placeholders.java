@@ -630,6 +630,25 @@ final class Placeholders {
                 at += 5;
                 continue;
             }
+            if (isWordChar(c)) {
+                // ONE STEP PER WORD, not per character. This runs on every
+                // statement a backend executes, and asking for three keywords at
+                // every character was most of what a short INSERT cost to send.
+                // Stepping over the whole word is exact: every character inside
+                // a word is a word character whose predecessor is one too, so no
+                // keyword can match there and skip() acts on none of them (its
+                // only word-character case, a dollar quote, needs a non-word
+                // character before it).
+                int end = at + 1;
+                while (end < length && isWordChar(sql.charAt(end))) {
+                    end++;
+                }
+                char first = (char) (c | 0x20);
+                if (first != 'b' && first != 'c' && first != 'e') {
+                    at = end;
+                    continue;
+                }
+            }
             if (isWord(sql, at, "begin")) {
                 // ONLY A BLOCK BEGIN COUNTS. "BEGIN;" and "BEGIN TRANSACTION;"
                 // open a TRANSACTION and are a whole statement on their own, so

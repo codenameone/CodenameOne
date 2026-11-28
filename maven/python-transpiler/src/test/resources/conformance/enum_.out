@@ -15,3 +15,4 @@ Red Color.GREEN r GREEN True
 AttributeError cannot reassign member 'RED'
 True [<Status.OK: 200>, <Status.NOT_FOUND: 404>] NOT_FOUND 200
 200 True 200 404
+PIC (13) True True a ['AUTO (1)', 'PIC (13)'] True

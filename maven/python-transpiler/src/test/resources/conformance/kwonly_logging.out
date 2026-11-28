@@ -1,0 +1,6 @@
+True 0 True False
+'INFO:hi'
+'INFO:hi\n'
+'INFO:hi\nINFO:hi\n'
+'INFO:hi\nINFO:hi\nINFO:hi\n'
+'INFO:hi\nINFO:hi\nINFO:hi\nINFO:root info\n'

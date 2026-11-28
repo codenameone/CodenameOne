@@ -87,6 +87,12 @@ public abstract class TranspilePythonTask extends Cn1Task {
     @OutputDirectory
     public abstract DirectoryProperty getOutputDirectory();
 
+    /// Where `cn1python.dat` (the Python package data) is written: a
+    /// directory packaged at the root of the application's resources.
+    @org.gradle.api.tasks.Optional
+    @OutputDirectory
+    public abstract DirectoryProperty getPackageDataDirectory();
+
     @TaskAction
     public void transpile() {
         try {
@@ -95,7 +101,8 @@ public abstract class TranspilePythonTask extends Cn1Task {
                     .classPath(new java.util.ArrayList<java.io.File>(getJavaClassPath().getFiles()))
                     .javaSources(getJavaSourceDirectory().get().getAsFile(),
                             getJavaImportsDirectory().get().getAsFile())
-                    .virtualThreadStack(getVirtualThreadStack().getOrNull()).run();
+                    .virtualThreadStack(getVirtualThreadStack().getOrNull())
+                    .packageData(getPackageDataDirectory().getAsFile().getOrNull()).run();
         } catch (BuildException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());
         }

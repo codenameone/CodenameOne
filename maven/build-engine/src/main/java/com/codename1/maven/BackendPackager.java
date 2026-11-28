@@ -419,6 +419,8 @@ public class BackendPackager {
         // commands and no controller takes this pass's CliApplication as its own.
         com.codename1.maven.processors.CommandAnnotationProcessor commands =
                 new com.codename1.maven.processors.CommandAnnotationProcessor();
+        // Forced for the reason the entity flavour is: see setBackendModule.
+        commands.setBackendModule(true);
         try {
             commands.start(ctx);
             for (AnnotatedClass cls : index.values()) {
@@ -1182,6 +1184,15 @@ public class BackendPackager {
             // always set both; this half had only the first.
             command.add("-DCN1_BACKEND_NO_SQLITE");
         }
+        // The collector's floors for a server process, as vm/backend/build.sh
+        // sets them (its comments have the measurements): collect from 4MB of
+        // garbage rather than the VM's 24MB, and hold the heap near the live
+        // set while the collector is mostly idle. This goal set neither, so a
+        // packaged binary let its trigger climb to the 128MB ceiling -- the
+        // a measured application peaked at a 200MB footprint, and 100-125MB with these,
+        // at the same wall time. Before the cflags, which may override them.
+        command.add("-DCN1_BIBOP_GC_MIN_TRIGGER_BYTES=" + (4 * 1024 * 1024));
+        command.add("-DCN1_BIBOP_TIGHT_SURVIVAL_PERCENT=66");
         if (cflags != null && cflags.trim().length() > 0) {
             command.addAll(Arrays.asList(cflags.trim().split("\\s+")));
         }
@@ -1192,6 +1203,7 @@ public class BackendPackager {
         if (cFiles == null) {
             throw new BuildExecutionException("The translator produced nothing in " + sourceDir);
         }
+        List<File> sources = new ArrayList<File>();
         for (File file : cFiles) {
             String name = file.getName();
             // .S as well as .c, which is what vm/backend/build.sh compiles. The
@@ -1201,14 +1213,44 @@ public class BackendPackager {
             // undefined and this goal could not produce a binary at all.
             // Generated resource assembly is in the same position.
             if (name.endsWith(".c") || name.endsWith(".S") || name.endsWith(".s")) {
-                command.add(file.getAbsolutePath());
+                sources.add(file);
             }
         }
-        command.addAll(Arrays.asList("-lm", "-lpthread", "-lssl", "-lcrypto", "-lnghttp2"));
+        // Each file to an object on every core, then one link. A single clang
+        // given every file compiles them one after another: a Python tool of a
+        // few thousand modules took 37 minutes on one core. Nothing is lost by
+        // splitting, since without LTO clang optimises each file on its own
+        // either way.
+        File objects = new File(sourceDir.getParentFile(), simpleName + "-obj");
+        emptyDirs(objects);
+        mkdirs(objects);
         if (System.getProperty("os.name", "").startsWith("Linux")) {
             // libcurl is opened on the first outbound request (cn1_backend_web.c),
             // so an idle server never maps it or the TLS stack it was built with.
+            // A compile flag, so it goes before the objects are compiled.
             command.add("-DCN1_BACKEND_CURL_DLOPEN");
+        }
+        List<File> compiled = compileObjects(new ArrayList<String>(command), sources, objects);
+        StringBuilder list = new StringBuilder();
+        for (File object : compiled) {
+            list.append('"').append(object.getAbsolutePath().replace("\\", "\\\\")
+                    .replace("\"", "\\\"")).append("\"\n");
+        }
+        // Through a response file rather than on the command line: thousands of
+        // objects outgrow the kernel's argument limit (E2BIG) and the linker
+        // could not be started at all. Both clang and gcc read @file.
+        File responseFile = new File(sourceDir.getParentFile(), "c-objects.rsp");
+        try {
+            java.nio.file.Files.write(responseFile.toPath(),
+                    list.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException err) {
+            throw new BuildExecutionException("Could not write " + responseFile + ": "
+                    + err.getMessage(), err);
+        }
+        command.add("@" + responseFile.getAbsolutePath());
+        command.addAll(Arrays.asList("-lm", "-lpthread", "-lssl", "-lcrypto", "-lnghttp2"));
+        if (System.getProperty("os.name", "").startsWith("Linux")) {
+            // dlopen, for the libcurl the define above loads on demand.
             command.add("-ldl");
         } else {
             command.add("-lcurl");
@@ -1216,7 +1258,7 @@ public class BackendPackager {
         command.add(deadStripFlag(System.getProperty("os.name", "")));
         command.add("-o");
         command.add(binary.getAbsolutePath());
-        run(command, host.baseDir(), "compile the generated C");
+        run(command, host.baseDir(), "link the generated C");
     }
 
     /**
@@ -1756,6 +1798,57 @@ public class BackendPackager {
                 out.add(child.getAbsolutePath());
             }
         }
+    }
+
+    /// Compiles every source to an object in `objects` with `flags`, one
+    /// compiler per core, and answers the objects in source order. The first
+    /// failure is reported with the compiler's output, as a single compile was.
+    private List<File> compileObjects(final List<String> flags, List<File> sources, File objects)
+            throws BuildExecutionException, BuildFailureException {
+        List<File> out = new ArrayList<File>();
+        List<java.util.concurrent.Future<Void>> pending = new ArrayList<java.util.concurrent.Future<Void>>();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(
+                Math.max(1, Runtime.getRuntime().availableProcessors()));
+        try {
+            int index = 0;
+            for (final File source : sources) {
+                // Numbered: two sources may share a name once the suffix is dropped.
+                final File object = new File(objects, (index++) + "-" + source.getName() + ".o");
+                out.add(object);
+                pending.add(pool.submit(new java.util.concurrent.Callable<Void>() {
+                    @Override
+                    public Void call() throws Exception {
+                        List<String> cmd = new ArrayList<String>(flags);
+                        cmd.add("-c");
+                        cmd.add(source.getAbsolutePath());
+                        cmd.add("-o");
+                        cmd.add(object.getAbsolutePath());
+                        run(cmd, host.baseDir(), "compile the generated C (" + source.getName() + ")");
+                        return null;
+                    }
+                }));
+            }
+            for (java.util.concurrent.Future<Void> f : pending) {
+                try {
+                    f.get();
+                } catch (java.util.concurrent.ExecutionException err) {
+                    Throwable cause = err.getCause();
+                    if (cause instanceof BuildFailureException) {
+                        throw (BuildFailureException) cause;
+                    }
+                    if (cause instanceof BuildExecutionException) {
+                        throw (BuildExecutionException) cause;
+                    }
+                    throw new BuildExecutionException("Could not compile the generated C", cause);
+                }
+            }
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            throw new BuildExecutionException("Interrupted while compiling the generated C", err);
+        } finally {
+            pool.shutdownNow();
+        }
+        return out;
     }
 
     protected void run(List<String> command, File directory, String what)

@@ -1,0 +1,5 @@
+weakref:29 class ProxyType has no layout: its body binds __setattr__
+weakref:42 getattr with a computed name is reflection; write override = weakref.ProxyType.__getattr__ in cn1-python.properties and its compliant body in cn1-python-overrides/weakref.ProxyType.__getattr__.py
+weakref:45 setattr with a computed name is reflection; write override = weakref.ProxyType.__setattr__ in cn1-python.properties and its compliant body in cn1-python-overrides/weakref.ProxyType.__setattr__.py
+weakref:48 delattr with a computed name is reflection; write override = weakref.ProxyType.__delattr__ in cn1-python.properties and its compliant body in cn1-python-overrides/weakref.ProxyType.__delattr__.py
+weakref:88 class CallableProxyType has no layout: base ProxyType has no layout

@@ -33,6 +33,7 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Database for the JavaScript port, backed by SQLite compiled to WebAssembly.
@@ -151,6 +152,80 @@ public class DatabaseImpl extends Database {
      * inside one does not reach here as a Java throwable, it unwinds the worker and hangs every
      * thread waiting on the call.
      */
+    /** Every function registered on any connection, by the id SQLite hands back. */
+    private static final List<Function<Object[], Object>> FUNCTIONS = new ArrayList<Function<Object[], Object>>();
+
+    /** The ids this connection registered, freed when it closes. */
+    private final List<Integer> ownIds = new ArrayList<Integer>();
+
+    @Override
+    public boolean supportsFunctions() {
+        return true;
+    }
+
+    @Override
+    public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
+        int id = -1;
+        if (function != null) {
+            // A slot a closed connection freed is reused: its statements went with it.
+            id = FUNCTIONS.indexOf(null);
+            if (id < 0) {
+                id = FUNCTIONS.size();
+                FUNCTIONS.add(function);
+            } else {
+                FUNCTIONS.set(id, function);
+            }
+            ownIds.add(Integer.valueOf(id));
+        }
+        checkNative(SQLiteNative.createFunction(peer, name, argCount, id));
+    }
+
+    /**
+     * Runs a registered function for SQLite, called by port.js from inside the engine while a
+     * statement steps, and driven to completion synchronously there: a function that blocks
+     * (waits on a lock, a network call) fails the statement instead.
+     *
+     * <p>port.js hands each argument over as SQLite stores it, an integer or a real as its text so
+     * that a 64-bit value arrives exact, with {@code kinds} saying which (1 integer, 2 real, 3
+     * text, 4 blob, 5 null). The answer is {kind, value} in the same coding, with kind 0 and the
+     * message for an exception, which fails the statement with that message.
+     */
+    static Object[] callFunction(int id, Object[] args, int[] kinds) {
+        try {
+            for (int i = 0; i < args.length; i++) {
+                if (kinds[i] == 1) {
+                    args[i] = Long.valueOf(Long.parseLong(String.valueOf(args[i])));
+                } else if (kinds[i] == 2) {
+                    args[i] = Double.valueOf(Double.parseDouble(String.valueOf(args[i])));
+                }
+            }
+            Function<Object[], Object> f = id >= 0 && id < FUNCTIONS.size() ? FUNCTIONS.get(id) : null;
+            if (f == null) {
+                return new Object[] {"0", "no such function"};
+            }
+            Object v = f.apply(args);
+            if (v == null) {
+                return new Object[] {"5", null};
+            }
+            if (v instanceof Boolean) {
+                return new Object[] {"1", ((Boolean) v).booleanValue() ? "1" : "0"};
+            }
+            if (v instanceof Long || v instanceof Integer || v instanceof Short || v instanceof Byte) {
+                return new Object[] {"1", String.valueOf(((Number) v).longValue())};
+            }
+            if (v instanceof Number) {
+                return new Object[] {"2", String.valueOf(((Number) v).doubleValue())};
+            }
+            if (v instanceof byte[]) {
+                return new Object[] {"4", v};
+            }
+            return new Object[] {"3", String.valueOf(v)};
+        } catch (RuntimeException e) {
+            String m = e.getMessage();
+            return new Object[] {"0", m == null ? e.toString() : m};
+        }
+    }
+
     private static void checkNative(boolean ok) throws IOException {
         if (!ok) {
             throw new IOException(SQLiteNative.lastError());
@@ -249,6 +324,10 @@ public class DatabaseImpl extends Database {
             // Reported, not swallowed. The peer is already cleared so there is no retry, which
             // makes this the only chance to say the data may not have reached storage.
             checkNative(SQLiteNative.close(closing));
+            for (int iter = 0; iter < ownIds.size(); iter++) {
+                FUNCTIONS.set(ownIds.get(iter).intValue(), null);
+            }
+            ownIds.clear();
         } finally {
             // Last, not first: until the engine has let the database go this connection still
             // holds it, and giving the claim back sooner lets another connection start rewriting

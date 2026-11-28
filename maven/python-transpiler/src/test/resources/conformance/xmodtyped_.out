@@ -1,0 +1,12 @@
+[True, False, True, False]
+[True, False, True, False]
+True False True
+['p', 'div', 'svg:p', 'skip:q'] ['a', 'ns:b']
+3 9 10
+empty empty
+full full
+yes yes no
+True False False
+True True
+42 42
+['x', 'y'] ['x', 'y'] 0

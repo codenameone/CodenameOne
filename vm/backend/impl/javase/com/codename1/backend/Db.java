@@ -108,6 +108,16 @@ public final class Db {
         }
     }
 
+    /// [#execute], also storing [#lastInsertId] into `lastInsertId[0]` when it
+    /// is not null, under the one lock.
+    public synchronized int execute(String sql, Object[] params, long[] lastInsertId) throws IOException {
+        int changed = execute(sql, params);
+        if (lastInsertId != null) {
+            lastInsertId[0] = lastInsertId();
+        }
+        return changed;
+    }
+
     public synchronized int execute(String sql, Object[] params) throws IOException {
         // THE SAME REFUSAL AS THE TRANSLATED ARM. There sqlite reads the statement
         // as a C string, so a NUL ends it and what is left may still be a complete
@@ -160,7 +170,27 @@ public final class Db {
         }
     }
 
-    public synchronized List query(String sql, Object[] params) throws IOException {
+    public List query(String sql, Object[] params) throws IOException {
+        return query(sql, params, false);
+    }
+
+    /// Runs a query and returns every row as an `Object[]` of its values in
+    /// the order the statement projects them; the column names are on the
+    /// result ([Database#columnNames]). See [Database#queryPositional].
+    public List queryPositional(String sql, Object[] params) throws IOException {
+        return query(sql, params, true);
+    }
+
+    /// [#queryPositional] into a list the caller owns, answering the column
+    /// names, which must not be changed; see the translated twin.
+    public synchronized String[] queryPositionalInto(String sql, Object[] params, List out) throws IOException {
+        List rows = query(sql, params, true);
+        out.addAll(rows);
+        String[] names = rows instanceof QueryRows ? ((QueryRows) rows).sharedColumnNames() : null;
+        return names != null ? names : new String[0];
+    }
+
+    private synchronized List query(String sql, Object[] params, boolean positional) throws IOException {
         // THE SAME REFUSAL AS THE TRANSLATED ARM. There sqlite reads the statement
         // as a C string, so a NUL ends it and what is left may still be a complete
         // statement with its authorization clause gone -- see the note in the
@@ -173,9 +203,15 @@ public final class Db {
             PreparedStatement statement = c.prepareStatement(sql);
             try {
                 bind(statement, params);
-                ResultSet results = statement.executeQuery();
+                // execute, not executeQuery: a statement such as a PRAGMA that
+                // sets something answers no result set, which executeQuery
+                // reports as a failure, and the translated twin returns no rows.
+                if (!statement.execute()) {
+                    return new QueryRows(0);
+                }
+                ResultSet results = statement.getResultSet();
                 try {
-                    return readRows(results);
+                    return readRows(results, positional);
                 } finally {
                     results.close();
                 }
@@ -246,7 +282,6 @@ public final class Db {
         execute("PRAGMA busy_timeout=" + millis, null);
     }
 
-    /// Synchronized with close for the reason the translated arm gives.
     public synchronized long lastInsertId() {
         return lastInsertId;
     }
@@ -269,6 +304,30 @@ public final class Db {
                 // already gone
             }
         }
+    }
+
+    /// Registers a scalar SQL function; see Database.createFunction. The
+    /// packaged binary's twin calls sqlite3_create_function_v2 directly; here
+    /// sqlite-jdbc does, through SqliteJdbcFunctions (impl/javase-sqlite). That
+    /// class is a ServiceLoader provider rather than code in this file because
+    /// sqlite-jdbc is an optional dependency: this twin is also compiled with the
+    /// JDK alone, where SQL functions are simply unavailable.
+    public synchronized boolean createFunction(String name, int argc,
+            final java.util.function.Function<Object[], Object> body) throws IOException {
+        if (name.indexOf('\0') >= 0) {
+            throw new IOException("a function name cannot contain NUL");
+        }
+        Connection c = live(); //NOPMD CloseResource - the Db owns its connection; close() releases it
+        SqlFunctionRegistrar registrar = SqlFunctionRegistrar.Holder.INSTANCE;
+        if (registrar == null) {
+            throw new IOException("SQL functions need sqlite-jdbc on the class path");
+        }
+        try {
+            registrar.register(c, name, argc, body);
+        } catch (SQLException err) {
+            throw new IOException("could not register " + name + ": " + err.getMessage(), err);
+        }
+        return true;
     }
 
     private Connection live() throws IOException {
@@ -296,15 +355,24 @@ public final class Db {
         }
     }
 
-    private static List readRows(ResultSet results) throws SQLException {
+    private static List readRows(ResultSet results, boolean positional) throws SQLException {
         ResultSetMetaData meta = results.getMetaData();
         int columns = meta.getColumnCount();
-        List rows = new QueryRows(columns);
+        QueryRows rows = new QueryRows(columns);
         String[] names = new String[columns];
         for (int iter = 0 ; iter < columns ; iter++) {
             names[iter] = meta.getColumnLabel(iter + 1);
         }
+        rows.setColumnNames(names);
         while (results.next()) {
+            if (positional) {
+                Object[] row = new Object[columns];
+                for (int iter = 0 ; iter < columns ; iter++) {
+                    row[iter] = value(results, iter + 1);
+                }
+                rows.add(row);
+                continue;
+            }
             Map row = new LinkedHashMap();
             for (int iter = 0 ; iter < columns ; iter++) {
                 row.put(names[iter], value(results, iter + 1));

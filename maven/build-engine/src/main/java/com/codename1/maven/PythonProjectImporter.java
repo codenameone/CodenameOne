@@ -113,8 +113,13 @@ public final class PythonProjectImporter {
             String txt = read(new File(source, "requirements.txt"));
             r.requirements.addAll(requirements(pyproject, txt));
             r.requirementSpecs.addAll(requirementSpecs(pyproject, txt));
-            if (r.mainModule != null) {
-                updateSetting(new File(commonDir, "codenameone_settings.properties"), r.mainModule);
+            File settings = new File(commonDir, "codenameone_settings.properties");
+            // Only an application has the settings file. A command-line project
+            // (backend-only) runs main.py as __main__ and has no setting to
+            // record; writing the file there would make the plugin take the
+            // project for an application.
+            if (r.mainModule != null && settings.exists()) {
+                updateSetting(settings, r.mainModule);
                 if (mainPackage != null && mainClass != null && mainPackage.length() > 0 && mainClass.length() > 0) {
                     writeEntryPoint(new File(commonDir, "src/main/java"), mainPackage, mainClass);
                 }
@@ -282,7 +287,12 @@ public final class PythonProjectImporter {
                 if (SKIPPED.contains(n) || n.endsWith(".egg-info") || n.endsWith(".dist-info")) {
                     continue;
                 }
-                if (f.isDirectory() || n.endsWith(".py")) {
+                // The build directives travel with the sources: without them the
+                // build stops on exactly the functions they name (an exec() in a
+                // command line module the application never calls), and the
+                // error tells the developer to write the file the import dropped.
+                if (f.isDirectory() || n.endsWith(".py")
+                        || (path.length() == 0 && n.equals(PythonProjectBuilder.DIRECTIVES))) {
                     copy(f, new File(dest, n), path.length() == 0 ? n : path + "/" + n, imported, r);
                 }
             }

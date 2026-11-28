@@ -119,18 +119,21 @@ public final class Gil {
     }
 
     private static void acquire(long me) {
-        if (OWNER.compareAndSet(0, me)) {
-            return;
-        }
-        WAITERS.incrementAndGet();
-        try {
-            int attempt = 0;
-            while (!OWNER.compareAndSet(0, me)) {
-                pauseWaiter(HANDOFF.get() > 0 ? 0 : attempt++);
+        if (!OWNER.compareAndSet(0, me)) {
+            WAITERS.incrementAndGet();
+            try {
+                int attempt = 0;
+                while (!OWNER.compareAndSet(0, me)) {
+                    pauseWaiter(HANDOFF.get() > 0 ? 0 : attempt++);
+                }
+            } finally {
+                WAITERS.decrementAndGet();
             }
-        } finally {
-            WAITERS.decrementAndGet();
         }
+        // Per-thread interpreter state is switched here, once per hand-over,
+        // so that Python code reads it from a static rather than a ThreadLocal
+        // on every use.
+        Typed.adoptThread();
     }
 
     /// One step aside for a thread waiting on something another thread

@@ -1,0 +1,10 @@
+0 9 shape:9 x:9
+1 12 circle!12 x!12
+2 p.area0 p.describe0 p.describe0
+3 16 shape:16 x:16
+side 3
+side 4
+side 4
+1 25 via:3
+2
+8 ['shape:4', 'circle!3', 'shape:1']

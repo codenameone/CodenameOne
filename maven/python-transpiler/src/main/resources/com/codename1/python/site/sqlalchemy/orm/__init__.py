@@ -1,11 +1,21 @@
 """SQLAlchemy 2.0 declarative ORM subset: DeclarativeBase, Mapped, mapped_column,
 relationship (one-to-many, many-to-one, many-to-many through ``secondary``) and Session.
 
-Mapping is done by a metaclass reading the class body's ``__annotations__``; nothing is
-evaluated with ``exec``. Instance state lives in ``obj.__dict__``: a column attribute that
-is absent from it is *expired* and is reloaded from the database on access, which is how
-``expire_on_commit``, ``refresh`` and ``rollback`` work. Changes are found at flush time by
-comparing the attribute values with a snapshot taken at load, so no attribute events.
+There is no metaclass and nothing is looked up by a computed name. The build
+(``SqlAlchemyLowering``) rewrites every module-level mapped class: each column and
+relationship becomes a descriptor naming its key and its slot number literally
+(``_sa_col``/``_sa_rel``), the class gets literal tables (``__cn1_sa_cols__``,
+``__cn1_sa_rels__``, ``__cn1_sa_parent__``, ``__cn1_sa_table__``, ``__cn1_sa_args__``,
+``__cn1_sa_nslots__``), a keyword-only ``__init__`` storing each column's slot literally
+(unless the user wrote one) and a keyword hook ``__cn1_sa_kw__``, ``back_populates`` pairs are
+linked with ``_sa_pair`` and the class is mapped by ``M.__cn1_sa_map__()`` right after
+its definition.
+
+Instance state lives in a declared slot list ``obj._sa_v`` indexed by those slot
+numbers: a slot holding ``_UNSET`` is *expired* and is reloaded from the database on
+access, which is how ``expire_on_commit``, ``refresh`` and ``rollback`` work. Changes are
+found at flush time by comparing the slots with a snapshot taken at load, so no
+attribute events.
 
 Also: cascades (save-update, delete, delete-orphan; deleting a parent nulls its children's
 foreign keys unless ``passive_deletes``), ``selectinload``/``joinedload`` and ``lazy=`` eager
@@ -14,11 +24,10 @@ primary keys, single-table and joined-table inheritance with ``polymorphic_on``,
 ``aliased()`` and ``any()``/``has()`` on relationships.
 
 Unsupported: chained loader options, concrete-table inheritance, joins along a many-to-many
-relationship, hybrid properties.
+relationship, hybrid properties, mapped classes not defined at module level.
 """
 
 import datetime as _dt
-import typing as _typing
 import sqlalchemy as _sa
 
 from sqlalchemy import (Column, ForeignKey, Integer, String, Float, Boolean, DateTime, Date, LargeBinary,
@@ -30,93 +39,40 @@ __all__ = ["DeclarativeBase", "Mapped", "mapped_column", "relationship", "Sessio
            "declarative_base", "registry", "selectinload", "joinedload", "subqueryload", "lazyload",
            "aliased"]
 
-_PY_TYPES = {int: Integer, str: String, float: Float, bool: Boolean, bytes: LargeBinary,
-             _dt.datetime: DateTime, _dt.date: Date}
 _PY_NAMES = {"int": Integer, "str": String, "float": Float, "bool": Boolean, "bytes": LargeBinary,
              "datetime": DateTime, "datetime.datetime": DateTime, "date": Date, "datetime.date": Date}
 
 
-class _MappedAnnotation:
-    def __init__(self, arg):
-        self.arg = arg
+class _Unset:
+    def __repr__(self):
+        return "<unset>"
+
+
+# The value of a slot that holds nothing: never loaded, or expired.
+_UNSET = _Unset()
 
 
 class Mapped:
     def __class_getitem__(cls, item):
-        return _MappedAnnotation(item)
+        return cls
 
 
 WriteOnlyMapped = Mapped
 DynamicMapped = Mapped
 
 
-def _name_of(t):
-    if isinstance(t, str):
-        return t.strip().strip("'\"")
-    fa = getattr(t, "__forward_arg__", None)
-    if fa is not None:
-        return fa
-    return getattr(t, "__name__", None)
-
-
-def _strip(s, prefix):
-    for p in prefix:
-        if s.startswith(p + "[") and s.endswith("]"):
-            return s[len(p) + 1:-1].strip()
-    return None
-
-
-def _analyze(ann):
-    """Returns (python type or class name, optional flag, is_list) for an annotation."""
-    if isinstance(ann, _MappedAnnotation):
-        ann = ann.arg
-    elif isinstance(ann, str):
-        inner = _strip(ann.strip(), ("Mapped", "orm.Mapped", "WriteOnlyMapped", "DynamicMapped"))
-        if inner is None:
-            return None, False, False
-        ann = inner
-    if isinstance(ann, str):
-        s = ann.strip()
-        inner = _strip(s, ("Optional", "typing.Optional"))
-        if inner is not None:
-            t, _, lst = _analyze_str(inner)
-            return t, True, lst
-        if s.endswith("| None"):
-            t, _, lst = _analyze_str(s[:-6].strip())
-            return t, True, lst
-        return _analyze_str(s)
-    origin = _typing.get_origin(ann)
-    args = _typing.get_args(ann)
-    if origin is _typing.Union or (args and type(None) in args and origin is not list):
-        rest = [a for a in args if a is not type(None)]
-        t, _, lst = _analyze(rest[0]) if rest else (None, False, False)
-        return t, True, lst
-    if origin in (list, set):
-        return _name_of(args[0]) if args else None, False, True
-    return ann, False, False
-
-
-def _analyze_str(s):
-    inner = _strip(s, ("List", "list", "typing.List", "Set", "set"))
-    if inner is not None:
-        return _name_of(inner), False, True
-    return _name_of(s), False, False
-
-
-def _sql_type(pytype, tmap=None):
-    if pytype is None:
+def _sql_type(name, tmap=None):
+    if name is None:
         return None
     if tmap:
         # DeclarativeBase.type_annotation_map: {str: String(100)} is how a model
         # gives every Mapped[str] a length, which MySQL's VARCHAR demands.
+        short = name.split(".")[-1]
         for k in tmap:
-            if k is pytype or (isinstance(pytype, str) and getattr(k, "__name__", None) == pytype):
+            if getattr(k, "__name__", None) == short:
                 v = tmap[k]
                 return v() if isinstance(v, type) else v
-    if isinstance(pytype, str):
-        t = _PY_NAMES.get(pytype)
-    else:
-        t = _PY_TYPES.get(pytype)
+    t = _PY_NAMES.get(name)
     return t() if t is not None else None
 
 
@@ -151,26 +107,69 @@ def mapped_column(*args, **kw):
     return _MappedColumnSpec(args, kw)
 
 
+def _peek(obj, i):
+    """Slot ``i`` of ``obj`` without loading it: None when it holds nothing."""
+    v = obj._sa_v[i]
+    return None if v is _UNSET else v
+
+
+def _get(obj, i):
+    """Slot ``i`` of ``obj``, reloading the row first when it is expired."""
+    v = obj._sa_v[i]
+    if v is not _UNSET:
+        return v
+    st = obj._sa_state
+    if st.session is not None and st.persistent:
+        st.session._load_expired(obj)
+        return _peek(obj, i)
+    return None
+
+
 class _ColumnAttr:
-    def __init__(self, key, column):
+    """A mapped column: the class reads the Column, an instance reads slot ``idx``."""
+
+    def __init__(self, idx, key, pytype, optional, spec):
+        self.idx = idx
         self.key = key
-        self.column = column
+        self.pytype = pytype
+        self.optional = optional
+        self.spec = spec
+        self.column = None
+
+    def _build(self, owner, tmap):
+        spec = self.spec
+        if isinstance(spec, _MappedColumnSpec):
+            col = spec._make(self.key, self.pytype, self.optional, tmap)
+        elif isinstance(spec, Column):
+            col = spec
+            if col.name is None:
+                col.name = col.key = self.key
+        else:
+            t = _sql_type(self.pytype, tmap)
+            if t is None:
+                raise exc.ArgumentError("Could not locate SQLAlchemy type for %s.%s" % (owner.__name__, self.key))
+            col = Column(self.key, t, nullable=self.optional)
+        self.column = col
+        return col
 
     def __get__(self, obj, owner=None):
         if obj is None:
             return self.column
-        d = obj.__dict__
-        if self.key in d:
-            return d[self.key]
-        st = d.get("_sa_state")
-        if st is not None and st.session is not None and st.persistent:
-            st.session._load_expired(obj)
-            # obj.__dict__ may be a snapshot taken when read: read it again after the load.
-            return obj.__dict__.get(self.key)
-        return None
+        return _get(obj, self.idx)
 
     def __set__(self, obj, value):
-        obj.__dict__[self.key] = value
+        obj._sa_v[self.idx] = value
+
+
+def _sa_col(idx, key, pytype, optional, spec):
+    return _ColumnAttr(idx, key, pytype, optional, spec)
+
+
+class _Thunk:
+    """A value the build wrote as a deferred expression (``order_by="Book.id"``)."""
+
+    def __init__(self, fn):
+        self.fn = fn
 
 
 _ONETOMANY = "ONETOMANY"
@@ -219,7 +218,7 @@ class InstrumentedList:
     def _removed(self, x):
         self._prop._back_set(self._owner, x, False)
         if self._prop.delete_orphan:
-            sess = _state(self._owner).session
+            sess = self._owner._sa_state.session
             if sess is not None:
                 sess._orphans.append((x, self._prop))
 
@@ -260,6 +259,9 @@ class RelationshipProperty:
     def __init__(self, argument=None, back_populates=None, uselist=None, lazy="select", order_by=None,
                  foreign_keys=None, cascade=None, backref=None, viewonly=False, secondary=None,
                  passive_deletes=False, **kw):
+        if backref is not None:
+            raise exc.ArgumentError("relationship(backref=...) is not supported; declare both sides"
+                                    " with back_populates")
         self.argument = argument
         self.back_populates = back_populates
         self.uselist = uselist
@@ -274,35 +276,26 @@ class RelationshipProperty:
         self.cascade_delete = "delete" in parts
         self.delete_orphan = "delete-orphan" in parts
         self.key = None
+        self.idx = -1
         self.parent = None
-        self._target_name = None
+        self._target_fn = None
         self._list_ann = None
-        self._ann = None
+        self._back = None
         self._ready = False
 
     def _setup(self):
         if self._ready:
             return
-        arg = self.argument
-        if arg is None:
-            arg = self._target_name
-        if callable(arg) and not isinstance(arg, type):
-            arg = arg()
-        if isinstance(arg, str):
-            arg = self.parent._sa_registry[arg]
+        arg = self._target_fn()
         self.target = arg
-        if arg is None:
-            raise exc.ArgumentError("Could not determine the target class of relationship %s.%s (%r)"
-                                    % (self.parent.__name__ if self.parent is not None else None, self.key,
-                                       self._ann))
         pt = self.parent.__table__
         tt = arg.__table__
         self.direction = None
         sec = self.secondary
         if isinstance(sec, str):
             sec = self.parent.metadata.tables[sec]
-        elif sec is not None and not isinstance(sec, Table) and callable(sec):
-            sec = sec()
+        elif isinstance(sec, _Thunk):
+            sec = sec.fn()
         self.secondary = sec
         if sec is not None:
             self.sec_local = None
@@ -334,18 +327,21 @@ class RelationshipProperty:
         if self.direction is None:
             raise exc.ArgumentError("Could not determine join condition for relationship %s.%s"
                                     % (self.parent.__name__, self.key))
-        if isinstance(self.order_by, str):
-            cname, aname = self.order_by.split(".")
-            self.order_by = getattr(self.parent._sa_registry[cname], aname)
+        if isinstance(self.order_by, _Thunk):
+            self.order_by = self.order_by.fn()
         if self.uselist is None:
             self.uselist = self.direction != _MANYTOONE if self._list_ann is None else self._list_ann
         self._ready = True
 
     def _other(self):
         self._setup()
-        if self.back_populates:
-            return self.target.__sa_mapper__.relationships[self.back_populates]
-        return None
+        b = self._back
+        if b is not None:
+            # Its uselist is decided by its own setup: read before it, a
+            # collection side looked scalar (a fresh Author's books set to the
+            # Book itself by `Book(author=a)`).
+            b._setup()
+        return b
 
     def _join_info(self):
         self._setup()
@@ -380,18 +376,18 @@ class RelationshipProperty:
     def __get__(self, obj, owner=None):
         if obj is None:
             return self
-        d = obj.__dict__
-        if self.key in d:
-            return d[self.key]
+        v = obj._sa_v[self.idx]
+        if v is not _UNSET:
+            return v
         self._setup()
-        st = d.get("_sa_state")
-        if st is not None and st.session is not None and st.persistent:
+        st = obj._sa_state
+        if st.session is not None and st.persistent:
             value = st.session._lazy_load(obj, self)
         elif self.uselist:
             value = InstrumentedList(obj, self)
         else:
             value = None
-        d[self.key] = value
+        obj._sa_v[self.idx] = value
         return value
 
     def __set__(self, obj, value):
@@ -401,24 +397,24 @@ class RelationshipProperty:
             if self.direction == _MANYTOMANY:
                 old = self.__get__(obj)
                 lst._db = list(old._db)
-            obj.__dict__[self.key] = lst
+            obj._sa_v[self.idx] = lst
             for x in value:
                 lst.append(x)
             return
-        old = obj.__dict__.get(self.key)
-        obj.__dict__[self.key] = value
+        old = _peek(obj, self.idx)
+        obj._sa_v[self.idx] = value
         other = self._other()
         if other is None:
             return
         if other.uselist:
             if old is not None and old is not value:
-                ol = old.__dict__.get(other.key)
+                ol = old._sa_v[other.idx]
                 if isinstance(ol, InstrumentedList):
                     ol._items = [i for i in ol._items if i is not obj]
             if value is not None:
-                getattr(value, other.key)._raw_add(obj)
+                other.__get__(value)._raw_add(obj)
         elif value is not None:
-            value.__dict__[other.key] = obj
+            value._sa_v[other.idx] = obj
 
     def _back_set(self, owner, child, add):
         """``child`` was added to or removed from ``owner``'s collection: update the other side."""
@@ -426,19 +422,34 @@ class RelationshipProperty:
         if other is None:
             return
         if self.direction == _MANYTOMANY:
-            lst = child.__dict__.get(other.key)
+            lst = child._sa_v[other.idx]
             if add:
-                if lst is None:
-                    lst = getattr(child, other.key)
+                if not isinstance(lst, InstrumentedList):
+                    lst = other.__get__(child)
                 lst._raw_add(owner)
-            elif lst is not None:
+            elif isinstance(lst, InstrumentedList):
                 lst._raw_remove(owner)
             return
-        child.__dict__[other.key] = owner if add else None
+        child._sa_v[other.idx] = owner if add else None
 
 
 def relationship(argument=None, **kw):
     return RelationshipProperty(argument, **kw)
+
+
+def _sa_rel(idx, key, target, is_list, rel):
+    """The build's form of a relationship: ``target`` returns the class it names."""
+    rel.idx = idx
+    rel.key = key
+    rel._target_fn = target
+    rel._list_ann = is_list
+    return rel
+
+
+def _sa_pair(a, b):
+    """Links two relationships that name each other in back_populates."""
+    a._back = b
+    b._back = a
 
 
 class _LoaderOption:
@@ -477,9 +488,11 @@ class AliasedClass:
                      from_=self.alias, key=self.alias.name)
 
     def __getattr__(self, name):
+        # The mapped attributes are data here: a list of (key, column) the
+        # mapper holds, compared by value, never an attribute lookup.
         if name.startswith("_"):
             raise AttributeError(name)
-        for k, c in self._m.attrs:
+        for k, c, i in self._m.attrs:
             if k == name:
                 return self.alias.corresponding_column(c)
         raise AttributeError(name)
@@ -493,16 +506,12 @@ class _State:
     def __init__(self):
         self.session = None
         self.persistent = False
+        # Slot number -> the value the database last held.
         self.snapshot = {}
 
 
 def _state(obj):
-    d = obj.__dict__
-    st = d.get("_sa_state")
-    if st is None:
-        st = _State()
-        d["_sa_state"] = st
-    return st
+    return obj._sa_state
 
 
 class Mapper:
@@ -510,8 +519,9 @@ class Mapper:
         args = args or {}
         self.class_ = cls
         self.table = table
+        # (key, column, slot number) for every mapped column, the inherited ones first.
         self.attrs = attrs
-        self.columns = [c for k, c in attrs]
+        self.columns = [c for k, c, i in attrs]
         self.relationships = relationships
         self.inherits = inherits
         self.base = inherits.base if inherits is not None else self
@@ -522,7 +532,7 @@ class Mapper:
             self.pk = inherits.pk
             self.tables = list(inherits.tables)
         else:
-            self.pk = [(k, c) for k, c in attrs if c.primary_key]
+            self.pk = [(k, c, i) for k, c, i in attrs if c.primary_key]
             self.tables = []
         if not any(t is table for t in self.tables):
             self.tables.append(table)
@@ -549,23 +559,14 @@ class Mapper:
         return self.polymorphic_on.in_(ids)
 
     def _identity(self, obj):
-        return tuple(obj.__dict__.get(k) for k, c in self.pk)
-
-    def _populate(self, obj, values):
-        d = obj.__dict__
-        st = _state(obj)
-        for i in range(len(self.attrs)):
-            k, c = self.attrs[i]
-            v = c.type.result(values[i])
-            d[k] = v
-            st.snapshot[k] = v
+        return tuple(_peek(obj, i) for k, c, i in self.pk)
 
     def _load_row(self, session, values, cols=None):
         if cols is None:
             cols = self.columns
         origs = [getattr(c, "_proxied", c) for c in cols]
         ident = []
-        for k, pc in self.pk:
+        for k, pc, pi in self.pk:
             for i in range(len(origs)):
                 if origs[i] is pc:
                     ident.append(values[i])
@@ -583,14 +584,15 @@ class Mapper:
         fresh = obj is None
         if fresh:
             obj = m.class_.__new__(m.class_)
-        st = _state(obj)
-        d = obj.__dict__
+            obj._sa_alloc()
+        st = obj._sa_state
+        sv = obj._sa_v
         for i in range(len(origs)):
-            k = _attr_key(m, origs[i])
-            if fresh or k not in d:
+            j = _attr_idx(m, origs[i])
+            if fresh or sv[j] is _UNSET:
                 v = origs[i].type.result(values[i])
-                d[k] = v
-                st.snapshot[k] = v
+                sv[j] = v
+                st.snapshot[j] = v
         if fresh and session is not None:
             st.session = session
             st.persistent = True
@@ -598,126 +600,95 @@ class Mapper:
         return obj
 
 
-class DeclarativeMeta(type):
-    def __new__(mcs, name, bases, ns, **kw):
-        cls = type.__new__(mcs, name, bases, ns)
-        if ns.get("_sa_root"):
-            return cls
-        if not any(b.__dict__.get("_sa_registry") is not None for b in cls.__mro__[1:]) \
-                or "_sa_registry" in ns:
-            if "metadata" not in ns:
-                cls.metadata = MetaData()
-            cls._sa_registry = {}
-            cls.registry = cls._sa_registry
-            return cls
-        parent = getattr(cls, "__sa_mapper__", None)
-        if parent is None and "__tablename__" not in ns and "__table__" not in ns:
-            return cls
-        _map_class(cls, ns, parent)
-        return cls
-
-
-def _map_class(cls, ns, parent=None):
-    ann = ns.get("__annotations__", {})
-    tmap = getattr(cls, "type_annotation_map", None)
+def _map_class(cls):
+    """What the metaclass did, from the literal tables the build wrote into ``cls``."""
+    pcls = cls.__cn1_sa_parent__
+    parent = pcls.__sa_mapper__ if pcls is not None else None
+    tmap = cls.type_annotation_map
     attrs = []
+    for a in cls.__cn1_sa_cols__:
+        attrs.append((a.key, a._build(cls, tmap), a.idx))
     rels = {}
-    specs = []
-    for key in ann:
-        a = ann[key]
-        v = ns.get(key)
-        if isinstance(v, RelationshipProperty):
-            pyt, optional, is_list = _analyze(a)
-            v._target_name = pyt if isinstance(pyt, str) else _name_of(pyt)
-            v._list_ann = is_list if pyt is not None else None
-            v._ann = a
-            v.key = key
-            v.parent = cls
-            rels[key] = v
-            continue
-        pyt, optional, is_list = _analyze(a)
-        if isinstance(v, _MappedColumnSpec):
-            col = v._make(key, pyt, optional, tmap)
-            specs.append((v, col))
-        elif isinstance(v, Column):
-            col = v
-            if col.name is None:
-                col.name = col.key = key
-        elif v is None and (isinstance(a, _MappedAnnotation) or (isinstance(a, str) and "Mapped" in a)):
-            t = _sql_type(pyt, tmap)
-            if t is None:
-                raise exc.ArgumentError("Could not locate SQLAlchemy type for %s.%s" % (cls.__name__, key))
-            col = Column(key, t, nullable=optional)
-        else:
-            continue
-        attrs.append((key, col))
-    for key in ns:
-        v = ns[key]
-        if key not in ann:
-            if isinstance(v, _MappedColumnSpec):
-                col = v._make(key, None, False)
-                specs.append((v, col))
-                attrs.append((key, col))
-            elif isinstance(v, Column):
-                if v.name is None:
-                    v.name = v.key = key
-                attrs.append((key, v))
-            elif isinstance(v, RelationshipProperty):
-                v.key = key
-                v.parent = cls
-                rels[key] = v
-    args = dict(ns.get("__mapper_args__", {}))
+    for r in cls.__cn1_sa_rels__:
+        r.parent = cls
+        rels[r.key] = r
+    margs = cls.__cn1_sa_args__
+    args = dict(margs) if margs is not None else {}
+    tablename = cls.__cn1_sa_table__
     inherit_cols = []
-    own = [k for k, c in attrs]
     if parent is None:
-        table = Table(cls.__tablename__, cls.metadata, *[c for k, c in attrs])
+        table = Table(tablename, cls.metadata, *[c for k, c, i in attrs])
         all_attrs = attrs
         all_rels = rels
     else:
         all_rels = dict(parent.relationships)
         all_rels.update(rels)
-        if "__tablename__" not in ns and "__table__" not in ns:
+        if tablename is None:
             # Single-table inheritance: the subclass's columns join the parent's table.
             table = parent.table
-            for k, c in attrs:
+            for k, c, i in attrs:
                 c.table = table
                 table.c._add(c)
             all_attrs = parent.attrs + attrs
         else:
-            table = Table(ns["__tablename__"], cls.metadata, *[c for k, c in attrs])
-            pkeys = [k for k, c in parent.attrs]
-            for k, c in attrs:
-                for pk_, pc in parent.attrs:
+            table = Table(tablename, cls.metadata, *[c for k, c, i in attrs])
+            pkeys = [k for k, c, i in parent.attrs]
+            for k, c, i in attrs:
+                for pk_, pc, pi in parent.attrs:
                     if k == pk_:
                         inherit_cols.append((c, pc))
-            all_attrs = parent.attrs + [(k, c) for k, c in attrs if k not in pkeys]
+            all_attrs = parent.attrs + [(k, c, i) for k, c, i in attrs if k not in pkeys]
     on = args.get("polymorphic_on")
     if on is not None:
         if isinstance(on, str):
-            on = [c for k, c in all_attrs if k == on][0]
-        elif isinstance(on, _MappedColumnSpec):
-            on = [c for sp, c in specs if sp is on][0]
+            on = [c for k, c, i in all_attrs if k == on][0]
         elif isinstance(on, _ColumnAttr):
             on = on.column
+        elif isinstance(on, _MappedColumnSpec):
+            on = [a.column for a in cls.__cn1_sa_cols__ if a.spec is on][0]
         args["polymorphic_on"] = on
     cls.__table__ = table
     cls.__sa_mapper__ = Mapper(cls, table, all_attrs, all_rels, parent, args, inherit_cols)
-    for k, c in all_attrs:
-        if k in own:
-            setattr(cls, k, _ColumnAttr(k, c))
-    cls._sa_registry[cls.__name__] = cls
 
 
-class DeclarativeBase(metaclass=DeclarativeMeta):
-    _sa_root = True
+class DeclarativeBase:
+    metadata = None
+    type_annotation_map = None
+    __table__ = None
+    __sa_mapper__ = None
+    # The tables SqlAlchemyLowering writes into every mapped class.
+    __cn1_sa_cols__ = ()
+    __cn1_sa_rels__ = ()
+    __cn1_sa_parent__ = None
+    __cn1_sa_table__ = None
+    __cn1_sa_args__ = None
+    __cn1_sa_nslots__ = 0
 
     def __init__(self, **kw):
-        m = type(self).__sa_mapper__
-        _state(self)
+        self._sa_new()
+        self.__cn1_sa_kw__(kw)
         for k in kw:
-            if not any(k == a for a, c in m.attrs) and k not in m.relationships:
-                raise TypeError("%r is an invalid keyword argument for %s" % (k, type(self).__name__))
-            setattr(self, k, kw[k])
+            raise TypeError("%r is an invalid keyword argument for %s" % (k, type(self).__name__))
+
+    def _sa_new(self):
+        # The start of every constructor: the keyword one above, and the
+        # keyword-only __init__ the build writes into each model.
+        if type(self).__sa_mapper__ is None:
+            raise exc.InvalidRequestError("class %s was not mapped at build time: a model must be defined at"
+                                          " module level, deriving from a DeclarativeBase subclass of the same"
+                                          " module" % type(self).__name__)
+        self._sa_alloc()
+
+    def _sa_alloc(self):
+        self._sa_v = [_UNSET] * self.__cn1_sa_nslots__
+        self._sa_state = _State()
+
+    def __cn1_sa_kw__(self, kw):
+        pass
+
+    @classmethod
+    def __cn1_sa_map__(cls):
+        _map_class(cls)
 
     def __repr__(self):
         m = type(self).__sa_mapper__
@@ -732,10 +703,8 @@ class MappedAsDataclass:
 
 
 def declarative_base(metadata=None):
-    ns = {"_sa_registry": {}}
-    if metadata is not None:
-        ns["metadata"] = metadata
-    return DeclarativeMeta("Base", (DeclarativeBase,), ns)
+    raise exc.InvalidRequestError("declarative_base() is compiled by the build: assign it to a name at"
+                                  " module level (Base = declarative_base())")
 
 
 class _SessionTx:
@@ -790,13 +759,13 @@ class Session:
 
     def expunge_all(self):
         for obj in list(self._identity.values()) + self._new:
-            _state(obj).session = None
+            obj._sa_state.session = None
         self._identity = {}
         self._new = []
         self._deleted = []
 
     def expunge(self, obj):
-        st = _state(obj)
+        st = obj._sa_state
         st.session = None
         self._new = [o for o in self._new if o is not obj]
         for k in list(self._identity):
@@ -805,7 +774,7 @@ class Session:
 
     # -- unit of work
     def add(self, obj, _warn=True):
-        st = _state(obj)
+        st = obj._sa_state
         if st.persistent and st.session is self:
             return
         if any(o is obj for o in self._new):
@@ -821,7 +790,7 @@ class Session:
     def _cascade(self, obj):
         m = type(obj).__sa_mapper__
         for key in m.relationships:
-            v = obj.__dict__.get(key)
+            v = _peek(obj, m.relationships[key].idx)
             if v is None:
                 continue
             if isinstance(v, InstrumentedList):
@@ -831,13 +800,13 @@ class Session:
                 self._cascade_one(v)
 
     def _cascade_one(self, x):
-        st = _state(x)
+        st = x._sa_state
         if st.persistent and st.session is self:
             return
         self.add(x)
 
     def delete(self, obj):
-        st = _state(obj)
+        st = obj._sa_state
         if not st.persistent:
             self._new = [o for o in self._new if o is not obj]
             return
@@ -850,26 +819,26 @@ class Session:
             rel._setup()
             if rel.direction != _ONETOMANY:
                 continue
-            if key not in obj.__dict__ and rel.passive_deletes:
+            if obj._sa_v[rel.idx] is _UNSET and rel.passive_deletes:
                 # The database's ON DELETE takes care of rows that were never loaded.
                 continue
-            v = getattr(obj, key)
+            v = rel.__get__(obj)
             if isinstance(v, InstrumentedList):
                 children = list(v._items)
             else:
                 children = [] if v is None else [v]
             other = rel._other()
-            rk = _attr_key(rel.target.__sa_mapper__, rel.remote)
+            rk = _attr_idx(rel.target.__sa_mapper__, rel.remote)
             for c in children:
                 if rel.cascade_delete:
                     self.delete(c)
                 else:
-                    c.__dict__[rk] = None
+                    c._sa_v[rk] = None
                     if other is not None:
-                        c.__dict__[other.key] = None
+                        c._sa_v[other.idx] = None
 
     def __contains__(self, obj):
-        st = _state(obj)
+        st = obj._sa_state
         return st.session is self
 
     def _sync(self, obj):
@@ -877,16 +846,16 @@ class Session:
         for key in m.relationships:
             rel = m.relationships[key]
             rel._setup()
-            v = obj.__dict__.get(key)
+            v = _peek(obj, rel.idx)
             if v is None:
                 continue
             if rel.direction == _MANYTOONE and not isinstance(v, InstrumentedList):
-                obj.__dict__[_attr_key(m, rel.local)] = v.__dict__.get(_attr_key(rel.target.__sa_mapper__, rel.remote))
+                obj._sa_v[_attr_idx(m, rel.local)] = _peek(v, _attr_idx(rel.target.__sa_mapper__, rel.remote))
             elif rel.direction == _ONETOMANY and isinstance(v, InstrumentedList):
-                pk = obj.__dict__.get(_attr_key(m, rel.local))
+                pk = _peek(obj, _attr_idx(m, rel.local))
                 tm = rel.target.__sa_mapper__
                 for child in v._items:
-                    child.__dict__[_attr_key(tm, rel.remote)] = pk
+                    child._sa_v[_attr_idx(tm, rel.remote)] = pk
 
     def _is_deleted(self, obj):
         return any(o is obj for o in self._deleted)
@@ -896,7 +865,7 @@ class Session:
         self._orphans = []
         for x, prop in orphans:
             other = prop._other()
-            if other is not None and x.__dict__.get(other.key) is not None:
+            if other is not None and _peek(x, other.idx) is not None:
                 continue
             self.delete(x)
         for obj in list(self._identity.values()):
@@ -941,13 +910,13 @@ class Session:
                 rel._setup()
                 if rel.direction == _MANYTOMANY:
                     conn.execute(rel.secondary.delete().where(
-                        rel.sec_local == obj.__dict__.get(_attr_key(m, rel.local))))
+                        rel.sec_local == _peek(obj, _attr_idx(m, rel.local))))
             for t in reversed(m.tables):
                 conn.execute(t.delete().where(*self._pk_where(m, t, obj)))
             key = (m.identity_class, m._identity(obj))
             if key in self._identity:
                 del self._identity[key]
-            _state(obj).persistent = False
+            obj._sa_state.persistent = False
             self._tx_deleted.append(obj)
 
     def _sync_m2m(self, conn, obj, done):
@@ -957,10 +926,10 @@ class Session:
             rel._setup()
             if rel.direction != _MANYTOMANY:
                 continue
-            lst = obj.__dict__.get(key)
+            lst = obj._sa_v[rel.idx]
             if not isinstance(lst, InstrumentedList):
                 continue
-            mine = obj.__dict__.get(_attr_key(m, rel.local))
+            mine = _peek(obj, _attr_idx(m, rel.local))
             for x in lst._items:
                 if not any(x is y for y in lst._db):
                     self._assoc(conn, rel, mine, x, True, done)
@@ -970,7 +939,7 @@ class Session:
             lst._db = list(lst._items)
 
     def _assoc(self, conn, rel, mine, other, add, done):
-        theirs = other.__dict__.get(_attr_key(rel.target.__sa_mapper__, rel.remote))
+        theirs = _peek(other, _attr_idx(rel.target.__sa_mapper__, rel.remote))
         pair = sorted([(rel.sec_local.name, mine), (rel.sec_remote.name, theirs)])
         sig = (rel.secondary.name, add, pair[0], pair[1])
         if sig in done:
@@ -982,48 +951,49 @@ class Session:
             conn.execute(rel.secondary.delete().where(rel.sec_local == mine, rel.sec_remote == theirs))
 
     def _pk_where(self, m, t, obj):
-        st = _state(obj)
-        d = obj.__dict__
+        st = obj._sa_state
         if t is m.tables[0]:
-            return [c == st.snapshot.get(k, d.get(k)) for k, c in m.pk]
+            return [c == st.snapshot.get(i, _peek(obj, i)) for k, c, i in m.pk]
         out = []
         for sub, par in m.inherit_cols:
             if sub.table is t:
-                k = _attr_key(m, par)
-                out.append(sub == st.snapshot.get(k, d.get(k)))
+                i = _attr_idx(m, par)
+                out.append(sub == st.snapshot.get(i, _peek(obj, i)))
         return out
 
     def _insert(self, conn, obj):
         m = type(obj).__sa_mapper__
-        st = _state(obj)
-        d = obj.__dict__
+        st = obj._sa_state
+        sv = obj._sa_v
         if m.polymorphic_on is not None and m.polymorphic_identity is not None:
-            dk = _attr_key(m, m.polymorphic_on)
-            if d.get(dk) is None:
-                d[dk] = m.polymorphic_identity
+            dk = _attr_idx(m, m.polymorphic_on)
+            if _peek(obj, dk) is None:
+                sv[dk] = m.polymorphic_identity
         for t in m.tables:
             values = {}
-            for k, c in m.attrs:
+            for k, c, i in m.attrs:
                 if c.table is not t:
                     continue
-                v = d.get(k)
+                present = sv[i] is not _UNSET
+                v = sv[i] if present else None
                 if v is None and c.default is not None:
                     v = c._default_value()
-                    d[k] = v
-                if v is not None or k in d:
+                    sv[i] = v
+                    present = True
+                if present:
                     values[c.key] = v
             for sub, par in m.inherit_cols:
                 if sub.table is t:
-                    values[sub.key] = d.get(_attr_key(m, par))
+                    values[sub.key] = _peek(obj, _attr_idx(m, par))
             res = conn.execute(t.insert().values(values))
             if t is m.tables[0]:
-                for k, c in m.pk:
-                    if d.get(k) is None:
-                        d[k] = res.lastrowid
-        for k, c in m.attrs:
-            if k not in d:
-                d[k] = None
-            st.snapshot[k] = d[k]
+                for k, c, i in m.pk:
+                    if _peek(obj, i) is None:
+                        sv[i] = res.lastrowid
+        for k, c, i in m.attrs:
+            if sv[i] is _UNSET:
+                sv[i] = None
+            st.snapshot[i] = sv[i]
         st.persistent = True
         st.session = self
         self._identity[(m.identity_class, m._identity(obj))] = obj
@@ -1031,23 +1001,23 @@ class Session:
 
     def _update(self, conn, obj):
         m = type(obj).__sa_mapper__
-        st = _state(obj)
-        d = obj.__dict__
+        st = obj._sa_state
+        sv = obj._sa_v
         changed = []
-        for k, c in m.attrs:
-            if k in d and (k not in st.snapshot or st.snapshot[k] != d[k]):
-                changed.append((k, c))
+        for k, c, i in m.attrs:
+            if sv[i] is not _UNSET and (i not in st.snapshot or st.snapshot[i] != sv[i]):
+                changed.append((c, i))
         if not changed:
             return
         for t in m.tables:
             ch = {}
-            for k, c in changed:
+            for c, i in changed:
                 if c.table is t:
-                    ch[c.key] = d[k]
+                    ch[c.key] = sv[i]
             if ch:
                 conn.execute(t.update().where(*self._pk_where(m, t, obj)).values(ch))
-        for k, c in changed:
-            st.snapshot[k] = d[k]
+        for c, i in changed:
+            st.snapshot[i] = sv[i]
 
     def commit(self):
         self.flush()
@@ -1066,19 +1036,19 @@ class Session:
             key = (m.identity_class, m._identity(obj))
             if self._identity.get(key) is obj:
                 del self._identity[key]
-            st = _state(obj)
+            st = obj._sa_state
             st.persistent = False
             st.session = None
-            for k, c in m.pk:
+            for k, c, i in m.pk:
                 if c.autoincrement and isinstance(c.type, Integer):
-                    obj.__dict__[k] = None
+                    obj._sa_v[i] = None
         for obj in self._tx_deleted:
-            st = _state(obj)
+            st = obj._sa_state
             st.persistent = True
             m = type(obj).__sa_mapper__
             self._identity[(m.identity_class, m._identity(obj))] = obj
         for obj in self._new:
-            _state(obj).session = None
+            obj._sa_state.session = None
         self._new = []
         self._deleted = []
         self._orphans = []
@@ -1092,16 +1062,14 @@ class Session:
 
     def expire(self, obj, attribute_names=None):
         m = type(obj).__sa_mapper__
-        d = obj.__dict__
-        pk = [k for k, c in m.pk]
-        for k, c in m.attrs:
+        sv = obj._sa_v
+        pk = [k for k, c, i in m.pk]
+        for k, c, i in m.attrs:
             if k not in pk and (attribute_names is None or k in attribute_names):
-                if k in d:
-                    del d[k]
+                sv[i] = _UNSET
         for k in m.relationships:
             if attribute_names is None or k in attribute_names:
-                if k in d:
-                    del d[k]
+                sv[m.relationships[k].idx] = _UNSET
 
     def refresh(self, obj, attribute_names=None):
         self.expire(obj, attribute_names)
@@ -1109,24 +1077,24 @@ class Session:
 
     def _load_expired(self, obj):
         m = type(obj).__sa_mapper__
-        st = _state(obj)
-        where = [c == st.snapshot.get(k, obj.__dict__.get(k)) for k, c in m.pk]
+        st = obj._sa_state
+        where = [c == st.snapshot.get(i, _peek(obj, i)) for k, c, i in m.pk]
         stmt = select(*m.columns).select_from(m.local_from).where(*where)
         row = stmt._execute_on(self.connection(), None).first()
         if row is None:
             raise exc.InvalidRequestError("Instance has been deleted, or its row is otherwise not present.")
-        d = obj.__dict__
-        for i in range(len(m.attrs)):
-            k = m.attrs[i][0]
-            d[k] = row[i]
-            st.snapshot[k] = row[i]
+        sv = obj._sa_v
+        for j in range(len(m.attrs)):
+            i = m.attrs[j][2]
+            sv[i] = row[j]
+            st.snapshot[i] = row[j]
 
     def _lazy_load(self, obj, rel):
         m = type(obj).__sa_mapper__
         tm = rel.target.__sa_mapper__
         if rel.direction == _MANYTOMANY:
             lst = InstrumentedList(obj, rel)
-            pk = getattr(obj, _attr_key(m, rel.local))
+            pk = _get(obj, _attr_idx(m, rel.local))
             stmt = select(rel.target).select_from(tm.local_from, rel.secondary).where(
                 rel.sec_local == pk, rel.remote == rel.sec_remote)
             if rel.order_by is not None:
@@ -1137,7 +1105,7 @@ class Session:
             return lst
         if rel.direction == _ONETOMANY:
             lst = InstrumentedList(obj, rel)
-            pk = getattr(obj, _attr_key(m, rel.local))
+            pk = _get(obj, _attr_idx(m, rel.local))
             stmt = select(rel.target).where(rel.remote == pk)
             if rel.order_by is not None:
                 stmt = stmt.order_by(rel.order_by)
@@ -1146,7 +1114,7 @@ class Session:
             if rel.uselist:
                 return lst
             return lst._items[0] if lst._items else None
-        fk = getattr(obj, _attr_key(m, rel.local))
+        fk = _get(obj, _attr_idx(m, rel.local))
         if fk is None:
             return None
         key = (tm.identity_class, (fk,))
@@ -1198,17 +1166,17 @@ class Session:
         rel._setup()
         todo = []
         for o in objs:
-            if o is not None and rel.key not in o.__dict__ and not any(o is x for x in todo):
+            if o is not None and o._sa_v[rel.idx] is _UNSET and not any(o is x for x in todo):
                 todo.append(o)
         if not todo:
             return
         tm = rel.target.__sa_mapper__
         if rel.direction == _MANYTOMANY:
             for o in todo:
-                o.__dict__[rel.key] = self._lazy_load(o, rel)
+                o._sa_v[rel.idx] = self._lazy_load(o, rel)
             return
-        rk = _attr_key(tm, rel.remote)
-        keys = [o.__dict__.get(_attr_key(type(o).__sa_mapper__, rel.local)) for o in todo]
+        rk = _attr_idx(tm, rel.remote)
+        keys = [_peek(o, _attr_idx(type(o).__sa_mapper__, rel.local)) for o in todo]
         wanted = []
         for k in keys:
             if k is not None and k not in wanted:
@@ -1219,7 +1187,7 @@ class Session:
             if rel.direction == _ONETOMANY and rel.order_by is not None:
                 stmt = stmt.order_by(rel.order_by)
             for x in stmt._execute_on(self.connection(), None, self).scalars():
-                k = x.__dict__.get(rk)
+                k = _peek(x, rk)
                 if k not in groups:
                     groups[k] = []
                 groups[k].append(x)
@@ -1229,9 +1197,9 @@ class Session:
             if rel.direction == _ONETOMANY:
                 lst = InstrumentedList(o, rel)
                 lst._items = list(found)
-                o.__dict__[rel.key] = lst if rel.uselist else (found[0] if found else None)
+                o._sa_v[rel.idx] = lst if rel.uselist else (found[0] if found else None)
             else:
-                o.__dict__[rel.key] = found[0] if found else None
+                o._sa_v[rel.idx] = found[0] if found else None
 
     # -- queries
     def _autoflush(self):
@@ -1251,7 +1219,7 @@ class Session:
     def get(self, entity, ident, **kw):
         m = entity.__sa_mapper__
         if isinstance(ident, dict):
-            ident = tuple(ident[k] for k, c in m.pk)
+            ident = tuple(ident[k] for k, c, i in m.pk)
         if not isinstance(ident, tuple):
             ident = (ident,)
         obj = self._identity.get((m.identity_class, ident))
@@ -1282,20 +1250,25 @@ class Session:
     def dirty(self):
         out = []
         for obj in self._identity.values():
-            st = _state(obj)
+            st = obj._sa_state
             m = type(obj).__sa_mapper__
-            for k, c in m.attrs:
-                if k in obj.__dict__ and k in st.snapshot and st.snapshot[k] != obj.__dict__[k]:
+            for k, c, i in m.attrs:
+                if obj._sa_v[i] is not _UNSET and i in st.snapshot and st.snapshot[i] != obj._sa_v[i]:
                     out.append(obj)
                     break
         return out
 
 
-def _attr_key(mapper, col):
-    for k, c in mapper.attrs:
+def _attr_idx(mapper, col):
+    """The slot of ``col`` in ``mapper``'s instances; a joined-inheritance subclass's own
+    copy of an inherited key (its primary key) shares the inherited slot."""
+    for k, c, i in mapper.attrs:
         if c is col:
-            return k
-    return col.key
+            return i
+    for k, c, i in mapper.attrs:
+        if k == col.key:
+            return i
+    raise exc.InvalidRequestError("Column %s is not mapped by %s" % (col.key, mapper.class_.__name__))
 
 
 class sessionmaker:
@@ -1313,4 +1286,4 @@ class sessionmaker:
 
 
 def registry():
-    return {}
+    raise exc.InvalidRequestError("registry() is not supported; derive the base from DeclarativeBase")

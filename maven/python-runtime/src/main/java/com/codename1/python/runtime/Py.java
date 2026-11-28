@@ -231,6 +231,15 @@ public final class Py {
     }
 
     public static PyType typeOf(Object o) {
+        // Asked first and answered here: isinstance, method lookup and every
+        // builtin's receiver check come through this, and going by way of
+        // obj() was a second call, frame and guard per ask.
+        if (o instanceof PyInstance) {
+            return ((PyInstance) o).cls;
+        }
+        if (o instanceof PyObject) {
+            return ((PyObject) o).type();
+        }
         if (o instanceof Long) {
             return INT_TYPE;
         }
@@ -287,6 +296,10 @@ public final class Py {
         if (o instanceof String) {
             return o.hashCode();
         }
+        if (o instanceof Double) {
+            // The boxed value is the float object: a NaN hashes by it.
+            return Hashing.ofDouble(((Double) o).doubleValue(), o);
+        }
         return obj(o).hash();
     }
 
@@ -306,6 +319,9 @@ public final class Py {
         }
         if (o instanceof String) {
             return o.hashCode();
+        }
+        if (o instanceof Double) {
+            return Hashing.ofDouble(((Double) o).doubleValue(), o);
         }
         return keyHashSlow(o, role);
     }
@@ -329,6 +345,118 @@ public final class Py {
     public static Object len(Object f, Object o) {
         if (f == Builtins.LEN) { //NOPMD CompareObjectsWithEquals - identity is meant
             return PyInt.of(len(o));
+        }
+        return call(f, o);
+    }
+
+    /// `ord(o)` where the name may still be rebound: the builtin's answer
+    /// with no dispatch through its function object when `f` is the builtin.
+    public static Object ord(Object f, Object o) {
+        if (f == Builtins.ORD) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return Builtins.ord(o);
+        }
+        return call(f, o);
+    }
+
+    /// `isinstance(o, t)` where the name may still be rebound: the builtin's
+    /// answer without its argument array when `f` is the builtin.
+    public static Object isinstance(Object f, Object o, Object t) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, t));
+        }
+        return call(f, o, t);
+    }
+
+    /// `isinstance(o, (a, b))` with the tuple written out: the builtin checks
+    /// each type in turn without the tuple being built; anything else that
+    /// is bound to the name gets the tuple.
+    public static Object isinstanceAny(Object f, Object o, Object a, Object b) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b));
+        }
+        return call(f, o, tuple(a, b));
+    }
+
+    public static Object isinstanceAny(Object f, Object o, Object a, Object b, Object c) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c));
+        }
+        return call(f, o, tuple(a, b, c));
+    }
+
+    public static Object isinstanceAny(Object f, Object o, Object a, Object b, Object c, Object d) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d));
+        }
+        return call(f, o, tuple(a, b, c, d));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e));
+        }
+        return call(fn, o, tuple(a, b, c, d, e));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e, Object f) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e) || isinstance(o, f));
+        }
+        return call(fn, o, tuple(a, b, c, d, e, f));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e) || isinstance(o, f) || isinstance(o, g));
+        }
+        return call(fn, o, tuple(a, b, c, d, e, f, g));
+    }
+
+    public static Object isinstanceAny(Object fn, Object o, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        if (fn == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            return bool(isinstance(o, a) || isinstance(o, b) || isinstance(o, c) || isinstance(o, d) || isinstance(o, e) || isinstance(o, f) || isinstance(o, g) || isinstance(o, h));
+        }
+        return call(fn, o, tuple(a, b, c, d, e, f, g, h));
+    }
+
+    /// `x in (a, b, ...)` with the tuple written out: each item is compared
+    /// in turn, identity first as a tuple's `__contains__` does, and no tuple
+    /// is built.
+    public static boolean inOf(Object x, Object a, Object b) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e, Object f) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x) || f == x || eqBool(f, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x) || f == x || eqBool(f, x) || g == x || eqBool(g, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    public static boolean inOf(Object x, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return a == x || eqBool(a, x) || b == x || eqBool(b, x) || c == x || eqBool(c, x) || d == x || eqBool(d, x) || e == x || eqBool(e, x) || f == x || eqBool(f, x) || g == x || eqBool(g, x) || h == x || eqBool(h, x); //NOPMD CompareObjectsWithEquals - identity first, as a tuple compares
+    }
+
+    /// `dict(o)`, as [#isinstance(Object, Object, Object)]: a copy of a dict
+    /// made straight from it.
+    public static Object dict1(Object f, Object o) {
+        if (f == DICT_TYPE && o instanceof PyDict) { //NOPMD CompareObjectsWithEquals - identity is meant
+            PyDict d = new PyDict();
+            d.update(o);
+            return d;
         }
         return call(f, o);
     }
@@ -421,8 +549,45 @@ public final class Py {
 
     /// Instantiates exception type `t` with `msg` and wraps it for `throw`.
     public static PyException error(PyType t, String msg) {
+        if (t.plainException()) {
+            // What BaseException's __new__ and __init__ would do, without
+            // two lookups, two argument copies and two calls a raise.
+            PyInstance e = t.newInstance();
+            e.setAttrDirect("args", new PyTuple(new Object[] {msg}));
+            return new PyException(e);
+        }
         return new PyException(t.call(new Object[] {str(msg)}, NO_KW));
     }
+
+    /// A UnicodeDecodeError with its parts, as a codec raises it.
+    static PyException decodeError(String encoding, byte[] object, int start, int end, String reason) {
+        return new PyException(UNICODE_DECODE_ERROR.call(new Object[] {str(encoding), new PyBytes(object),
+            Long.valueOf(start), Long.valueOf(end), str(reason)}, NO_KW));
+    }
+
+    /// A UnicodeEncodeError with its parts; `start`/`end` count code points.
+    static PyException encodeError(String encoding, String object, int start, int end, String reason) {
+        return new PyException(UNICODE_ENCODE_ERROR.call(new Object[] {str(encoding), str(object),
+            Long.valueOf(start), Long.valueOf(end), str(reason)}, NO_KW));
+    }
+
+    /// What a translated library's `compile` is: it answers a code object
+    /// that names its file and mode and holds nothing to run, since running
+    /// one is `eval` or `exec`, which a build refuses wherever the program
+    /// reaches them.
+    public static final PyBuiltin UNCOMPILED = new PyBuiltin("compile", (args, kwNames) -> {
+        if (args.length < 3) {
+            throw typeError("compile() missing required argument 'mode'");
+        }
+        String mode = toStr(args[2]);
+        if (!"exec".equals(mode) && !"eval".equals(mode) && !"single".equals(mode)) {
+            throw valueError("compile() mode must be 'exec', 'eval' or 'single'");
+        }
+        PyModule code = new PyModule("code", new String[0]);
+        code.setAttr("co_filename", args[1]);
+        code.setAttr("co_name", str("<module>"));
+        return code;
+    });
 
     public static PyException typeError(String m) {
         return error(TYPE_ERROR, m);
@@ -459,6 +624,14 @@ public final class Py {
     public static PyException unboundLocal(String name) {
         return error(UNBOUND_LOCAL_ERROR, "cannot access local variable '" + name
                 + "' where it is not associated with a value");
+    }
+
+    /// A closure's read of a free variable its enclosing function has not
+    /// bound (or has deleted): CPython raises NameError, not
+    /// UnboundLocalError, for it.
+    public static PyException unboundFree(String name) {
+        return error(NAME_ERROR, "cannot access free variable '" + name
+                + "' where it is not associated with a value in enclosing scope");
     }
 
     public static PyException keyError(Object key) {
@@ -555,11 +728,28 @@ public final class Py {
         if (o instanceof String) {
             return ((String) o).length() != 0;
         }
-        return obj(o).isTrue();
+        if (o instanceof PyList) {
+            return ((PyList) o).size != 0;
+        }
+        // An instance (a bs4 Tag in every `if node:`) asks its class once,
+        // without the trip through obj().
+        if (o instanceof PyInstance) {
+            return ((PyInstance) o).isTrue();
+        }
+        return (o instanceof PyObject ? (PyObject) o : obj(o)).isTrue();
     }
 
     public static Object not(Object o) {
         return bool(!isTrue(o));
+    }
+
+    /// `a == lit` for a str literal: a str compares its text, anything else
+    /// (a str subclass, an object with its own `__eq__`) the generic way.
+    public static boolean eqStr(Object a, String lit) {
+        if (a instanceof String) {
+            return lit.equals(a);
+        }
+        return !(a instanceof Long) && a != Py.NONE && eqBool(a, lit); //NOPMD CompareObjectsWithEquals - identity is meant
     }
 
     public static boolean eqBool(Object a, Object b) {
@@ -613,7 +803,7 @@ public final class Py {
         if (a instanceof PyInstance) {
             Object m = Py.typeOf(a).lookup("__ne__");
             if (m != null) {
-                Object r = Py.obj(m).call(new Object[] {a, b}, NO_KW);
+                Object r = (m instanceof PyObject ? (PyObject) m : Py.obj(m)).call2(a, b);
                 if (r != NOT_IMPLEMENTED) {
                     return r;
                 }
@@ -781,7 +971,66 @@ public final class Py {
         if (a instanceof String && b instanceof String) {
             return PyStr.compare((String) a, (String) b) < 0;
         }
+        if (a instanceof PyTuple && b instanceof PyTuple) {
+            // Two tuples (a heap's or a sort key's entries) compare
+            // element-wise here, without the boxed-bool round trip through
+            // PyTuple.lt. No Java subclass overrides the comparison (a struct
+            // sequence compares as a tuple, as in CPython), and a Python
+            // subclass is a PyInstance, which takes the long way below.
+            Object[] x = ((PyTuple) a).arr();
+            Object[] y = ((PyTuple) b).arr();
+            return seqCompare(x, x.length, y, y.length) < 0;
+        }
         return isTrue(lt(a, b));
+    }
+
+    public static boolean neBool(Object a, Object b) {
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() != ((Long) b).longValue();
+        }
+        if (a instanceof String && b instanceof String) {
+            return !a.equals(b);
+        }
+        return isTrue(ne(a, b));
+    }
+
+    public static boolean leBool(Object a, Object b) {
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() <= ((Long) b).longValue();
+        }
+        if (a instanceof Double && b instanceof Double) {
+            return ((Double) a).doubleValue() <= ((Double) b).doubleValue();
+        }
+        if (a instanceof String && b instanceof String) {
+            return PyStr.compare((String) a, (String) b) <= 0;
+        }
+        return isTrue(le(a, b));
+    }
+
+    public static boolean gtBool(Object a, Object b) {
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() > ((Long) b).longValue();
+        }
+        if (a instanceof Double && b instanceof Double) {
+            return ((Double) a).doubleValue() > ((Double) b).doubleValue();
+        }
+        if (a instanceof String && b instanceof String) {
+            return PyStr.compare((String) a, (String) b) > 0;
+        }
+        return isTrue(gt(a, b));
+    }
+
+    public static boolean geBool(Object a, Object b) {
+        if (a instanceof Long && b instanceof Long) {
+            return ((Long) a).longValue() >= ((Long) b).longValue();
+        }
+        if (a instanceof Double && b instanceof Double) {
+            return ((Double) a).doubleValue() >= ((Double) b).doubleValue();
+        }
+        if (a instanceof String && b instanceof String) {
+            return PyStr.compare((String) a, (String) b) >= 0;
+        }
+        return isTrue(ge(a, b));
     }
 
     private static PyException cmpError(String op, Object a, Object b) {
@@ -805,11 +1054,26 @@ public final class Py {
     }
 
     public static Object in(Object x, Object container) {
-        return bool(Py.obj(container).contains(x));
+        return bool(contains(container, x));
+    }
+
+    /// `x in container` in a test: membership always answers a bool, so the
+    /// boxed result [#in] would make is never needed there.
+    public static boolean inBool(Object x, Object container) {
+        return contains(container, x);
     }
 
     public static Object notIn(Object x, Object container) {
-        return bool(!Py.obj(container).contains(x));
+        return bool(!contains(container, x));
+    }
+
+    /// `x in container`; a str in a str is answered without the PyStr view
+    /// Py.obj would allocate for the container.
+    private static boolean contains(Object container, Object x) {
+        if (container instanceof String && x instanceof String) {
+            return ((String) container).indexOf((String) x) >= 0;
+        }
+        return Py.obj(container).contains(x);
     }
 
     // ---- arithmetic ------------------------------------------------------
@@ -887,6 +1151,10 @@ public final class Py {
         if (r == null) {
             r = Py.obj(b).radd(a);
             if (r == null) {
+                if (a instanceof String && b instanceof PyInstance && ((PyInstance) b).base instanceof String) {
+                    // a str subclass without __radd__ concatenates as the str it carries
+                    return ((String) a).concat((String) ((PyInstance) b).base);
+                }
                 if (a instanceof String && !(b instanceof String)) {
                     throw typeError("can only concatenate str (not \"" + Py.typeOf(b).name + "\") to str");
                 }
@@ -1057,6 +1325,13 @@ public final class Py {
         if (a instanceof String) {
             return Formatting.percent((String) a, b);
         }
+        if (a instanceof PyBytes) {
+            return Formatting.percentBytes(((PyBytes) a).value, b);
+        }
+        if (a instanceof PyByteArray) {
+            PyByteArray ba = (PyByteArray) a;
+            return new PyByteArray(Formatting.percentBytes(ba.bytes(), b).value);
+        }
         if (a instanceof Long) {
             long x = ((Long) a).longValue();
             if (b instanceof Long) {
@@ -1210,6 +1485,12 @@ public final class Py {
     }
 
     /// `a += b`: the in-place method when the type has one, else `a + b`.
+    /// Answers `r`; `a` was evaluated first. A lambda the transpiler expands in
+    /// place stores its arguments this way, ahead of its body.
+    public static Object seq(Object a, Object r) {
+        return r;
+    }
+
     public static Object iadd(Object a, Object b) {
         Object r = a instanceof PyObject ? ((PyObject) a).iadd(b) : null;
         return r != null ? r : add(a, b);
@@ -1306,6 +1587,83 @@ public final class Py {
         Py.obj(o).setAttr(name, v);
     }
 
+    // ---- lookups that miss without raising -----------------------------------
+    //
+    // `try: x += obj.attr / d[key]` with one `except AttributeError` /
+    // `except KeyError` is lowered by the parser into a probe, a branch and the
+    // original try (see Parser.missProbe): the probe answers MISS instead of
+    // raising, so the common miss builds no exception and unwinds nothing.
+
+    /// A probe found nothing and ran no code while looking: re-reading is
+    /// pure, so [#unmissed] may evaluate the original expression again.
+    public static final Object MISS = new Object();
+
+    /// A probe that caught the error it stands for, raised by code that ran
+    /// (a `__getitem__`, a property): that exception is rethrown rather than
+    /// evaluating the code a second time.
+    static final class Miss {
+        final PyException error;
+
+        Miss(PyException error) {
+            this.error = error;
+        }
+    }
+
+    /// `d[key]` for the probe: [#MISS] when an exact dict lacks the key, a
+    /// [Miss] for a KeyError raised anywhere else.
+    public static Object getitemOrMiss(Object o, Object key) {
+        if (o instanceof PyDict && o.getClass() == PyDict.class) {
+            Object v = ((PyDict) o).getOrNull(key);
+            return v == null ? MISS : v;
+        }
+        try {
+            return getitem(o, key);
+        } catch (PyException e) {
+            if (e.matches(KEY_ERROR)) {
+                return new Miss(e);
+            }
+            throw e;
+        }
+    }
+
+    /// Whether the probe missed AND the handler names the builtin it was
+    /// lowered for. A module that rebinds `KeyError` takes the original try,
+    /// where [#unmissed] raises the real error for its handler to match.
+    public static boolean isMiss(Object m, Object handlerType, Object builtin) {
+        return (m == MISS || m instanceof Miss) && handlerType == builtin; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// The probed value, or the error it stands for: a [Miss] rethrows its
+    /// exception; [#MISS] answers null and the caller re-reads.
+    public static Object unmissed(Object m) {
+        if (m instanceof Miss) {
+            throw ((Miss) m).error;
+        }
+        return m == MISS ? null : m; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// `getattr(obj, name, default)` over a probe.
+    public static Object orDefault(Object m, Object dflt) {
+        return m == MISS || m instanceof Miss ? dflt : m; //NOPMD CompareObjectsWithEquals - identity is meant
+    }
+
+    /// `o["k"]` for a str literal key: an exact dict is probed directly by
+    /// the str's cached hash, without the sequence checks of [#getitem] or
+    /// its virtual `getItem`. A miss, a dict subclass and anything else take
+    /// the general path, so `__missing__` and `__getitem__` still apply.
+    public static Object getitemS(Object o, String key) {
+        if (o instanceof PyDict) {
+            PyDict d = (PyDict) o;
+            if (d.type() == DICT_TYPE) { //NOPMD CompareObjectsWithEquals - identity is meant
+                Object v = d.getStrHashed(key, key.hashCode());
+                if (v != null) {
+                    return v;
+                }
+            }
+        }
+        return getitem(o, key);
+    }
+
     public static Object getitem(Object o, Object key) {
         if (o instanceof PyList) {
             PyList l = (PyList) o;
@@ -1322,6 +1680,16 @@ public final class Py {
                 }
             }
             return l.getItem(key);
+        }
+        if (o instanceof String && key instanceof Long) {
+            // s[i] without the PyStr view Py.obj makes (an allocation per
+            // character a tokenizer reads).
+            String str = (String) o;
+            long i = ((Long) key).longValue();
+            int len = str.length();
+            if (i >= 0 && i < len && PyStr.surrogates(str) == 0) {
+                return Typed.ch(str.charAt((int) i));
+            }
         }
         return Py.obj(o).getItem(key);
     }
@@ -1367,9 +1735,9 @@ public final class Py {
                 return l.get((int) i);
             }
         } else if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
-            if (i >= 0 && i < items.length) {
-                return items[(int) i];
+            PyTuple t = (PyTuple) o;
+            if (i >= 0 && i < t.size()) {
+                return t.get((int) i);
             }
         }
         return Py.obj(o).getItem(Long.valueOf(i));
@@ -1388,10 +1756,65 @@ public final class Py {
 
     /// `o[a:b:c]`, with NONE for a missing part.
     public static Object getslice(Object o, Object a, Object b, Object c) {
+        if (o instanceof String && c == NONE && (a instanceof Long || a == NONE) //NOPMD CompareObjectsWithEquals - identity is meant
+                && (b instanceof Long || b == NONE)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            // s[a:b] of int bounds on a string without surrogate pairs, where a
+            // code point is a char: clamped as CPython clamps, and no PySlice.
+            String s = (String) o;
+            int n = s.length();
+            if (PyStr.surrogates(s) == 0) {
+                int lo = a == NONE ? 0 : clampSlice(((Long) a).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+                int hi = b == NONE ? n : clampSlice(((Long) b).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+                return hi <= lo ? "" : lo == 0 && hi == n ? s : s.substring(lo, hi);
+            }
+        }
         if (o instanceof PyList) {
             return ((PyList) o).getSlice(a, b, c);
         }
+        if (o instanceof PyBytes && c == NONE //NOPMD CompareObjectsWithEquals - identity is meant
+                && (a instanceof Long || a == NONE) && (b instanceof Long || b == NONE)) { //NOPMD CompareObjectsWithEquals - identity is meant
+            // b[a:b] of int bounds: one block copy, without a PySlice or its index array.
+            byte[] v = ((PyBytes) o).value;
+            int n = v.length;
+            int lo = a == NONE ? 0 : clampSlice(((Long) a).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+            int hi = b == NONE ? n : clampSlice(((Long) b).longValue(), n); //NOPMD CompareObjectsWithEquals - identity is meant
+            if (lo == 0 && hi == n) {
+                return o; // bytes are immutable: CPython hands back the same object
+            }
+            return PyBytes.range(v, lo, hi);
+        }
         return Py.obj(o).getItem(new PySlice(a, b, c));
+    }
+
+    /// The transpiler's lowering of `"lit %s" % (a,)`; see `Formatting.pct`.
+    /// One `%s`, `%d` or `%i` conversion of `v`, for the transpiler's
+    /// concatenation of a literal format whose values are mostly typed.
+    public static String pconv(char c, Object v) {
+        return Formatting.conv1(c, v);
+    }
+
+    public static String pct(String[] lits, String convs, Object a) {
+        return Formatting.pct(lits, convs, a);
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b) {
+        return Formatting.pct(lits, convs, a, b);
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c) {
+        return Formatting.pct(lits, convs, a, b, c);
+    }
+
+    public static String pct(String[] lits, String convs, Object a, Object b, Object c, Object d) {
+        return Formatting.pct(lits, convs, a, b, c, d);
+    }
+
+    static int clampSlice(long v, int n) {
+        if (v < 0) {
+            v += n;
+            return v < 0 ? 0 : (int) v;
+        }
+        return v > n ? n : (int) v;
     }
 
     /// `o[a:b:c]` for a local whose previous list `old` nothing else can
@@ -1464,7 +1887,7 @@ public final class Py {
             return k >= 0 && l.isFloatAt(k);
         }
         if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
+            Object[] items = ((PyTuple) o).arr();
             int k = floatIndex(i, items.length);
             return k >= 0 && items[k] instanceof Double;
         }
@@ -1477,7 +1900,7 @@ public final class Py {
             PyList l = (PyList) o;
             return l.floatAt(floatIndex(i, l.size));
         }
-        Object[] items = ((PyTuple) o).items;
+        Object[] items = ((PyTuple) o).arr();
         return ((Double) items[floatIndex(i, items.length)]).doubleValue();
     }
 
@@ -1545,14 +1968,14 @@ public final class Py {
             return v instanceof Double ? ((Double) v).doubleValue() : Double.NaN;
         }
         if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
+            PyTuple t = (PyTuple) o;
             if (k < 0) {
-                k += items.length;
+                k += t.size();
             }
-            if (k < 0 || k >= items.length) {
+            if (k < 0 || k >= t.size()) {
                 return Double.NaN;
             }
-            Object v = items[(int) k];
+            Object v = t.get((int) k);
             return v instanceof Double ? ((Double) v).doubleValue() : Double.NaN;
         }
         return Double.NaN;
@@ -1658,42 +2081,145 @@ public final class Py {
 
     /// One-argument call; `len(x)` skips the argument array and the builtin.
     public static Object call(Object f, Object a) {
+        if (f instanceof PyFunction) {
+            // A Python function straight into its body: no view, no
+            // virtual call1.
+            PyFunction.Body1 b = ((PyFunction) f).body1;
+            if (b != null) {
+                return b.run(a);
+            }
+        }
         if (f == Builtins.LEN) { //NOPMD CompareObjectsWithEquals - identity is meant
             return Long.valueOf(len(a));
         }
-        return Py.obj(f).call1(a);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call1(a);
     }
 
     public static Object call(Object f) {
-        return Py.obj(f).call0();
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call0();
     }
 
     public static Object call(Object f, Object a, Object b) {
-        return Py.obj(f).call2(a, b);
+        if (f instanceof PyFunction) {
+            PyFunction.Body2 g = ((PyFunction) f).body2;
+            if (g != null) {
+                return g.run(a, b);
+            }
+        }
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call2(a, b);
     }
 
     public static Object call(Object f, Object a, Object b, Object c) {
-        return Py.obj(f).call3(a, b, c);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call3(a, b, c);
     }
 
     public static Object call(Object f, Object a, Object b, Object c, Object d) {
-        return Py.obj(f).call4(a, b, c, d);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call4(a, b, c, d);
     }
 
     public static Object call(Object f, Object a, Object b, Object c, Object d, Object e) {
-        return Py.obj(f).call5(a, b, c, d, e);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call5(a, b, c, d, e);
     }
 
     public static Object call(Object f, Object a, Object b, Object c, Object d, Object e, Object g) {
-        return Py.obj(f).call6(a, b, c, d, e, g);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call6(a, b, c, d, e, g);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6) {
+        return Py.obj(fn).call7(x0, x1, x2, x3, x4, x5, x6);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7) {
+        return Py.obj(fn).call8(x0, x1, x2, x3, x4, x5, x6, x7);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8) {
+        return Py.obj(fn).call9(x0, x1, x2, x3, x4, x5, x6, x7, x8);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9) {
+        return Py.obj(fn).call10(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10) {
+        return Py.obj(fn).call11(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10, Object x11) {
+        return Py.obj(fn).call12(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10, Object x11, Object x12) {
+        return Py.obj(fn).call13(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
+    }
+
+    public static Object call(Object fn, Object x0, Object x1, Object x2, Object x3, Object x4, Object x5, Object x6, Object x7, Object x8, Object x9, Object x10, Object x11, Object x12, Object x13) {
+        return Py.obj(fn).call14(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13);
     }
 
     public static Object call(Object f, Object... args) {
-        return Py.obj(f).call(args, NO_KW);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call(args, NO_KW);
+    }
+
+    /// [#callKw] of a fixed arity: no argument array at the call site.
+    public static Object callKwF(Object fn, String[] kwNames, Object a) {
+        return Py.obj(fn).callKwF(kwNames, a);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b) {
+        return Py.obj(fn).callKwF(kwNames, a, b);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m);
+    }
+
+    public static Object callKwF(Object fn, String[] kwNames, Object a, Object b, Object c, Object d, Object e, Object f, Object g, Object h, Object i, Object j, Object k, Object l, Object m, Object n) {
+        return Py.obj(fn).callKwF(kwNames, a, b, c, d, e, f, g, h, i, j, k, l, m, n);
     }
 
     public static Object callKw(Object f, Object[] args, String[] kwNames) {
-        return Py.obj(f).call(args, kwNames);
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call(args, kwNames);
     }
 
     /// `obj.name(args)`, without materialising the bound method when `name`
@@ -1704,7 +2230,7 @@ public final class Py {
             if (inst.own(name) == null) {
                 Object m = inst.cls.lookup(name);
                 if (m instanceof PyFunction) {
-                    return Py.obj(m).call(prepend(o, args), NO_KW);
+                    return ((PyFunction) m).call(prepend(o, args), NO_KW);
                 }
             }
         } else if (!(o instanceof PyType) && !(o instanceof PyModule) && !(o instanceof PySuper)) {
@@ -1712,7 +2238,7 @@ public final class Py {
             // from the MRO after the class it was made for, never from there.
             Object m = Py.typeOf(o).lookup(name);
             if (m instanceof PyBuiltin) {
-                return Py.obj(m).call(prepend(o, args), NO_KW);
+                return ((PyBuiltin) m).call(prepend(o, args), NO_KW);
             }
         }
         return Py.obj(Py.obj(o).getAttr(name)).call(args, NO_KW);
@@ -1722,6 +2248,104 @@ public final class Py {
     /// lists each argument; `kinds` says 0 = plain, 1 = star, 2 = double star,
     /// 3 = keyword (name in `names` at the same index).
     public static Object callSpread(Object f, Object[] parts, int[] kinds, String[] names) {
+        // `f(*args, **kwargs)` forwarding a tuple and an empty dict, the
+        // usual shape of a wrapper (pdfplumber's render_char over super()):
+        // the arguments go straight into a fixed-arity call, with nothing
+        // gathered into lists or arrays on the way.
+        int npos = spreadCount(parts, kinds);
+        if (npos >= 0 && npos <= 14) {
+            PyObject fo = Py.obj(f);
+            switch (npos) {
+                case 0:
+                    return fo.call0();
+                case 1:
+                    return fo.call1(spreadAt(parts, kinds, 0));
+                case 2:
+                    return fo.call2(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1));
+                case 3:
+                    return fo.call3(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2));
+                case 4:
+                    return fo.call4(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3));
+                case 5:
+                    return fo.call5(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4));
+                case 6:
+                    return fo.call6(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5));
+                case 7:
+                    return fo.call7(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6));
+                case 8:
+                    return fo.call8(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7));
+                case 9:
+                    return fo.call9(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8));
+                case 10:
+                    return fo.call10(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9));
+                case 11:
+                    return fo.call11(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10));
+                case 12:
+                    return fo.call12(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10), spreadAt(parts, kinds, 11));
+                case 13:
+                    return fo.call13(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10), spreadAt(parts, kinds, 11), spreadAt(parts, kinds, 12));
+                case 14:
+                    return fo.call14(spreadAt(parts, kinds, 0), spreadAt(parts, kinds, 1), spreadAt(parts, kinds, 2), spreadAt(parts, kinds, 3), spreadAt(parts, kinds, 4), spreadAt(parts, kinds, 5), spreadAt(parts, kinds, 6), spreadAt(parts, kinds, 7), spreadAt(parts, kinds, 8), spreadAt(parts, kinds, 9), spreadAt(parts, kinds, 10), spreadAt(parts, kinds, 11), spreadAt(parts, kinds, 12), spreadAt(parts, kinds, 13));
+                default:
+                    break;
+            }
+        }
+        return callSpreadGeneral(f, parts, kinds, names);
+    }
+
+    /// The positional count of a call whose parts are plain values, tuples
+    /// and lists spread with `*`, and empty plain dicts spread with `**`;
+    /// -1 for any other call.
+    private static int spreadCount(Object[] parts, int[] kinds) {
+        int n = 0;
+        for (int i = 0; i < parts.length; i++) {
+            Object p = parts[i];
+            switch (kinds[i]) {
+                case 0:
+                    n++;
+                    break;
+                case 1:
+                    if (p instanceof PyTuple) {
+                        n += ((PyTuple) p).size();
+                    } else if (p != null && p.getClass() == PyList.class) {
+                        n += ((PyList) p).size;
+                    } else {
+                        return -1;
+                    }
+                    break;
+                case 2:
+                    if (p == null || p.getClass() != PyDict.class || ((PyDict) p).size != 0) {
+                        return -1;
+                    }
+                    break;
+                default:
+                    return -1;
+            }
+        }
+        return n;
+    }
+
+    /// Positional argument `j` of a call [#spreadCount] accepted.
+    private static Object spreadAt(Object[] parts, int[] kinds, int j) {
+        for (int i = 0; i < parts.length; i++) {
+            Object p = parts[i];
+            if (kinds[i] == 0) {
+                if (j == 0) {
+                    return p;
+                }
+                j--;
+            } else if (kinds[i] == 1) {
+                int n = p instanceof PyTuple ? ((PyTuple) p).size() : ((PyList) p).size;
+                if (j < n) {
+                    return p instanceof PyTuple ? ((PyTuple) p).get(j) : ((PyList) p).get(j);
+                }
+                j -= n;
+            }
+        }
+        throw new IllegalStateException();
+    }
+
+    private static Object callSpreadGeneral(Object f, Object[] parts, int[] kinds, String[] names) {
         List<Object> pos = new ArrayList<Object>();
         List<String> kwn = new ArrayList<String>();
         List<Object> kwv = new ArrayList<Object>();
@@ -1767,7 +2391,7 @@ public final class Py {
         for (int i = 0; i < kwv.size(); i++) {
             args[pos.size() + i] = kwv.get(i);
         }
-        return Py.obj(f).call(args, kwn.toArray(new String[kwn.size()]));
+        return (f instanceof PyObject ? (PyObject) f : Py.obj(f)).call(args, kwn.toArray(new String[kwn.size()]));
     }
 
     public static Object[] prepend(Object first, Object[] rest) {
@@ -1791,6 +2415,45 @@ public final class Py {
         throw typeError("indices must be integers or slices, not " + Py.typeOf(o).name);
     }
 
+    /// The index in `seq[key]`. An int no `long` holds is past either end of
+    /// any sequence, and is an IndexError as every other such index is.
+    public static long subscript(Object key) {
+        if (key instanceof Long) {
+            return ((Long) key).longValue();
+        }
+        if (key instanceof PyInt && ((PyInt) key).big != null) {
+            throw indexError("cannot fit 'int' into an index-sized integer");
+        }
+        return index(key);
+    }
+
+    /// No names: the parameter table of a function that takes none.
+    public static final String[] NO_NAMES = new String[0];
+
+    /// The names in `joined`, one a line: how generated code writes a table
+    /// of names down as one constant.
+    public static String[] names(String joined) {
+        int n = 1;
+        for (int i = 0; i < joined.length(); i++) {
+            if (joined.charAt(i) == '\n') {
+                n++;
+            }
+        }
+        String[] out = new String[n];
+        int at = 0;
+        for (int i = 0; i < n; i++) {
+            int end = joined.indexOf('\n', at);
+            if (end < 0) {
+                end = joined.length();
+            }
+            // Interned, as the literals they stand for were: names are
+            // compared by identity before they are compared by value.
+            out[i] = joined.substring(at, end).intern();
+            at = end + 1;
+        }
+        return out;
+    }
+
     // ---- iteration -------------------------------------------------------
 
     public static PyObject iter(Object o) {
@@ -1801,6 +2464,28 @@ public final class Py {
         throw typeError("iter() returned non-iterator of type '" + typeOf(r).name + "'");
     }
 
+    /// `next(it)`, where `f` is what the name `next` holds where it is
+    /// called: the builtin goes straight to the iterator.
+    public static Object nextB(Object f, Object it) {
+        if (f == Builtins.NEXT && it instanceof PyObject) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object v = ((PyObject) it).next();
+            if (v == null) {
+                throw Builtins.exhausted(it);
+            }
+            return v;
+        }
+        return call(f, it);
+    }
+
+    /// `next(it, default)`.
+    public static Object nextB(Object f, Object it, Object dflt) {
+        if (f == Builtins.NEXT && it instanceof PyObject) { //NOPMD CompareObjectsWithEquals - identity is meant
+            Object v = ((PyObject) it).next();
+            return v != null ? v : dflt;
+        }
+        return call(f, it, dflt);
+    }
+
     /// The next item of iterator `it`, or null when it is exhausted.
     public static Object next(Object it) {
         return ((PyObject) it).next();
@@ -1809,7 +2494,7 @@ public final class Py {
     /// Materialises any iterable.
     public static Object[] toArray(Object o) {
         if (o instanceof PyTuple) {
-            return ((PyTuple) o).items;
+            return ((PyTuple) o).arr();
         }
         if (o instanceof PyList) {
             return ((PyList) o).toArray();
@@ -1820,9 +2505,27 @@ public final class Py {
     }
 
     /// `a, b = value`: exactly `n` items or `ValueError`.
+    /// [#unpack] for generated code, answering an empty array when `o` is
+    /// a fixed-size tuple of exactly `n` items (n is at least one): the
+    /// caller then reads them from the tuple, and no array is made for it.
+    public static Object[] unpackT(Object o, int n) {
+        if (o instanceof PyTuple && ((PyTuple) o).elems == null && ((PyTuple) o).size() == n) {
+            return NO_ARGS;
+        }
+        return unpack(o, n);
+    }
+
+    /// [#unpackNames] answering an empty array as [#unpackT] does.
+    public static Object[] unpackNamesT(Object o, int n) {
+        if (o instanceof PyTuple && ((PyTuple) o).elems == null && ((PyTuple) o).size() == n) {
+            return NO_ARGS;
+        }
+        return unpackNames(o, n);
+    }
+
     public static Object[] unpack(Object o, int n) {
         if (o instanceof PyTuple) {
-            Object[] items = ((PyTuple) o).items;
+            Object[] items = ((PyTuple) o).arr();
             if (items.length == n) {
                 return items;
             }
@@ -1857,10 +2560,14 @@ public final class Py {
         if (o instanceof PyTuple) {
             // A tuple never changes, and the generated code only reads the
             // array it gets back, at once: its own items need no copy.
-            Object[] items = ((PyTuple) o).items;
+            Object[] items = ((PyTuple) o).arr();
             if (items.length == n) {
                 return items;
             }
+        }
+        if (o instanceof ItemWalk && n == 2) {
+            // Read at once, like a tuple's items (see ItemWalk).
+            return ((ItemWalk) o).current;
         }
         return unpack(o, n);
     }
@@ -1903,6 +2610,35 @@ public final class Py {
         return PyTuple.of(items);
     }
 
+    // `(a, b)` to `(a, ..., f)`: one object each, its items in fields. A
+    // tuple of one keeps the varargs form, whose single Object[] argument
+    // would otherwise bind here.
+
+    public static PyTuple tuple(Object a, Object b) {
+        return new PyTuple.T2(a, b);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c) {
+        return new PyTuple.T3(a, b, c);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c, Object d) {
+        return new PyTuple.T4(a, b, c, d);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c, Object d, Object e) {
+        return new PyTuple.T5(a, b, c, d, e);
+    }
+
+    public static PyTuple tuple(Object a, Object b, Object c, Object d, Object e, Object f) {
+        return new PyTuple.T6(a, b, c, d, e, f);
+    }
+
+    /// `{}`, without the empty varargs array or a sized table.
+    public static PyDict dict() {
+        return new PyDict();
+    }
+
     /// `{k0: v0, k1: v1, ...}` from alternating keys and values.
     public static PyDict dict(Object... kv) {
         PyDict d = new PyDict(kv.length / 2);
@@ -1941,6 +2677,16 @@ public final class Py {
     /// `format(value, spec)`, the engine of f-strings.
     public static Object format(Object v, String spec) {
         return str(Formatting.format(v, spec));
+    }
+
+    /// One formatted piece of an f-string, as the Java string the generated
+    /// builder appends: a str under the empty spec is itself (str.__format__
+    /// with no spec is the identity, and an exact str cannot override it).
+    public static String fmt(Object v, String spec) {
+        if (v instanceof String && spec.length() == 0) {
+            return (String) v;
+        }
+        return Formatting.format(v, spec);
     }
 
     /// Joins the pieces of an f-string.
@@ -2050,9 +2796,25 @@ public final class Py {
     private static final java.util.Set<String> FACTORY_MODULES = new java.util.HashSet<String>(java.util.Arrays.asList(
             "__main__", "collections", "typing", "enum", "dataclasses"));
 
+    /// `isinstance(o, t)` as a condition in typed code: the builtin's answer
+    /// as a Java boolean, with no bool to box and test.
+    public static boolean isinstanceB(Object f, Object o, Object t) {
+        if (f == Builtins.ISINSTANCE) { //NOPMD CompareObjectsWithEquals - identity is meant
+            if (o instanceof PyInstance && ((PyInstance) o).cls == t) { //NOPMD CompareObjectsWithEquals - identity is meant
+                return true;
+            }
+            return isinstance(o, t);
+        }
+        return isTrue(call(f, o, t));
+    }
+
     public static boolean isinstance(Object o, Object t) {
+        if (t instanceof PyType) {
+            // The common case first: a class, not a tuple or a union.
+            return ((PyType) t).instanceCheck(o);
+        }
         if (t instanceof PyTuple) {
-            Object[] items = ((PyTuple) t).items;
+            Object[] items = ((PyTuple) t).arr();
             for (Object item : items) {
                 if (isinstance(o, item)) {
                     return true;
@@ -2067,7 +2829,13 @@ public final class Py {
             return ((PyUnion) t).instanceCheck(o);
         }
         if (!(t instanceof PyType)) {
-            throw typeError("isinstance() arg 2 must be a type, a tuple of types, or a union");
+            // Any object whose type defines __instancecheck__ may stand on
+            // the right (typing.Mapping and the other generic aliases).
+            Object check = typeOf(t).lookup("__instancecheck__");
+            if (check == null) {
+                throw typeError("isinstance() arg 2 must be a type, a tuple of types, or a union");
+            }
+            return isTrue(call(check, t, o));
         }
         return ((PyType) t).instanceCheck(o);
     }
@@ -2133,6 +2901,12 @@ public final class Py {
     // ---- modules ---------------------------------------------------------
 
     /// `import name`.
+    /// How many calls so far built an argument array because the callee had
+    /// no fixed-arity path for their shape; see `ArgArrays.fallback`.
+    public static long argArrayFallbacks() {
+        return ArgArrays.fallbacks;
+    }
+
     public static PyModule importModule(String name) {
         return PyModule.load(name);
     }

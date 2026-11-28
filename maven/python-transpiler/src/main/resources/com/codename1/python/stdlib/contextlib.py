@@ -8,6 +8,7 @@ from collections import deque
 
 
 class AbstractContextManager:
+    __class_getitem__ = classmethod(type(list[int]))
     def __enter__(self):
         return self
 
@@ -16,6 +17,7 @@ class AbstractContextManager:
 
 
 class AbstractAsyncContextManager:
+    __class_getitem__ = classmethod(type(list[int]))
     async def __aenter__(self):
         return self
 
@@ -179,29 +181,45 @@ class nullcontext(AbstractContextManager, AbstractAsyncContextManager):
 
 
 class _RedirectStream(AbstractContextManager):
-    _stream = None
-
+    # Each subclass reads and writes its own sys attribute by its literal
+    # name: no attribute is looked up from a computed string.
     def __init__(self, new_target):
         self._new_target = new_target
         self._old_targets = []
 
+    def _get(self):
+        raise NotImplementedError
+
+    def _set(self, value):
+        raise NotImplementedError
+
     def __enter__(self):
-        import sys
-        self._old_targets.append(getattr(sys, self._stream))
-        setattr(sys, self._stream, self._new_target)
+        self._old_targets.append(self._get())
+        self._set(self._new_target)
         return self._new_target
 
     def __exit__(self, exctype, excinst, exctb):
-        import sys
-        setattr(sys, self._stream, self._old_targets.pop())
+        self._set(self._old_targets.pop())
 
 
 class redirect_stdout(_RedirectStream):
-    _stream = "stdout"
+    def _get(self):
+        import sys
+        return sys.stdout
+
+    def _set(self, value):
+        import sys
+        sys.stdout = value
 
 
 class redirect_stderr(_RedirectStream):
-    _stream = "stderr"
+    def _get(self):
+        import sys
+        return sys.stderr
+
+    def _set(self, value):
+        import sys
+        sys.stderr = value
 
 
 class ExitStack(AbstractContextManager):

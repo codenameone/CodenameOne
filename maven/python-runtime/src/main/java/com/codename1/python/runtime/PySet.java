@@ -43,8 +43,8 @@ public final class PySet extends PyObject {
     };
 
     final boolean frozen;
-    private Object[] keys = new Object[MINSIZE];
-    private long[] hashes = new long[MINSIZE];
+    private Object[] keys;
+    private long[] hashes;
     private int mask = MINSIZE - 1;
     /// Active plus dummy entries.
     private int fill;
@@ -55,13 +55,34 @@ public final class PySet extends PyObject {
 
     public PySet(boolean frozen) {
         this.frozen = frozen;
+        keys = new Object[MINSIZE];
+        hashes = new long[MINSIZE];
     }
 
     public PySet() {
         this(false);
     }
 
+    /// A copy of `src`'s table, for [#of] where [#merge] would build that
+    /// same table: nothing allocated but the two copies.
+    private PySet(boolean frozen, PySet src) {
+        this.frozen = frozen;
+        keys = src.keys.clone();
+        hashes = src.hashes.clone();
+        fill = src.used;
+        used = src.used;
+    }
+
     public static PySet of(Object iterable, boolean frozen) {
+        if (iterable instanceof PySet) {
+            PySet o = (PySet) iterable;
+            // merge into a fresh table copies slot for slot exactly when
+            // the source is minimal, has no dummies and needs no resize;
+            // markdownify copies its parent tags so for every tag.
+            if (o.mask == MINSIZE - 1 && o.fill == o.used && (long) o.used * 5 < (long) o.mask * 3) {
+                return new PySet(frozen, o);
+            }
+        }
         PySet s = new PySet(frozen);
         s.update(iterable);
         return s;
@@ -287,7 +308,30 @@ public final class PySet extends PyObject {
             }
             return;
         }
+        if (iterable instanceof PyList && iterable.getClass() == PyList.class) { //NOPMD CompareObjectsWithEquals - exactly list: a subclass may override __iter__
+            // set(names) over a plain list, sqlite-utils' check of every
+            // query's columns: indexed, as the list's own iterator reads it
+            // (live, so an __eq__ that changes the list ends it the same way).
+            PyList l = (PyList) iterable;
+            for (int i = 0; i < l.size(); i++) {
+                Object v = l.get(i);
+                insert(v, hashOf(v));
+            }
+            return;
+        }
         Object it = Py.iter(iterable);
+        if (it instanceof PyGenerator) {
+            // Stepped under one handler (see PyList.extend).
+            PyGenerator g = (PyGenerator) it;
+            try {
+                for (Object v = PyGenerator.loopNext(g); v != null; v = PyGenerator.loopNext(g)) {
+                    insert(v, hashOf(v));
+                }
+            } catch (Throwable e) {
+                throw PyGenerator.loopEscape(g, e);
+            }
+            return;
+        }
         for (Object v = Py.next(it); v != null; v = Py.next(it)) {
             insert(v, hashOf(v));
         }
@@ -305,6 +349,16 @@ public final class PySet extends PyObject {
         }
         PySet s = new PySet();
         s.merge(constant);
+        return s;
+    }
+
+    /// The frozenset constant CPython folds `x in {"a", "b"}` to; the
+    /// transpiler makes it once per module.
+    public static PySet frozenConstants(Object... items) {
+        PySet s = new PySet(true);
+        for (Object item : items) {
+            s.addRaw(item);
+        }
         return s;
     }
 

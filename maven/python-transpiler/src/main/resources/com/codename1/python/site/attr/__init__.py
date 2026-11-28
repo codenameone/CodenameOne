@@ -3,9 +3,12 @@
 # exception, as the rest of the Codename One Python runtime.
 """Classes without boilerplate: the attrs API.
 
-Written from the documented behaviour of attrs. The generated methods are
-closures over the attribute list, since no source text is compiled at run
-time.
+Written from the documented behaviour of attrs. Nothing is generated at
+run time: the build writes every method of an attrs class into the class
+itself (codegen.AttrsLowering), each naming its fields literally, and the
+class decorator is replaced by _cn1_finish, which only builds the Attribute
+list the methods index. A class the build cannot see whole -- one made by
+make_class, or a decorator applied to type(...) -- is refused at build time.
 """
 
 from dataclasses import _is_classvar
@@ -107,6 +110,9 @@ class Attribute:
         self.inherited = inherited
         self.on_setattr = on_setattr
         self.alias = alias
+        # The hook an assignment runs (the field's own, else the class's),
+        # set by _cn1_finish and read by the generated properties.
+        self._cn1_hook = None
 
     @property
     def cmp(self):
@@ -116,8 +122,28 @@ class Attribute:
         new = Attribute(self.name, self.default, self.validator, self.repr, None, self.hash, self.init,
                         self.inherited, self.metadata, self.type, self.converter, self.kw_only, self.eq,
                         self.eq_key, self.order, self.order_key, self.on_setattr, self.alias)
-        for k, v in changes.items():
-            setattr(new, k, v)
+        # Each attribute named literally: no store by a computed name.
+        for k in changes:
+            if k not in _ATTRIBUTE_FIELDS:
+                raise TypeError("Attribute has no field " + repr(k))
+        g = changes.get
+        new.name = g("name", new.name)
+        new.default = g("default", new.default)
+        new.validator = g("validator", new.validator)
+        new.repr = g("repr", new.repr)
+        new.hash = g("hash", new.hash)
+        new.init = g("init", new.init)
+        new.inherited = g("inherited", new.inherited)
+        new.metadata = g("metadata", new.metadata)
+        new.type = g("type", new.type)
+        new.converter = g("converter", new.converter)
+        new.kw_only = g("kw_only", new.kw_only)
+        new.eq = g("eq", new.eq)
+        new.eq_key = g("eq_key", new.eq_key)
+        new.order = g("order", new.order)
+        new.order_key = g("order_key", new.order_key)
+        new.on_setattr = g("on_setattr", new.on_setattr)
+        new.alias = g("alias", new.alias)
         return new
 
     def __repr__(self):
@@ -139,6 +165,11 @@ class Attribute:
 
     def __hash__(self):
         return hash((self.name, self.inherited, self.alias))
+
+
+_ATTRIBUTE_FIELDS = frozenset(("name", "default", "validator", "repr", "hash", "init", "inherited", "metadata",
+                               "type", "converter", "kw_only", "eq", "eq_key", "order", "order_key",
+                               "on_setattr", "alias"))
 
 
 class _CountingAttr:
@@ -297,9 +328,9 @@ def _run_validator(instance, attrib, value):
 def validate(inst):
     if validators.get_disabled():
         return
-    for a in fields(inst.__class__):
+    for a, v in zip(fields(inst.__class__), inst.__cn1_attrs_values__()):
         if a.validator is not None:
-            a.validator(inst, a, getattr(inst, a.name))
+            a.validator(inst, a, v)
 
 
 def _is_attrs_instance(obj):
@@ -310,8 +341,7 @@ def asdict(inst, recurse=True, filter=None, dict_factory=dict, retain_collection
            value_serializer=None):
     result = dict_factory()
     items = []
-    for a in fields(inst.__class__):
-        v = getattr(inst, a.name)
+    for a, v in zip(fields(inst.__class__), inst.__cn1_attrs_values__()):
         if filter is not None and not filter(a, v):
             continue
         if value_serializer is not None:
@@ -347,8 +377,7 @@ def _asdict_value(v, filter, dict_factory, retain, serializer):
 
 def astuple(inst, recurse=True, filter=None, tuple_factory=tuple, retain_collection_types=False):
     rv = []
-    for a in fields(inst.__class__):
-        v = getattr(inst, a.name)
+    for a, v in zip(fields(inst.__class__), inst.__cn1_attrs_values__()):
         if filter is not None and not filter(a, v):
             continue
         if recurse is True:
@@ -381,25 +410,29 @@ def evolve(*args, **changes):
         raise TypeError("evolve() takes 1 positional argument, but %d were given" % len(args))
     inst = args[0]
     cls = inst.__class__
-    for a in fields(cls):
+    for a, v in zip(fields(cls), inst.__cn1_attrs_values__()):
         if not a.init:
             continue
         name = a.alias
         if name not in changes:
-            changes[name] = getattr(inst, a.name)
+            changes[name] = v
     return cls(**changes)
 
 
 def assoc(inst, **changes):
-    new = inst.__class__.__new__(inst.__class__)
+    # Deprecated in attrs. Here it is evolve() keyed by attribute name: the
+    # copy goes through the generated __init__ (converters and validators
+    # run), since nothing stores a field by a computed name.
     names = set(a.name for a in fields(inst.__class__))
     for k in changes:
         if k not in names:
             raise exceptions.AttrsAttributeNotFoundError(
-                "{k} is not an attrs attribute on {cl}.".format(k=k, cl=new.__class__))
+                "{k} is not an attrs attribute on {cl}.".format(k=k, cl=inst.__class__))
+    by_alias = {}
     for a in fields(inst.__class__):
-        object.__setattr__(new, a.name, changes.get(a.name, getattr(inst, a.name)))
-    return new
+        if a.name in changes:
+            by_alias[a.alias] = changes[a.name]
+    return evolve(inst, **by_alias)
 
 
 def cmp_using(eq=None, lt=None, le=None, gt=None, ge=None, require_same_type=True, class_name="Comparable"):
@@ -525,148 +558,54 @@ def _initial(attrib, inst):
     return d
 
 
-def _make_init(cls, attrs, frozen_class, pre_init, post_init):
-    init_attrs = [a for a in attrs if a.init]
-    std = [a for a in init_attrs if not a.kw_only]
-    kwo = [a for a in init_attrs if a.kw_only]
-    qualname = cls.__qualname__ + ".__init__"
-    nstd = len(std)
-    nreq = len([a for a in std if a.default is NOTHING])
-    names = [a.alias for a in std + kwo]
+# What the generated methods of a lowered class call (codegen.AttrsLowering).
 
-    def __init__(self, *args, **kwargs):
-        if len(args) > nstd:
-            if nreq == nstd:
-                takes = "%d positional argument%s" % (nstd + 1, "" if nstd == 0 else "s")
-            else:
-                takes = "from %d to %d positional arguments" % (nreq + 1, nstd + 1)
-            raise TypeError("%s() takes %s but %d were given" % (qualname, takes, len(args) + 1))
-        values = {}
-        for i in range(len(args)):
-            values[std[i].alias] = args[i]
-        for k, v in kwargs.items():
-            if k not in names:
-                raise TypeError(qualname + "() got an unexpected keyword argument " + repr(k))
-            if k in values:
-                raise TypeError(qualname + "() got multiple values for argument " + repr(k))
-            values[k] = v
-        missing = [a.alias for a in std if a.alias not in values and a.default is NOTHING]
-        if missing:
-            raise TypeError("%s() missing %d required positional argument%s: %s"
-                            % (qualname, len(missing), "" if len(missing) == 1 else "s",
-                               _and_join(["'" + m + "'" for m in missing])))
-        missing = [a.alias for a in kwo if a.alias not in values and a.default is NOTHING]
-        if missing:
-            raise TypeError("%s() missing %d required keyword-only argument%s: %s"
-                            % (qualname, len(missing), "" if len(missing) == 1 else "s",
-                               _and_join(["'" + m + "'" for m in missing])))
-        if pre_init:
-            self.__attrs_pre_init__()
-        assigned = []
-        for a in attrs:
-            if a.init and a.alias in values:
-                v = values[a.alias]
-            elif a.default is not NOTHING:
-                v = _initial(a, self)
-            else:
-                continue
-            if a.converter is not None:
-                v = _convert_one(a.converter, v, self, a)
-            object.__setattr__(self, a.name, v)
-            assigned.append(a)
-        if not validators.get_disabled():
-            for a in assigned:
-                if a.validator is not None:
-                    a.validator(self, a, getattr(self, a.name))
-        if post_init:
-            self.__attrs_post_init__()
-    __init__.__qualname__ = qualname
-    return __init__
+def _cn1_default(a, inst):
+    return _initial(a, inst)
+
+
+def _cn1_convert(a, inst, value):
+    return _convert_value(inst, a, value)
+
+
+def _cn1_validating():
+    return not validators.get_disabled()
+
+
+def _cn1_on_set(a, inst, value):
+    h = a._cn1_hook
+    if h is None:
+        return value
+    return h(inst, a, value)
 
 
 _active = set()
 
 
-def _make_repr(attrs):
-    shown = [a for a in attrs if a.repr is not False]
-
-    def __repr__(self):
-        key = id(self)
-        if key in _active:
-            return "..."
-        _active.add(key)
-        try:
-            qn = self.__class__.__qualname__
-            qn = qn.rsplit(">.", 1)[-1]
-            parts = []
-            for a in shown:
-                v = getattr(self, a.name)
-                parts.append(a.name + "=" + (repr(v) if a.repr is True else a.repr(v)))
-            return qn + "(" + ", ".join(parts) + ")"
-        finally:
-            _active.discard(key)
-    return __repr__
+def _cn1_repr(inst, attrs, values):
+    key = id(inst)
+    if key in _active:
+        return "..."
+    _active.add(key)
+    try:
+        qn = inst.__class__.__qualname__
+        qn = qn.rsplit(">.", 1)[-1]
+        parts = []
+        for a, v in zip(attrs, values):
+            if a.repr is False:
+                continue
+            parts.append(a.name + "=" + (repr(v) if a.repr is True else a.repr(v)))
+        return qn + "(" + ", ".join(parts) + ")"
+    finally:
+        _active.discard(key)
 
 
-def _tuple_getter(attrs, flag):
-    chosen = []
-    for a in attrs:
-        if flag == "eq":
-            if a.eq:
-                chosen.append((a.name, a.eq_key))
-        elif a.order:
-            chosen.append((a.name, a.order_key))
-
-    def as_tuple(self):
-        out = []
-        for name, key in chosen:
-            v = getattr(self, name)
-            out.append(v if key is None else key(v))
-        return tuple(out)
-    return as_tuple
+def _cn1_frozen_setattr(self, name, value):
+    raise FrozenInstanceError()
 
 
-def _make_eq(as_tuple):
-    def __eq__(self, other):
-        if other.__class__ is not self.__class__:
-            return NotImplemented
-        return as_tuple(self) == as_tuple(other)
-
-    def __ne__(self, other):
-        result = __eq__(self, other)
-        if result is NotImplemented:
-            return NotImplemented
-        return not result
-    return __eq__, __ne__
-
-
-def _make_order(as_tuple, op):
-    def compare(self, other):
-        if other.__class__ is not self.__class__:
-            return NotImplemented
-        a = as_tuple(self)
-        b = as_tuple(other)
-        if op == "__lt__":
-            return a < b
-        if op == "__le__":
-            return a <= b
-        if op == "__gt__":
-            return a > b
-        return a >= b
-    compare.__name__ = op
-    return compare
-
-
-def _make_hash(attrs, cls):
-    hashed = []
-    for a in attrs:
-        if (a.eq if a.hash is None else a.hash):
-            hashed.append(a.name)
-    seed = cls.__qualname__
-
-    def __hash__(self):
-        return hash((seed,) + tuple(getattr(self, n) for n in hashed))
-    return __hash__
+def _cn1_frozen_delattr(self, name):
+    raise FrozenInstanceError()
 
 
 def _hook_for(a, class_hook):
@@ -676,68 +615,20 @@ def _hook_for(a, class_hook):
     return hook
 
 
-def _make_setattr(attrs, frozen_class, class_hook, parent_setattr):
-    by_name = dict((a.name, a) for a in attrs)
-    hooks = {}
-    if not frozen_class:
-        for a in attrs:
-            h = _hook_for(a, class_hook)
-            if h is not None:
-                hooks[a.name] = h
-
-    def __setattr__(self, name, value):
-        if frozen_class:
-            raise FrozenInstanceError()
-        h = hooks.get(name)
-        if h is not None:
-            value = h(self, by_name[name], value)
-        object.__setattr__(self, name, value)
-
-    def __delattr__(self, name):
-        if frozen_class:
-            raise FrozenInstanceError()
-        object.__delattr__(self, name)
-    return __setattr__, __delattr__, len(hooks) > 0
-
-
-def _has_own(cls, name):
-    return name in cls.__dict__
-
-
-def _wrap(cls, these, repr_, eq, order, hash_, init, frozen_, kw_only, auto_attribs, auto_detect, on_setattr,
-          define_mode, match_args, field_transformer, unsafe_hash):
-    if unsafe_hash is not None:
-        hash_ = unsafe_hash
-    if auto_detect:
-        if _has_own(cls, "__repr__"):
-            repr_ = False
-        if _has_own(cls, "__init__"):
-            init = False
-        has_eq = _has_own(cls, "__eq__") or _has_own(cls, "__ne__")
-        if has_eq and eq is None:
-            eq = False
-        has_order = (_has_own(cls, "__lt__") or _has_own(cls, "__le__") or _has_own(cls, "__gt__") or
-                     _has_own(cls, "__ge__"))
-        if has_order and order is None:
-            order = False
-        if hash_ is None and _has_own(cls, "__hash__"):
-            hash_ = False
-    if eq is None:
-        eq = True
-    if order is None:
-        order = eq if not define_mode else False
-    if order and not eq:
-        raise ValueError("`order` can only be True if `eq` is True too.")
-    if isinstance(on_setattr, (list, tuple)):
-        on_setattr = setters.pipe(*on_setattr)
-    if frozen_ and on_setattr is not None:
-        raise ValueError("Frozen classes can't use on_setattr.")
-    own, _ = _collect_own(cls, these, auto_attribs, kw_only)
+def _cn1_finish(cls):
+    """The decorator of a lowered attrs class: builds __attrs_attrs__."""
+    lowered = cls.__dict__.get("__cn1_attrs_lowered__")
+    if lowered is None:
+        raise TypeError("attrs class " + cls.__qualname__ + " was not lowered at build time")
+    names, rows, kw_only, frozen_, on_setattr, define_mode, match_args = lowered
+    annotations = cls.__dict__.get("__annotations__", {})
+    own = [_attribute_from(n, ca, annotations.get(n), kw_only) for n, ca in rows]
     taken = set(a.name for a in own)
-    base = _collect_base(cls, taken, kw_only)
-    attrs = base + own
-    if field_transformer is not None:
-        attrs = list(field_transformer(cls, attrs))
+    attrs = _collect_base(cls, taken, kw_only) + own
+    seen = tuple(a.name for a in attrs)
+    if seen != names:
+        raise TypeError("attrs class " + cls.__qualname__ + " has attributes " + repr(seen) + " but was built for " +
+                        repr(names) + ": its attrs bases must be in the same module")
     had_default = False
     for a in attrs:
         if a.init is not False and a.kw_only is False:
@@ -746,134 +637,64 @@ def _wrap(cls, these, repr_, eq, order, hash_, init, frozen_, kw_only, auto_attr
                                  "factory.  Attribute in question: " + repr(a))
             if a.default is not NOTHING:
                 had_default = True
-    # Class-level cleanup: the placeholders must not remain as class attributes.
-    base_names = set(a.name for a in base)
-    for a in own:
-        if a.name not in base_names or True:
-            v = cls.__dict__.get(a.name, NOTHING)
-            if v is not NOTHING and (isinstance(v, _CountingAttr) or these is None):
-                delattr(cls, a.name)
-    cls.__attrs_attrs__ = _AttrsTuple(attrs)
+    if isinstance(on_setattr, (list, tuple)):
+        on_setattr = setters.pipe(*on_setattr)
+    if frozen_ and on_setattr is not None:
+        raise ValueError("Frozen classes can't use on_setattr.")
     if define_mode and on_setattr is None and not frozen_:
         on_setattr = setters.pipe(setters.convert, setters.validate)
-    if init:
-        cls.__init__ = _make_init(cls, attrs, frozen_, hasattr(cls, "__attrs_pre_init__"),
-                                  hasattr(cls, "__attrs_post_init__"))
-    if repr_:
-        cls.__repr__ = _make_repr(attrs)
-    if eq:
-        as_tuple = _tuple_getter(attrs, "eq")
-        cls.__eq__, cls.__ne__ = _make_eq(as_tuple)
-    if order:
-        ot = _tuple_getter(attrs, "order")
-        for op in ("__lt__", "__le__", "__gt__", "__ge__"):
-            setattr(cls, op, _make_order(ot, op))
+    if not frozen_:
+        for a in attrs:
+            a._cn1_hook = _hook_for(a, on_setattr)
+    cls.__attrs_attrs__ = _AttrsTuple(attrs)
     if frozen_:
-        cls.__setattr__, cls.__delattr__, _ = _make_setattr(attrs, True, None, None)
-    elif on_setattr is not None or any(a.on_setattr is not None for a in attrs):
-        any_hooks = False
-        s, d, any_hooks = _make_setattr(attrs, False, on_setattr, None)
-        if any_hooks and (define_mode is False or any(a.validator is not None or a.converter is not None or
-                                                      a.on_setattr is not None for a in attrs)):
-            cls.__setattr__ = s
-    if hash_ is True:
-        cls.__hash__ = _make_hash(attrs, cls)
-    elif hash_ is None:
-        if eq and frozen_:
-            cls.__hash__ = _make_hash(attrs, cls)
-        elif eq:
-            cls.__hash__ = None
-    elif hash_ is False:
-        pass
+        cls.__setattr__ = _cn1_frozen_setattr
+        cls.__delattr__ = _cn1_frozen_delattr
     if match_args and "__match_args__" not in cls.__dict__:
         cls.__match_args__ = tuple(a.alias for a in attrs if a.init and not a.kw_only)
     return cls
+
+
+def _not_lowered(*args, **kwargs):
+    raise TypeError("attrs: this class was not lowered at build time; decorate a class statement with a "
+                    "decorator the build can read")
 
 
 def attrs(maybe_cls=None, these=None, repr_ns=None, repr=None, cmp=None, hash=None, init=None, slots=False,
           frozen=False, weakref_slot=True, str=False, auto_attribs=False, kw_only=False, cache_hash=False,
           auto_exc=False, eq=None, order=None, auto_detect=False, collect_by_mro=False, getstate_setstate=None,
           on_setattr=None, field_transformer=None, match_args=True, unsafe_hash=None):
-    eq, order = _eq_order_class(cmp, eq, order)
-
-    def wrap(cls):
-        return _wrap(cls, these, True if repr is None else repr, eq, order, hash, True if init is None else init,
-                     frozen, kw_only, auto_attribs, auto_detect, on_setattr, False, match_args, field_transformer,
-                     unsafe_hash)
+    # Every class statement it decorates is lowered at build time, and any
+    # other use is refused there: reaching this means neither happened.
     if maybe_cls is None:
-        return wrap
-    return wrap(maybe_cls)
-
-
-def _eq_order_class(cmp, eq, order):
-    if cmp is not None and (eq is not None or order is not None):
-        raise ValueError("Don't mix `cmp` with `eq' and `order`.")
-    if cmp is not None:
-        return cmp, cmp
-    return eq, order
+        return _not_lowered
+    return _not_lowered(maybe_cls)
 
 
 s = attrs
 attributes = attrs
 
 
-def dataclass(maybe_cls=None, *, these=None, repr=True, unsafe_hash=None, hash=None, init=True, slots=False,
-              frozen=False, weakref_slot=True, str=False, auto_attribs=True, kw_only=False, cache_hash=False,
-              auto_exc=True, eq=True, order=False, auto_detect=True, getstate_setstate=None, on_setattr=None,
-              field_transformer=None, match_args=True):
-    return attrs(maybe_cls, these=these, repr=repr, hash=hash, init=init, slots=slots, frozen=frozen,
-                 auto_attribs=auto_attribs, kw_only=kw_only, eq=eq, order=order, auto_detect=auto_detect,
-                 on_setattr=on_setattr, field_transformer=field_transformer, match_args=match_args,
-                 unsafe_hash=unsafe_hash)
+def dataclass(maybe_cls=None, **kwargs):
+    return attrs(maybe_cls)
 
 
-def define(maybe_cls=None, *, these=None, repr=None, unsafe_hash=None, hash=None, init=None, slots=True,
-           frozen=False, weakref_slot=True, str=False, auto_attribs=None, kw_only=False, cache_hash=False,
-           auto_exc=True, eq=None, order=False, auto_detect=True, getstate_setstate=None, on_setattr=None,
-           field_transformer=None, match_args=True):
-    def wrap(cls):
-        return _wrap(cls, these, True if repr is None else repr, eq, order, hash, True if init is None else init,
-                     frozen, kw_only, auto_attribs, auto_detect, on_setattr, True, match_args, field_transformer,
-                     unsafe_hash)
-    if maybe_cls is None:
-        return wrap
-    return wrap(maybe_cls)
+def define(maybe_cls=None, **kwargs):
+    return attrs(maybe_cls)
 
 
 mutable = define
 
 
 def frozen(maybe_cls=None, **kwargs):
-    kwargs["frozen"] = True
-    return define(maybe_cls, **kwargs)
+    return attrs(maybe_cls)
 
 
 def make_class(name, attrs, bases=(object,), class_body=None, **attributes_arguments):
-    if isinstance(attrs, dict):
-        cls_dict = {}
-        for k, v in attrs.items():
-            cls_dict[k] = v
-        cd = dict((k, _recount(v)) for k, v in cls_dict.items())
-    elif isinstance(attrs, (list, tuple)):
-        cd = {}
-        for k in attrs:
-            cd[k] = attrib()
-    else:
-        raise TypeError("attrs argument must be a dict or a list.")
-    if class_body is not None:
-        cd.update(class_body)
-    cls = type(name, tuple(bases), cd)
-    return attrs_decorator(cls, attributes_arguments)
-
-
-def _recount(v):
-    if isinstance(v, _CountingAttr):
-        v.counter = _next_count()
-    return v
-
-
-def attrs_decorator(cls, kwargs):
-    return globals()["attrs"](cls, **kwargs)
+    # A class made at run time has no layout and no generated methods; the
+    # build refuses every call of this.
+    raise TypeError("attrs.make_class builds a class at run time, which a closed-world build cannot compile; "
+                    "declare the class with @define")
 
 
 from attr import converters, filters, setters, validators  # noqa: E402  (they import names defined above)

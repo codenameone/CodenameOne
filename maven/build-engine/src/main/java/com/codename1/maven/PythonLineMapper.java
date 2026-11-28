@@ -142,18 +142,50 @@ public final class PythonLineMapper {
         }
     }
 
+    /// The index of a line-table part, `$cn1PyLines` being 0 and
+    /// `$cn1PyLines$N` being N; -1 for any other field. A long table is
+    /// split over several constants because one holds at most 65535 bytes.
+    static int part(String name) {
+        if (!name.startsWith(FIELD)) {
+            return -1;
+        }
+        if (name.length() == FIELD.length()) {
+            return 0;
+        }
+        if (name.charAt(FIELD.length()) != '$' || name.length() == FIELD.length() + 1) {
+            return -1;
+        }
+        int n = 0;
+        for (int i = FIELD.length() + 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c < '0' || c > '9' || n > 100000) {
+                return -1;
+            }
+            n = n * 10 + (c - '0');
+        }
+        return n;
+    }
+
     static Table read(byte[] bytes) {
-        final String[] value = new String[1];
+        final TreeMap<Integer, String> parts = new TreeMap<Integer, String>();
         new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public FieldVisitor visitField(int access, String name, String desc, String signature, Object v) {
-                if (FIELD.equals(name) && v instanceof String) {
-                    value[0] = (String) v;
+                int p = part(name);
+                if (p >= 0 && v instanceof String) {
+                    parts.put(p, (String) v);
                 }
                 return null;
             }
         }, ClassReader.SKIP_CODE);
-        return value[0] == null ? null : new Table(value[0]);
+        if (!parts.containsKey(0)) {
+            return null;
+        }
+        StringBuilder value = new StringBuilder();
+        for (String s : parts.values()) {
+            value.append(s);
+        }
+        return new Table(value.toString());
     }
 
     static byte[] rewrite(byte[] bytes, final Table t) {
@@ -167,7 +199,7 @@ public final class PythonLineMapper {
 
             @Override
             public FieldVisitor visitField(int access, String name, String desc, String signature, Object v) {
-                return FIELD.equals(name) ? null : super.visitField(access, name, desc, signature, v);
+                return part(name) >= 0 ? null : super.visitField(access, name, desc, signature, v);
             }
 
             @Override

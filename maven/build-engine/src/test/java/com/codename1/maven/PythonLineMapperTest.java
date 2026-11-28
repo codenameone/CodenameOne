@@ -95,6 +95,25 @@ public class PythonLineMapperTest {
     }
 
     @Test
+    public void joinsATableSplitOverSeveralConstants() throws Exception {
+        // A table past one constant's 65535 bytes is split, even inside a
+        // pair; the parts are joined by index, not by declaration order.
+        String split = SOURCE.replace("private static final String $cn1PyLines = \"app/util.py\\n5:3,7:4,9:9\";",
+                "private static final String $cn1PyLines$2 = \":9\"; private static final String $cn1PyLines = "
+                + "\"app/util.py\\n5:3,7\"; private static final String $cn1PyLines$1 = \":4,9\";");
+        assertTrue(split.contains("$cn1PyLines$2"));
+        File classes = tmp.newFolder("classes");
+        CompatFixtures.compile(tmp.newFolder(), classes, "com/codename1/generated/python/py_app$2eutil.java", split);
+        assertEquals(2, PythonLineMapper.apply(classes));
+        Seen outer = scan(new File(classes, PythonLineMapper.PACKAGE_DIR + "/py_app$2eutil.class"));
+        assertEquals("util.py", outer.source);
+        assertFalse("every part is removed", outer.hasTable);
+        assertEquals("[3, 4, 9]", new java.util.TreeSet<Integer>(outer.lines).toString());
+        assertEquals(-1, PythonLineMapper.part("$cn1PyLinesX"));
+        assertEquals(-1, PythonLineMapper.part("$cn1PyLines$"));
+    }
+
+    @Test
     public void otherClassesAreLeftAlone() throws Exception {
         File classes = tmp.newFolder("classes");
         CompatFixtures.compile(tmp.newFolder(), classes, "com/codename1/generated/python/PythonModules.java",
@@ -124,7 +143,7 @@ public class PythonLineMapperTest {
 
             @Override
             public FieldVisitor visitField(int access, String name, String desc, String sig, Object v) {
-                s.hasTable |= PythonLineMapper.FIELD.equals(name);
+                s.hasTable |= PythonLineMapper.part(name) >= 0;
                 return null;
             }
 

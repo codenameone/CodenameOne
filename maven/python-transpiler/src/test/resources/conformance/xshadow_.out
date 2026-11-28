@@ -1,0 +1,4 @@
+(0, 'float', 'unset', 1)
+(5, 'int', 'set:g', 1)
+0 float True
+(7, 'int', 'set:g', 1) (0, 'float', 'unset', 1)

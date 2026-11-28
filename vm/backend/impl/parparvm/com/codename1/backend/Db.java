@@ -23,6 +23,7 @@
 package com.codename1.backend;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import com.codename1.db.sql.QueryRows;
@@ -43,6 +44,56 @@ public final class Db {
     private static final int TYPE_NULL = 5;
 
     private long handle;
+
+    /// Prepared statements kept for reuse, by their SQL, oldest first.
+    ///
+    /// Preparing is parsing and planning the statement, and an application
+    /// sends the same few statements over and over: measured on a SQLite log
+    /// writer, preparing again on every call cost as much as a third of what
+    /// SQLite spent executing them. CPython's sqlite3 keeps 128 for the same
+    /// reason. A statement is marked BUSY while it runs and cleared afterwards,
+    /// reset, so a call that re-enters with the same SQL -- a SQL function's
+    /// body querying the database mid-step -- prepares a fresh one instead of
+    /// resetting a statement that is still stepping.
+    ///
+    /// Entries stay in the map while they run, and the oldest is found by a
+    /// use counter only when an insertion overflows the cache: taking one out
+    /// and putting it back, as a LinkedHashMap of boxed handles did, allocated
+    /// a map node and a Long on every statement.
+    private final HashMap<String, Stmt> statements = new HashMap<String, Stmt>();
+
+    /// Counts statement uses, for picking the least recently used to evict.
+    private long useClock;
+
+    /// One prepared statement. `cached` is whether `statements` holds it.
+    private static final class Stmt {
+        final String sql;
+        final long handle;
+        boolean busy;
+        boolean cached;
+        long used;
+        /// The column names last read, and the statement's re-prepare count
+        /// then (sqlite3_stmt_status SQLITE_STMTSTATUS_REPREPARE).
+        String[] names;
+        int namesAt;
+
+        Stmt(String sql, long handle) {
+            this.sql = sql;
+            this.handle = handle;
+        }
+    }
+
+    private static final int STATEMENT_CACHE_SIZE = 64;
+
+    /// Every registered SQL function body, indexed by the id SQLite hands back
+    /// as the function's user data. A C callback cannot hold a Java reference,
+    /// so the id is the only thing that crosses; a slot is freed when the
+    /// connection that registered it closes, and reused.
+    private static Object[] functions = new Object[8];
+    private static final Object FUNCTIONS_LOCK = new Object();
+
+    /// The slots this connection registered, released by close().
+    private int[] functionIds = new int[0];
 
     private Db(long handle) {
         this.handle = handle;
@@ -89,44 +140,72 @@ public final class Db {
     }
 
     /// Runs a statement that returns no rows. Returns the number of rows changed.
-    private int executeLocked(String sql, Object[] params) throws IOException {
-        long stmt = prepare(sql, params);
+    /// With `lastInsertId`, also stores [#lastInsertId] into `lastInsertId[0]`
+    /// under the same hold of the gate.
+    private int executeLocked(String sql, Object[] params, long[] lastInsertId) throws IOException {
+        Stmt st = prepare(sql, params);
+        long stmt = st.handle;
         try {
-            int rc = stepImpl(stmt);
+            int rc = step(stmt);
             if (rc < 0) {
                 throw new IOException("Statement failed: " + errorImpl(handle) + " [" + sql + "]");
             }
             // Drain: a statement may return rows even when the caller ignores them.
             while (rc == 1) {
-                rc = stepImpl(stmt);
+                rc = step(stmt);
                 if (rc < 0) {
                     throw new IOException("Statement failed: " + errorImpl(handle) + " [" + sql + "]");
                 }
             }
+            if (lastInsertId != null) {
+                lastInsertId[0] = lastInsertRowIdImpl(handle);
+            }
             return changesImpl(handle);
         } finally {
-            finalizeImpl(stmt);
+            release(st);
         }
     }
 
     /// Runs a query and returns every row as a column-name to value map. Values are
     /// String, Long, Double or null, which is exactly what the JSON writer accepts.
-    private List queryLocked(String sql, Object[] params) throws IOException {
-        long stmt = prepare(sql, params);
+    private List queryLocked(String sql, Object[] params, boolean positional) throws IOException {
+        QueryRows rows = new QueryRows(0);
+        String[] names = run(sql, params, positional, rows);
+        rows.setColumnCount(names.length);
+        // The statement's cached names: never changed, and getColumnNames copies.
+        rows.adoptColumnNames(names);
+        return rows;
+    }
+
+    private String[] run(String sql, Object[] params, boolean positional, List rows) throws IOException {
+        Stmt st = prepare(sql, params);
+        long stmt = st.handle;
         try {
-            int columns = columnCountImpl(stmt);
-            List rows = new QueryRows(columns);
-            String[] names = new String[columns];
-            for (int iter = 0 ; iter < columns ; iter++) {
-                names[iter] = columnNameImpl(stmt, iter);
-            }
+            // AFTER THE FIRST STEP: a cached statement is re-prepared for a
+            // schema change only inside sqlite3_step, so before it the count
+            // and names are the old program's -- an ALTER TABLE ADD COLUMN
+            // between two runs of `SELECT *` would drop the new column.
+            int columns = -1;
+            String[] names = null;
             while (true) {
-                int rc = stepImpl(stmt);
+                int rc = step(stmt);
+                if (columns < 0 && rc >= 0) {
+                    columns = columnCountImpl(stmt);
+                    names = columnNames(st, columns);
+                }
                 if (rc < 0) {
                     throw new IOException("Query failed: " + errorImpl(handle) + " [" + sql + "]");
                 }
                 if (rc == 0) {
-                    return rows;
+                    return names;
+                }
+                if (positional) {
+                    Object[] row = new Object[columns];
+                    for (int iter = 0 ; iter < columns ; iter++) {
+                        row[iter] = columnValue(stmt, iter);
+                    }
+                    rows.add(row);
+                    continue;
                 }
                 Map row = new LinkedHashMap();
                 for (int iter = 0 ; iter < columns ; iter++) {
@@ -135,7 +214,7 @@ public final class Db {
                 rows.add(row);
             }
         } finally {
-            finalizeImpl(stmt);
+            release(st);
         }
     }
 
@@ -273,9 +352,15 @@ public final class Db {
 
     /// Holds the connection gate (see [#enter]) for [#executeLocked].
     public int execute(String sql, Object[] params) throws IOException {
+        return execute(sql, params, null);
+    }
+
+    /// [#execute], also storing [#lastInsertId] into `lastInsertId[0]` when it
+    /// is not null -- under the one hold of the gate, rather than taking it again.
+    public int execute(String sql, Object[] params, long[] lastInsertId) throws IOException {
         enter();
         try {
-            return executeLocked(sql, params);
+            return executeLocked(sql, params, lastInsertId);
         } finally {
             exit();
         }
@@ -285,7 +370,32 @@ public final class Db {
     public List query(String sql, Object[] params) throws IOException {
         enter();
         try {
-            return queryLocked(sql, params);
+            return queryLocked(sql, params, false);
+        } finally {
+            exit();
+        }
+    }
+
+    /// Runs a query and returns every row as an `Object[]` of its values in
+    /// the order the statement projects them; the column names are on the
+    /// result ([Database#columnNames]). See [Database#queryPositional].
+    public List queryPositional(String sql, Object[] params) throws IOException {
+        enter();
+        try {
+            return queryLocked(sql, params, true);
+        } finally {
+            exit();
+        }
+    }
+
+    /// [#queryPositional] into a list the caller owns and reuses, answering the
+    /// column names -- the statement's own array, which must not be changed. A
+    /// new result list per statement cost an object and its first storage block,
+    /// and the DB-API layer then copied every row into a list of its own.
+    public String[] queryPositionalInto(String sql, Object[] params, List out) throws IOException {
+        enter();
+        try {
+            return run(sql, params, true, out);
         } finally {
             exit();
         }
@@ -327,8 +437,11 @@ public final class Db {
                 closePending = true;
                 return;
             }
+            // Taken in the same section as the check: a caller entering
+            // between the two would make this close wait instead of deferring.
+            gateOwner = me;
+            gateHolds++;
         }
-        enter();
         try {
             closeLocked();
         } finally {
@@ -384,8 +497,20 @@ public final class Db {
     /// connection as its query ends.
     private void closeLocked() {
         if (handle != 0) {
+            // sqlite3_close answers SQLITE_BUSY while any statement is alive,
+            // so the cached ones go first.
+            // A busy one is mid-step under a re-entrant call; release() finalizes it
+            // when that call returns, since the handle is gone by then.
+            for (Stmt cached : statements.values()) {
+                cached.cached = false;
+                if (!cached.busy) {
+                    finalizeImpl(cached.handle);
+                }
+            }
+            statements.clear();
             if (closeImpl(handle) == 0) {
                 handle = 0;
+                releaseFunctions();
             } else {
                 // Not silent. The handle is deliberately kept so a later close can
                 // retry, but a connection that will not close is worth a line:
@@ -413,7 +538,64 @@ public final class Db {
         }
     }
 
-    private long prepare(String sql, Object[] params) throws IOException {
+    /// The statement's column names. Decoding them is a string per column per
+    /// run, and they change only when SQLite re-prepares the statement after a
+    /// schema change -- which moves where it keeps them, so the addresses tell.
+    private static String[] columnNames(Stmt st, int columns) {
+        int at = reprepareCountImpl(st.handle);
+        String[] names = st.names;
+        if (names != null && names.length == columns && st.namesAt == at) {
+            return names;
+        }
+        names = new String[columns];
+        for (int iter = 0 ; iter < columns ; iter++) {
+            names[iter] = columnNameImpl(st.handle, iter);
+        }
+        st.names = names;
+        st.namesAt = at;
+        return names;
+    }
+
+    /// Finalizes a statement the caller will never see, dropping it from the
+    /// cache when it was the cached copy.
+    private void discard(Stmt st) {
+        if (st.cached) {
+            statements.remove(st.sql);
+            st.cached = false;
+        }
+        finalizeImpl(st.handle);
+    }
+
+    /// Hands a statement back to the cache, reset, or finalizes it when the
+    /// connection closed meanwhile or another copy of it is already cached.
+    private void release(Stmt st) {
+        resetImpl(st.handle);
+        st.busy = false;
+        if (st.cached) {
+            return;
+        }
+        if (handle == 0 || statements.containsKey(st.sql)) {
+            finalizeImpl(st.handle);
+            return;
+        }
+        if (statements.size() >= STATEMENT_CACHE_SIZE) {
+            Stmt oldest = null;
+            for (Stmt e : statements.values()) {
+                if (!e.busy && (oldest == null || e.used < oldest.used)) {
+                    oldest = e;
+                }
+            }
+            if (oldest != null) {
+                statements.remove(oldest.sql);
+                oldest.cached = false;
+                finalizeImpl(oldest.handle);
+            }
+        }
+        st.cached = true;
+        statements.put(st.sql, st);
+    }
+
+    private Stmt prepare(String sql, Object[] params) throws IOException {
         // THE STATEMENT ITSELF cannot hold a NUL. sqlite3_prepare_v2 is called
         // with -1, so it reads to the first zero byte -- and the native's note
         // says such a truncation leaves an incomplete statement sqlite rejects.
@@ -430,10 +612,17 @@ public final class Db {
         if (handle == 0) {
             throw new IOException("Database is closed");
         }
-        long stmt = prepareImpl(handle, sql);
-        if (stmt == 0) {
-            throw new IOException("Could not prepare: " + errorImpl(handle) + " [" + sql + "]");
+        Stmt st = statements.get(sql);
+        if (st == null || st.busy) {
+            long fresh = prepareImpl(handle, sql);
+            if (fresh == 0) {
+                throw new IOException("Could not prepare: " + errorImpl(handle) + " [" + sql + "]");
+            }
+            st = new Stmt(sql, fresh);
         }
+        st.busy = true;
+        st.used = ++useClock;
+        long stmt = st.handle;
         // THE COUNT HAS TO MATCH, both ways. Binding more than the statement has
         // is SQLITE_RANGE and bind() refuses it -- but binding FEWER said nothing
         // at all: SQLite leaves an unbound parameter as NULL, so an insert or an
@@ -443,7 +632,7 @@ public final class Db {
         int expected = parameterCountImpl(stmt);
         int supplied = params == null ? 0 : params.length;
         if (supplied != expected) {
-            finalizeImpl(stmt);
+            discard(st);
             throw new IOException("the statement has " + expected + " parameter"
                     + (expected == 1 ? "" : "s") + " and " + supplied
                     + " were supplied [" + sql + "]");
@@ -461,11 +650,11 @@ public final class Db {
                 // the call AND the Database -- sqlite3_close answers SQLITE_BUSY
                 // while any statement is unfinalized, and nothing holds a handle
                 // to finalize. The parameter-count branch above already does this.
-                finalizeImpl(stmt);
+                discard(st);
                 throw refused;
             }
         }
-        return stmt;
+        return st;
     }
 
     /// Binds one parameter, or fails.
@@ -474,16 +663,144 @@ public final class Db {
     /// placeholders -- SQLITE_RANGE -- was ignored and the statement executed anyway,
     /// with the unbound parameter reading as NULL. A mutation committed with the
     /// wrong values and nothing said so, where the JavaSE JDBC path throws.
+    /// Registers a scalar SQL function; see Database.createFunction.
+    public boolean createFunction(String name, int argc,
+            java.util.function.Function<Object[], Object> body) throws IOException {
+        enter();
+        try {
+            return createFunctionLocked(name, argc, body);
+        } finally {
+            exit();
+        }
+    }
+
+    private boolean createFunctionLocked(String name, int argc,
+            java.util.function.Function<Object[], Object> body) throws IOException {
+        if (handle == 0) {
+            throw new IOException("the database is closed");
+        }
+        // A NUL would end the name where it becomes a C string, registering a
+        // different function from the one asked for; see open().
+        if (name.indexOf('\0') >= 0) {
+            throw new IOException("a function name cannot contain NUL");
+        }
+        byte[] utf8 = name.getBytes("UTF-8");
+        int id;
+        synchronized (FUNCTIONS_LOCK) {
+            id = -1;
+            for (int i = 0; i < functions.length; i++) {
+                if (functions[i] == null) {
+                    id = i;
+                    break;
+                }
+            }
+            if (id < 0) {
+                id = functions.length;
+                Object[] grown = new Object[functions.length * 2];
+                System.arraycopy(functions, 0, grown, 0, functions.length);
+                functions = grown;
+            }
+            functions[id] = body;
+        }
+        if (createFunctionImpl(handle, utf8, argc, id) != 0) {
+            synchronized (FUNCTIONS_LOCK) {
+                functions[id] = null;
+            }
+            throw new IOException("could not register " + name + ": " + errorImpl(handle));
+        }
+        int[] ids = new int[functionIds.length + 1];
+        System.arraycopy(functionIds, 0, ids, 0, functionIds.length);
+        ids[functionIds.length] = id;
+        functionIds = ids;
+        return true;
+    }
+
+    private void releaseFunctions() {
+        synchronized (FUNCTIONS_LOCK) {
+            for (int id : functionIds) {
+                functions[id] = null;
+            }
+        }
+        functionIds = new int[0];
+    }
+
+    /// Called from the native trampoline while a statement runs: reads the
+    /// arguments, runs the body and hands its answer (or its failure) back.
+    /// Nothing may escape, since the caller is C.
+    @SuppressWarnings("unchecked")
+    static void callFunction(long ctx, int id, int argc, long argv) {
+        Object body;
+        synchronized (FUNCTIONS_LOCK) {
+            body = id >= 0 && id < functions.length ? functions[id] : null;
+        }
+        if (!(body instanceof java.util.function.Function)) {
+            resultError(ctx, "the function is no longer registered");
+            return;
+        }
+        try {
+            Object[] args = new Object[argc];
+            for (int i = 0; i < argc; i++) {
+                switch (valueTypeImpl(argv, i)) {
+                    case TYPE_INTEGER:
+                        args[i] = Long.valueOf(valueLongImpl(argv, i));
+                        break;
+                    case TYPE_FLOAT:
+                        args[i] = Double.valueOf(valueDoubleImpl(argv, i));
+                        break;
+                    case TYPE_TEXT:
+                        args[i] = valueTextImpl(argv, i);
+                        break;
+                    case TYPE_BLOB:
+                        args[i] = valueBlobImpl(argv, i);
+                        break;
+                    default:
+                        args[i] = null;
+                        break;
+                }
+            }
+            Object r = ((java.util.function.Function<Object[], Object>) body).apply(args);
+            if (r == null) {
+                resultNullImpl(ctx);
+            } else if (r instanceof Double || r instanceof Float) {
+                resultDoubleImpl(ctx, ((Number) r).doubleValue());
+            } else if (r instanceof Number) {
+                resultLongImpl(ctx, ((Number) r).longValue());
+            } else if (r instanceof Boolean) {
+                resultLongImpl(ctx, ((Boolean) r).booleanValue() ? 1 : 0);
+            } else if (r instanceof byte[]) {
+                resultBlobImpl(ctx, (byte[]) r);
+            } else {
+                resultTextImpl(ctx, r.toString().getBytes("UTF-8"));
+            }
+        } catch (Throwable t) { //NOPMD AvoidCatchingThrowable - the caller is C; anything escaping would unwind through SQLite
+            String message = t.getMessage();
+            resultError(ctx, message == null ? t.toString() : message);
+        }
+    }
+
+    private static void resultError(long ctx, String message) {
+        try {
+            resultErrorImpl(ctx, message.getBytes("UTF-8"));
+        } catch (java.io.UnsupportedEncodingException err) {
+            resultNullImpl(ctx);
+        }
+    }
+
     private static void bind(long stmt, int index, Object value) throws IOException {
         int status;
         if (value == null) {
             status = bindNullImpl(stmt, index);
+        } else if (value instanceof Long) {
+            // The three types nearly every parameter is, tested first and read
+            // without a virtual call.
+            status = bindLongImpl(stmt, index, ((Long) value).longValue());
         } else if (value instanceof String) {
             status = bindStringImpl(stmt, index, (String) value);
-        } else if (value instanceof Integer || value instanceof Long
-                || value instanceof Short || value instanceof Byte) {
+        } else if (value instanceof Double) {
+            status = bindDoubleImpl(stmt, index, ((Double) value).doubleValue());
+        } else if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
             status = bindLongImpl(stmt, index, ((Number) value).longValue());
-        } else if (value instanceof Double || value instanceof Float) {
+        } else if (value instanceof Float) {
             status = bindDoubleImpl(stmt, index, ((Number) value).doubleValue());
         } else if (value instanceof byte[]) {
             status = bindBlobImpl(stmt, index, (byte[]) value);
@@ -499,6 +816,18 @@ public final class Db {
     }
 
     private static native long openImpl(String path);
+    private static native int createFunctionImpl(long handle, byte[] name, int argc, int id);
+    private static native int valueTypeImpl(long argv, int index);
+    private static native long valueLongImpl(long argv, int index);
+    private static native double valueDoubleImpl(long argv, int index);
+    private static native String valueTextImpl(long argv, int index);
+    private static native byte[] valueBlobImpl(long argv, int index);
+    private static native void resultNullImpl(long ctx);
+    private static native void resultLongImpl(long ctx, long value);
+    private static native void resultDoubleImpl(long ctx, double value);
+    private static native void resultTextImpl(long ctx, byte[] value);
+    private static native void resultBlobImpl(long ctx, byte[] value);
+    private static native void resultErrorImpl(long ctx, byte[] message);
     private static native int closeImpl(long handle);
     private static native String errorImpl(long handle);
     private static native long prepareImpl(long handle, String sql);
@@ -507,16 +836,28 @@ public final class Db {
     private static native int bindDoubleImpl(long stmt, int index, double value);
     private static native int bindNullImpl(long stmt, int index);
     private static native int bindBlobImpl(long stmt, int index, byte[] value);
+    /// One sqlite3_step: offloaded ([#stepImpl]), or on this thread
+    /// ([#stepInlineImpl]) once the connection has a function written in Java,
+    /// which sqlite3_step calls and which has to run on a VM thread.
+    private int step(long stmt) {
+        return functionIds.length > 0 ? stepInlineImpl(stmt) : stepImpl(stmt);
+    }
+
     private static native int stepImpl(long stmt);
+
+    private static native int stepInlineImpl(long stmt);
+
     private static native int parameterCountImpl(long stmt);
     private static native int columnCountImpl(long stmt);
     private static native String columnNameImpl(long stmt, int index);
+    private static native int reprepareCountImpl(long stmt);
     private static native int columnTypeImpl(long stmt, int index);
     private static native String columnStringImpl(long stmt, int index);
     private static native long columnLongImpl(long stmt, int index);
     private static native double columnDoubleImpl(long stmt, int index);
     private static native byte[] columnBlobImpl(long stmt, int index);
     private static native void finalizeImpl(long stmt);
+    private static native void resetImpl(long stmt);
     private static native int changesImpl(long handle);
     private static native long lastInsertRowIdImpl(long handle);
 }

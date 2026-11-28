@@ -1,0 +1,13 @@
+b b
+2 1 1
+b 2 None
+DeprecationWarning Write to deprecated property nextSibling. (Replaced by next_sibling) -- Deprecated since version 4.0.0.
+DeprecationWarning Access to deprecated property nextSibling. (Replaced by next_sibling) -- Deprecated since version 4.0.0.
+DeprecationWarning Call to deprecated method findAll. (Replaced by find_all) -- Deprecated since version 4.0.0.
+DeprecationWarning Call to deprecated method findAll. (Replaced by find_all) -- Deprecated since version 4.0.0.
+DeprecationWarning Call to deprecated method findAll. (Replaced by find_all) -- Deprecated since version 4.0.0.
+DeprecationWarning Call to deprecated method findChild. (Replaced by find) -- Deprecated since version 4.0.0.
+DeprecationWarning Call to deprecated method fetch. (Replaced by find_all) -- Deprecated since version 4.0.0.
+DeprecationWarning Call to deprecated method findChild. (Replaced by find) -- Deprecated since version 4.0.0.
+fetch findChild
+True

@@ -1,0 +1,2 @@
+[('cropbox', 1), ('rects', ['rect']), ('lines', ['line']), ('ax', 4), ('bx', 4)]
+[('cropbox', 1), ('trimbox', 2), ('rects', ['rect']), ('lines', ['line']), ('ax', 4), ('bx', 4)]

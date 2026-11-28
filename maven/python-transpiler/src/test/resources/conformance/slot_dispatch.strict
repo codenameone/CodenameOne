@@ -1,0 +1,1 @@
+main:66 getattr with a computed name is reflection; write override = main.Forwarder.__getattr__ in cn1-python.properties and its compliant body in cn1-python-overrides/main.Forwarder.__getattr__.py

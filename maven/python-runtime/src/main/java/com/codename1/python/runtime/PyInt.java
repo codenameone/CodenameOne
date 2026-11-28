@@ -36,6 +36,13 @@ public class PyInt extends PyObject {
     private static final PyInt[] CACHE = new PyInt[CACHE_HIGH - CACHE_LOW + 1];
     private static final BigInteger LONG_MIN = BigInteger.valueOf(Long.MIN_VALUE);
     private static final BigInteger LONG_MAX = BigInteger.valueOf(Long.MAX_VALUE);
+    private static final Long[] BOXED = new Long[1024];
+
+    static {
+        for (int i = 0; i < BOXED.length; i++) {
+            BOXED[i] = Long.valueOf(i);
+        }
+    }
 
     static {
         for (int i = 0; i < CACHE.length; i++) {
@@ -57,8 +64,15 @@ public class PyInt extends PyObject {
     }
 
     public static Object of(long v) {
+        // Long.valueOf caches -128..127 only; iterating bytes and building
+        // code point lists produce 0..255 all the time, and every one of
+        // those above 127 was a new object.
+        if (v >= 0 && v < BOXED.length) {
+            return BOXED[(int) v];
+        }
         return Long.valueOf(v);
     }
+
 
     public static Object of(BigInteger b) {
         if (b.compareTo(LONG_MIN) >= 0 && b.compareTo(LONG_MAX) <= 0) {
@@ -77,6 +91,29 @@ public class PyInt extends PyObject {
 
     /// Parses an integer literal or `int(str, base)` text.
     public static Object parse(String s, int base) {
+        return parse(s, base, s);
+    }
+
+    /// [#parse], naming `orig` (what int() was given: a str or bytes) as
+    /// CPython does, by its repr, in a failure.
+    public static Object parse(String s, int base, Object orig) {
+        int len = s.length();
+        if (base == 10 && len > 0 && len <= 18) {
+            // The common case, ASCII digits with an optional minus, read
+            // without the copies and per-digit lookups below.
+            int k = s.charAt(0) == '-' && len > 1 ? 1 : 0;
+            long v = 0;
+            for (; k < len; k++) {
+                int d = s.charAt(k) - '0';
+                if (d < 0 || d > 9) {
+                    break;
+                }
+                v = v * 10 + d;
+            }
+            if (k == len) {
+                return of(s.charAt(0) == '-' ? -v : v);
+            }
+        }
         String t = s.trim().replace("_", "");
         boolean neg = false;
         if (t.startsWith("-") || t.startsWith("+")) {
@@ -85,13 +122,15 @@ public class PyInt extends PyObject {
         }
         if (base == 0 || base == 16 || base == 8 || base == 2) {
             String lower = t.length() > 1 ? t.substring(0, 2) : "";
-            if ("0x".equals(lower) || "0X".equals(lower)) {
+            // A prefix is only read as one when it names the base asked for
+            // (or base 0): int("0B47", 16) is 0xB47, not a binary literal.
+            if (("0x".equals(lower) || "0X".equals(lower)) && (base == 0 || base == 16)) {
                 base = 16;
                 t = t.substring(2);
-            } else if ("0o".equals(lower) || "0O".equals(lower)) {
+            } else if (("0o".equals(lower) || "0O".equals(lower)) && (base == 0 || base == 8)) {
                 base = 8;
                 t = t.substring(2);
-            } else if ("0b".equals(lower) || "0B".equals(lower)) {
+            } else if (("0b".equals(lower) || "0B".equals(lower)) && (base == 0 || base == 2)) {
                 base = 2;
                 t = t.substring(2);
             } else if (base == 0) {
@@ -99,11 +138,11 @@ public class PyInt extends PyObject {
             }
         }
         if (t.length() == 0) {
-            throw Py.valueError("invalid literal for int() with base " + base + ": '" + s + "'");
+            throw Py.valueError("invalid literal for int() with base " + base + ": " + Py.toRepr(orig));
         }
         for (int i = 0; i < t.length(); i++) {
             if (Character.digit(t.charAt(i), base) < 0) {
-                throw Py.valueError("invalid literal for int() with base " + base + ": '" + s + "'");
+                throw Py.valueError("invalid literal for int() with base " + base + ": " + Py.toRepr(orig));
             }
         }
         if (t.length() <= 12 || base == 10 && t.length() <= 18) {
@@ -439,7 +478,12 @@ public class PyInt extends PyObject {
         if (big == null && n < 63 && (value == 0 || Math.abs(value) < (1L << (62 - n)))) {
             return of(value << n);
         }
-        return of(toBig().shiftLeft((int) n));
+        if (n > Integer.MAX_VALUE) {
+            // A cast would wrap the count, and a negative one makes shiftLeft
+            // shift right. CPython cannot build such a number either.
+            throw Py.overflowError("too many digits in integer");
+        }
+        return of(toBig().shiftLeft(Math.toIntExact(n)));
     }
 
     @Override
@@ -454,7 +498,11 @@ public class PyInt extends PyObject {
         if (big == null) {
             return of(n >= 64 ? (value < 0 ? -1 : 0) : value >> n);
         }
-        return of(big.shiftRight((int) n));
+        if (n > Integer.MAX_VALUE) {
+            // Past every bit of any representable number: what is left is the sign.
+            return of(big.signum() < 0 ? -1 : 0);
+        }
+        return of(big.shiftRight(Math.toIntExact(n)));
     }
 
     @Override

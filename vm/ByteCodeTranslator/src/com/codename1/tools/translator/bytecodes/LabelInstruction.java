@@ -286,7 +286,7 @@ public class LabelInstruction extends Instruction {
                     b.append(s.cls);
                     b.append(s.counter);
                     b.append(" = threadStateData->tryBlockOffset;\n");
-                    b.append("    BEGIN_TRY(");
+                    b.append("    BEGIN_TRY_H(");
                     b.append(s.cls);
                     b.append(", catch_");
                     b.append(labelName(parent));

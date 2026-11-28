@@ -1,0 +1,5 @@
+47
+['root', 'ab', 'cde', 'f', 'gh']
+['AB', 'CDE', 'GH']
+AttributeError True
+['X']

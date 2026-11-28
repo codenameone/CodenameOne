@@ -96,7 +96,9 @@ class Subnormal(DecimalException):
     pass
 
 
-class Overflow(Inexact, Rounded):
+# Overflow and Underflow carry only their first base: a second exception base
+# gives the class no layout, and nothing here catches them as Rounded.
+class Overflow(Inexact):
     def handle(self, context, sign, *args):
         if context.rounding in (ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_HALF_DOWN, ROUND_UP):
             return _SignedInfinity[sign]
@@ -109,7 +111,7 @@ class Overflow(Inexact, Rounded):
         return _dec(sign, "9" * context.prec, context.Emax - context.prec + 1)
 
 
-class Underflow(Inexact, Rounded, Subnormal):
+class Underflow(Inexact):
     pass
 
 
@@ -151,30 +153,74 @@ class Context:
         else:
             self.flags = {s: bool(flags.get(s, False)) for s in _signals}
 
-    def __setattr__(self, name, value):
-        if name == "prec":
-            if not isinstance(value, int):
-                raise TypeError("an integer is required")
-            if not 1 <= value <= MAX_PREC:
-                raise ValueError("valid range for prec is [1, MAX_PREC]")
-        elif name == "Emin":
-            if not isinstance(value, int):
-                raise TypeError("an integer is required")
-            if not MIN_EMIN <= value <= 0:
-                raise ValueError("valid range for Emin is [MIN_EMIN, 0]")
-        elif name == "Emax":
-            if not isinstance(value, int):
-                raise TypeError("an integer is required")
-            if not 0 <= value <= MAX_EMAX:
-                raise ValueError("valid range for Emax is [0, MAX_EMAX]")
-        elif name == "capitals" or name == "clamp":
-            if value not in (0, 1):
-                raise ValueError("valid values for %s are [0, 1]" % name)
-        elif name == "rounding":
-            if value not in _ROUNDINGS:
-                raise TypeError("valid values for rounding are:\n  [ROUND_CEILING, ROUND_FLOOR, ROUND_UP, ROUND_DOWN,"
-                                "\n   ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_HALF_EVEN,\n   ROUND_05UP]")
-        object.__setattr__(self, name, value)
+    # The validated attributes are properties rather than a __setattr__, which
+    # would leave Context without a layout.
+    @property
+    def prec(self):
+        return self._prec
+
+    @prec.setter
+    def prec(self, value):
+        if not isinstance(value, int):
+            raise TypeError("an integer is required")
+        if not 1 <= value <= MAX_PREC:
+            raise ValueError("valid range for prec is [1, MAX_PREC]")
+        self._prec = value
+
+    @property
+    def Emin(self):
+        return self._Emin
+
+    @Emin.setter
+    def Emin(self, value):
+        if not isinstance(value, int):
+            raise TypeError("an integer is required")
+        if not MIN_EMIN <= value <= 0:
+            raise ValueError("valid range for Emin is [MIN_EMIN, 0]")
+        self._Emin = value
+
+    @property
+    def Emax(self):
+        return self._Emax
+
+    @Emax.setter
+    def Emax(self, value):
+        if not isinstance(value, int):
+            raise TypeError("an integer is required")
+        if not 0 <= value <= MAX_EMAX:
+            raise ValueError("valid range for Emax is [0, MAX_EMAX]")
+        self._Emax = value
+
+    @property
+    def capitals(self):
+        return self._capitals
+
+    @capitals.setter
+    def capitals(self, value):
+        if value not in (0, 1):
+            raise ValueError("valid values for capitals are [0, 1]")
+        self._capitals = value
+
+    @property
+    def clamp(self):
+        return self._clamp
+
+    @clamp.setter
+    def clamp(self, value):
+        if value not in (0, 1):
+            raise ValueError("valid values for clamp are [0, 1]")
+        self._clamp = value
+
+    @property
+    def rounding(self):
+        return self._rounding
+
+    @rounding.setter
+    def rounding(self, value):
+        if value not in _ROUNDINGS:
+            raise TypeError("valid values for rounding are:\n  [ROUND_CEILING, ROUND_FLOOR, ROUND_UP, ROUND_DOWN,"
+                            "\n   ROUND_HALF_UP, ROUND_HALF_DOWN, ROUND_HALF_EVEN,\n   ROUND_05UP]")
+        self._rounding = value
 
     def __repr__(self):
         return ("Context(prec=%d, rounding=%s, Emin=%d, Emax=%d, capitals=%d, clamp=%d, flags=[%s], traps=[%s])"
@@ -377,10 +423,23 @@ def localcontext(ctx=None, **kwargs):
         ctx = getcontext()
     manager = _ContextManager(ctx)
     for key, value in kwargs.items():
-        if key == "flags" or key == "traps":
-            setattr(manager.new_context, key, {s: s in value for s in _signals})
-        elif key in ("prec", "rounding", "Emin", "Emax", "capitals", "clamp"):
-            setattr(manager.new_context, key, value)
+        c = manager.new_context
+        if key == "flags":
+            c.flags = {s: s in value for s in _signals}
+        elif key == "traps":
+            c.traps = {s: s in value for s in _signals}
+        elif key == "prec":
+            c.prec = value
+        elif key == "rounding":
+            c.rounding = value
+        elif key == "Emin":
+            c.Emin = value
+        elif key == "Emax":
+            c.Emax = value
+        elif key == "capitals":
+            c.capitals = value
+        elif key == "clamp":
+            c.clamp = value
         else:
             raise TypeError("'%s' is an invalid keyword argument for this function" % key)
     return manager

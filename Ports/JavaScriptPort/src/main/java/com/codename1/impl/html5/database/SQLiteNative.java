@@ -173,4 +173,13 @@ public class SQLiteNative {
     public static native double columnDouble(long stmtPeer, int col);
 
     public static native long columnLong(long stmtPeer, int col);
+
+    /**
+     * Registers, or with {@code id} -1 removes, the SQL function {@code name} of {@code argCount}
+     * arguments on the connection. SQLite calls it back through
+     * {@code DatabaseImpl.callFunction(int, Object[], int[])} with {@code id}.
+     *
+     * @return false on failure, with the reason in {@link #lastError()}
+     */
+    public static native boolean createFunction(long dbPeer, String name, int argCount, int id);
 }

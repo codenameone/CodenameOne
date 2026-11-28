@@ -1,0 +1,1 @@
+main:3 attrs s used as a value, not as a class decorator, cannot be lowered at build time; decorate each class statement with it directly

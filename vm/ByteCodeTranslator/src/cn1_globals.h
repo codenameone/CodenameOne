@@ -816,7 +816,11 @@ typedef struct clazz*       JAVA_CLASS;
          * which every application links -- fails to link for those. The macro only
          * expands where an aastore exists, which is exactly where the class is kept
          * alive. The branch hint is the part that carries over. */ \
-        if(__builtin_expect(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value)), 0)) { \
+        /* An Object[] takes anything and an exact match needs no walk: both are
+         * answered here, so the usual store makes no call at all. */ \
+        if(__builtin_expect(cn1__comp != NULL && cn1__comp->classId != cn1_class_id_java_lang_Object \
+                && cn1__comp->classId != GET_CLASS_ID(value) \
+                && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value)), 0)) { \
             cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ArrayStoreException(threadStateData), CN1_CLASS_OF(value)->clsName, NULL); \
         } \
     } \
@@ -825,7 +829,7 @@ typedef struct clazz*       JAVA_CLASS;
 #define BC_CHECKCAST_CHECKED(typeOfCheckCast, targetName) { \
     if(SP[-1].data.o != JAVA_NULL) { \
         int tmpCheckCastId = GET_CLASS_ID(SP[-1].data.o); \
-        if(!instanceofFunction(typeOfCheckCast, tmpCheckCastId)) { \
+        if(tmpCheckCastId != (typeOfCheckCast) && !instanceofFunction(typeOfCheckCast, tmpCheckCastId)) { \
             cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ClassCastException(threadStateData), CN1_CLASS_OF(SP[-1].data.o)->clsName, targetName); \
         } \
     } \
@@ -835,13 +839,7 @@ typedef struct clazz*       JAVA_CLASS;
 
 
 // (*--SP) rather than (*pop(&SP)), which is the same decrement-then-dereference
-// and avoids taking SP's address. A method that emits setjmp declares SP volatile
-// so longjmp cannot clobber it (see CN1_DECLARE_SP); &SP is then
-// `struct elementStruct *volatile *`, and pop() takes `struct elementStruct **`,
-// so every pop in such a method passed a pointer that discarded the very
-// qualifier the frame variant exists to apply. That was ~9,100 warnings in one
-// application build, and it was the compiler being right: writing through the
-// unqualified pointer is not the volatile access the declaration asked for.
+// and avoids taking SP's address, so SP can stay in a register.
 #define POP_INT() ((*--SP).data.i)
 #define POP_OBJ() ((*--SP).data.o)
 #define POP_OBJ_NO_RELEASE() ((*--SP).data.o)
@@ -1462,7 +1460,7 @@ extern struct JavaObjectPrototype cn1TaggedProxy[CN1_TAG_COUNT];
 #define CN1_TAG_CODE(o) (((uintptr_t)(o)) & CN1_TAG_MASK)
 #define CN1_IS_TAGGED(o) (CN1_TAG_CODE(o) != 0)
 // A function rather than a macro so the argument is evaluated exactly once; every caller
-// passes an lvalue, but SP[-1].data.o through a volatile SP would otherwise be three loads.
+// passes an lvalue, and a macro would evaluate SP[-1].data.o three times.
 static inline struct clazz* cn1ClassOf(JAVA_OBJECT o) {
     uintptr_t cn1__code = ((uintptr_t)o) & CN1_TAG_MASK;
     struct JavaObjectPrototype* cn1__p = cn1__code ? &cn1TaggedProxy[cn1__code]
@@ -1794,7 +1792,17 @@ struct CN1BuilderAccess {
 
 // indicates a try/catch block currently in frame
 struct TryBlock {
-    jmp_buf destination;
+    // The jmp_buf a throw resumes at, in the frame that set it up -- never a copy.
+    // A generated method shares ONE jmp_buf among all of its handlers and tells
+    // them apart by `handler`, which the longjmp delivers as setjmp's result:
+    // a setjmp per handler at every method entry, and a memcpy of the whole
+    // jmp_buf (~200 bytes on arm64) at every try entry, were what a try cost.
+    jmp_buf* destination;
+    // Which of the method's handlers this block is (a DEFINE_CATCH_BLOCK constant,
+    // never 0); 1 for a block whose jmp_buf is its own (the runtime's C call sites).
+    // Read back after the jump from the block the throw stopped at: every throw
+    // path leaves tryBlockOffset on the block that caught.
+    JAVA_INT handler;
     struct CN1StackBuffer* nativeBuffers;
     struct CN1BuilderAccess* builderAccess;
     
@@ -1991,6 +1999,42 @@ extern void cn1SatbBulkQuiesce(void);
                  cn1SatbEnqueue(cn1__old); \
          } } while(0)
 #endif
+
+// A reference field store at the call site. set_field_X used to be a function per field
+// holding both barrier macros, and at clang's -inline-threshold=50 every one of them stayed
+// a call: three of them were 16% of a Python generator's resume. The header now maps a
+// plain reference setter onto this (see ByteCodeClass): off-mark, with no generational
+// barrier, a store is a flag test and a store. Anything else takes cn1SetRefFieldSlow,
+// which runs the same two macros the setter ran, in the same order, so barrier semantics
+// are unchanged -- only where the code lives moved.
+extern void cn1SetRefFieldSlow(JAVA_OBJECT target, JAVA_OBJECT* addr, JAVA_OBJECT value);
+static inline void cn1InlSetRefField(JAVA_OBJECT target, size_t offset, JAVA_OBJECT value) {
+    JAVA_OBJECT* addr = (JAVA_OBJECT*)((char*)target + offset);
+#if defined(CN1_DISABLE_SATB)
+    if(__builtin_expect(cn1GcGenBarrier, 0)) {
+#else
+    if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) {
+#endif
+        cn1SetRefFieldSlow(target, addr, value);
+        return;
+    }
+    *addr = value;
+}
+
+// The same for a static: no owning object, so the generational half has nothing to
+// remember (CN1_GEN_REMEMBER tests its target for null) and the insertion and deletion
+// halves run exactly as the static setter ran them.
+static inline void cn1InlSetStaticRef(JAVA_OBJECT* addr, JAVA_OBJECT value) {
+#if defined(CN1_DISABLE_SATB)
+    if(__builtin_expect(cn1GcGenBarrier, 0)) {
+#else
+    if(__builtin_expect(gcSatbActive | cn1GcGenBarrier, 0)) {
+#endif
+        cn1SetRefFieldSlow(JAVA_NULL, addr, value);
+        return;
+    }
+    *addr = value;
+}
 
 // ---- java.lang.ref support -------------------------------------------------
 // A WeakReference's referent is NOT traced by the generated mark function. That
@@ -3334,7 +3378,12 @@ extern JAVA_OBJECT cn1BibopFastNew(CODENAME_ONE_THREAD_STATE, int size, struct c
  * mid-use -> the intermittent Windows WebSocket-reader use-after-free. On platforms with
  * signal-stop this just makes the cheaper cooperative path usable; a no-op when conservative
  * roots are off. */
-#define CN1_YIELD_THREAD do { struct ThreadLocalData* __cn1yts = getThreadLocalData(); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
+/* The _TS forms take the state the native was called with (threadStateData) instead of
+ * looking it up: the same struct getThreadLocalData() answers for the running thread,
+ * virtual or not, without its pthread_once, key read and virtual-thread lookup -- which
+ * cost as much as sqlite3_step itself on a statement of one row. */
+#define CN1_YIELD_THREAD_TS(ts) do { struct ThreadLocalData* __cn1yts = (ts); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
+#define CN1_YIELD_THREAD CN1_YIELD_THREAD_TS(getThreadLocalData())
 /* The capture is cleared through a macro of its own because gcParkCaptured only
  * EXISTS when conservative roots are compiled in. Referencing it unconditionally
  * meant -DCN1_DISABLE_CONSERVATIVE_GC_ROOTS -- the A/B arm vm/CLAUDE.md documents
@@ -3368,7 +3417,8 @@ extern JAVA_OBJECT cn1BibopFastNew(CODENAME_ONE_THREAD_STATE, int size, struct c
    scans every registered virtual thread whether or not it is running.
    Going active is cn1GcTryResumeActive's handshake, retried until the collector is not
    holding this thread; see there for why a plain store of threadActive is not enough. */
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); do { while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } } while(__cn1rts->gcPthreadValid && !cn1GcTryResumeActive(__cn1rts)); CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+#define CN1_RESUME_THREAD_TS(ts) do { struct ThreadLocalData* __cn1rts = (ts); CN1_STALL_T0(__cn1rt0); do { while (__cn1rts->threadBlockedByGC){ if(!cn1VirtualThreadYieldIfVirtual()) { usleep((JAVA_INT)1000); } } } while(__cn1rts->gcPthreadValid && !cn1GcTryResumeActive(__cn1rts)); CN1_GC_PARK_RELEASE(__cn1rts); CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
+#define CN1_RESUME_THREAD CN1_RESUME_THREAD_TS(getThreadLocalData())
 
 extern struct ThreadLocalData* getThreadLocalData();
 
@@ -3394,7 +3444,20 @@ extern struct ThreadLocalData* getThreadLocalData();
         threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers; \
         threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess; \
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
-        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, destinationJump, sizeof(jmp_buf)); \
+        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &(destinationJump); \
+        threadStateData->blocks[threadStateData->tryBlockOffset].handler = 1; \
+        threadStateData->tryBlockOffset++; \
+    }
+
+// A generated try entry: `handlerId` is the handler's DEFINE_CATCH_BLOCK constant,
+// and the jmp_buf is the method's one, set up by CN1_TRY_ENTRY.
+#define BEGIN_TRY_H(classId, handlerId) {\
+        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].nativeBuffers = threadStateData->nativeBuffers; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].builderAccess = threadStateData->builderAccess; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = classId; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].destination = &cn1TryJmp; \
+        threadStateData->blocks[threadStateData->tryBlockOffset].handler = handlerId; \
         threadStateData->tryBlockOffset++; \
     }
 
@@ -3429,12 +3492,43 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 
 #define END_TRY(offset) threadStateData->tryBlockOffset = methodBlockOffset + offset - 1
 
-#define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) jmp_buf destinationJump; \
+// The one setjmp of a method with handlers, ahead of its DEFINE_CATCH_BLOCKs. A
+// throw resumes here with the catching handler's constant, and control falls
+// through the DEFINE_CATCH_BLOCKs to the one that owns it. Every handler used to
+// take a setjmp of its own here, at method entry, so a method with four handlers
+// paid four on every call whether or not its try was ever reached.
+#define CN1_TRY_ENTRY() jmp_buf cn1TryJmp; \
+    int cn1TryCaught = 0; \
+    if(CN1_TRY_SETJMP(cn1TryJmp)) { \
+        cn1TryCaught = threadStateData->blocks[threadStateData->tryBlockOffset].handler; \
+    } \
+    SP = cn1SpEntry; \
+    __asm__ __volatile__("" : : "r"(cn1SpEntry) : "memory");
+
+// The restore variable is assigned when its try is entered, and only a throw
+// from inside that try sets cn1TryCaught to this handler's constant, so the
+// read below never sees it unassigned. The compiler cannot follow the longjmp
+// and reports it as uninitialized at every handler; it is silenced here rather
+// than paid for with an initializing store on every call of the method.
+#if defined(__clang__)
+#define CN1_UNINIT_READ_BEGIN _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wuninitialized\"")
+#define CN1_UNINIT_READ_END _Pragma("clang diagnostic pop")
+#elif defined(__GNUC__)
+#define CN1_UNINIT_READ_BEGIN _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wuninitialized\"") _Pragma("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
+#define CN1_UNINIT_READ_END _Pragma("GCC diagnostic pop")
+#else
+#define CN1_UNINIT_READ_BEGIN
+#define CN1_UNINIT_READ_END
+#endif
+
+#define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) \
+    enum { destinationJump = __COUNTER__ + 2 }; \
 { \
-    int currentOffset CN1_UNUSED = threadStateData->tryBlockOffset; \
-    if(CN1_TRY_SETJMP(destinationJump)) { \
+    if(cn1TryCaught == destinationJump) { \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
+        CN1_UNINIT_READ_BEGIN \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
+        CN1_UNINIT_READ_END \
         SP = &stack[1]; \
         stack[0].data.o = threadStateData->exception; \
         stack[0].type = CN1_TYPE_OBJECT; \
@@ -3443,6 +3537,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 }
 
 extern JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex);
+extern JAVA_OBJECT cn1ThrowableStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ex);
 
 
 /*
@@ -3698,6 +3793,37 @@ extern void cn1InstallFaultHandler(void);
 #define CHECK_ARRAY_ACCESS(array_pos, bounds) CN1_ARRAY_ACCESS_GUARD(SP[- array_pos].data.o, bounds)
 #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) CN1_ARRAY_ACCESS_GUARD_EXPR(array, bounds)
 #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) CN1_ARRAY_ACCESS_GUARD(array, bounds)
+
+// One check for a whole run of constant-index loads of one array, emitted by the
+// translator for b[i], b[i+1], ... b[bound] in straight-line code that nothing
+// else in can throw or write (BytecodeMethod.analyzeConstantIndexRuns), at the
+// FIRST load of the run; the loads after it are emitted unchecked. Checked one by
+// one, the cold path of every load kept clang from keeping the array header in a
+// register, and the branches between the loads kept it from fusing eight byte
+// loads into one 64-bit load.
+//
+// The exception is the one Java would throw. The guard for the first load runs
+// first, so null is a NullPointerException and an index past the end at the first
+// load reports itself. Past that, the run is ascending by one and nothing
+// observable happens in it, so the first load that would fail is the one at
+// ->length, and that is the index reported. Diverges like CN1_ARRAY_ACCESS_GUARD:
+// the run's unchecked loads can never execute after a failed check.
+//
+// Within one expression -- b[0] & 0xff | (b[1] & 0xff) << 8 -- C leaves the
+// operands of | unsequenced. The guarded load is the leftmost, innermost one, and
+// clang (the only compiler translated code is built with, clang-cl on Windows
+// included) emits a binary operator's left operand first; LLVM never hoists a load
+// it cannot prove dereferenceable above the noreturn call that may precede it.
+#define CN1_ARRAY_RUN_GUARD(array, index, bound) \
+    do { \
+        JAVA_OBJECT __cn1RgA = (array); \
+        CN1_ARRAY_ACCESS_GUARD(__cn1RgA, (index)); \
+        if(__builtin_expect(((unsigned int)(bound)) >= (unsigned int)(((JAVA_ARRAY)__cn1RgA)->length), 0)) { cn1ThrowArrayIndexOrDie(threadStateData, ((JAVA_ARRAY)__cn1RgA)->length); } \
+    } while(0)
+
+// The expression form of the guard above: guards the run, then reads the element.
+#define CN1_ARRAY_ELEMENT_RUN(dataType, array, index, bound) \
+    ({ JAVA_OBJECT __cn1RgE = (array); CN1_ARRAY_RUN_GUARD(__cn1RgE, (index), (bound)); ((dataType*) CN1_ARRAY_DATA((JAVA_ARRAY)__cn1RgE))[(index)]; })
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
     #define CHECK_NPE_TOP_OF_STACK() if(SP[-1].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
@@ -4297,7 +4423,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     threadStateData->callStackOffset++;
 }
 
-// How SP is declared, and why it is a parameter rather than a fixed token.
+// How SP is declared, and why it is never volatile.
 //
 // ParparVM compiles a try/catch into a setjmp region, so the edges leaving it
 // are abnormal ones. SP is modified all through that region -- every push and
@@ -4314,97 +4440,105 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // method with a short-circuit condition inside a try was enough to trigger it,
 // which means app code, not just the framework.
 //
-// `volatile` goes on the POINTER, not the pointee: `struct elementStruct* volatile SP`
-// keeps SP itself in memory so longjmp cannot clobber it, while stack slot
-// accesses through it stay ordinary. Writing `volatile struct elementStruct* SP`
-// would instead make every operand-stack read and write volatile, which is a
-// different -- and expensive -- statement.
+// The fix is to keep SP DEAD across that edge, not to keep it in memory. Every
+// frame records where SP starts in a const, cn1SpEntry, and CN1_TRY_ENTRY assigns
+// SP from it on both returns of the setjmp; the catch blocks then assign it again
+// (&stack[1]) before anything reads it. Nothing modified since the setjmp is ever
+// read after a longjmp, which is what C99 asks, and no version of SP is live where
+// the abnormal edges meet, which is what gcc needs.
 //
-// Only frames that actually emit setjmp pay for it; BytecodeMethod picks the
-// _VSP variant using the same test it already uses to decide whether locals are
-// volatile.
-#define CN1_DECLARE_SP(spQualifier, spPosition) \
-    struct elementStruct* spQualifier SP CN1_UNUSED = &stack[spPosition];
+// SP used to be `volatile` here instead, and that sent every push and pop of a
+// method with a try through memory -- a load and a store of SP for each, and the
+// whole operand stack with them. A Python `for` loop has a try (it closes a
+// generator it abandons), so a trivial loop body cost 70ns an iteration against
+// CPython's 50. CN1_TRY_ENTRY is emitted as a method's first statement, before any
+// instruction has pushed, so cn1SpEntry is also where SP stands when it runs.
+//
+// What volatile also did, by accident, was keep the frame in memory: the compiler
+// could not tell which slot a store through SP hit, so no local slot ever lived in a
+// register. With SP in a register clang can tell, and it promoted a frameless
+// frame's locals to registers -- a catch then read the values they held at the
+// setjmp, and a transaction's catch rolled back the wrong connection (BackendOrmTest).
+// So CN1_TRY_ENTRY hands the frame's address to an empty asm: the frame has escaped,
+// every slot is stored before any call, and a throw happens only inside a call, so
+// the catch reads what the slots held when it was thrown.
+#define CN1_DECLARE_SP(spPosition) \
+    struct elementStruct* const cn1SpEntry CN1_UNUSED = &stack[spPosition]; \
+    struct elementStruct* SP CN1_UNUSED = cn1SpEntry;
 
 // we need to zero out the values with memset otherwise we will run into a problem
 // when invoking release on pre-existing object which might be garbage
-#define DEFINE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
+#define DEFINE_METHOD_STACK_IMPL(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition) \
+    CN1_DECLARE_SP(spPosition) \
     cn1InitMethodStackInline(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
     int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
-#define DEFINE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+#define DEFINE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_METHOD_STACK_IMPL(stackSize, localsStackSize, spPosition, classNameId, methodNameId)
 
-#define DEFINE_INSTANCE_METHOD_STACK_IMPL(spQualifier, stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
+#define DEFINE_INSTANCE_METHOD_STACK_IMPL(stackSize, localsStackSize, spPosition, classNameId, methodNameId) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition) \
+    CN1_DECLARE_SP(spPosition) \
     cn1InitMethodStackInline(threadStateData, __cn1ThisObject, stackSize, localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
     int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
-#define DEFINE_INSTANCE_METHOD_STACK_VSP(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(volatile, stackSize, localsStackSize, spPosition, classNameId, methodNameId)
+#define DEFINE_INSTANCE_METHOD_STACK(stackSize, localsStackSize, spPosition, classNameId, methodNameId) DEFINE_INSTANCE_METHOD_STACK_IMPL(stackSize, localsStackSize, spPosition, classNameId, methodNameId)
 
-#define DEFINE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_REF_IMPL(stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition) \
+    CN1_DECLARE_SP(spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
     int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
-#define DEFINE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_REF_IMPL(stackSize, localsStackSize, spPosition)
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition) \
+    CN1_DECLARE_SP(spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_TRUE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
     int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(, stackSize, localsStackSize, spPosition)
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(volatile, stackSize, localsStackSize, spPosition)
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_REF(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_REF_IMPL(stackSize, localsStackSize, spPosition)
 
-#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition) \
+    CN1_DECLARE_SP(spPosition) \
     cn1_init_method_stack_fast(threadStateData, (JAVA_OBJECT)1, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
     int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
-#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
-#define DEFINE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FAST_PRIMITIVE_IMPL(stackSize, localsStackSize, spPosition)
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(stackSize, localsStackSize, spPosition) \
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals CN1_UNUSED = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition) \
+    CN1_DECLARE_SP(spPosition) \
     cn1_init_method_stack_fast(threadStateData, __cn1ThisObject, stackSize, localsStackSize, JAVA_FALSE); \
     const int currentCodenameOneCallStackOffset CN1_UNUSED = threadStateData->callStackOffset;\
     int* const cn1CurrentLine CN1_UNUSED = &threadStateData->callStackLine[currentCodenameOneCallStackOffset - 1]; \
     int methodBlockOffset CN1_UNUSED = threadStateData->tryBlockOffset;
 
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(, stackSize, localsStackSize, spPosition)
-#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_VSP(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(volatile, stackSize, localsStackSize, spPosition)
+#define DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE(stackSize, localsStackSize, spPosition) DEFINE_INSTANCE_METHOD_STACK_FAST_PRIMITIVE_IMPL(stackSize, localsStackSize, spPosition)
 
 #define CN1_FAST_RETURN_RELEASE() \
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread; \
@@ -4419,14 +4553,13 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // no callStackOffset bump. The method body (PUSH/POP/SP ops, arithmetic, calls)
 // is emitted byte-for-byte unchanged; it just operates on this local SP. Frame
 // elimination is GC-trivial here -- it changes nothing the collector sees.
-#define DEFINE_METHOD_STACK_FRAMELESS_IMPL(spQualifier, stackSize, localsStackSize, spPosition) \
+#define DEFINE_METHOD_STACK_FRAMELESS_IMPL(stackSize, localsStackSize, spPosition) \
     struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
     struct elementStruct* locals CN1_UNUSED = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
-    CN1_DECLARE_SP(spQualifier, spPosition)
+    CN1_DECLARE_SP(spPosition)
 
-#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(, stackSize, localsStackSize, spPosition)
-#define DEFINE_METHOD_STACK_FRAMELESS_VSP(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(volatile, stackSize, localsStackSize, spPosition)
+#define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) DEFINE_METHOD_STACK_FRAMELESS_IMPL(stackSize, localsStackSize, spPosition)
 
 // The two names a try/catch needs that a frameless frame does not otherwise define.
 // Emitted ONLY into frameless methods that contain one, so the other 90% of frameless
@@ -5042,9 +5175,8 @@ static inline struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, str
 
 // Inlined: POP_INT/POP_LONG/POP_OBJ hit this on every pop, including hot return paths
 // (return POP_LONG()). It was a non-inline call -- pure overhead for a pointer decrement.
-// Returns the new SP rather than writing through a pointer to it, so the caller's
-// SP keeps whatever qualifiers its frame gave it. The pointer-taking form
-// discarded volatile on every frame that declares SP volatile; see POP_MANY.
+// Returns the new SP rather than writing through a pointer to it, so the caller
+// never takes SP's address and can keep it in a register.
 extern struct elementStruct* cn1PopMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* sp);
 
 

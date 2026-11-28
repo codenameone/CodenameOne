@@ -37,10 +37,25 @@ REPEAT_ONE = 17
 MIN_REPEAT_ONE = 18
 
 
-def run(code, text, pos, endpos, mode, forbid=-1):
-    """mode 0 = match, 1 = fullmatch, 2 = search. Returns registers or None."""
+def native(code):
+    """The Java program for `code`, compiled on first use."""
     prog = getattr(code, "_native", None)
     if prog is None:
         prog = _cn1re.compile(code.prog, code.groups, code.marks, code.prefix, code.anchored)
         code._native = prog
-    return _cn1re.run(prog, text, pos, endpos, mode, forbid)
+    return prog
+
+
+def run(code, text, pos, endpos, mode, forbid=-1):
+    """mode 0 = match, 1 = fullmatch, 2 = search. Returns registers or None."""
+    return _cn1re.run(native(code), text, pos, endpos, mode, forbid)
+
+
+def subn(code, text, template, count):
+    """Pattern.subn of a str with a compiled template: (result, count)."""
+    return _cn1re.subn(native(code), text, template, count)
+
+
+def findall(code, text, pos, endpos):
+    """Pattern.findall of a str over [pos, endpos]."""
+    return _cn1re.findall(native(code), text, pos, endpos)

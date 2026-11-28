@@ -584,6 +584,12 @@ final class JavascriptReachability {
         // AnimationFrameCallback is also a JSFunctor, not a JSObject. Its Java
         // implementations are called only by the host requestAnimationFrame bridge.
         seedRuntimeDispatched("com_codename1_html5_js_browser_AnimationFrameCallback", "onAnimationFrame", "(D)V");
+        // A SQL function written in Java: port.js calls the port's static
+        // DatabaseImpl.callFunction from inside the engine, which calls the
+        // application's Function.apply -- neither edge is in any bytecode.
+        enqueueResolved("com_codename1_impl_html5_database_DatabaseImpl", "callFunction",
+                "(I[Ljava/lang/Object;[I)[Ljava/lang/Object;", true);
+        seedRuntimeDispatched("java_util_function_Function", "apply", "(Ljava/lang/Object;)Ljava/lang/Object;");
         // JSO bridge methods are reachable via hand-written port.js
         // dispatch sites that the bytecode-only RTA can't see (e.g.
         // ``__nativeEventListener`` in port.js calls

@@ -77,6 +77,10 @@ mkdir -p target
 OUT="$(mktemp -d "$(pwd)/target/javase.XXXXXX")"
 trap 'rm -rf "$OUT"' EXIT
 BUILD_CP="$OUT"
+# Db.createFunction's sqlite-jdbc half compiles only beside the driver; without it
+# the twin builds from the JDK alone and createFunction reports it unavailable.
+SQLITE_SRC=""
+case ":$DRIVERS:" in *sqlite-jdbc*) SQLITE_SRC="impl/javase-sqlite" ;; esac
 if [ -n "$GEN" ]; then BUILD_CP="$BUILD_CP:$GEN"; fi
 if [ -n "$DRIVERS" ]; then BUILD_CP="$BUILD_CP:$DRIVERS"; fi
 # The core classes marked @SharedWithBackend come from CodenameOne/src directly.
@@ -86,7 +90,8 @@ SHARED_LIST="$(./shared-sources.sh --javase)"
 SHARED=()
 while IFS= read -r f; do SHARED+=("$f"); done <<< "$SHARED_LIST"
 "$JAVAC" -nowarn -encoding UTF-8 -cp "$BUILD_CP" -d "$OUT" \
-    $(find src impl/javase $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
+    $(find src impl/javase $SQLITE_SRC $COMMON "$DEMO" -name '*.java') "${SHARED[@]}"
+if [ -n "$SQLITE_SRC" ]; then cp -r impl/javase-sqlite/META-INF "$OUT/"; fi
 if [ -n "$GEN" ]; then cp -r "$GEN/." "$OUT/"; fi
 
 CP="$OUT"

@@ -26,9 +26,10 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
+import java.util.function.Function;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
-import com.codename1.impl.SQLText;
+import com.codename1.impl.SqlFunctionBridge;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,6 +45,75 @@ class WindowsDatabase extends Database {
 
     private long peer;
 
+    /// The functions every connection of this process has registered; SQLite holds only the id.
+    private static final SqlFunctionBridge FUNCTIONS = new SqlFunctionBridge() {
+        @Override
+        protected int valueType(long argv, int i) {
+            return WindowsNative.sqlValueType(argv, i);
+        }
+
+        @Override
+        protected long valueLong(long argv, int i) {
+            return WindowsNative.sqlValueLong(argv, i);
+        }
+
+        @Override
+        protected double valueDouble(long argv, int i) {
+            return WindowsNative.sqlValueDouble(argv, i);
+        }
+
+        @Override
+        protected byte[] valueText(long argv, int i) {
+            return WindowsNative.sqlValueText(argv, i);
+        }
+
+        @Override
+        protected byte[] valueBlob(long argv, int i) {
+            return WindowsNative.sqlValueBlob(argv, i);
+        }
+
+        @Override
+        protected void resultNull(long ctx) {
+            WindowsNative.sqlResultNull(ctx);
+        }
+
+        @Override
+        protected void resultLong(long ctx, long v) {
+            WindowsNative.sqlResultLong(ctx, v);
+        }
+
+        @Override
+        protected void resultDouble(long ctx, double v) {
+            WindowsNative.sqlResultDouble(ctx, v);
+        }
+
+        @Override
+        protected void resultText(long ctx, byte[] utf8) {
+            WindowsNative.sqlResultText(ctx, utf8);
+        }
+
+        @Override
+        protected void resultBlob(long ctx, byte[] v) {
+            WindowsNative.sqlResultBlob(ctx, v);
+        }
+
+        @Override
+        protected void resultError(long ctx, byte[] utf8) {
+            WindowsNative.sqlResultError(ctx, utf8);
+        }
+    };
+
+    static {
+        // The engine's calls arrive at WindowsNative.sqlFunctionCall, which forwards them here.
+        WindowsNative.sqlFunctionHandler = new WindowsNative.SqlFunctionHandler() {
+            @Override
+            public void call(long ctx, int id, int argc, long argv) {
+                FUNCTIONS.call(ctx, id, argc, argv);
+            }
+        };
+    }
+
+
     /**
      * The name this database was opened under. Retained because a managed key resolves its
      * keystore alias from the database name, and changeKey() would otherwise have nothing to
@@ -52,6 +122,7 @@ class WindowsDatabase extends Database {
     private final String databaseName;
 
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
+    private final com.codename1.impl.SQLStatementCache statements = new com.codename1.impl.SQLStatementCache();
 
     /// SQLite's success code.
     private static final int SQLITE_OK = 0;
@@ -303,7 +374,7 @@ class WindowsDatabase extends Database {
         if (isLegacyBehavior()) {
             return;
         }
-        if (SQLStatementSplitter.isMultiStatement(sql)) {
+        if (!isPlainStatement(sql) && SQLStatementSplitter.isMultiStatement(sql)) {
             throw new IOException("This method takes a single SQL statement, but the string "
                     + "contains " + SQLStatementSplitter.countStatements(sql)
                     + ". Use execute(String) to run a script.");
@@ -372,10 +443,17 @@ class WindowsDatabase extends Database {
         for (int iter = 0; iter < cursors.length; iter++) {
             cursors[iter].databaseClosed();
         }
+        // SQLite will not close a connection whose statements are still alive.
+        long[] cached = statements.drain();
+        for (int iter = 0; iter < cached.length; iter++) {
+            WindowsNative.sqlStmtFinalize(cached[iter]);
+        }
         long closing = peer;
         peer = 0;
         try {
             WindowsNative.sqlDbClose(closing);
+            // Only once the engine is gone: a statement it still ran could call one.
+            FUNCTIONS.release(this);
         } finally {
             // Last, not first: see the iOS port. The claim covers the handle, not the intent to
             // close. In a finally because the native close can fail and the handle has already
@@ -386,6 +464,67 @@ class WindowsDatabase extends Database {
             noteConnectionClosed();
             releaseOpenDatabase(openKey);
             releaseOpenDatabase(identityKey);
+        }
+    }
+
+    @Override
+    public long changes() throws IOException {
+        checkOpen();
+        return WindowsNative.sqlDbChanges(peer);
+    }
+
+    @Override
+    public long lastInsertRowId() throws IOException {
+        checkOpen();
+        return WindowsNative.sqlDbLastInsertRowid(peer);
+    }
+
+    @Override
+    public boolean supportsFunctions() {
+        return true;
+    }
+
+    /// A cached statement for `sql`, its parameters back to NULL, or 0.
+    /// sqlite3_reset keeps the last run's bindings, and a legacy call that
+    /// passes fewer values than placeholders must see NULL in the rest, as a
+    /// freshly prepared statement would.
+    private long takeCached(String sql) throws IOException {
+        long stmt = statements.take(sql);
+        if (stmt != 0) {
+            int count = WindowsNative.sqlStmtParameterCount(stmt);
+            for (int iter = 1; iter <= count; iter++) {
+                WindowsNative.sqlStmtBindNull(stmt, iter);
+            }
+        }
+        return stmt;
+    }
+
+    /// [#takeCached] for a path with no handler on the way: a statement that
+    /// cannot be cleared is finalized, and the caller prepares a fresh one.
+    private long takeCachedStatus(String sql) {
+        long stmt = statements.take(sql);
+        if (stmt == 0) {
+            return 0;
+        }
+        try {
+            int count = WindowsNative.sqlStmtParameterCount(stmt);
+            for (int iter = 1; iter <= count; iter++) {
+                WindowsNative.sqlStmtBindNull(stmt, iter);
+            }
+            return stmt;
+        } catch (IOException e) {
+            WindowsNative.sqlStmtFinalizeStatus(stmt);
+            return 0;
+        }
+    }
+
+    @Override
+    public void createFunction(String name, int argCount, Function<Object[], Object> function) throws IOException {
+        checkOpen();
+        byte[] utf8 = SqlFunctionBridge.functionName(name);
+        int id = function == null ? -1 : FUNCTIONS.register(this, function);
+        if (WindowsNative.sqlDbCreateFunction(peer, utf8, argCount, id) != 0) {
+            throw new IOException("Could not create the SQL function " + name);
         }
     }
 
@@ -481,9 +620,23 @@ class WindowsDatabase extends Database {
         reserveAttachments(sql, params);
         requireSingleStatement(sql);
         try {
-            long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
+            long stmt = takeCached(sql);
+            if (stmt == 0) {
+                stmt = WindowsNative.sqlStmtPrepare(peer, sql);
+            }
+            // bind finalizes the statement itself when it throws.
             bind(stmt, params);
-            WindowsNative.sqlStmtExecuteAndFinalize(stmt);
+            try {
+                while (WindowsNative.sqlStmtStep(stmt)) {
+                    // Rows of a statement run for its effect are discarded, as before.
+                }
+            } catch (IOException err) {
+                WindowsNative.sqlStmtFinalize(stmt);
+                throw err;
+            }
+            // Reset releases what the run holds, so a cached statement keeps no lock.
+            WindowsNative.sqlStmtReset(stmt);
+            WindowsNative.sqlStmtFinalize(statements.put(sql, stmt));
             // The names on success only -- a statement that failed opened no savepoint.
             noteScriptTransactionControl(sql);
         } finally {
@@ -494,12 +647,56 @@ class WindowsDatabase extends Database {
         }
     }
 
+    /// The status form of [#execute(String, Object...)], with no handler on the way for the
+    /// statement nearly every call runs: one plain statement on an open connection, its
+    /// parameters ones the engine binds directly. Anything else -- and the bookkeeping after a
+    /// failure -- takes the inherited path, which wraps the throwing method.
+    @Override
+    public int executeStatus(String sql, Object[] params, long[] counts) {
+        if (peer == 0 || params == null || !isPlainStatement(sql)) {
+            return super.executeStatus(sql, params, counts);
+        }
+        long stmt = takeCachedStatus(sql);
+        if (stmt == 0) {
+            stmt = WindowsNative.sqlStmtPrepareStatus(peer, sql);
+            if (stmt == 0) {
+                return failStatus(WindowsNative.sqlDbErrorText(peer), 1);
+            }
+        }
+        int rc = WindowsNative.sqlStmtRunStatus(stmt, params, counts);
+        if (rc == 0) {
+            // A plain statement that ran changed no transaction state.
+            WindowsNative.sqlStmtFinalizeStatus(statements.put(sql, stmt));
+            return 0;
+        }
+        return statementFailed(sql, params, counts, stmt, rc);
+    }
+
+    /// The cold half of [#executeStatus(String, Object[], long[])], kept apart so that its handler is
+    /// set up only when a statement did not run.
+    private int statementFailed(String sql, Object[] params, long[] counts, long stmt, int rc) {
+        if (rc == -2 || rc == -3) {
+            // Nothing ran: a parameter only Java binds, or a count the throwing path words.
+            WindowsNative.sqlStmtFinalizeStatus(statements.put(sql, stmt));
+            return super.executeStatus(sql, params, counts);
+        }
+        String message = WindowsNative.sqlDbErrorText(peer);
+        WindowsNative.sqlStmtFinalizeStatus(stmt);
+        try {
+            // As execute does after any run: ON CONFLICT ROLLBACK ends the transaction as it fails.
+            noteEngineTransactionState(WindowsNative.sqlDbInTransaction(peer));
+        } catch (IOException err) {
+            return failStatus(err.getMessage(), rc);
+        }
+        return failStatus(message, rc);
+    }
+
     @Override
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         // A statement with placeholders and no arguments would otherwise run with every slot left
         // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
         // mode, where running it unbound is the behaviour applications were written against.
@@ -519,7 +716,7 @@ class WindowsDatabase extends Database {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         bindText(stmt, params);
         return register(new CursorImpl(stmt), sql);
     }
@@ -536,13 +733,29 @@ class WindowsDatabase extends Database {
         checkOpen();
         requireSingleStatement(sql);
         requireQueryStatement(sql);
-        long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
+        long stmt = prepareCached(sql);
         bind(stmt, params);
         return register(new CursorImpl(stmt), sql);
     }
 
+    private long prepareCached(String sql) throws IOException {
+        long stmt = takeCached(sql);
+        return stmt != 0 ? stmt : WindowsNative.sqlStmtPrepare(peer, sql);
+    }
+
+    /// Takes back a closed cursor's statement, reset, for the next query with the same SQL.
+    void recycle(String sql, long stmt) throws IOException {
+        if (peer == 0 || sql == null) {
+            WindowsNative.sqlStmtFinalize(stmt);
+            return;
+        }
+        WindowsNative.sqlStmtReset(stmt);
+        WindowsNative.sqlStmtFinalize(statements.put(sql, stmt));
+    }
+
     private Cursor register(CursorImpl cursor, String sql) {
         cursor.owner = this;
+        cursor.cacheKey = sql;
         // A statement that writes must never be re-executed to move backwards: this cursor is
         // stepped to run it, so a getCount() or last() would write again. The cursor refuses
         // rather than doing it twice.
@@ -595,7 +808,7 @@ class WindowsDatabase extends Database {
                 if (params[iter] == null) {
                     WindowsNative.sqlStmtBindNull(stmt, iter + 1);
                 } else {
-                    WindowsNative.sqlStmtBindText(stmt, iter + 1, SQLText.toUTF8(params[iter]));
+                    WindowsNative.sqlStmtBindString(stmt, iter + 1, params[iter]);
                 }
             }
         } catch (IOException err) {
@@ -636,7 +849,7 @@ class WindowsDatabase extends Database {
             } else if (p instanceof byte[]) {
                 WindowsNative.sqlStmtBindBlob(stmt, index, (byte[]) p);
             } else if (p instanceof String) {
-                WindowsNative.sqlStmtBindText(stmt, index, SQLText.toUTF8((String) p));
+                WindowsNative.sqlStmtBindString(stmt, index, (String) p);
             } else if (p instanceof Double || p instanceof Float) {
                 WindowsNative.sqlStmtBindDouble(stmt, index, ((Number) p).doubleValue());
             } else if (p instanceof Long || p instanceof Integer || p instanceof Short
@@ -645,7 +858,7 @@ class WindowsDatabase extends Database {
             } else if (p instanceof Boolean) {
                 WindowsNative.sqlStmtBindLong(stmt, index, ((Boolean) p).booleanValue() ? 1 : 0);
             } else {
-                WindowsNative.sqlStmtBindText(stmt, index, SQLText.toUTF8(p.toString()));
+                WindowsNative.sqlStmtBindString(stmt, index, p.toString());
             }
         }
     }
@@ -653,6 +866,7 @@ class WindowsDatabase extends Database {
     /** Cursor over a compiled statement; seeks by resetting and stepping again. */
     static class CursorImpl extends AbstractDBCursor {
         private long stmt;
+        String cacheKey;
         WindowsDatabase owner;
 
         CursorImpl(long stmt) {
@@ -712,7 +926,11 @@ class WindowsDatabase extends Database {
             if (stmt != 0) {
                 long closing = stmt;
                 stmt = 0;
-                WindowsNative.sqlStmtFinalize(closing);
+                if (owner != null) {
+                    owner.recycle(cacheKey, closing);
+                } else {
+                    WindowsNative.sqlStmtFinalize(closing);
+                }
             }
         }
 
@@ -723,7 +941,23 @@ class WindowsDatabase extends Database {
 
         @Override
         protected String columnLabel(int columnIndex) throws IOException {
-            return SQLText.fromUTF8(WindowsNative.sqlColName(stmt, columnIndex));
+            return WindowsNative.sqlColNameString(stmt, columnIndex);
+        }
+
+        @Override
+        protected boolean capturesColumnTypeBeforeRead() {
+            // sqlite3_column_type is undefined once a getter has converted the value.
+            return true;
+        }
+
+        @Override
+        protected int columnType(int index) throws IOException {
+            return WindowsNative.sqlColType(stmt, index);
+        }
+
+        @Override
+        protected boolean readRow(Object[] out) throws IOException {
+            return WindowsNative.sqlRowValues(stmt, out);
         }
 
         @Override
@@ -733,7 +967,7 @@ class WindowsDatabase extends Database {
 
         @Override
         protected String readString(int index) throws IOException {
-            return SQLText.fromUTF8(WindowsNative.sqlColText(stmt, index));
+            return WindowsNative.sqlColString(stmt, index);
         }
 
         @Override

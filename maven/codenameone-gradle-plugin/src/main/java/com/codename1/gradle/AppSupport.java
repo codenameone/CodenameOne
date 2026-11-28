@@ -1283,7 +1283,10 @@ final class AppSupport {
                     common(t, project, layout, ext, userProperties);
                     t.setDescription("Transpiles the Python sources in src/main/python to Java");
                     t.getPythonDirectory().set(pythonDir);
-                    t.getSources().from(project.fileTree(pythonDir, f -> f.include("**/*.py")));
+                    // Every file: a data file beside a module ships in cn1python.dat.
+                    t.getSources().from(project.fileTree(pythonDir));
+                    t.getSources().from(project.fileTree(new File(pythonDir.getParentFile(),
+                            com.codename1.maven.PythonPackageResolver.PACKAGES_DIR)));
                     if (pythonMain != null) {
                         t.getMainModule().set(pythonMain);
                     }
@@ -1296,8 +1299,10 @@ final class AppSupport {
                     t.getJavaSourceDirectory().set(javaDir);
                     t.getJavaSources().from(project.fileTree(javaDir, f -> f.include("**/*.java")));
                     t.getJavaImportsDirectory().set(new File(layout.buildDir(), "cn1-python-java-imports"));
+                    t.getPackageDataDirectory().set(new File(layout.buildDir(), "cn1-python-resources"));
                 });
         main.getJava().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getOutputDirectory));
+        main.getResources().srcDir(python.flatMap(com.codename1.gradle.tasks.TranspilePythonTask::getPackageDataDirectory));
     }
 
     /// The javac annotation processor that writes the source a project compiles

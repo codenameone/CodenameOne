@@ -50,4 +50,23 @@
         </Or>
         <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
     </Match>
+    <!-- null is "no binding" and "strict mode off", which every caller
+         tests for: an empty array is a real answer in both (a call binding
+         no parameter, a strict mode naming no module). -->
+    <Match>
+        <Class name="com.codename1.python.transpiler.codegen.Infer"/>
+        <Or>
+            <Method name="bindByName"/>
+            <Method name="strictPrefixes"/>
+        </Or>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+    <!-- DeclarativeMap.deref answers three ways: null (not a shared entry),
+         {module, null} (a function of the body) and {module, value}; null
+         is the "no answer" case, not an empty result. -->
+    <Match>
+        <Class name="com.codename1.python.transpiler.codegen.DeclarativeMap"/>
+        <Method name="deref"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
 </FindBugsFilter>

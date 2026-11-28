@@ -63,6 +63,19 @@ public final class QueryRows extends ArrayList {
         return columnNames == null ? null : (String[]) columnNames.clone();
     }
 
+    /// The column names themselves, not a copy, for a caller that only reads
+    /// them -- the generated DB-API connection does so on every statement, where
+    /// a copy per call was an allocation per statement. Must not be changed.
+    public String[] sharedColumnNames() {
+        return columnNames;
+    }
+
+    /// Takes `columnNames` as it is rather than copying it; the caller hands over
+    /// an array nothing changes afterwards.
+    public void adoptColumnNames(String[] columnNames) {
+        this.columnNames = columnNames;
+    }
+
     public void setColumnNames(String[] columnNames) {
         this.columnNames = columnNames == null ? null : (String[]) columnNames.clone();
     }

@@ -116,6 +116,23 @@ final class Hashing {
     }
 
     /// The xxHash-based tuple hash of CPython 3.8+.
+    /// [#ofTuple(Object[])] read through the tuple itself: a fixed-size tuple
+    /// ([PyTuple] T2..T6) keeps its items in fields, and asking it for an array
+    /// first copied them into a new one for every hash -- a tuple used as a dict
+    /// key or a set member is hashed on every lookup.
+    static long ofTuple(PyTuple t) {
+        int n = t.size();
+        long acc = XXPRIME_5;
+        for (int i = 0; i < n; i++) {
+            long lane = Py.hashOf(t.get(i));
+            acc += lane * XXPRIME_2;
+            acc = (acc << 31) | (acc >>> 33);
+            acc *= XXPRIME_1;
+        }
+        acc += n ^ (XXPRIME_5 ^ 3527539L);
+        return acc == -1 ? 1546275796L : acc;
+    }
+
     static long ofTuple(Object[] items) {
         long acc = XXPRIME_5;
         for (Object item : items) {

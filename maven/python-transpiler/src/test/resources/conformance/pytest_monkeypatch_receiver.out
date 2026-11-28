@@ -1,0 +1,5 @@
+set 2
+attr receiver red
+deleted False
+other receiver [('set', 'x', 'y', 3), ('del', 'x', 'y')]
+undone 1 False

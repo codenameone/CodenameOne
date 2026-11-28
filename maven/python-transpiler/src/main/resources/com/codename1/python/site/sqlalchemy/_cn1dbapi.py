@@ -15,20 +15,12 @@ import decimal as _decimal
 paramstyle = "qmark"
 
 
-class Error(_sqlite3.Error):
-    pass
-
-
-class OperationalError(Error, _sqlite3.OperationalError):
-    pass
-
-
-class ProgrammingError(Error, _sqlite3.ProgrammingError):
-    pass
-
-
-class IntegrityError(Error, _sqlite3.IntegrityError):
-    pass
+# The sqlite3 classes themselves: the engine maps them into sqlalchemy.exc,
+# and a class with two exception bases could have no layout.
+Error = _sqlite3.Error
+OperationalError = _sqlite3.OperationalError
+ProgrammingError = _sqlite3.ProgrammingError
+IntegrityError = _sqlite3.IntegrityError
 
 
 _INTEGRITY = ("duplicate", "unique", "foreign key", "violates", "cannot be null", "not-null")

@@ -169,6 +169,13 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
 
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
+        if (getRunGuardBound() >= 0 && opcode >= Opcodes.IALOAD && opcode <= Opcodes.SALOAD
+                && shouldEmitNullAndArrayBoundsChecks()) {
+            // Left unreduced, the first load of a constant-index run still guards
+            // the run: the loads after it were marked safe on the strength of this
+            // check. Its own per-element check below stays as well.
+            b.append("    CN1_ARRAY_RUN_GUARD(SP[-2].data.o, SP[-1].data.i, ").append(getRunGuardBound()).append(");\n");
+        }
         switch(opcode) {
             case Opcodes.NOP:
                 break;

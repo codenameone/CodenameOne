@@ -26,7 +26,7 @@ package com.codename1.python.transpiler.api;
 import com.codename1.python.transpiler.analyze.ScopeBuilder;
 import com.codename1.python.transpiler.ast.Node;
 import com.codename1.python.transpiler.ast.Scope;
-import com.codename1.python.transpiler.codegen.Closed;
+import com.codename1.python.transpiler.codegen.WholeProgram;
 import com.codename1.python.transpiler.codegen.Emitter;
 import com.codename1.python.transpiler.parser.Parser;
 
@@ -164,32 +164,183 @@ public final class PythonTranspiler {
     ///        size, so `CN1_HTTP_VT_STACK` can still ask for more at start-up
     public static Map<String, String> transpile(Map<String, String> sources, String mainModule,
             List<java.io.File> classPath, Map<String, String> nativeModules, int virtualThreadStack) {
+        return transpile(sources, mainModule, classPath, nativeModules, virtualThreadStack,
+                java.util.Collections.<String>emptySet(), null);
+    }
+
+    /// @param libraries the source paths that came from PyPI rather than the
+    ///        application. They are compiled as the application's own:
+    ///        code that cannot be translated (`eval`, `exec`, `__import__`,
+    ///        the `sys` frame hooks) fails the build wherever the program
+    ///        reaches it, with the `cn1-python.properties` line that removes
+    ///        or replaces the function it is in. The one difference is
+    ///        `compile`, a build error in the application and, in a package,
+    ///        an object that holds nothing to run
+    /// @param deferred receives `module:line: what` for each place where
+    ///        reached code stores an attribute under a computed name on an
+    ///        object of no known class, which costs the typed fields of
+    ///        every class such an object may be; may be null
+    public static Map<String, String> transpile(Map<String, String> sources, String mainModule,
+            List<java.io.File> classPath, Map<String, String> nativeModules, int virtualThreadStack,
+            Set<String> libraries, List<String> deferred) {
         if (virtualThreadStack <= 0) {
             throw new IllegalArgumentException("virtual thread stack must be positive: " + virtualThreadStack);
         }
         Map<String, String> out = new LinkedHashMap<String, String>();
-        Map<String, String> classes = new LinkedHashMap<String, String>();
-        Map<String, Node.Module> trees = new LinkedHashMap<String, Node.Module>();
-        List<List<Node.Stmt>> bodies = new ArrayList<List<Node.Stmt>>();
-        for (Map.Entry<String, String> e : sources.entrySet()) {
-            String path = e.getKey().replace('\\', '/');
-            if (path.endsWith(".py")) {
-                Node.Module tree = Parser.parse(e.getValue(), path);
-                trees.put(path, tree);
-                bodies.add(tree.body);
+        // The application's own modules, taken before the bundled ones are
+        // added (addStdlib): the roots of a library-mode build.
+        Set<String> ownModules = new HashSet<String>();
+        for (String p : sources.keySet()) {
+            if (p.endsWith(".py") && (libraries == null || !libraries.contains(p))) {
+                ownModules.add(moduleOf(p.replace('\\', '/')));
             }
         }
-        boolean closed = Closed.check(bodies);
+        Map<String, String> classes = new LinkedHashMap<String, String>();
+        Map<String, Node.Module> trees = new LinkedHashMap<String, Node.Module>();
+        Map<String, String> treeSources = new LinkedHashMap<String, String>();
+        String distributions = sources.get("_cn1_distributions.py");
+        if (distributions != null && !sources.containsKey(com.codename1.python.transpiler.codegen.EntryPointTable.PATH)) {
+            // The entry points' targets as literal imports, for
+            // EntryPoint.load (EntryPointTable).
+            Set<String> modules = new HashSet<String>();
+            for (String p : sources.keySet()) {
+                if (p.endsWith(".py")) {
+                    modules.add(moduleOf(p.replace('\\', '/')));
+                }
+            }
+            sources.put(com.codename1.python.transpiler.codegen.EntryPointTable.PATH,
+                    com.codename1.python.transpiler.codegen.EntryPointTable.source(
+                            Parser.parse(distributions, "_cn1_distributions.py"), modules));
+        }
+        for (Map.Entry<String, String> e : sources.entrySet()) {
+            String path = e.getKey().replace('\\', '/');
+            if (path.endsWith(".py")
+                    && !path.startsWith(com.codename1.python.transpiler.codegen.Directives.OVERRIDES + "/")) {
+                // An override body is part of the function it overrides
+                // (Directives), never a module of its own.
+                Node.Module tree = Parser.parse(e.getValue(), path);
+                com.codename1.python.transpiler.codegen.KnownHelpers.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.ConstantDefaults.rewrite(tree);
+                com.codename1.python.transpiler.codegen.ProtocolChecks.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.ClassDecoratorLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.DataclassInit.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.AttrsLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.CobbleLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.NamedTupleLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.PydanticLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.SqlAlchemyLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.ArgparseLowering.rewrite(tree, path);
+                com.codename1.python.transpiler.codegen.PytestLowering.rewrite(tree, path);
+                trees.put(path, tree);
+                treeSources.put(path, e.getValue());
+            }
+        }
+        // threading.local objects used by literal names only become a
+        // per-thread slot class (ThreadLocalLowering).
+        com.codename1.python.transpiler.codegen.ThreadLocalLowering.rewrite(trees);
+        // flask's request/g/session/current_app proxies get one literal
+        // forwarding property per name the program uses (FlaskProxyLowering).
+        String flaskProxies = com.codename1.python.transpiler.codegen.FlaskProxyLowering.rewrite(trees);
+        if (flaskProxies != null) {
+            String fp = com.codename1.python.transpiler.codegen.FlaskProxyLowering.PATH;
+            trees.put(fp, Parser.parse(flaskProxies, fp));
+            treeSources.put(fp, flaskProxies);
+            sources.put(fp, flaskProxies);
+        }
+        // jinja2 reads a template's attributes through one literal accessor
+        // per site, generated from the program's literal templates
+        // (Jinja2Lowering).
+        String jinjaTables = com.codename1.python.transpiler.codegen.Jinja2Lowering.rewrite(trees, sources);
+        if (jinjaTables != null) {
+            String jp = com.codename1.python.transpiler.codegen.Jinja2Lowering.PATH;
+            trees.put(jp, Parser.parse(jinjaTables, jp));
+            treeSources.put(jp, jinjaTables);
+            sources.put(jp, jinjaTables);
+        }
+        // Whole program: class bases Python computes at import time but the
+        // closed program settles (BuildTimeBases).
+        com.codename1.python.transpiler.codegen.BuildTimeBases.rewrite(trees,
+                m -> resource(m.replace('.', '/') + ".py") != null
+                        || resource(m.replace('.', '/') + "/__init__.py") != null);
+        // Whole program: a model class's descriptors are resolved through
+        // the imports of every module (DeclarativeMap).
+        // openpyxl's custom document property finds its value element by
+        // name; each element gets literal code (CustomPropertyLowering).
+        com.codename1.python.transpiler.codegen.CustomPropertyLowering.rewrite(trees);
+        com.codename1.python.transpiler.codegen.DeclarativeMap.rewrite(trees);
+        com.codename1.python.transpiler.codegen.ColorValueLowering.rewrite(trees);
+        com.codename1.python.transpiler.codegen.NamedStyleLowering.rewrite(trees);
+        // Declarative XML element classes (python-pptx's xmlchemy) are made
+        // here rather than by their metaclass (OxmlDeclarative).
+        com.codename1.python.transpiler.codegen.OxmlDeclarative.rewrite(trees);
+        // soupsieve-style immutable slot classes get per-class constructors
+        // and slot readers instead of getattr over __slots__ (ImmutableSlots).
+        com.codename1.python.transpiler.codegen.ImmutableSlots.rewrite(trees);
+        // openpyxl's style descriptors become properties (StyleableLowering).
+        com.codename1.python.transpiler.codegen.StyleableLowering.rewrite(trees);
+        // The openpyxl aliases DeclarativeMap left become properties
+        // (AliasLowering).
+        com.codename1.python.transpiler.codegen.AliasLowering.rewrite(trees);
+        // setattr(obj, x.tagname, v) over a class-literal attribute becomes a
+        // per-class store method (LiteralAttrStore).
+        // The bundled modules are added later (addStdlib); resolve them on
+        // copies now so their stores count against the rewrite too.
+        Map<String, String> libSources = new LinkedHashMap<String, String>(sources);
+        Map<String, Node.Module> libTrees = new LinkedHashMap<String, Node.Module>(trees);
+        addStdlib(libSources, libTrees);
+        libTrees.keySet().removeAll(trees.keySet());
+        com.codename1.python.transpiler.codegen.LiteralAttrStore.rewrite(trees, libTrees.values());
+        // setattr(obj, row[0], v) over a local table of literal tuples
+        // stores one literal per branch (ClosedNameSetattr).
+        com.codename1.python.transpiler.codegen.ClosedNameSetattr.rewrite(trees);
+        // A constructor storing its **kw as attributes stores one literal
+        // attribute per key the program passes (KwAttrInit).
+        com.codename1.python.transpiler.codegen.KwAttrInit.rewrite(trees, libTrees);
+        // A field every construction sets to one literal attribute name is
+        // folded to it where it names an attribute (ClassArgSpecialize).
+        com.codename1.python.transpiler.codegen.ClassArgSpecialize.rewrite(trees, libTrees.values());
+        // A descriptor bound once in a class body takes the target's name
+        // from __set_name__ at build time (SetNameDescriptor).
+        com.codename1.python.transpiler.codegen.SetNameDescriptor.rewrite(trees);
+        {
+            List<Node.Module> everyModule = new ArrayList<Node.Module>(trees.values());
+            everyModule.addAll(libTrees.values());
+            com.codename1.python.transpiler.codegen.SetNameDescriptor.subclassBindings(everyModule);
+        }
+        // A method always called with literal attribute names is cloned
+        // per name, so its getattr/setattr become plain attribute access
+        // (ConstArgSpecialize).
+        Map<Node.FunctionDef, com.codename1.python.transpiler.codegen.ConstArgSpecialize.Text> clones =
+                com.codename1.python.transpiler.codegen.ConstArgSpecialize.rewrite(trees, treeSources);
+        // A loop over attribute names the program spells out is unrolled
+        // per name, so its getattr/setattr are literal (LoopUnroll).
+        com.codename1.python.transpiler.codegen.LoopUnroll.rewrite(trees, treeSources, clones);
+        // After the passes that compare a tree with its source text: a
+        // function storing a mapping argument as attributes is cloned per
+        // key sequence its callers spell out (DictItemsSetattr).
+        com.codename1.python.transpiler.codegen.DictItemsSetattr.rewrite(trees, libTrees.values());
+        if (trees.containsKey(com.codename1.python.transpiler.codegen.DeclarativeMap.META_PATH)) {
+            sources.put(com.codename1.python.transpiler.codegen.DeclarativeMap.META_PATH,
+                    com.codename1.python.transpiler.codegen.DeclarativeMap.metaSource());
+        }
+        if (trees.containsKey(com.codename1.python.transpiler.codegen.SerialisableMethods.MODULE_PATH)) {
+            sources.put(com.codename1.python.transpiler.codegen.SerialisableMethods.MODULE_PATH,
+                    com.codename1.python.transpiler.codegen.SerialisableMethods.moduleSource());
+        }
         String interop = null;
+        Set<String> javaAnswered = new HashSet<String>();
         if (com.codename1.python.transpiler.codegen.JavaInteropGenerator.usesJava(trees.values())) {
             try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
                     new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
-                interop = com.codename1.python.transpiler.codegen.JavaInteropGenerator.generate(trees, cp, PACKAGE);
+                interop = com.codename1.python.transpiler.codegen.JavaInteropGenerator.generate(trees, cp, PACKAGE, javaAnswered);
             } catch (IOException e) {
                 throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
             }
         }
-        Set<String> stdlib = addStdlib(sources, trees);
+        addStdlib(sources, trees);
+        // Enumeration members are defined by the compiler, not by a
+        // metaclass reading the class body (EnumLowering).
+        com.codename1.python.transpiler.codegen.EnumLowering.rewrite(trees);
         boolean server = false;
         boolean db = false;
         boolean image = false;
@@ -236,9 +387,75 @@ public final class PythonTranspiler {
             serverImage = image && backend;
             image &= !backend;
         }
+        // After the standard library was added: its modules are part of
+        // the program, typed like any other and counted like any other.
+        // Before anything reads the trees: a function the build was told
+        // to remove or replace has, from here on, the body that stands for
+        // it, and is analysed and compiled as that.
+        com.codename1.python.transpiler.codegen.Directives directives =
+                com.codename1.python.transpiler.codegen.Directives.parse(
+                        sources.get(com.codename1.python.transpiler.codegen.Directives.FILE), sources);
+        Map<String, Node.Module> byName = new LinkedHashMap<String, Node.Module>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            byName.put(moduleOf(e.getKey()), e.getValue());
+        }
+        directives.apply(byName);
+        for (Map.Entry<String, Node.Module> e : byName.entrySet()) {
+            dropOverloads(e.getValue().body);
+            if (!e.getKey().equals(mainModule)) {
+                dropMainBlocks(e.getValue().body);
+            }
+        }
+        // Before anything reads the trees: what the program never reaches
+        // is taken out of them, a whole module or a top-level statement at
+        // a time (see Liveness), and nothing downstream sees it.
+        Set<String> dead = new HashSet<String>();
+        Set<String> runtimeNames = runtimeNames(classPath, nativeModules);
+        truncateDoomed(trees, nativeModules, runtimeNames);
+        // Library mode (no main module): the application's own modules are
+        // the roots, each kept whole, and what they import is pruned as it is
+        // from a main -- otherwise every class of every bundled module would
+        // be compiled, and judged in strict mode, whether used or not.
+        List<String> roots = new ArrayList<String>();
+        if (mainModule != null) {
+            if (byName.containsKey(mainModule)) {
+                roots.add(mainModule);
+            }
+        } else {
+            for (String m : ownModules) {
+                if (byName.containsKey(m)) {
+                    roots.add(m);
+                }
+            }
+        }
+        if (!roots.isEmpty()) {
+            Map<String, List<Node.Stmt>> bodies = new LinkedHashMap<String, List<Node.Stmt>>();
+            Set<String> packages = new HashSet<String>();
+            for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+                String module = moduleOf(e.getKey());
+                bodies.put(module, e.getValue().body);
+                if (e.getKey().endsWith("__init__.py")) {
+                    packages.add(module);
+                }
+            }
+            dead = com.codename1.python.transpiler.codegen.Liveness.prune(bodies, packages, roots,
+                    directives.keep(), runtimeNames);
+            for (java.util.Iterator<String> it = trees.keySet().iterator(); it.hasNext();) {
+                if (dead.contains(moduleOf(it.next()))) {
+                    it.remove();
+                }
+            }
+        }
+        WholeProgram program = WholeProgram.of(moduleBodies(trees));
+        program.javaAnswers(javaAnswered);
+        // Every module is planned and entered into the program before any
+        // is emitted: the types are inferred over all of them at once, so
+        // a call from one module into another is as direct as one inside.
+        Map<String, Emitter> emitters = new LinkedHashMap<String, Emitter>();
         for (Map.Entry<String, String> e : sources.entrySet()) {
             String path = e.getKey().replace('\\', '/');
-            if (!path.endsWith(".py")) {
+            // An override body is spliced into its function, not a module.
+            if (!path.endsWith(".py") || path.startsWith(com.codename1.python.transpiler.codegen.Directives.OVERRIDES + "/")) {
                 continue;
             }
             String stem = path.substring(0, path.length() - 3);
@@ -250,16 +467,56 @@ public final class PythonTranspiler {
                 continue;
             }
             String module = stem.replace('/', '.');
+            if (dead.contains(module)) {
+                continue;
+            }
             String cls = className(module);
             Node.Module tree = trees.get(path);
             Scope scope = ScopeBuilder.build(tree, path);
-            // The standard library is written to be correct without the
-            // whole-program types, and is left out of the closed-world check.
-            String java = new Emitter(path, module, isPackage, PACKAGE, cls, scope)
-                    .closed(closed && !stdlib.contains(path)).emit(tree);
-            java = withLineMap(java, path.replace('\\', '/'));
-            out.put(PACKAGE.replace('.', '/') + "/" + cls + ".java", java);
+            Emitter emitter = new Emitter(path, module, isPackage, PACKAGE, cls, scope).facts(program.module(module));
+            emitter.prepare(tree, program);
+            emitters.put(path, emitter);
             classes.put(module, cls);
+        }
+        program.roots(runtimeNames == null ? null : new HashSet<String>(runtimeNames), directives.keep());
+        program.main(mainModule);
+        if (mainModule == null) {
+            // Library mode: the application's own modules are the roots.
+            program.libraryRoots(ownModules);
+        }
+        program.infer();
+        if (deferred != null) {
+            deferred.addAll(program.notes());
+        }
+        // A module nothing live imports never runs: it is neither emitted
+        // nor registered, so ParparVM never sees its classes.
+        for (java.util.Iterator<Map.Entry<String, Emitter>> it = emitters.entrySet().iterator(); it.hasNext();) {
+            String module = moduleOf(it.next().getKey());
+            if (!program.isLive(module)) {
+                it.remove();
+                classes.remove(module);
+            }
+        }
+        // One program: every module's typed fields are decided first, and
+        // then every module may read the plain fields of every class.
+        for (Emitter em : emitters.values()) {
+            em.planTyped();
+        }
+        Emitter.shareLayouts(new ArrayList<Emitter>(emitters.values()));
+        for (Emitter em : emitters.values()) {
+            em.planBodies();
+        }
+        List<Emitter.DynamicUse> dynamic = new ArrayList<Emitter.DynamicUse>();
+        for (Map.Entry<String, Emitter> e : emitters.entrySet()) {
+            String path = e.getKey();
+            String java = e.getValue().dynamicUses(dynamic).library(libraries.contains(path))
+                    .emit(trees.get(path));
+            java = withLineMap(java, path);
+            out.put(PACKAGE.replace('.', '/') + "/" + classes.get(moduleOf(path)) + ".java", java);
+        }
+        PythonSyntaxError unsupported = Emitter.dynamicCodeError(dynamic);
+        if (unsupported != null) {
+            throw unsupported;
         }
         if (mainModule != null && !classes.containsKey(mainModule)) {
             throw new IllegalArgumentException("main module '" + mainModule + "' is not among the sources");
@@ -279,6 +536,15 @@ public final class PythonTranspiler {
         if (serverImage) {
             out.put(PACKAGE.replace('.', '/') + "/BackendImage.java", backendImage());
         }
+        // The classes of Java replacements are installed like the modules
+        // written in Java, and their stubs go out with the generated
+        // sources: whoever writes those keeps a class the project already
+        // has (see Directives.shims).
+        Map<String, String> installed = new java.util.TreeMap<String, String>(nativeModules);
+        for (String cls : directives.shimClasses()) {
+            installed.put("replace " + cls, cls);
+        }
+        out.putAll(directives.shims());
         // The console is the backend's (com.codename1.cli); an application
         // has no terminal, and _cn1term answers as much with none installed.
         // Every backend build installs it, not just one that imports
@@ -291,7 +557,69 @@ public final class PythonTranspiler {
             out.put(PACKAGE.replace('.', '/') + "/BackendFileSystem.java", template("BackendFileSystem.java.txt"));
         }
         out.put(PACKAGE.replace('.', '/') + "/PythonModules.java", registry(classes, mainModule, interop != null, server, db,
-                image, serverImage, backend, term, nativeModules));
+                image, serverImage, backend, term, installed));
+        return out;
+    }
+
+    /// What Java may look up by name, which keeps a function or a method
+    /// in the build: the identifiers among the strings of the runtime's
+    /// own classes and of the modules written in Java. Null when the
+    /// runtime is not on the class path.
+    private static Set<String> runtimeNames(List<java.io.File> classPath, Map<String, String> nativeModules) {
+        try (com.codename1.python.transpiler.codegen.ClassPathReader cp =
+                new com.codename1.python.transpiler.codegen.ClassPathReader(classPath)) {
+            Set<String> names = cp.find("com/codename1/python/runtime/Py") == null ? null
+                    : cp.names("com/codename1/python/");
+            if (names != null) {
+                for (String cls : nativeModules.values()) {
+                    Set<String> more = cp.names(cls.replace('.', '/'));
+                    if (more != null) {
+                        names.addAll(more);
+                    }
+                }
+            }
+            return names;
+        } catch (IOException e) {
+            throw new IllegalStateException("cannot read the class path: " + e.getMessage(), e);
+        }
+    }
+
+    /// The program's modules after a top-level import that cannot
+    /// succeed are cut there (see Liveness#truncateDoomed).
+    private static void truncateDoomed(Map<String, Node.Module> trees, Map<String, String> nativeModules,
+            Set<String> runtimeNames) {
+        if (runtimeNames == null) {
+            return;
+        }
+        Set<String> tops = new HashSet<String>();
+        for (String path : trees.keySet()) {
+            tops.add(topOf(moduleOf(path)));
+        }
+        for (String m : nativeModules.keySet()) {
+            tops.add(topOf(m));
+        }
+        List<List<Node.Stmt>> bodies = new ArrayList<List<Node.Stmt>>();
+        for (Node.Module t : trees.values()) {
+            bodies.add(t.body);
+        }
+        com.codename1.python.transpiler.codegen.Liveness.truncateDoomed(bodies, tops, runtimeNames);
+    }
+
+    private static String topOf(String m) {
+        int dot = m.indexOf('.');
+        return dot < 0 ? m : m.substring(0, dot);
+    }
+
+    /// Each module's dotted name to its body.
+    private static Map<String, List<Node.Stmt>> moduleBodies(Map<String, Node.Module> trees) {
+        Map<String, List<Node.Stmt>> out = new LinkedHashMap<String, List<Node.Stmt>>();
+        for (Map.Entry<String, Node.Module> e : trees.entrySet()) {
+            String stem = e.getKey().substring(0, e.getKey().length() - 3);
+            if ("__init__".equals(stem) || stem.endsWith("/__init__")) {
+                stem = "__init__".equals(stem) ? "" : stem.substring(0, stem.length() - "/__init__".length());
+            }
+            out.put(stem.replace('/', '.'), e.getValue().body);
+        }
         return out;
     }
 
@@ -358,6 +686,17 @@ public final class PythonTranspiler {
                     modules.add(prefix);
                     added.add(path);
                     Node.Module t = Parser.parse(text, path);
+                    com.codename1.python.transpiler.codegen.ConstantDefaults.rewrite(t);
+                    com.codename1.python.transpiler.codegen.ProtocolChecks.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.ClassDecoratorLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.DataclassInit.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.AttrsLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.CobbleLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.NamedTupleLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.PydanticLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.SqlAlchemyLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.ArgparseLowering.rewrite(t, path);
+                    com.codename1.python.transpiler.codegen.PytestLowering.rewrite(t, path);
                     if (mentionsOpen(text)) {
                         opens.add(t);
                     }
@@ -746,6 +1085,78 @@ public final class PythonTranspiler {
     /// character a Java identifier cannot hold (including the dots) written
     /// as `$` and its hex code. Python names never contain `$`, so two
     /// modules never share a class.
+    /// Replaces each top-level `if __name__ == "__main__":` of a module
+    /// that is not the program's entry by its `else` (usually nothing). A
+    /// translated program runs only its entry as `__main__`, so the block
+    /// never runs; analysed anyway, bs4's demo `print(soup.prettify())`
+    /// reached BeautifulSoup's constructor with arguments of no type.
+    static void dropMainBlocks(List<Node.Stmt> body) {
+        for (int i = 0; i < body.size(); i++) {
+            Node.Stmt s = body.get(i);
+            if (s instanceof Node.If && isMainTest(((Node.If) s).test)) {
+                body.remove(i);
+                body.addAll(i, ((Node.If) s).orelse);
+                i += ((Node.If) s).orelse.size() - 1;
+            }
+        }
+    }
+
+    /// Takes out the `@overload` stubs of a body (and of its classes'):
+    /// `typing.overload` hands back a function that only raises, and the
+    /// undecorated definition after them rebinds the name, so no call ever
+    /// reaches one. Left in, each is a function of untyped parameters.
+    static void dropOverloads(List<Node.Stmt> body) {
+        for (int i = body.size() - 1; i >= 0; i--) {
+            Node.Stmt s = body.get(i);
+            if (s instanceof Node.ClassDef) {
+                dropOverloads(((Node.ClassDef) s).body);
+            } else if (s instanceof Node.FunctionDef && isOverload((Node.FunctionDef) s)
+                    && definedLater(body, i, ((Node.FunctionDef) s).name)) {
+                body.remove(i);
+            }
+        }
+    }
+
+    private static boolean isOverload(Node.FunctionDef f) {
+        for (Node.Expr d : f.decorators) {
+            if (d instanceof Node.Name && "overload".equals(((Node.Name) d).id)
+                    || d instanceof Node.Attribute && "overload".equals(((Node.Attribute) d).attr)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean definedLater(List<Node.Stmt> body, int i, String name) {
+        for (int j = i + 1; j < body.size(); j++) {
+            Node.Stmt s = body.get(j);
+            if (s instanceof Node.FunctionDef && name.equals(((Node.FunctionDef) s).name)
+                    && !isOverload((Node.FunctionDef) s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isMainTest(Node.Expr t) {
+        if (!(t instanceof Node.Compare) || ((Node.Compare) t).ops.size() != 1
+                || !"==".equals(((Node.Compare) t).ops.get(0))) {
+            return false;
+        }
+        Node.Expr l = ((Node.Compare) t).left;
+        Node.Expr r = ((Node.Compare) t).comparators.get(0);
+        return isName(l) && isMain(r) || isName(r) && isMain(l);
+    }
+
+    private static boolean isName(Node.Expr e) {
+        return e instanceof Node.Name && "__name__".equals(((Node.Name) e).id);
+    }
+
+    private static boolean isMain(Node.Expr e) {
+        return e instanceof Node.Constant && ((Node.Constant) e).kind == Node.Constant.Kind.STR
+                && "__main__".equals(((Node.Constant) e).text);
+    }
+
     public static String className(String module) {
         StringBuilder sb = new StringBuilder("py_");
         for (int i = 0; i < module.length(); i++) {
@@ -768,6 +1179,7 @@ public final class PythonTranspiler {
         return "// Generated by the Codename One Python transpiler.\n"
                 + "package " + PACKAGE + ";\n\n"
                 + "import com.codename1.backend.Database;\n"
+                + "import com.codename1.db.sql.QueryRows;\n"
                 + "import com.codename1.python.runtime.PyDb;\n"
                 + "import com.codename1.python.runtime.PySql;\n"
                 + "import java.io.IOException;\n"
@@ -823,7 +1235,10 @@ public final class PythonTranspiler {
                 + "        return String.valueOf(v);\n"
                 + "    }\n\n"
                 + "    static final class Conn extends PyDb.Connection {\n"
-                + "        private final Database db;\n\n"
+                + "        private final Database db;\n"
+                + "        private final PySql.Result shared = new PySql.Result();\n"
+                + "        private int depth;\n"
+                + "        private final long[] lastId = new long[1];\n\n"
                 + "        Conn(Database db) {\n"
                 + "            this.db = db;\n"
                 + "        }\n\n"
@@ -833,32 +1248,68 @@ public final class PythonTranspiler {
                 + "        }\n\n"
                 + "        @Override\n"
                 + "        public PySql.Result run(String sql, Object[] params, boolean query) throws IOException {\n"
-                + "            PySql.Result r = new PySql.Result();\n"
+                + "            // One result per connection, read by the caller before its next\n"
+                + "            // statement, as the client arm's are. Emptied only once the engine\n"
+                + "            // has answered: a SQL function that runs a statement of its own\n"
+                + "            // mid-step fills and is done with it before this one is filled.\n"
+                + "            // A statement run from inside another one's step (a SQL function's\n"
+                + "            // body) gets a result of its own: the outer one is being filled.\n"
+                + "            PySql.Result r = depth == 0 ? shared : new PySql.Result();\n"
+                + "            depth++;\n"
+                + "            try {\n"
+                + "                return fill(r, sql, params, query);\n"
+                + "            } finally {\n"
+                + "                depth--;\n"
+                + "            }\n"
+                + "        }\n\n"
+                + "        private PySql.Result fill(PySql.Result r, String sql, Object[] params, boolean query)\n"
+                + "                throws IOException {\n"
                 + "            if (!query) {\n"
-                + "                r.changes = db.execute(sql, params);\n"
-                + "                r.lastRowId = db.lastInsertId();\n"
+                + "                // One hold of the connection for the statement and its row id.\n"
+                + "                int changes = db.execute(sql, params, lastId);\n"
+                + "                r.clear();\n"
+                + "                r.changes = changes;\n"
+                + "                r.lastRowId = lastId[0];\n"
                 + "                return r;\n"
                 + "            }\n"
-                + "            List rows = db.query(sql, params);\n"
+                + "            // By position: a DB-API row is a tuple, and building a map per\n"
+                + "            // row only to read it back in column order was most of what\n"
+                + "            // a query allocated.\n"
+                + "            r.clear();\n"
+                + "            String[] direct = db.queryPositionalInto(sql, params, r.rows);\n"
+                + "            if (direct != null) {\n"
+                + "                // SQLite: the rows are in r.rows already, values as the\n"
+                + "                // engine answers them (Long, Double, String, byte[] or null).\n"
+                + "                r.columns = direct;\n"
+                + "                return r;\n"
+                + "            }\n"
+                + "            List rows = db.queryPositional(sql, params);\n"
+                + "            // From the result, not its first row: a query that matched\n"
+                + "            // nothing still has columns, and cursor.description must\n"
+                + "            // name them.\n"
+                + "            // Read, never changed: the names themselves rather than a copy.\n"
+                + "            String[] names = rows instanceof QueryRows ? ((QueryRows) rows).sharedColumnNames()\n"
+                + "                    : Database.columnNames(rows);\n"
+                + "            r.columns = names != null ? names : new String[0];\n"
                 + "            for (int i = 0; i < rows.size(); i++) {\n"
-                + "                Map row = (Map) rows.get(i);\n"
-                + "                if (i == 0) {\n"
-                + "                    r.columns = new String[row.size()];\n"
-                + "                    int c = 0;\n"
-                + "                    for (Iterator it = row.keySet().iterator(); it.hasNext();) {\n"
-                + "                        r.columns[c++] = String.valueOf(it.next());\n"
+                + "                Object row = rows.get(i);\n"
+                + "                if (row instanceof Object[]) {\n"
+                + "                    Object[] values = (Object[]) row;\n"
+                + "                    for (int c = 0; c < values.length; c++) {\n"
+                + "                        values[c] = value(values[c]);\n"
                 + "                    }\n"
+                + "                    r.rows.add(values);\n"
                 + "                }\n"
-                + "                Object[] values = new Object[r.columns.length];\n"
-                + "                for (int c = 0; c < values.length; c++) {\n"
-                + "                    values[c] = value(row.get(r.columns[c]));\n"
-                + "                }\n"
-                + "                r.rows.add(values);\n"
                 + "            }\n"
                 + "            // DECIMAL, DATE and the like arrive as text; their kinds let\n"
                 + "            // _cn1dbapi hand back decimal.Decimal and datetime values.\n"
                 + "            r.types = Database.columnTypes(rows);\n"
                 + "            return r;\n"
+                + "        }\n\n"
+                + "        @Override\n"
+                + "        public boolean createFunction(String name, int nargs,\n"
+                + "                java.util.function.Function<Object[], Object> body) throws IOException {\n"
+                + "            return db.createFunction(name, nargs, body);\n"
                 + "        }\n\n"
                 + "        @Override\n"
                 + "        public void begin() throws IOException {\n"
@@ -1095,9 +1546,25 @@ public final class PythonTranspiler {
             return java;
         }
         String value = pyFile + "\n" + pairs;
-        StringBuilder lit = new StringBuilder("\"");
+        // A class file holds a constant string of at most 65535 bytes of
+        // modified UTF-8, and a concatenation of literals folds into one
+        // constant. A long table is therefore split over several constants,
+        // `$cn1PyLines`, `$cn1PyLines$1`, ..., which `PythonLineMapper`
+        // joins in that order; each stays a compile-time constant, so the
+        // mapper reads them from the class file and the table is kept.
+        StringBuilder fields = new StringBuilder();
+        StringBuilder lit = new StringBuilder();
+        int bytes = 0;
+        int part = 0;
         for (int k = 0; k < value.length(); k++) {
             char c = value.charAt(k);
+            int size = c >= 1 && c < 0x80 ? 1 : c < 0x800 ? 2 : 3;
+            if (bytes + size > LINE_MAP_PART_BYTES) {
+                lineMapField(fields, part++, lit);
+                lit.setLength(0);
+                bytes = 0;
+            }
+            bytes += size;
             if (c == '\n') {
                 lit.append("\\n");
             } else if (c == '"' || c == '\\') {
@@ -1108,10 +1575,24 @@ public final class PythonTranspiler {
                 lit.append(c);
             }
         }
-        lit.append('"');
-        return java.substring(0, brace + 1) + " private static final String " + LINE_MAP_FIELD + " = " + lit + ";"
-                + java.substring(brace + 1);
+        lineMapField(fields, part, lit);
+        return java.substring(0, brace + 1) + fields + java.substring(brace + 1);
     }
+
+    /// The most modified UTF-8 bytes one line-table constant holds, under
+    /// the class file's limit of 65535.
+    static final int LINE_MAP_PART_BYTES = 60000;
+
+    private static void lineMapField(StringBuilder fields, int part, CharSequence lit) {
+        fields.append(" private static final String ").append(LINE_MAP_FIELD);
+        if (part > 0) {
+            fields.append('$').append(part);
+        }
+        fields.append(" = \"").append(lit).append("\";");
+    }
+
+    /// Modules to a registry method.
+    private static final int REGISTRY_GROUP = 400;
 
     private static String registry(Map<String, String> classes, String mainModule, boolean interop, boolean server, boolean db,
             boolean image, boolean serverImage, boolean backend, boolean term, Map<String, String> nativeModules) {
@@ -1145,6 +1626,8 @@ public final class PythonTranspiler {
             sb.append("        BackendFileSystem.install();\n");
         } else {
             sb.append("        com.codename1.python.runtime.Cn1FileSystem.installDefault();\n");
+            // The port's resource lookup and AES; a backend has neither.
+            sb.append("        com.codename1.python.runtime.Cn1Platform.install();\n");
         }
         // The network manager and Database are a client application's; a
         // backend's class library has neither, so it gets its own bridges.
@@ -1162,10 +1645,37 @@ public final class PythonTranspiler {
         for (String cls : new java.util.TreeSet<String>(nativeModules.values())) {
             sb.append("        ").append(cls).append(".install();\n");
         }
-        for (String cls : classes.values()) {
-            sb.append("        ").append(cls).append(".register();\n");
+        // By name and number, never by a call into the module's class: that
+        // call would initialise the class, and a program imports a fraction
+        // of the modules it is built with. In groups, because a method and a
+        // string constant each have a size limit.
+        List<String> names = new ArrayList<String>(classes.keySet());
+        int groups = (names.size() + REGISTRY_GROUP - 1) / REGISTRY_GROUP;
+        for (int g = 0; g < groups; g++) {
+            StringBuilder joined = new StringBuilder();
+            int end = Math.min(names.size(), (g + 1) * REGISTRY_GROUP);
+            for (int i = g * REGISTRY_GROUP; i < end; i++) {
+                if (joined.length() > 0) {
+                    joined.append("\\n");
+                }
+                joined.append(names.get(i).replace("\\", "\\\\").replace("\"", "\\\""));
+            }
+            sb.append("        com.codename1.python.runtime.PyModule.register(\"").append(joined)
+                    .append("\", PythonModules::load").append(g).append(");\n");
         }
         sb.append("    }\n\n");
+        for (int g = 0; g < groups; g++) {
+            sb.append("    private static void load").append(g).append("(int index) {\n");
+            sb.append("        switch (index) {\n");
+            int end = Math.min(names.size(), (g + 1) * REGISTRY_GROUP);
+            for (int i = g * REGISTRY_GROUP; i < end; i++) {
+                String name = names.get(i);
+                sb.append("            case ").append(i - g * REGISTRY_GROUP).append(":\n                ")
+                        .append(classes.get(name)).append(".exec(\"")
+                        .append(name.replace("\\", "\\\\").replace("\"", "\\\"")).append("\");\n                return;\n");
+            }
+            sb.append("            default:\n                return;\n        }\n    }\n\n");
+        }
         sb.append("    /// Runs the entry module as `__main__` and returns the status the\n");
         sb.append("    /// interpreter would exit with. An exception the program does not\n");
         sb.append("    /// catch is reported on stderr, never thrown: on a device the\n");

@@ -1,0 +1,5 @@
+['Nested', 'Convertible', 'Typed', 'Descriptor'] 41 a
+['NestedValue', 'Nested', 'Convertible', 'Typed', 'Descriptor', 'object']
+['Nested', 'Descriptor'] x
+[1, 2] c ['Nested', 'Descriptor'] 3
+True True True

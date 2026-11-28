@@ -49,13 +49,27 @@ class UnsupportedTest {
         {"m = __import__('os')\n", "1", "__import__()"},
         {"run = eval\n", "1", "eval()"},
         {"import sys\n\ndef t(*a):\n    pass\n\nsys.settrace(t)\n", "6", "sys.settrace"},
-        {"import sys\nprint(sys._getframe().f_lineno)\n", "2", "sys._getframe"},
         {"def f():\n    x = 1\n    return locals()\n", "3", "locals()"},
         {"x = 1\nfrom java.java.util import NoSuchList\n", "2", "no Java class java.util.NoSuchList"},
         {"import java.java.util\n", "1", "import the Java classes by name"},
         {"from java.java.util import *\n", "1", "imported by name"},
         {"from java.java.util import ArrayList\n\nclass L(ArrayList):\n    pass\n", "3",
             "cannot extend the Java class ArrayList"},
+        // ImmutableSlots: a store outside the generated constructor.
+        {"class Immutable:\n    __slots__ = ('_hash',)\n    def __init__(self, **kwargs):\n        temp = []\n"
+            + "        for k, v in kwargs.items():\n            temp.append(type(v))\n            temp.append(v)\n"
+            + "            super().__setattr__(k, v)\n        super().__setattr__('_hash', hash(tuple(temp)))\n"
+            + "    def __setattr__(self, n, v):\n        raise AttributeError(n)\n    def __eq__(self, o):\n        return True\n"
+            + "    def __repr__(self):\n        return ''\n\nclass T(Immutable):\n    __slots__ = ('tag', '_hash')\n"
+            + "    def __init__(self, tag):\n        super().__init__(tag=tag)\n"
+            + "    def retag(self, t):\n        self.tag = t\n", "22", "on an immutable instance"},
+        {"class Immutable:\n    __slots__ = ('_hash',)\n    def __init__(self, **kwargs):\n        temp = []\n"
+            + "        for k, v in kwargs.items():\n            temp.append(type(v))\n            temp.append(v)\n"
+            + "            super().__setattr__(k, v)\n        super().__setattr__('_hash', hash(tuple(temp)))\n"
+            + "    def __setattr__(self, n, v):\n        raise AttributeError(n)\n    def __eq__(self, o):\n        return True\n"
+            + "    def __repr__(self):\n        return ''\n\nclass T(Immutable):\n    __slots__ = ('tag', '_hash')\n"
+            + "    def __init__(self, tag):\n        super().__init__(tag=tag)\n"
+            + "\nt = T(1)\nt.tag = 2\n", "23", "a field of an immutable class"},
     };
 
     @TestFactory

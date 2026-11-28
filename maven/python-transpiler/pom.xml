@@ -48,6 +48,8 @@
                     <xmlOutput>true</xmlOutput>
                     <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
                     <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                    <!-- The typed emitter is one large class; the default fork heap runs out analysing it. -->
+                    <maxHeap>1536</maxHeap>
                 </configuration>
                 <executions>
                     <execution>

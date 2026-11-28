@@ -1,0 +1,11 @@
+<document root> 3 3 div 2
+14 4 html
+['<element p>', '<element div>']
+<fragment:document frag> 11 <element x> True True
+odd o 0 1
+None s
+root html 3 div <document root>
+['builder', 'count', 'current', 'extra', 'name', 'parent'] 5
+False gone
+['document', 'fragment:document', 'leaf', 'element'] [10, 10, 1, 1]
+27

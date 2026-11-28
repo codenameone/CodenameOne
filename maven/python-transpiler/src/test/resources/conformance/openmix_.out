@@ -1,0 +1,7 @@
+3 abc True parser
+2 42 Mixed detect:2 XY>Z
+parser/mixed 42 7
+mixed/parser abc 5
+parser/parser ab> 5 True True
+['parser', 'mixed', 'parser', 'parser'] [5, 5, 2, 7]
+Mixed mixed

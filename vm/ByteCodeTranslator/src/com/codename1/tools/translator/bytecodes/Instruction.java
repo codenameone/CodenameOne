@@ -46,6 +46,20 @@ public abstract class Instruction implements SignatureSet
         boundsSafe = true;
     }
 
+    // Set by BytecodeMethod.analyzeConstantIndexRuns on the FIRST load of a run of
+    // constant-index loads of one array (b[0], b[1], ... b[k]): the highest index of
+    // the run, which this load checks in place of its own so the rest of the run can
+    // be emitted unchecked. -1 when this load leads no run.
+    private int runGuardBound = -1;
+
+    public int getRunGuardBound() {
+        return runGuardBound;
+    }
+
+    public void setRunGuardBound(int bound) {
+        runGuardBound = bound;
+    }
+
     public static void setHasInstructions(boolean h) {
         hasInstructions = h;
     }   

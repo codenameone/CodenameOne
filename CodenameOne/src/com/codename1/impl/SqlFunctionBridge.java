@@ -1,0 +1,199 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl;
+
+import java.util.function.Function;
+import com.codename1.util.StringUtil;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+/// What every port whose database is SQLite in C shares to call a
+/// [Function]: the table that turns the id SQLite holds into the function,
+/// and the conversion of arguments and the result. A port supplies only the
+/// natives that read an argument and set the result.
+///
+/// The table is shared by every connection of the port, and connections may
+/// be used from different threads, so it is an immutable array behind an
+/// [AtomicReference]: a callback reads one snapshot, and a registration or a
+/// release replaces the whole array.
+public abstract class SqlFunctionBridge {
+    /// `sqlite3_value_type`: SQLITE_INTEGER.
+    public static final int SQLITE_INTEGER = 1;
+    /// `sqlite3_value_type`: SQLITE_FLOAT.
+    public static final int SQLITE_FLOAT = 2;
+    /// `sqlite3_value_type`: SQLITE_TEXT.
+    public static final int SQLITE_TEXT = 3;
+    /// `sqlite3_value_type`: SQLITE_BLOB.
+    public static final int SQLITE_BLOB = 4;
+
+    private static final Object[] EMPTY = new Object[0];
+
+    /// Pairs of (owner, function), indexed by id * 2.
+    private final AtomicReference<Object[]> table = new AtomicReference<Object[]>(EMPTY);
+
+    /// The id the engine is handed for a function registered by connection
+    /// `owner`. A slot freed by [#release] is reused: only a closed
+    /// connection's slots are freed, and its statements are gone with it, so
+    /// nothing still holds the old id.
+    public int register(Object owner, Function<Object[], Object> function) {
+        while (true) {
+            Object[] cur = table.get();
+            int at = cur.length;
+            for (int i = 0; i < cur.length; i += 2) {
+                if (cur[i] == null) {
+                    at = i;
+                    break;
+                }
+            }
+            Object[] next = new Object[Math.max(cur.length, at + 2)];
+            System.arraycopy(cur, 0, next, 0, cur.length);
+            next[at] = owner;
+            next[at + 1] = function;
+            if (table.compareAndSet(cur, next)) {
+                return at / 2;
+            }
+        }
+    }
+
+    /// Drops every function `owner` registered; called once its connection
+    /// is closed, so a closed database does not keep its functions alive.
+    public void release(Object owner) {
+        while (true) {
+            Object[] cur = table.get();
+            Object[] next = null;
+            for (int i = 0; i < cur.length; i += 2) {
+                if (cur[i] == owner) { //NOPMD CompareObjectsWithEquals - a connection is released by identity
+                    if (next == null) {
+                        next = new Object[cur.length];
+                        System.arraycopy(cur, 0, next, 0, cur.length);
+                    }
+                    next[i] = null;
+                    next[i + 1] = null;
+                }
+            }
+            if (next == null || table.compareAndSet(cur, next)) {
+                return;
+            }
+        }
+    }
+
+    /// The UTF-8 name SQLite is given, refusing one the native would cut:
+    /// it copies into a 256-byte buffer.
+    public static byte[] functionName(String name) throws java.io.IOException {
+        byte[] b = StringUtil.getBytes(name);
+        if (b.length > 255) {
+            throw new java.io.IOException("SQL function name is longer than 255 bytes: " + name);
+        }
+        return b;
+    }
+
+    /// Called from the native trampoline, while the engine waits, to compute
+    /// one value of function `id` and hand it back through `ctx`.
+    public void call(long ctx, int id, int argc, long argv) {
+        // Looked up outside the try: the cast must not
+        // sit under a handler (ParparVM does not check it, see check-cast-semantics.sh).
+        Object[] slots = table.get();
+        Object o = id >= 0 && id * 2 + 1 < slots.length ? slots[id * 2 + 1] : null;
+        if (!(o instanceof Function)) {
+            resultError(ctx, StringUtil.getBytes("no such function"));
+            return;
+        }
+        @SuppressWarnings("unchecked")
+        Function<Object[], Object> f = (Function<Object[], Object>) o;
+        try {
+            Object[] args = new Object[argc];
+            for (int i = 0; i < argc; i++) {
+                args[i] = argument(argv, i);
+            }
+            result(ctx, f.apply(args));
+        } catch (Throwable t) { //NOPMD AvoidCatchingThrowable - an exception must not unwind through SQLite's C frames
+            String m = t.getMessage();
+            resultError(ctx, StringUtil.getBytes(m == null ? t.toString() : m));
+        }
+    }
+
+    private Object argument(long argv, int i) {
+        switch (valueType(argv, i)) {
+            case SQLITE_INTEGER:
+                return Long.valueOf(valueLong(argv, i));
+            case SQLITE_FLOAT:
+                return Double.valueOf(valueDouble(argv, i));
+            case SQLITE_TEXT:
+                return StringUtil.newString(valueText(argv, i));
+            case SQLITE_BLOB:
+                byte[] b = valueBlob(argv, i);
+                return b == null ? new byte[0] : b;
+            default:
+                return null;
+        }
+    }
+
+    private void result(long ctx, Object v) {
+        if (v == null) {
+            resultNull(ctx);
+        } else if (v instanceof Boolean) {
+            resultLong(ctx, ((Boolean) v).booleanValue() ? 1 : 0);
+        } else if (v instanceof Double || v instanceof Float) {
+            resultDouble(ctx, ((Number) v).doubleValue());
+        } else if (v instanceof Number) {
+            resultLong(ctx, ((Number) v).longValue());
+        } else if (v instanceof byte[]) {
+            resultBlob(ctx, (byte[]) v);
+        } else {
+            resultText(ctx, StringUtil.getBytes(v.toString()));
+        }
+    }
+
+    /// `sqlite3_value_type` of argument `i`.
+    protected abstract int valueType(long argv, int i);
+
+    /// `sqlite3_value_int64` of argument `i`.
+    protected abstract long valueLong(long argv, int i);
+
+    /// `sqlite3_value_double` of argument `i`.
+    protected abstract double valueDouble(long argv, int i);
+
+    /// The UTF-8 text of argument `i`.
+    protected abstract byte[] valueText(long argv, int i);
+
+    /// The bytes of argument `i`.
+    protected abstract byte[] valueBlob(long argv, int i);
+
+    /// `sqlite3_result_null`.
+    protected abstract void resultNull(long ctx);
+
+    /// `sqlite3_result_int64`.
+    protected abstract void resultLong(long ctx, long v);
+
+    /// `sqlite3_result_double`.
+    protected abstract void resultDouble(long ctx, double v);
+
+    /// `sqlite3_result_text` of UTF-8 bytes.
+    protected abstract void resultText(long ctx, byte[] utf8);
+
+    /// `sqlite3_result_blob`.
+    protected abstract void resultBlob(long ctx, byte[] v);
+
+    /// `sqlite3_result_error` of a UTF-8 message.
+    protected abstract void resultError(long ctx, byte[] utf8);
+}

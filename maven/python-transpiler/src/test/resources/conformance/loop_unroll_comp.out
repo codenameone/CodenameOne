@@ -1,0 +1,5 @@
+False [('a', 0), ('b', '')]
+True
+True [('a', 0), ('b', ''), ('d', 4)]
+[('bullets', '*+-'), ('keep', []), ('wrap', True)] ['bullets', 'keep', 'wrap']
+{'bullets': '*+-', 'keep': [], 'wrap': False} True

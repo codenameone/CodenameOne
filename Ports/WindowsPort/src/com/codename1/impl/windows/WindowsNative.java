@@ -1254,6 +1254,8 @@ public final class WindowsNative {
 
     public static native void sqlDbExecScript(long dbPeer, String sql) throws java.io.IOException;
 
+    public static native long sqlDbChanges(long dbPeer);
+    public static native long sqlDbLastInsertRowid(long dbPeer);
     public static native long sqlStmtPrepare(long dbPeer, String sql) throws java.io.IOException;
     public static native int sqlStmtParameterCount(long stmtPeer) throws java.io.IOException;
     public static native void sqlStmtBindNull(long stmtPeer, int index) throws java.io.IOException;
@@ -1271,11 +1273,62 @@ public final class WindowsNative {
 
     public static native int sqlColCount(long stmtPeer) throws java.io.IOException;
     public static native byte[] sqlColName(long stmtPeer, int col) throws java.io.IOException;
+    public static native int sqlColType(long stmtPeer, int col);
     public static native boolean sqlColIsNull(long stmtPeer, int col) throws java.io.IOException;
     public static native byte[] sqlColText(long stmtPeer, int col) throws java.io.IOException;
+    // Text as a String read or built in place by the native, with no UTF-8 byte[] in between.
+    public static native void sqlStmtBindString(long stmtPeer, int index, String value) throws java.io.IOException;
+    public static native String sqlColString(long stmtPeer, int col) throws java.io.IOException;
+    public static native String sqlColNameString(long stmtPeer, int col) throws java.io.IOException;
+    // The whole current row, written into the caller's array; false when it is too short.
+    public static native boolean sqlRowValues(long stmtPeer, Object[] out);
+    // SQLite's result code instead of an exception, and the connection's message of the last one.
+    public static native int sqlStmtStepStatus(long stmtPeer);
+    // 0 when the statement does not compile; the message is then sqlDbErrorText's.
+    public static native long sqlStmtPrepareStatus(long dbPeer, String sql);
+    public static native String sqlDbErrorText(long dbPeer);
+    public static native int sqlStmtFinalizeStatus(long stmtPeer);
+    // Bind, step to the end and reset in one call: 0, -3 for a parameter count the statement does
+    // not take, -2 for a parameter only Java binds (nothing ran), else SQLite's code. On 0,
+    // counts (if not null) receives the changes and the last row id.
+    public static native int sqlStmtRunStatus(long stmtPeer, Object[] params, long[] counts);
     public static native byte[] sqlColBlob(long stmtPeer, int col) throws java.io.IOException;
     public static native double sqlColDouble(long stmtPeer, int col) throws java.io.IOException;
     public static native long sqlColLong(long stmtPeer, int col) throws java.io.IOException;
+    // SQL functions written in Java (Database.createFunction). The engine calls back into
+    // sqlFunctionCall below, which hands the call to the port's database class; that reads the
+    // arguments and sets the result through these while sqlite3_step waits.
+    /// Where the engine's SQL function calls go. Installed by WindowsDatabase when it loads,
+    /// which is before any function can be registered, so it is never null when called.
+    interface SqlFunctionHandler {
+        void call(long ctx, int id, int argc, long argv);
+    }
+
+    static SqlFunctionHandler sqlFunctionHandler;
+
+    /// Called by the engine (cn1_windows_db.c) while a statement calls a Java function. It lives
+    /// here rather than in WindowsDatabase because the C that calls it is compiled into every
+    /// translation, and a translation that never names the database class would otherwise
+    /// fail to link.
+    static void sqlFunctionCall(long ctx, int id, int argc, long argv) {
+        SqlFunctionHandler h = sqlFunctionHandler;
+        if (h != null) {
+            h.call(ctx, id, argc, argv);
+        }
+    }
+
+    public static native int sqlDbCreateFunction(long dbPeer, byte[] nameUtf8, int argCount, int id);
+    public static native int sqlValueType(long argv, int index);
+    public static native long sqlValueLong(long argv, int index);
+    public static native double sqlValueDouble(long argv, int index);
+    public static native byte[] sqlValueText(long argv, int index);
+    public static native byte[] sqlValueBlob(long argv, int index);
+    public static native void sqlResultNull(long ctx);
+    public static native void sqlResultLong(long ctx, long value);
+    public static native void sqlResultDouble(long ctx, double value);
+    public static native void sqlResultText(long ctx, byte[] utf8);
+    public static native void sqlResultBlob(long ctx, byte[] value);
+    public static native void sqlResultError(long ctx, byte[] utf8);
 
     /// True when the exe was built for the embedded (kiosk) target
     /// (`windows.embedded=true`, cn1_windows_embedded.cpp): a constant of the

@@ -75,7 +75,19 @@ import java.util.List;
 /// DATABASE_URL=postgres://app:secret@db.internal/app PORT=8080 ./server
 /// ```
 public final class Backend {
+    /// Whether installRuntime ran; it is reached from the static block and
+    /// from prepareRuntime, and may run only once.
+    private static final java.util.concurrent.atomic.AtomicBoolean RUNTIME_INSTALLED =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
     static {
+        installRuntime();
+    }
+
+    private static void installRuntime() {
+        if (!RUNTIME_INSTALLED.compareAndSet(false, true)) {
+            return;
+        }
         // First, so code in another package reaching for the internals while
         // anything below initializes still finds them.
         com.codename1.impl.backend.BackendAccess.install(new Access());
@@ -194,6 +206,19 @@ public final class Backend {
         this.shutdownMillis = shutdownMillis;
         this.ownTracer = ownTracer;
         this.application = application;
+    }
+
+    /// Prepares the runtime a program that never builds a server still needs:
+    /// in a native executable, `getResourceAsStream`, `MessageDigest` and
+    /// `SecureRandom` answer through a host this class installs as it
+    /// initializes. A command-line tool calls this before anything else; the
+    /// generated entry points do. Idempotent, and a no-op on the JVM.
+    public static void prepareRuntime() {
+        // The work itself, not an empty body that relies on the call to
+        // initialize this class: ParparVM emits no class initialization for a
+        // static method that does nothing, so an empty one installed nothing
+        // and a packaged tool still could not read its own resources.
+        installRuntime();
     }
 
     /// A builder whose defaults come from the configuration this process sees.

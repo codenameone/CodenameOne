@@ -4,6 +4,7 @@
 """Shallow and deep copy operations."""
 
 import copyreg
+import _cn1copy
 
 
 class Error(Exception):
@@ -41,8 +42,9 @@ def copy(x):
 
 
 def _reduction(x, cls):
-    """What x reduces to, as CPython's copy asks; None for the runtime's own
-    reconstruction of a built-in subclass that keeps object's default."""
+    """What x reduces to when its class asks for a reduction of its own;
+    None when it keeps object's default, which _reconstruct answers by
+    copying the compiled fields directly (_cn1copy)."""
     reductor = copyreg.dispatch_table.get(cls)
     if reductor is not None:
         return reductor(x)
@@ -50,9 +52,12 @@ def _reduction(x, cls):
         return x.__reduce_ex__(4)
     if getattr(cls, "__reduce__", None) is not object.__reduce__:
         return x.__reduce__()
-    if _builtin_base(cls) or isinstance(x, BaseException):
-        return None
-    return x.__reduce_ex__(4)
+    return None
+
+
+def _no_setstate(y):
+    raise TypeError("cannot copy " + type(y).__name__ + ": its reduction returns a state and the class "
+                    "has no __setstate__; applying the state would need setattr with a computed name")
 
 
 def _reconstruct_from(x, memo, func, args, state=None, listiter=None, dictiter=None):
@@ -68,15 +73,7 @@ def _reconstruct_from(x, memo, func, args, state=None, listiter=None, dictiter=N
         if hasattr(y, "__setstate__"):
             y.__setstate__(state)
         else:
-            slotstate = None
-            if isinstance(state, tuple) and len(state) == 2:
-                state, slotstate = state
-            if state:
-                for k, v in state.items():
-                    setattr(y, k, v)
-            if slotstate:
-                for k, v in slotstate.items():
-                    setattr(y, k, v)
+            _no_setstate(y)
     if listiter is not None:
         for item in listiter:
             y.append(deepcopy(item, memo) if deep else item)
@@ -144,32 +141,37 @@ def _keep_alive(x, memo):
 
 def _reconstruct(x, memo):
     cls = type(x)
-    y = cls.__new__(cls) if not _builtin_base(cls) else _new_like(x, cls, memo)
+    if _builtin_base(cls):
+        y = _new_like(x, cls, memo)
+    elif getattr(cls, "__getnewargs_ex__", None) is not None:
+        args, kwargs = x.__getnewargs_ex__()
+        if memo is not None:
+            args = deepcopy(args, memo)
+            kwargs = deepcopy(kwargs, memo)
+        y = cls.__new__(cls, *args, **kwargs)
+    elif getattr(cls, "__getnewargs__", None) is not None:
+        args = x.__getnewargs__()
+        if memo is not None:
+            args = deepcopy(args, memo)
+        y = cls.__new__(cls, *args)
+    else:
+        y = cls.__new__(cls)
     if memo is not None:
         memo[id(x)] = y
-    state = getattr(x, "__getstate__", None)
-    state = state() if state is not None and getattr(cls, "__getstate__", None) is not getattr(object, "__getstate__", None) else _state_of(x)
-    if state:
-        if memo is not None:
-            state = deepcopy(state, memo)
-        if hasattr(y, "__setstate__"):
-            y.__setstate__(state)
-        else:
-            for k, v in state.items():
-                setattr(y, k, v)
+    if getattr(cls, "__getstate__", None) is not object.__getstate__ or hasattr(y, "__setstate__"):
+        state = x.__getstate__()
+        if state:
+            if memo is not None:
+                state = deepcopy(state, memo)
+            if hasattr(y, "__setstate__"):
+                y.__setstate__(state)
+            else:
+                _no_setstate(y)
+        return y
+    # Every field by index through the methods the compiler generates per
+    # class, and the attributes held beside them: no name is looked up.
+    _cn1copy.copy_state(x, y, memo, None if memo is None else deepcopy)
     return y
-
-
-def _state_of(x):
-    try:
-        return dict(x.__dict__)
-    except AttributeError:
-        state = {}
-        for k in type(x).__mro__:
-            for name in k.__dict__.get("__slots__", ()):
-                if hasattr(x, name):
-                    state[name] = getattr(x, name)
-        return state
 
 
 def _builtin_base(cls):

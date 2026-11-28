@@ -41,8 +41,10 @@ class Param:
 
     def constraints(self):
         out = {}
-        for k in ("gt", "ge", "lt", "le", "min_length", "max_length", "pattern", "multiple_of"):
-            v = getattr(self, k)
+        # Each constraint by its literal name, in the order they were listed.
+        for k, v in (("gt", self.gt), ("ge", self.ge), ("lt", self.lt), ("le", self.le),
+                     ("min_length", self.min_length), ("max_length", self.max_length),
+                     ("pattern", self.pattern), ("multiple_of", self.multiple_of)):
             if v is not None:
                 out[k] = v
         return out
