@@ -31,10 +31,6 @@ import java.util.Map;
 ///   Apple now recommends the App Store Server API for new code; this endpoint
 ///   still answers, and keeps the sample free of a signing-key setup. Swap the
 ///   method for a call to `/inApps/v1/transactions/{id}` when you outgrow it.
-///   It needs the app receipt, so the app builds with
-///   `ios.storeKit2=false` (see `common/codenameone_settings.properties`):
-///   under StoreKit 2 the receipt's order data is a signed transaction,
-///   which this endpoint does not read.
 /// - Google Play: the purchase token is checked with the Play Developer API,
 ///   authorized by an OAuth access token for a service account with the
 ///   "View financial data" permission (`splat.iap.google.token`). Minting

@@ -135,7 +135,7 @@ static NSString * const kEventsKey = @"CN1IAPTestEvents";
             @"installed ReceiptStore.", [self recordedSubmissions]);
 
         // Which StoreKit delivered it. CI builds the app twice: with StoreKit
-        // 2 (the default) and with ios.storeKit2=false, and says which through
+        // 1 (the default) and with ios.storeKit2=true, and says which through
         // CN1_IAP_STOREKIT (TEST_RUNNER_CN1_IAP_STOREKIT on the xcodebuild
         // command line). The receipt's order data tells them apart: a signed
         // transaction (three dot-separated parts) under StoreKit 2, the app

@@ -118,12 +118,12 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcode-purchase-tests.log"
 
-# Which StoreKit the app was built with: 2 (the default) or 1 (a build with
-# ios.storeKit2=false). PurchaseStoreKitTests runs on both and checks the
+# Which StoreKit the app was built with: 1 (the default) or 2 (a build with
+# ios.storeKit2=true). PurchaseStoreKitTests runs on both and checks the
 # receipt it sees came from that StoreKit; PurchaseStoreKit2Tests drives the
 # StoreKit 2 lifecycle and runs only on 2. The test process reads the value
 # as CN1_IAP_STOREKIT: xcodebuild hands TEST_RUNNER_-prefixed variables to it.
-CN1_IAP_STOREKIT="${CN1_IAP_STOREKIT:-2}"
+CN1_IAP_STOREKIT="${CN1_IAP_STOREKIT:-1}"
 case "$CN1_IAP_STOREKIT" in
   1) ONLY_TESTING=(-only-testing:"${TEST_SCHEME}/PurchaseStoreKitTests") ;;
   2) ONLY_TESTING=(-only-testing:"${TEST_SCHEME}/PurchaseStoreKitTests"

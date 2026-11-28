@@ -42,6 +42,7 @@ private let commandsKey = "CN1IAPTestCommands"
 private let lifetime = "com.codenameone.hello.lifetime"
 private let monthly = "com.codenameone.hello.monthly"
 private let consumable = "com.codenameone.hello.pro"
+private let yearly = "com.codenameone.hello.yearly"
 
 @available(iOS 17.0, *)
 final class PurchaseStoreKit2Tests: XCTestCase {
@@ -131,21 +132,47 @@ final class PurchaseStoreKit2Tests: XCTestCase {
         try simulate(nil, StoreKitPurchaseAPI())
         XCTAssertFalse(events().contains("itemPurchased \(consumable)"), "\(events())")
 
+        // Ask to Buy, declined: pending is reported and StoreKit fails the
+        // request. On a device a declined request creates no transaction.
+        // SKTestSession on iOS 27 instead delivers a verified one through
+        // Transaction.updates while its own record says failed (reported on
+        // the developer forums, thread 856406), so whether the app grants it
+        // cannot be asserted here; the grants below are counted from this
+        // point on instead.
+        session.askToBuyEnabled = true
+        command("purchase:\(consumable)")
+        XCTAssertTrue(wait({
+            self.session.allTransactions().contains { $0.productIdentifier == consumable && $0.pendingAskToBuyConfirmation }
+        }, timeout: 30), "no Ask to Buy transaction was created: \(session.allTransactions())")
+        waitFor("itemPurchasePending \(consumable)")
+        let declined = try XCTUnwrap(session.allTransactions().first {
+            $0.productIdentifier == consumable && $0.pendingAskToBuyConfirmation
+        })
+        try session.declineAskToBuyTransaction(identifier: declined.identifier)
+        XCTAssertTrue(wait({
+            self.session.allTransactions().contains { $0.identifier == declined.identifier && $0.state == .failed }
+        }, timeout: 10), "the declined request did not fail: \(session.allTransactions())")
+        _ = wait({ false }, timeout: 3)
+        let grantsBefore = events().filter { $0 == "itemPurchased \(consumable)" }.count
+
         // Ask to Buy: nothing is granted while it waits, and the approved
         // transaction arrives later through Transaction.updates.
-        session.askToBuyEnabled = true
         command("purchase:\(consumable)")
         let pending = wait({
             self.session.allTransactions().contains { $0.productIdentifier == consumable && $0.pendingAskToBuyConfirmation }
         }, timeout: 30)
         XCTAssertTrue(pending, "no Ask to Buy transaction was created: \(session.allTransactions())")
-        XCTAssertFalse(events().contains("itemPurchased \(consumable)"), "granted before approval: \(events())")
+        XCTAssertTrue(wait({ self.events().filter { $0 == "itemPurchasePending \(consumable)" }.count >= 2 },
+                           timeout: 30), "the second request was not reported pending: \(events())")
+        XCTAssertEqual(events().filter { $0 == "itemPurchased \(consumable)" }.count, grantsBefore,
+                       "granted before approval: \(events())")
         let ask = try XCTUnwrap(session.allTransactions().first {
             $0.productIdentifier == consumable && $0.pendingAskToBuyConfirmation
         })
         try session.approveAskToBuyTransaction(identifier: ask.identifier)
         session.askToBuyEnabled = false
-        waitFor("itemPurchased \(consumable)")
+        XCTAssertTrue(wait({ self.events().filter { $0 == "itemPurchased \(consumable)" }.count > grantsBefore },
+                           timeout: 30), "the approved request was never granted: \(events())")
         waitForPrefix("receipt \(consumable) ")
         assertFinished(consumable)
 
@@ -163,13 +190,34 @@ final class PurchaseStoreKit2Tests: XCTestCase {
         // Each transaction was delivered once, however many StoreKit sources
         // (purchase result, updates, unfinished) reported it.
         let all = events()
-        for (sku, times) in [(lifetime, 1), (monthly, 2), (consumable, 1)] {
+        // The consumable is counted from before the approved Ask to Buy: what
+        // SKTestSession delivers for the declined one is not a device's.
+        XCTAssertEqual(all.filter { $0 == "itemPurchased \(consumable)" }.count, grantsBefore + 1,
+                       "\(consumable): \(all)")
+        for (sku, times) in [(lifetime, 1), (monthly, 2)] {
             XCTAssertEqual(all.filter { $0 == "itemPurchased \(sku)" }.count, times, "\(sku): \(all)")
         }
         let receiptIds = all.filter { $0.hasPrefix("receipt ") }.compactMap(receiptTransactionId)
         XCTAssertEqual(receiptIds.count, Set(receiptIds).count, "a receipt was submitted twice: \(all)")
         XCTAssertFalse(all.contains { $0.hasPrefix("receipt ") && !$0.contains(" jws:") },
                        "a receipt without the StoreKit 2 JWS: \(all)")
+
+        // An upgrade within the group: the yearly plan is a purchase. The
+        // monthly transaction it replaces comes back marked upgraded; it is
+        // finished, but is neither a purchase nor a second receipt -- its
+        // receipt was posted when it was bought, and the receipt store drops
+        // a transaction id it already has.
+        let receiptsBefore = events().filter { $0.hasPrefix("receipt ") }.count
+        command("subscribe:\(yearly)")
+        waitFor("itemPurchased \(yearly)")
+        waitForPrefix("receipt \(yearly) ")
+        assertFinished(yearly)
+        assertFinished(monthly)
+        _ = wait({ false }, timeout: 3)
+        XCTAssertEqual(events().filter { $0 == "itemPurchased \(monthly)" }.count, 2,
+                       "an upgraded transaction was reported as a purchase: \(events())")
+        XCTAssertEqual(events().filter { $0.hasPrefix("receipt ") }.count, receiptsBefore + 1,
+                       "the upgrade posted more than the new plan's receipt: \(events())")
 
         // Last, because it leaves a transaction StoreKit will offer again: a
         // purchase whose signature does not verify grants nothing and reports
@@ -263,12 +311,18 @@ final class PurchaseStoreKit2Tests: XCTestCase {
     /// The app finishes a transaction once its receipt is stored; until then
     /// it is in Transaction.unfinished.
     private func assertFinished(_ sku: String, file: StaticString = #filePath, line: UInt = #line) {
-        let done = wait({ !self.unfinishedProducts().contains(sku) }, timeout: 20)
-        XCTAssertTrue(done, "\(sku) was never finished", file: file, line: line)
+        // A probe that never answers is a failure, not an empty list: read as
+        // "nothing unfinished", it passed whether or not anything was finished.
+        let done = wait({
+            guard let open = self.unfinishedProducts() else { return false }
+            return !open.contains(sku)
+        }, timeout: 20)
+        XCTAssertTrue(done, "\(sku) was never finished (or Transaction.unfinished never answered)",
+                      file: file, line: line)
     }
 
-    private func unfinishedProducts() -> [String] {
-        var out: [String] = []
+    private func unfinishedProducts() -> [String]? {
+        var out: [String]? = nil
         var complete = false
         Task.detached {
             var ids: [String] = []
@@ -282,7 +336,6 @@ final class PurchaseStoreKit2Tests: XCTestCase {
                 complete = true
             }
         }
-        _ = wait({ complete }, timeout: 10)
-        return out
+        return wait({ complete }, timeout: 10) ? out : nil
     }
 }

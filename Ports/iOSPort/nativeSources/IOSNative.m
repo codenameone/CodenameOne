@@ -13971,7 +13971,8 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
             }
             nsSku = dict[@"sku"];
             id promo = dict[@"promotionalOffer"];
-            if (promo != nil) {
+            // dataWithJSONObject raises on anything but a dictionary or array.
+            if (promo != nil && [NSJSONSerialization isValidJSONObject:promo]) {
                 NSData *promoData = [NSJSONSerialization dataWithJSONObject:promo options:0 error:nil];
                 offerJson = promoData == nil ? nil : [[[NSString alloc] initWithData:promoData encoding:NSUTF8StringEncoding] autorelease];
             }

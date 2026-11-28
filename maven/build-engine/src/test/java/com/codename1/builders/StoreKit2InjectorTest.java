@@ -70,20 +70,20 @@ public class StoreKit2InjectorTest {
     }
 
     @Test
-    public void storeKit2IsOnUnlessTurnedOff() {
-        assertTrue(StoreKit2Injector.enabled(request(), false));
-        assertTrue(StoreKit2Injector.enabled(request("ios.storeKit2", "true"), false));
-        assertFalse(StoreKit2Injector.enabled(request("ios.storeKit2", " FALSE "), false));
-        assertTrue(StoreKit2Injector.enabled(request(), true));
+    public void storeKit2IsOffUnlessTurnedOn() {
+        assertFalse(StoreKit2Injector.enabled(request(), false));
+        assertTrue(StoreKit2Injector.enabled(request("ios.storeKit2", " TRUE "), false));
+        assertFalse(StoreKit2Injector.enabled(request("ios.storeKit2", "false"), false));
+        assertFalse(StoreKit2Injector.enabled(request(), true));
     }
 
     @Test
     public void aMacBuildFallsBackToTheIosHint() {
-        assertFalse(StoreKit2Injector.enabled(request("ios.storeKit2", "false"), true));
-        assertTrue(StoreKit2Injector.enabled(request("ios.storeKit2", "false", "macos.storeKit2", "true"), true));
-        assertFalse(StoreKit2Injector.enabled(request("macos.storeKit2", "false"), true));
+        assertTrue(StoreKit2Injector.enabled(request("ios.storeKit2", "true"), true));
+        assertFalse(StoreKit2Injector.enabled(request("ios.storeKit2", "true", "macos.storeKit2", "false"), true));
+        assertTrue(StoreKit2Injector.enabled(request("macos.storeKit2", "true"), true));
         // The iOS build never reads the Mac hint.
-        assertTrue(StoreKit2Injector.enabled(request("macos.storeKit2", "false"), false));
+        assertFalse(StoreKit2Injector.enabled(request("macos.storeKit2", "true"), false));
     }
 
     @Test

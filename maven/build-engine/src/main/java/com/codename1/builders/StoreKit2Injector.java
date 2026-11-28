@@ -47,23 +47,24 @@ public final class StoreKit2Injector {
     }
 
     /**
-     * Whether a build wants StoreKit 2: {@code ios.storeKit2}, or for a macOS
-     * build {@code macos.storeKit2} falling back to it. On unless {@code false}.
-     * Without the bridge the port's StoreKit 1 natives run on every OS
-     * version, and a receipt's order data is the app receipt again rather
-     * than the signed transaction: the opt-out for a server of the
-     * developer's own that still posts it to {@code verifyReceipt}.
+     * Whether a build wants StoreKit 2: {@code ios.storeKit2=true}, or for a
+     * macOS build {@code macos.storeKit2} falling back to it. Off unless
+     * {@code true}: with the bridge a receipt's order data is the signed
+     * transaction rather than the app receipt, which a developer server that
+     * posts it to Apple's {@code verifyReceipt} cannot read, so it is the
+     * developer's choice to make. Without the bridge the port's StoreKit 1
+     * natives run on every OS version.
      *
      * @param request the build
      * @param mac     true for a macOS build
-     * @return false when the build turned StoreKit 2 off
+     * @return true when the build turned StoreKit 2 on
      */
     public static boolean enabled(BuildRequest request, boolean mac) {
-        String v = request.getArg("ios.storeKit2", "true");
+        String v = request.getArg("ios.storeKit2", "false");
         if (mac) {
             v = request.getArg("macos.storeKit2", v);
         }
-        return !"false".equalsIgnoreCase(v.trim());
+        return "true".equalsIgnoreCase(v.trim());
     }
 
     /**

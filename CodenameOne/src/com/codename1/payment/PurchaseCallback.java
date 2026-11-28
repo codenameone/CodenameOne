@@ -41,16 +41,16 @@ public interface PurchaseCallback {
     /// - `sku`: the id
     void itemPurchaseError(String sku, String errorMessage);
 
-    /// Invoked if a refund was granted for a purchase
+    /// Invoked if a refund was granted for a purchase.
+    ///
+    /// Called on iOS and macOS (StoreKit 2) when Apple revokes a purchase: a refund, or a
+    /// Family Sharing purchase the organizer withdrew. Other platforms do not call it, so treat
+    /// it as a prompt to recompute ownership from the receipts (see `Purchase#getReceipts()`),
+    /// which is the signal that works everywhere.
     ///
     /// #### Parameters
     ///
     /// - `sku`: the sku purchased
-    ///
-    /// #### Deprecated
-    ///
-    /// @deprecated This callback is no longer used.  Use the Receipts API to check if the user currently "owns" a product.  See https://www.codenameone.com/blog/intro-to-in-app-purchase.html for a guide
-    /// into how to set up in-app purchase for all scenarios including subscriptions.
     void itemRefunded(String sku);
 
     /// Invoked when a subscription SKU is started

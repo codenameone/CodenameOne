@@ -48,9 +48,31 @@
         {
           "adHocOffers" : [],
           "codeOffers" : [],
-          "displayPrice" : "1.99",
+          "displayPrice" : "9.99",
           "familyShareable" : false,
           "groupNumber" : 1,
+          "internalID" : "CN1E2E0001-0000-0000-0000-0000000000A4",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Codename One e2e yearly",
+              "displayName" : "CN1 Test Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.codenameone.hello.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "CN1 Test Yearly",
+          "subscriptionGroupID" : "CN1E2E01",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
           "internalID" : "CN1E2E0001-0000-0000-0000-0000000000A3",
           "introductoryOffer" : null,
           "localizations" : [

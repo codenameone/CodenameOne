@@ -62,6 +62,11 @@ import UIKit
 @objc(CN1StoreKit2)
 final class CN1StoreKit2: NSObject {
     private static let finishedKey = "CN1StoreKit2FinishedTransactions"
+    // Bounded so UserDefaults does not grow for ever. A finished transaction
+    // is not delivered again by StoreKit (only unfinished ones and new states
+    // of one are), so forgetting the oldest costs nothing in practice; were
+    // one to come back, Purchase's processed transaction ids still keep its
+    // receipt from being stored twice.
     private static let finishedLimit = 500
 
     private let lock = NSLock()
@@ -188,6 +193,9 @@ final class CN1StoreKit2: NSObject {
 
     /// Starts a purchase; the outcome arrives as events. offerJson is the
     /// ApplePromotionalOffer the Java side serialized, or nil.
+    // No appAccountToken is set: the Purchase API has no user id to give it,
+    // and adding one is an API change. A server binds a purchase to its user
+    // by who presents the receipt, as with StoreKit 1.
     @objc func purchase(_ sku: String, offerJson: String?) {
         guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) else {
             enqueue(["type": "purchaseError", "sku": sku, "error": "StoreKit 2 is not available"])

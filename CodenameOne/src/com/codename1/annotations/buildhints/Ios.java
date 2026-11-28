@@ -168,12 +168,11 @@ public @interface Ios {
     @Hint(appendable = true, name = "ios.spm.packages", separator = ";")
     String[] spmPackages() default {};
 
-    /// In-app purchase through StoreKit 2, on by default. `false` keeps the
-    /// StoreKit 1 implementation on every iOS version. What changes is the
-    /// order data of a `Receipt`: under StoreKit 2 it is the signed
-    /// transaction (a JWS), under StoreKit 1 the base64 app receipt. Set it
-    /// to `false` only for a server of your own that still posts the order
-    /// data to Apple's deprecated `verifyReceipt`. Codename One Commerce
+    /// `true` makes in-app purchase use StoreKit 2; off by default, which
+    /// keeps StoreKit 1 on every iOS version. What changes is the order data
+    /// of a `Receipt`: under StoreKit 2 it is the signed transaction (a JWS),
+    /// under StoreKit 1 the base64 app receipt, which is what a server posting
+    /// it to Apple's deprecated `verifyReceipt` expects. Codename One Commerce
     /// accepts both. StoreKit 2 needs iOS 15; below that StoreKit 1 is used
     /// whatever this says.
     Toggle storeKit2() default Toggle.DEFAULT;

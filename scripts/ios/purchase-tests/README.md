@@ -28,14 +28,14 @@ shared/static `receiptStore`).
 
 ## StoreKit 1 and StoreKit 2
 
-A build that uses the payment API also gets the StoreKit 2 bridge
-(`CN1StoreKit2.swift`, injected by `StoreKit2Injector` from
+A build that uses the payment API and sets `ios.storeKit2=true` gets the
+StoreKit 2 bridge (`CN1StoreKit2.swift`, injected by `StoreKit2Injector` from
 `maven/build-engine/.../builders/storekit/CN1StoreKit2.swifts`), and on iOS 15+
 `CN1StoreKit.m` routes every purchase through it instead of `SKPaymentQueue`.
-`ios.storeKit2=false` leaves the bridge out, and StoreKit 1 runs everywhere.
+Without the hint StoreKit 1 runs everywhere.
 
-`CN1_IAP_STOREKIT` (default `2`) picks the mode `run-ios-purchase-tests.sh`
-expects; `purchase-e2e.yml` runs both, the `1` leg with the hint set:
+`CN1_IAP_STOREKIT` (default `1`) picks the mode `run-ios-purchase-tests.sh`
+expects; `purchase-e2e.yml` runs both, the `2` leg with the hint set:
 
 - `PurchaseStoreKitTests` runs in both modes and checks the build really is the
   one asked for: the `CN1StoreKit2` class is linked in mode 2 only, and the

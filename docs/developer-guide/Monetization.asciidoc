@@ -110,7 +110,7 @@ As you discussed before, there are two types of subscriptions:
 Non-renewable subscriptions are the same as consumable products, except that they're shareable across devices. Auto-renewable subscriptions will continue as long as the user doesn't cancel the subscription. They will be re-billed automatically by the appropriate app-store when the chosen period expires, and the app-store handles the management details itself.
 
 // vale-skip: proselint.Annotations: "NOTE" is the asciidoc admonition prefix here, not a TODO marker.
-NOTE: The concept of an "Non-renewable" subscription is unique to iTunes. Google Play has no formal similar option. To create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a *regular product* in Google play, and a Non-renewable subscription in the iTunes store. You'll learn more about that in a later post when you go into the specifics of app store setup.
+NOTE: The concept of an "Non-renewable" subscription is unique to the App Store. Google Play has no formal similar option. To create a non-renewable subscription SKU that behaves the same in your iOS and Android apps you would create it as a *regular product* in Google play, and a Non-renewable subscription in the iTunes store. The store setup is covered later in this chapter.
 
 IMPORTANT:  The `Purchase` class includes both a `purchase()` method and a `subscribe()` method. On some platforms it makes no difference which one you use, but on Android it matters. If the product is set up as a subscription in Google Play, then you *must* use `subscribe()` to buy the product. If it's set up as a regular product, then you *must* use `purchase()`.  Since you enter "Non-renewable" subscriptions as regular products in the play store, you would use the `purchase()` method.
 
@@ -125,21 +125,22 @@ To build the signed discount payload required by Apple you can use the `ApplePro
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MonetizationJava033Snippet.java[tag=monetization-java-033,indent=0]
 ----
 
-Apple generates the signature and timestamp from your App Store Connect server notifications endpoint; Codename One passes them to the native StoreKit APIs. For one-time products you can call `purchase(sku, offer)` instead of `subscribe(...)`.
+Your server signs the offer with a subscription offer key created in App Store Connect; Codename One passes the signature, nonce and timestamp to StoreKit. For one-time products you can call `purchase(sku, offer)` instead of `subscribe(...)`.
 
 [[storekit-2]]
 ==== StoreKit 2 on iOS and macOS
 
-Apple has two in-app purchase APIs: the original StoreKit, now called StoreKit 1, and StoreKit 2, which has no Objective-C interface. A build that uses `com.codename1.payment` links StoreKit 2 and uses it on iOS and tvOS 15 and macOS 12 or newer. Older systems run StoreKit 1. One API serves the whole run; the two are never mixed. Your code doesn't change: `Purchase`, `PurchaseCallback`, `RestoreCallback`, `ReceiptStore` and Commerce behave the same on both.
+Apple has two in-app purchase APIs: the original StoreKit, now called StoreKit 1, and StoreKit 2, which has no Objective-C interface. A build uses StoreKit 1 unless it turns StoreKit 2 on with the `ios.storeKit2` build hint. With the hint, StoreKit 2 runs on iOS 15, tvOS 15 and macOS 12 or newer, and older systems still run StoreKit 1. One API serves the whole run; the two are never mixed. Your code doesn't change: `Purchase`, `PurchaseCallback`, `RestoreCallback`, `ReceiptStore` and Commerce behave the same on both.
 
 What StoreKit 2 changes for an app is the transaction lifecycle, and Codename One handles it for you:
 
-* Every transaction is checked against Apple's signature on the device. One that fails the check reports `itemPurchaseError` and grants nothing.
-* A transaction is finished only after the receipt store accepts its receipt, so a purchase that was paid for but not yet recorded is offered again on the next launch instead of being lost.
+* Every transaction is checked against Apple's signature on the device. A purchase started in the app that fails the check reports `itemPurchaseError` and grants nothing. One that arrives later, outside the purchase flow, is logged, grants nothing and stays unfinished, so StoreKit offers it again at every launch.
+* A transaction is finished only after its receipt is saved in the app's persistent queue of receipts waiting for the receipt store, so a purchase that was paid for but not yet saved is offered again on the next launch instead of being lost. The queue keeps sending the receipt until the receipt store accepts it.
 * Purchases that happen outside the app -- a renewal, an Ask to Buy approval, an offer code redeemed in the App Store -- arrive while the app runs and on the next launch, through the same callbacks.
-* An Ask to Buy request reports nothing and grants nothing while it waits; `itemPurchased` arrives once a parent approves it, even if the app was closed meanwhile.
-* A refund or a revoked Family Sharing purchase reports `itemRefunded`, so the app can withdraw what it granted.
-* `restore()` reports what the account currently owns. A refunded or expired purchase isn't restored.
+* An Ask to Buy or Strong Customer Authentication request grants nothing while it waits. A callback that implements `PendingPurchaseCallback` gets `itemPurchasePending`; `itemPurchased` arrives once a parent approves it, even if the app was closed meanwhile. A declined request reports nothing more.
+* A refund or a revoked Family Sharing purchase calls `itemRefunded`. Treat it as a prompt to recompute what the user owns from the receipts, which is the signal every platform has.
+* A renewal that had already expired when it arrived is posted to the receipt store without an `itemPurchased` call; count renewals from the receipts, not from callbacks. An upgrade within a subscription group calls `itemPurchased` for the new plan only. The plan it replaced was posted when it was bought, so it is not posted again, and a server learns of the upgrade through App Store Server Notifications V2.
+* `restore()` posts a receipt for and calls `itemRestored` on what the account currently owns. A refunded or expired purchase, and any consumable, isn't restored.
 * Promotional offers (`purchase(sku, offer)` and `subscribe(sku, offer)`) are passed to StoreKit 2 as purchase options; the `ApplePromotionalOffer` payload is the same.
 
 ===== The order data a server receives
@@ -156,27 +157,51 @@ The one visible difference is `Receipt.getOrderData()`, which is what the receip
 
 A server can tell the two apart without asking the device: a JWS is three base64url segments separated by dots, and an app receipt has no dots.
 
-Commerce (<<Commerce,the Commerce chapter>>) accepts both, verifies the JWS signature, and with App Store Server API credentials asks Apple about the transaction itself. Nothing needs to change for an app that uses it.
-
-===== Migrating a server that uses verifyReceipt
-
-Apple deprecated `verifyReceipt`, and it can't read a signed transaction: it answers status 21002. A server that posts the order data there -- including the CN1-IAP-Validator library described below -- has two options:
-
-. *Move the server to the signed transaction (recommended).* Verify the JWS the way Apple's https://github.com/apple/app-store-server-library-java[App Store Server Library] does: the header's `alg` is `ES256`, the `x5c` chain leads to Apple Root CA - G3, and the leaf certificate signed the token. Or look the transaction up by its id with the https://developer.apple.com/documentation/appstoreserverapi/get-transaction-info[App Store Server API]. Both work for every product type, including non-consumables, which have no subscription status to query.
-. *Keep StoreKit 1 for now.* Set the build hint below, and the app uses StoreKit 1 everywhere and sends the app receipt as before:
+To turn StoreKit 2 on:
 
 [source,properties]
 ----
-codename1.arg.ios.storeKit2=false
+codename1.arg.ios.storeKit2=true
 ----
 
-`macos.storeKit2` does the same for a native Mac build; without it a Mac build follows `ios.storeKit2`. The hint is a way to migrate on your own schedule, not a destination: Apple adds new purchase features to StoreKit 2 only.
+`macos.storeKit2` does the same for a native Mac build; without it a Mac build follows `ios.storeKit2`. StoreKit 2 is opt-in because it changes the order data your server receives, as described below. Apple adds new purchase features to StoreKit 2 only, so plan to turn it on.
+
+Commerce (<<Commerce,the Commerce chapter>>) accepts both, verifies the JWS signature, and with App Store Server API credentials asks Apple about the transaction itself. An app that uses Commerce can turn the hint on without other changes.
+
+===== Migrating a server that uses verifyReceipt
+
+Apple deprecated `verifyReceipt`, and it can't read a signed transaction: it answers status 21002. A server that posts the order data there -- including the CN1-IAP-Validator library described below -- needs to change before you turn StoreKit 2 on:
+
+. *Move the server to the signed transaction (recommended).* Verify the JWS the way Apple's https://github.com/apple/app-store-server-library-java[App Store Server Library] does: the header's `alg` is `ES256`, the `x5c` chain leads to Apple Root CA - G3, and the leaf certificate signed the token. Or look the transaction up by its id with the https://developer.apple.com/documentation/appstoreserverapi/get-transaction-info[App Store Server API]. Both work for every product type, including non-consumables, which have no subscription status to query.
+. *Leave the hint off until it is.* The app keeps using StoreKit 1 everywhere and sends the app receipt as before.
 
 ===== Testing with StoreKit configuration files
 
-Xcode's local StoreKit testing works with both APIs. Add a `.storekit` configuration file to the scheme of the generated Xcode project (*Edit Scheme > Run > Options > StoreKit Configuration*) and purchases run against it with no App Store Connect setup. Transactions from that store are signed by a certificate Xcode generates, so a server that verifies the signature against Apple's root -- Commerce among them -- treats them as unverified. That's expected.
+Xcode's local StoreKit testing works with both APIs. Add a `.storekit` configuration file to the scheme of the generated Xcode project (*Edit Scheme > Run > Options > StoreKit Configuration*) and purchases run against it with no App Store Connect setup. Transactions from that store are signed by a certificate Xcode generates, so a server that verifies the signature against Apple's root -- Commerce among them -- treats them as unverified. That's expected: Commerce records them as unvalidated grants with the environment `Xcode`. Sandbox and TestFlight transactions carry the environment `Sandbox`, and Commerce looks them up on Apple's sandbox host. The Codename One simulator runs no StoreKit at all.
 
 In an XCTest, attach the configuration to the scheme as well as creating an `SKTestSession`. StoreKit 2 settles on its environment when the app first calls it, at launch, before a test runs: without the scheme setting it picks the sandbox and returns no products.
+
+[[iap-pitfalls]]
+==== Known problems and how to avoid them
+
+In-app purchase fails in ways no compiler catches, usually only on a device or after review. These are the ones that come up most:
+
+* *A cancelled purchase calls no callback.* Neither StoreKit nor Codename One reports a purchase the user dismissed, so a "buying..." indicator must reset when the app resumes or after a timeout, never only in `itemPurchased` or `itemPurchaseError`.
+* *A pending purchase isn't a purchase.* An Android cash payment and an iOS Ask to Buy request call `itemPurchasePending` (if your callback implements `PendingPurchaseCallback`) and nothing is owned until `itemPurchased`. Never grant on the pending call.
+* *`purchase()` versus `subscribe()` must match the Google Play product type.* On Android the wrong one fails; see the note earlier in this chapter.
+* *Android refunds a purchase nobody acknowledged within three days.* The port acknowledges non-consumables and subscriptions when they arrive, and consumes consumables, so this only bites code that bypasses `Purchase`.
+* *Ownership lives in the receipts, not in callbacks.* Renewals, upgrades within a subscription group, refunds and purchases made on another device don't all produce a callback on every platform. Install a `ReceiptStore` (or use Commerce) and read `Purchase.getReceipts()` or `isSubscribed()`. Without a receipt store `isSubscriptionSupported()` is `false` on iOS.
+* *A server on `verifyReceipt` breaks under StoreKit 2* with status 21002, the CN1-IAP-Validator library included. Migrate it as described in <<storekit-2>> before you set `ios.storeKit2=true`.
+* *Grace periods and billing retries are visible only to a server*, through App Store Server Notifications V2 or Google Real-time developer notifications (Commerce handles both). The device sees nothing until the renewal arrives.
+* *Show the store's price.* Display `Product.getDisplayPrice()` from `getProducts()`, never a hard-coded amount: prices are per storefront and currency, and App Review rejects a mismatch.
+* *App Review requires a "Restore purchases" button* for non-consumables and subscriptions on iOS. Gate it on `isRestoreSupported()` (see the next section).
+* *Test accounts.* Sign in with an Apple sandbox account under *Settings > App Store > Sandbox Account*, never as the device's main Apple ID. Sandbox and TestFlight subscriptions renew on an accelerated schedule and stop after a few renewals, so a subscription that lapses in testing isn't a bug.
+* *A transaction that fails Apple's signature check is redelivered at every launch* and grants nothing. It's normal for Xcode's local StoreKit testing; anywhere else it means a tampered device or a broken build.
+* *An XCTest needs the StoreKit configuration on its scheme*, or StoreKit 2 settles on the sandbox and returns no products (see <<storekit-2>>).
+* *A refund reaches the app, not the receipt store.* `itemRefunded` is called on the device; a server learns of a refund only through App Store Server Notifications V2 (or Commerce). A receipt store that grants on purchase must also listen for those, or a refunded item stays granted.
+* *A transaction is finished once its receipt is saved on the device*, not once your server accepted it. A server that later refuses the receipt for good gets no second delivery from StoreKit, so log refusals; an app deleted before its queue reached the server loses that receipt too, and `restore()` recovers what it owned.
+* *Xcode's local store numbers transactions from zero again* after its transactions are cleared, while the app remembers the ids it already processed. Delete the app from the simulator between test runs, or a new purchase with a reused id is ignored.
+* *A consumable is gone after restore.* Stores don't restore consumables; keep a consumable balance on your server.
 
 ==== Restoring purchases and managing subscriptions
 
@@ -189,7 +214,7 @@ Because these flows are handled by the underlying store your UI doesn't need to 
 
 ==== The Server-Side
 
-Since a subscription purchased on one user device *needs* to be available across the user's devices (Apple's rules for non-renewable subscriptions), your app will need to have a server-component. In this section, you'll gloss over that & "mock" the server interface. You'll go into the specifics of the server-side below.
+Since a subscription purchased on one user device *needs* to be available across the user's devices (Apple's rules for non-renewable subscriptions), your app will need to have a server-component. In this section, you'll gloss over that and "mock" the server interface. You'll go into the specifics of the server-side below.
 
 ===== The receipts API
 

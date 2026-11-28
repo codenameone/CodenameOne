@@ -252,12 +252,19 @@ class ZoozPurchase extends Purchase implements Runnable {
         if (type == null) {
             return;
         }
-        if ("purchased".equals(type) || "superseded".equals(type)) {
+        if ("purchased".equals(type)) {
             Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, sku, transactionId,
                     date(event.get("date")), str(event.get("jws")));
-            if ("purchased".equals(type)) {
-                IOSImplementation.itemPurchased(sku);
-            }
+            IOSImplementation.itemPurchased(sku);
+            IOSImplementation.nativeInstance.storeKit2Finish(transactionId);
+        } else if ("superseded".equals(type)) {
+            // Upgraded within its group, or already expired when delivered --
+            // an app not opened for months drains its old renewals this way.
+            // The receipt store still learns of it, but it is not a purchase:
+            // no analytics event, and no CommerceManager purchase context is
+            // spent on it.
+            Purchase.postRestoredReceipt(Receipt.STORE_CODE_ITUNES, sku, transactionId,
+                    date(event.get("date")), str(event.get("jws")));
             IOSImplementation.nativeInstance.storeKit2Finish(transactionId);
         } else if ("refunded".equals(type)) {
             IOSImplementation.itemRefunded(sku);
@@ -282,6 +289,7 @@ class ZoozPurchase extends Purchase implements Runnable {
             // Ask to Buy / Strong Customer Authentication. The approved
             // transaction arrives later as a "purchased" event.
             Log.p("Purchase of " + sku + " is pending approval");
+            IOSImplementation.itemPurchasePending(sku);
         }
     }
 

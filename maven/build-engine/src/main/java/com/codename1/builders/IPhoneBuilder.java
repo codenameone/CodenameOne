@@ -4868,7 +4868,7 @@ public class IPhoneBuilder extends Executor {
                 // StoreKit 2's Swift bridge, beside the port natives so the
                 // translator adds it to the app target (as with the system
                 // LLM bridge). CN1StoreKit.m uses it where the OS has StoreKit 2.
-                // ios.storeKit2=false leaves it out: StoreKit 1 everywhere.
+                // Only with ios.storeKit2=true; otherwise StoreKit 1 everywhere.
                 if (StoreKit2Injector.enabled(request, false)) {
                     StoreKit2Injector.injectApple(this, buildinRes);
                 }

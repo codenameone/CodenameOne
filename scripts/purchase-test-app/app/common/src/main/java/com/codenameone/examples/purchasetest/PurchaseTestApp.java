@@ -25,6 +25,7 @@ package com.codenameone.examples.purchasetest;
 import com.codename1.io.Storage;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
+import com.codename1.payment.PendingPurchaseCallback;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.system.Lifecycle;
@@ -48,7 +49,7 @@ import com.codename1.annotations.buildhints.*;
 @Android(licenseKey = "CN1TESTPLACEHOLDERKEYNOTFORPRODUCTIONxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxIDAQAB", useAndroidX = Toggle.ON)
 @Ios(applicationQueriesSchemes = {"cydia"}, newStorageLocation = Toggle.ON)
 @IosPrivacy(cameraUsageDescription = "Used by the CI smoke test to verify the com.codename1.camera native bridge compiles. The app never opens a camera session.")
-public class PurchaseTestApp extends Lifecycle implements PurchaseCallback, RestoreCallback {
+public class PurchaseTestApp extends Lifecycle implements PendingPurchaseCallback, RestoreCallback {
     private PurchaseTestSink events;
 
     @Override
@@ -142,6 +143,7 @@ public class PurchaseTestApp extends Lifecycle implements PurchaseCallback, Rest
     public void itemPurchased(String sku) { event("itemPurchased " + sku); }
     public void itemPurchaseError(String sku, String errorMessage) { event("itemPurchaseError " + sku + " " + errorMessage); }
     public void itemRefunded(String sku) { event("itemRefunded " + sku); }
+    public void itemPurchasePending(String sku) { event("itemPurchasePending " + sku); }
     public void subscriptionStarted(String sku) { event("subscriptionStarted " + sku); }
     public void subscriptionCanceled(String sku) { event("subscriptionCanceled " + sku); }
     public void paymentFailed(String paymentCode, String failureReason) { event("paymentFailed " + paymentCode); }

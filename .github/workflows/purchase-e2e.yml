@@ -130,8 +130,8 @@ jobs:
     needs: [golden-plan, build-port]
     permissions:
       contents: read
-    # Both StoreKits ship: 2 by default on iOS 15+, 1 below that and in a build
-    # with ios.storeKit2=false. Each leg builds the app its way and checks the
+    # Both StoreKits ship: 1 by default, 2 on iOS 15+ in a build with
+    # ios.storeKit2=true. Each leg builds the app its way and checks the
     # receipt came from that StoreKit (run-ios-purchase-tests.sh).
     strategy:
       fail-fast: false
@@ -211,9 +211,9 @@ jobs:
           # build-port handed off (not LRU-evicted, survives --failed re-runs).
           tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
 
-      - name: Build the StoreKit 1 variant
-        if: matrix.storekit == 1
-        run: echo 'codename1.arg.ios.storeKit2=false' >> scripts/purchase-test-app/app/common/codenameone_settings.properties
+      - name: Build the StoreKit 2 variant
+        if: matrix.storekit == 2
+        run: echo 'codename1.arg.ios.storeKit2=true' >> scripts/purchase-test-app/app/common/codenameone_settings.properties
 
       - name: Build dedicated IAP app (StoreKit compiled in)
         id: build_ios_app
