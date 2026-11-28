@@ -175,7 +175,7 @@ public class StoreAudit {
 
     static void checkPurposeStrings() {
         for (String[] p : PURPOSES) {
-            List<Hit> uses = grep(p[1]);
+            List<Hit> uses = grepCode(p[1]);
             String hint = hints.getProperty("codename1.arg." + p[2]);
             if (!uses.isEmpty()) {
                 features.add(p[0]);
@@ -226,14 +226,14 @@ public class StoreAudit {
     }
 
     static void checkPayments() {
-        List<Hit> purchase = grep("\\bPurchase\\.getInAppPurchase\\(|\\bpurchase\\(|\\bsubscribe\\(|\\bPurchaseCallback\\b");
-        boolean iap = !grep("\\bPurchase\\.getInAppPurchase\\(|\\bPurchaseCallback\\b").isEmpty();
+        List<Hit> purchase = grepCode("\\bPurchase\\.getInAppPurchase\\(|\\bpurchase\\(|\\bsubscribe\\(|\\bPurchaseCallback\\b");
+        boolean iap = !grepCode("\\bPurchase\\.getInAppPurchase\\(|\\bPurchaseCallback\\b").isEmpty();
         if (!iap) {
             purchase = List.of();
         }
         if (iap) {
             features.add("iap");
-            if (grep("\\.restore\\(\\)").isEmpty()) {
+            if (grepCode("\\.restore\\(\\)").isEmpty()) {
                 add(Sev.BLOCKER, "IAP-NO-RESTORE", at(purchase.get(0)),
                         "In-app purchases with no call to restore() (Apple 3.1.1).",
                         "Add a visible \"Restore purchases\" button that calls Purchase.getInAppPurchase().restore().");
@@ -241,7 +241,7 @@ public class StoreAudit {
             boolean subs = !grep("\\bsubscribe\\(|\\bisSubscriptionSupported\\(|\\bReceipt\\b").isEmpty();
             if (subs) {
                 features.add("subscriptions");
-                if (grep("\\bmanageSubscriptions\\(").isEmpty()) {
+                if (grepCode("\\bmanageSubscriptions\\(").isEmpty()) {
                     add(Sev.HIGH, "SUB-NO-MANAGE", at(purchase.get(0)),
                             "Subscriptions with no manageSubscriptions() entry point. Cancelling must be as easy as subscribing (Apple 3.1.2, FTC, EU).",
                             "In settings, when isManageSubscriptionsSupported(), offer manageSubscriptions(sku).");
@@ -269,8 +269,8 @@ public class StoreAudit {
     }
 
     static void checkAccounts() {
-        List<Hit> social = grep("\\b(GoogleConnect|FacebookConnect|MicrosoftConnect|Auth0Connect|FirebaseAuth)\\b");
-        List<Hit> apple = grep("\\bAppleSignIn\\b");
+        List<Hit> social = grepCode("\\b(GoogleConnect|FacebookConnect|MicrosoftConnect|Auth0Connect|FirebaseAuth)\\b");
+        List<Hit> apple = grepCode("\\bAppleSignIn\\b");
         List<Hit> login = grep("(?i)\\b(Login\\b|signIn\\(|signUp\\(|register\\(|createAccount|\"(sign in|log in|sign up|create account)\")");
         if (!social.isEmpty() || !apple.isEmpty() || !login.isEmpty()) {
             features.add("accounts");
@@ -390,7 +390,7 @@ public class StoreAudit {
                     "A log line may print personal data or credentials.",
                     "Remove it from the release build.");
         }
-        List<Hit> deep = grep("\\bgetAppArg\\(\\)");
+        List<Hit> deep = grepCode("\\bgetAppArg\\(\\)");
         boolean sensitive = deep.stream().anyMatch(h -> lines.get(h.file).stream()
                 .anyMatch(l -> l.matches("(?i).*\\b(delete\\w*|transfer\\w*|pay(ment)?|purchase\\w*|resetPassword|logout|signIn)\\(.*")));
         if (sensitive) {
@@ -450,7 +450,7 @@ public class StoreAudit {
         // Android has no orientation hint of its own; a lock there comes from
         // code (Display.lockOrientation), so only the iOS hint is read.
         String orient = hints.getProperty("codename1.arg.ios.interface_orientation", "");
-        if (!grep("\\blockOrientation\\(").isEmpty()) {
+        if (!grepCode("\\blockOrientation\\(").isEmpty()) {
             orient += " portrait";
         }
         if (orient.matches("(?i).*(portrait|landscape).*") && !orient.matches("(?i).*(sensor|unspecified|full).*")) {
@@ -467,7 +467,7 @@ public class StoreAudit {
                     "ios.appUsesNonExemptEncryption is not set, so each upload may wait on the encryption question.",
                     "Set codename1.arg.ios.appUsesNonExemptEncryption=false when the app uses only HTTPS and OS crypto.");
         }
-        boolean push = !grep("\\bPushCallback\\b|\\bregisterPush\\(").isEmpty();
+        boolean push = !grepCode("\\bPushCallback\\b|\\bregisterPush\\(").isEmpty();
         if (push) {
             features.add("push");
         }
@@ -491,10 +491,10 @@ public class StoreAudit {
                         "Show the ATT prompt before the SDK starts, set the purpose string, and list the data in the privacy labels.");
             }
         }
-        List<Hit> web = grep("\\bBrowserComponent\\b");
+        List<Hit> web = grepCode("\\bBrowserComponent\\b");
         if (!web.isEmpty()) {
             features.add("web");
-            long forms = grep("\\bextends Form\\b|\\bnew Form\\(").size();
+            long forms = grepCode("\\bextends Form\\b|\\bnew Form\\(").size();
             if (forms <= 2) {
                 add(Sev.HIGH, "WEB-WRAPPER", at(web.get(0)),
                         "Few native screens and a BrowserComponent: an app that is mostly a website is rejected (Apple 4.2).",
@@ -674,10 +674,64 @@ public class StoreAudit {
 
     // --------------------------------------------------------------- helpers
 
+    /// Sources with comments and string literals blanked, for matching API
+    /// use: a call named in a comment or a string is not a use.
+    static final Map<Path, List<String>> code = new LinkedHashMap<>();
+
+    static List<Hit> grepCode(String regex) {
+        if (code.isEmpty()) {
+            for (Map.Entry<Path, List<String>> e : lines.entrySet()) {
+                boolean javaLike = !e.getKey().toString().endsWith(".properties");
+                List<String> out = new ArrayList<>();
+                boolean block = false;
+                for (String l : e.getValue()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < l.length() && javaLike; i++) {
+                        char c = l.charAt(i);
+                        if (block) {
+                            if (c == '*' && i + 1 < l.length() && l.charAt(i + 1) == '/') {
+                                block = false;
+                                i++;
+                            }
+                            continue;
+                        }
+                        if (c == '/' && i + 1 < l.length() && l.charAt(i + 1) == '/') {
+                            break;
+                        }
+                        if (c == '/' && i + 1 < l.length() && l.charAt(i + 1) == '*') {
+                            block = true;
+                            i++;
+                            continue;
+                        }
+                        if (c == '"' || c == '\'') {
+                            char q = c;
+                            sb.append(q);
+                            for (i++; i < l.length() && l.charAt(i) != q; i++) {
+                                if (l.charAt(i) == '\\') {
+                                    i++;
+                                }
+                            }
+                            sb.append(q);
+                            continue;
+                        }
+                        sb.append(c);
+                    }
+                    out.add(sb.toString());
+                }
+                code.put(e.getKey(), out);
+            }
+        }
+        return grepIn(code, regex);
+    }
+
     static List<Hit> grep(String regex) {
+        return grepIn(lines, regex);
+    }
+
+    static List<Hit> grepIn(Map<Path, List<String>> src, String regex) {
         Pattern p = Pattern.compile(regex);
         List<Hit> out = new ArrayList<>();
-        for (Map.Entry<Path, List<String>> e : lines.entrySet()) {
+        for (Map.Entry<Path, List<String>> e : src.entrySet()) {
             List<String> ls = e.getValue();
             for (int i = 0; i < ls.size(); i++) {
                 String l = ls.get(i);
