@@ -136,7 +136,7 @@ def validate_includes(includes):
     java_snippets = []
     for item in includes:
         # The Wayline, Savor, Skirmish, Dash and Parley chapters show the sample applications themselves,
-        # which are built and tested by wayline.yml, savor.yml, skirmish.yml, dash.yml and parley.yml, so they include its sources directly
+        # which are built and tested by samples.yml, so they include its sources directly
         # rather than through copies under docs/demos that could drift from it.
         if not item["target"].startswith(INCLUDE_ROOTS):
             errors.append(

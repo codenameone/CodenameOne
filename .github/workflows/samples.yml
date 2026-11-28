@@ -1,0 +1,2599 @@
+# Every sample application under scripts/ (the full-stack samples and the
+# games), in ONE workflow: one job per kind of check, and each sample a step of
+# it. These used to be fourteen workflows of eight to ten jobs each, so a change
+# to the shared app kit queued well over a hundred jobs.
+#
+#   select            which samples the change touches, from each sample's old
+#                     `paths` filter (PATHS below); every sample on the nightly
+#                     and on a manual run, and when this file itself changes.
+#   one job per kind  template sync, the server tests (JVM and compiled, and on
+#                     each database), the client end to end run, the browser,
+#                     Android and iOS. The framework is installed once per job,
+#                     then each selected sample runs as steps named
+#                     "<sample>: ...". A failed sample does not stop the next:
+#                     every step runs unless the run was cancelled, and the job
+#                     fails at the end if any step did.
+#
+# iOS builds the port once (build-ios-port) and splits the samples over two
+# macOS jobs; on the nightly, samples-ios-nightly.yml builds them instead.
+
+name: Samples (full-stack and game)
+on:
+  pull_request:
+    paths:
+    - .github/workflows/samples.yml
+    - maven/cn1-app-kit/**
+    - scripts/bastion/**
+    - scripts/bazaar/**
+    - scripts/brickyard/**
+    - scripts/ci/reset-*.sh
+    - scripts/ci/sample-server-tests-on-database.sh
+    - scripts/ci/start-test-database.sh
+    - scripts/dash/**
+    - scripts/fieldline/**
+    - scripts/papercut/**
+    - scripts/parley/**
+    - scripts/pulse/**
+    - scripts/reel/**
+    - scripts/savor/**
+    - scripts/skirmish/**
+    - scripts/slate/**
+    - scripts/splat/**
+    - scripts/wayline/**
+  workflow_dispatch:
+  schedule:
+  - cron: 11 0 * * *
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  packages: read
+jobs:
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+  select:
+    needs: golden-plan
+    if: needs.golden-plan.outputs.run == 'true'
+    name: Select the samples this change touches
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      samples: ${{ steps.select.outputs.samples }}
+      template-sync: ${{ steps.select.outputs.template-sync }}
+      backend: ${{ steps.select.outputs.backend }}
+      chain: ${{ steps.select.outputs.chain }}
+      backend-database: ${{ steps.select.outputs.backend-database }}
+      client-e2e: ${{ steps.select.outputs.client-e2e }}
+      web: ${{ steps.select.outputs.web }}
+      android: ${{ steps.select.outputs.android }}
+      ios: ${{ steps.select.outputs.ios }}
+      app: ${{ steps.select.outputs.app }}
+      rules: ${{ steps.select.outputs.rules }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        filter: blob:none
+        persist-credentials: false
+    - id: select
+      name: Select
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha || '' }}
+        PATHS: '{"bastion": ["scripts/bastion/**", "maven/cn1-app-kit/**"], "bazaar": ["scripts/bazaar/**", "maven/cn1-app-kit/**"], "brickyard": ["scripts/brickyard/**"], "dash": ["scripts/dash/**", "maven/cn1-app-kit/**"], "fieldline": ["scripts/fieldline/**", "maven/cn1-app-kit/**"], "papercut": ["scripts/papercut/**"], "parley": ["scripts/parley/**", "maven/cn1-app-kit/**"], "pulse": ["scripts/pulse/**", "maven/cn1-app-kit/**"], "reel": ["scripts/reel/**", "maven/cn1-app-kit/**"], "savor": ["scripts/savor/**", "scripts/ci/sample-server-tests-on-database.sh", "scripts/ci/start-test-database.sh", "scripts/ci/reset-*.sh", "maven/cn1-app-kit/**"], "skirmish": ["scripts/skirmish/**", "maven/cn1-app-kit/**"], "slate": ["scripts/slate/**", "maven/cn1-app-kit/**"], "splat": ["scripts/splat/**"], "wayline": ["scripts/wayline/**", "scripts/ci/sample-server-tests-on-database.sh", "scripts/ci/start-test-database.sh", "scripts/ci/reset-*.sh", "maven/cn1-app-kit/**"]}'
+        KINDS: '{"android": ["bastion", "bazaar", "dash", "fieldline", "papercut", "parley", "pulse", "reel", "savor", "skirmish", "slate", "splat", "wayline"], "app": ["brickyard"], "backend": ["bastion", "bazaar", "brickyard", "dash", "fieldline", "papercut", "parley", "pulse", "reel", "savor", "skirmish", "slate", "splat", "wayline"], "backend-database": ["bastion", "bazaar", "brickyard", "dash", "fieldline", "papercut", "parley", "pulse", "reel", "savor", "skirmish", "slate", "splat", "wayline"], "chain": ["bastion"], "client-e2e": ["bastion", "bazaar", "dash", "fieldline", "papercut", "parley", "pulse", "reel", "savor", "skirmish", "slate", "splat", "wayline"], "ios": ["bastion", "bazaar", "dash", "fieldline", "papercut", "parley", "pulse", "reel", "savor", "skirmish", "slate", "splat", "wayline"], "rules": ["dash", "skirmish", "splat"], "template-sync": ["bastion", "bazaar", "dash", "fieldline", "papercut", "parley", "pulse", "reel", "savor", "skirmish", "slate", "splat", "wayline"],
+          "web": ["bastion", "bazaar", "fieldline", "parley", "pulse", "reel", "savor", "slate", "wayline"]}'
+      run: |
+        python3 - <<'EOF'
+        import fnmatch, json, os, subprocess
+        paths = json.loads(os.environ["PATHS"])
+        kinds = json.loads(os.environ["KINDS"])
+        everything = sorted(paths)
+        if os.environ["EVENT"] == "pull_request" and os.environ["BASE"]:
+            changed = subprocess.check_output(
+                ["git", "diff", "--name-only", os.environ["BASE"] + "...HEAD"], text=True).split()
+            if ".github/workflows/samples.yml" in changed:
+                chosen = everything
+            else:
+                def hit(p):
+                    # GitHub's paths filter: ** crosses directories, * does not.
+                    rx = "^" + "".join(".*" if a == "**" else "[^/]*" if a == "*" else
+                                       __import__("re").escape(a) for a in __import__("re").split(r"(\*\*|\*)", p)) + "$"
+                    return any(__import__("re").match(rx, f) for f in changed)
+                chosen = [s for s in everything if any(hit(p) for p in paths[s])]
+        else:
+            chosen = everything
+        print("selected:", " ".join(chosen) or "(none)")
+        with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+            out.write("samples= " + " ".join(chosen) + " \n")
+            for k, members in kinds.items():
+                out.write(k + "=" + ("true" if set(members) & set(chosen) else "false") + "\n")
+        EOF
+  template-sync:
+    name: Initializr template matches the sample
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.template-sync == 'true' }}
+    timeout-minutes: 130
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: 'bastion: Compare the template with scripts/bastion'
+      run: python3 scripts/sync-initializr-template.py bastion
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bazaar: Compare the template with scripts/bazaar'
+      run: python3 scripts/sync-initializr-template.py bazaar
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+    - name: 'dash: Compare the template with scripts/dash'
+      run: |
+        python3 scripts/sync-initializr-template.py dash
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+    - name: 'fieldline: Compare the template with scripts/fieldline'
+      run: python3 scripts/sync-initializr-template.py fieldline
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+    - name: 'papercut: Compare the template with scripts/papercut'
+      run: |
+        python3 scripts/sync-initializr-template.py papercut
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+    - name: 'parley: Compare the template with scripts/parley'
+      run: python3 scripts/sync-initializr-template.py parley
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+    - name: 'pulse: Compare the template with scripts/pulse'
+      run: python3 scripts/sync-initializr-template.py pulse
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+    - name: 'reel: Compare the template with scripts/reel'
+      run: python3 scripts/sync-initializr-template.py reel
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+    - name: 'savor: Compare the template with scripts/savor'
+      run: python3 scripts/sync-initializr-template.py savor
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'skirmish: Compare the template with scripts/skirmish'
+      run: |
+        python3 scripts/sync-initializr-template.py skirmish
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+    - name: 'slate: Compare the template with scripts/slate'
+      run: python3 scripts/sync-initializr-template.py slate
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+    - name: 'splat: Compare the template with scripts/splat'
+      run: |
+        python3 scripts/sync-initializr-template.py splat
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+    - name: 'wayline: Compare the template with scripts/wayline'
+      run: python3 scripts/sync-initializr-template.py wayline
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+  backend:
+    name: Server tests (JVM and compiled)
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.backend == 'true' }}
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Install native build tools
+      run: |
+        bash scripts/ci/apt-get-update.sh
+        # A server binary links libcurl, OpenSSL and nghttp2; clang alone
+        # compiles the tests and then fails at the link.
+        sudo apt-get install -y clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Install the framework, the backend runtime and the plugin
+      working-directory: maven
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin,cn1-app-kit,cn1-app-kit/common,cn1-app-kit/backend,cn1-app-kit/lib \
+          -am install -DskipTests -Plocal-dev-javase \
+          -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+          -Dmaven.javadoc.skip=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_8_HOME }}
+        RETRY_ONLY_MATCHING: transient
+    - name: 'bastion: Run the server tests on the JVM and compiled'
+      working-directory: scripts/bastion
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Check that both runners reported'
+      working-directory: scripts/bastion/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bastion-backend-tests
+        path: scripts/bastion/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'bazaar: Run the server tests on the JVM and compiled'
+      working-directory: scripts/bazaar
+      run: |
+        # sample-app is the third-party app sample; its own tests run on the
+        # JVM, and RestockAppE2ETest in backend drives it end to end.
+        mvn -B -Dcodename1.platform=backend -pl shared,backend,sample-app test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+    - name: 'bazaar: Check that both runners reported'
+      working-directory: scripts/bazaar/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+    - name: 'bazaar: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bazaar-backend-tests
+        path: |
+          scripts/bazaar/backend/target/surefire-reports/**
+          scripts/bazaar/sample-app/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'brickyard: Run the server tests on the JVM and compiled'
+      working-directory: scripts/brickyard
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') }}
+    - name: 'brickyard: Check that both runners reported'
+      working-directory: scripts/brickyard/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') }}
+    - name: 'brickyard: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: brickyard-backend-tests
+        path: scripts/brickyard/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'dash: Run the server tests on the JVM and compiled'
+      working-directory: scripts/dash
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+    - name: 'dash: Check that both runners reported'
+      working-directory: scripts/dash/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+    - name: 'dash: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: dash-backend-tests
+        path: scripts/dash/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'fieldline: Run the server tests on the JVM and compiled'
+      working-directory: scripts/fieldline
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+    - name: 'fieldline: Check that both runners reported'
+      working-directory: scripts/fieldline/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+    - name: 'fieldline: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: fieldline-backend-tests
+        path: scripts/fieldline/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'papercut: Run the server tests on the JVM and compiled'
+      working-directory: scripts/papercut
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+    - name: 'papercut: Check that both runners reported'
+      working-directory: scripts/papercut/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+    - name: 'papercut: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: papercut-backend-tests
+        path: scripts/papercut/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'parley: Run the server tests on the JVM and compiled'
+      working-directory: scripts/parley
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+    - name: 'parley: Check that both runners reported'
+      working-directory: scripts/parley/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+    - name: 'parley: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: parley-backend-tests
+        path: scripts/parley/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'pulse: Run the server tests on the JVM and compiled'
+      working-directory: scripts/pulse
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+    - name: 'pulse: Check that both runners reported'
+      working-directory: scripts/pulse/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+    - name: 'pulse: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: pulse-backend-tests
+        path: scripts/pulse/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'reel: Run the server tests on the JVM and compiled'
+      working-directory: scripts/reel
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+    - name: 'reel: Check that both runners reported'
+      working-directory: scripts/reel/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+    - name: 'reel: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: reel-backend-tests
+        path: scripts/reel/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'savor: Run the server tests on the JVM and compiled'
+      working-directory: scripts/savor
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'savor: Check that both runners reported'
+      working-directory: scripts/savor/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'savor: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: savor-backend-tests
+        path: scripts/savor/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'skirmish: Run the server tests on the JVM and compiled'
+      working-directory: scripts/skirmish
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+    - name: 'skirmish: Check that both runners reported'
+      working-directory: scripts/skirmish/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+    - name: 'skirmish: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: skirmish-backend-tests
+        path: scripts/skirmish/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'slate: Run the server tests on the JVM and compiled'
+      working-directory: scripts/slate
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+    - name: 'slate: Check that both runners reported'
+      working-directory: scripts/slate/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+    - name: 'slate: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: slate-backend-tests
+        path: scripts/slate/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'splat: Run the server tests on the JVM and compiled'
+      working-directory: scripts/splat
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+    - name: 'splat: Check that both runners reported'
+      working-directory: scripts/splat/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+    - name: 'splat: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: splat-backend-tests
+        path: scripts/splat/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'wayline: Run the server tests on the JVM and compiled'
+      working-directory: scripts/wayline
+      run: |
+        mvn -B -Dcodename1.platform=backend -pl shared,backend test \
+          -Dcn1.backend.compiledTests=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Check that both runners reported'
+      working-directory: scripts/wayline/backend/target/surefire-reports
+      run: |
+        jvm=$(find . -maxdepth 1 -name 'TEST-*.xml' ! -name '*-compiled.xml' | wc -l)
+        compiled=$(find . -maxdepth 1 -name 'TEST-*-compiled.xml' | wc -l)
+        echo "JVM reports: $jvm, compiled reports: $compiled"
+        if [ "$jvm" -eq 0 ] || [ "$compiled" -eq 0 ]; then
+          echo "::error::a runner produced no test reports"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: wayline-backend-tests
+        path: scripts/wayline/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+  chain:
+    name: Ether on a development chain
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.chain == 'true' }}
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Install the framework, the backend runtime and the plugin
+      working-directory: maven
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin,cn1-app-kit/backend \
+          -am install -DskipTests -Plocal-dev-javase \
+          -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+          -Dmaven.javadoc.skip=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_8_HOME }}
+        RETRY_ONLY_MATCHING: transient
+    - name: 'bastion: Deposit, sweep and withdraw on a geth development node'
+      run: scripts/bastion/run-chain-test.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        MAVEN_OPTS: -Dmaven.repo.local=${{ github.workspace }}/.m2-repo
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Check that the chain test ran'
+      working-directory: scripts/bastion/backend/target/surefire-reports
+      run: |
+        f=TEST-com.codenameone.examples.bastion.chain.ChainIntegrationTest.xml
+        grep -o 'tests="[0-9]*"[^>]*skipped="[0-9]*"' "$f"
+        if ! grep -q 'skipped="0"' "$f" || grep -q 'tests="0"' "$f"; then
+          echo "::error::ChainIntegrationTest did not run"
+          exit 1
+        fi
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+  backend-database:
+    name: Server tests on ${{ matrix.database }}
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cn1
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: cn1
+        ports:
+        - 5432:5432
+        options: --health-cmd "pg_isready -U cn1" --health-interval 5s --health-timeout 5s --health-retries 20
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.backend-database == 'true' }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+        - postgresql
+        - mysql
+        - sqlserver
+        - oracle
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Start MySQL
+      if: matrix.database == 'mysql'
+      run: |
+        sudo systemctl start mysql.service
+        sudo mysql -uroot -proot -e "CREATE USER 'cn1'@'%' IDENTIFIED WITH mysql_native_password BY 'secret'; GRANT ALL ON *.* TO 'cn1'@'%'; CREATE DATABASE cn1;"
+        # The ledger reads what the writer before it committed, which
+        # REPEATABLE READ (MySQL's default) does not answer; the server
+        # refuses to start without this (IsolationCheck).
+        sudo mysql -uroot -proot -e "SET GLOBAL transaction_isolation = 'READ-COMMITTED';"
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Install the framework, the backend runtime and the plugin
+      working-directory: maven
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,backend-test,codenameone-maven-plugin,cn1-app-kit,cn1-app-kit/common,cn1-app-kit/backend,cn1-app-kit/lib \
+          -am install -DskipTests -Plocal-dev-javase \
+          -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+          -Dmaven.javadoc.skip=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_8_HOME }}
+        RETRY_ONLY_MATCHING: transient
+    - name: Start ${{ matrix.database }}
+      if: matrix.database == 'sqlserver' || matrix.database == 'oracle'
+      run: scripts/ci/start-test-database.sh ${{ matrix.database }}
+    - name: 'bastion: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/bastion \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'bastion: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bastion-backend-${{ matrix.database }}-tests
+        path: scripts/bastion/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'bazaar: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/bazaar \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'bazaar: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bazaar-backend-${{ matrix.database }}-tests
+        path: scripts/bazaar/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'brickyard: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/brickyard \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'brickyard: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: brickyard-backend-${{ matrix.database }}-tests
+        path: scripts/brickyard/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'dash: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/dash \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'dash: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: dash-backend-${{ matrix.database }}-tests
+        path: scripts/dash/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'fieldline: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/fieldline \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'fieldline: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: fieldline-backend-${{ matrix.database }}-tests
+        path: scripts/fieldline/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'papercut: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/papercut \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'papercut: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: papercut-backend-${{ matrix.database }}-tests
+        path: scripts/papercut/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'parley: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/parley \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'parley: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: savor-backend-${{ matrix.database }}-tests
+        path: scripts/parley/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'pulse: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/pulse \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'pulse: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: pulse-backend-${{ matrix.database }}-tests
+        path: scripts/pulse/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'reel: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/reel \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'reel: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: reel-backend-${{ matrix.database }}-tests
+        path: scripts/reel/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'savor: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ -n "${CN1_TEST_DATABASE_URL:-}" ]; then
+          :
+        elif [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/savor \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'savor: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: savor-backend-${{ matrix.database }}-tests
+        path: scripts/savor/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'skirmish: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/skirmish \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'skirmish: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: skirmish-backend-${{ matrix.database }}-tests
+        path: scripts/skirmish/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'slate: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/slate \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'slate: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: slate-backend-${{ matrix.database }}-tests
+        path: scripts/slate/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'splat: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/splat \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') }}
+    - name: 'splat: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') && (matrix.database == 'postgresql' || matrix.database == 'mysql') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: splat-backend-${{ matrix.database }}-tests
+        path: scripts/splat/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'wayline: Run the server tests on ${{ matrix.database }}'
+      run: |
+        if [ -n "${CN1_TEST_DATABASE_URL:-}" ]; then
+          :
+        elif [ "${{ matrix.database }}" = mysql ]; then
+          export CN1_TEST_DATABASE_URL="mysql://cn1:secret@127.0.0.1:3306/cn1?sslmode=disable"
+        else
+          export CN1_TEST_DATABASE_URL="postgres://cn1:secret@localhost:5432/cn1?sslmode=disable"
+        fi
+        scripts/ci/sample-server-tests-on-database.sh scripts/wayline \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') && (always()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: wayline-backend-${{ matrix.database }}-tests
+        path: scripts/wayline/backend/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+  client-e2e:
+    name: The app's tests, and the server driven over HTTP (JVM and compiled)
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.client-e2e == 'true' }}
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Install native build tools
+      run: |
+        bash scripts/ci/apt-get-update.sh
+        sudo apt-get install -y clang zlib1g-dev libcurl4-openssl-dev libssl-dev libnghttp2-dev
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Install Codename One artifacts (core / javase / css-compiler / plugin / backend)
+      env:
+        RETRY_ONLY_MATCHING: transient
+        RETRY_ATTEMPTS: '5'
+        RETRY_DELAY_SECONDS: '60'
+      run: |
+        export JAVA_HOME="${JAVA_HOME_8}"
+        export PATH="${JAVA_HOME_8}/bin:$PATH"
+        cd maven
+        bash ../scripts/ci/retry.sh mvn -B \
+            -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test,cn1-app-kit,cn1-app-kit/backend,cn1-app-kit/common,cn1-app-kit/lib -am install \
+            -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true \
+            -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true
+    - name: Ensure a virtual display (xvfb) for the simulator
+      run: |
+        if ! command -v xvfb-run >/dev/null 2>&1; then
+          (timeout 300 apt-get update && timeout 300 apt-get install -y xvfb) || true
+        fi
+    - name: 'bastion: Build a project generated from the Initializr template'
+      run: scripts/bastion/check-template.sh "$RUNNER_TEMP/bastion-template"
+      env:
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Build the app and run its tests'
+      working-directory: scripts/bastion
+      run: mvn -B -Dcodename1.platform=javase -Djava.awt.headless=true package
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Drive the JVM server over HTTP'
+      run: scripts/bastion/run-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Drive the compiled server over HTTP'
+      run: |
+        BASTION_SERVER_LOG="$GITHUB_WORKSPACE/scripts/bastion/target/e2e-server-native.log" \
+          scripts/bastion/run-e2e.sh --native
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Upload the server logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bastion-e2e
+        path: scripts/bastion/target/e2e-server*.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'bazaar: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/bazaar/check-template.sh "$RUNNER_TEMP/bazaar-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+    - name: 'bazaar: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/bazaar/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+    - name: 'bazaar: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bazaar-e2e
+        path: |
+          scripts/bazaar/target/e2e-shots/**
+          scripts/bazaar/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'dash: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/dash/check-template.sh "$RUNNER_TEMP/dash-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+    - name: 'dash: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/dash/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+    - name: 'dash: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: dash-e2e
+        path: |
+          scripts/dash/target/e2e-shots/**
+          scripts/dash/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'fieldline: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/fieldline/check-template.sh "$RUNNER_TEMP/fieldline-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+    - name: 'fieldline: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/fieldline/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+    - name: 'fieldline: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: fieldline-e2e
+        path: |
+          scripts/fieldline/target/e2e-shots/**
+          scripts/fieldline/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'papercut: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/papercut/check-template.sh "$RUNNER_TEMP/papercut-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+    - name: 'papercut: Arena tests'
+      run: |
+        export JAVA_HOME="${JAVA_HOME_17}"
+        cd scripts/papercut
+        mvn -B -pl shared,common -am test -Dtest=ArenaTest -Dsurefire.failIfNoSpecifiedTests=false
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+    - name: 'papercut: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/papercut/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+    - name: 'papercut: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: papercut-e2e
+        path: |
+          scripts/papercut/target/e2e-shots/**
+          scripts/papercut/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'parley: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/parley/check-template.sh "$RUNNER_TEMP/parley-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+    - name: 'parley: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/parley/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+    - name: 'parley: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: parley-e2e
+        path: |
+          scripts/parley/target/e2e-shots/**
+          scripts/parley/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'pulse: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/pulse/check-template.sh "$RUNNER_TEMP/pulse-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+    - name: 'pulse: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/pulse/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+    - name: 'pulse: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: pulse-e2e
+        path: |
+          scripts/pulse/target/e2e-shots/**
+          scripts/pulse/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'reel: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/reel/check-template.sh "$RUNNER_TEMP/reel-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+    - name: 'reel: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/reel/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+    - name: 'reel: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: reel-e2e
+        path: |
+          scripts/reel/target/e2e-shots/**
+          scripts/reel/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'savor: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/savor/check-template.sh "$RUNNER_TEMP/savor-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'savor: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/savor/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'savor: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: savor-e2e
+        path: |
+          scripts/savor/target/e2e-shots/**
+          scripts/savor/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'skirmish: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/skirmish/check-template.sh "$RUNNER_TEMP/skirmish-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+    - name: 'skirmish: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/skirmish/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+    - name: 'skirmish: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: skirmish-e2e
+        path: |
+          scripts/skirmish/target/e2e-shots/**
+          scripts/skirmish/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'slate: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/slate/check-template.sh "$RUNNER_TEMP/slate-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+    - name: 'slate: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/slate/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+    - name: 'slate: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: slate-e2e
+        path: |
+          scripts/slate/target/e2e-shots/**
+          scripts/slate/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'splat: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/splat/check-template.sh "$RUNNER_TEMP/splat-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+    - name: 'splat: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/splat/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+    - name: 'splat: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: splat-e2e
+        path: |
+          scripts/splat/target/e2e-shots/**
+          scripts/splat/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'wayline: Build a project generated from the Initializr template'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/wayline/check-template.sh "$RUNNER_TEMP/wayline-template"
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Run the Initializr''s tests'
+      working-directory: scripts/initializr
+      run: |
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        xvfb-run -a mvn -B -Dcn1.localWorkspace=true -Dcodename1.platform=javase -Ptest verify
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Run the application against the server'
+      run: |
+        export JDK_8_HOME="${JAVA_HOME_8}"
+        export JAVA_HOME="${JAVA_HOME_17}"
+        export PATH="${JAVA_HOME_17}/bin:$PATH"
+        scripts/wayline/run-e2e.sh
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Upload the captures and the server log'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: wayline-e2e
+        path: |
+          scripts/wayline/target/e2e-shots/**
+          scripts/wayline/target/e2e-server.log
+        if-no-files-found: warn
+        retention-days: 14
+  web:
+    name: Web app hosted by the server (headless browser)
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.web == 'true' }}
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up Node 20
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+    - name: Cache Playwright browsers
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('scripts/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-chromium-
+    - name: Install Playwright Chromium
+      run: |
+        cd scripts
+        npm ci
+        # Playwright shells out to apt for the OS-level packages, so the
+        # runner image's third-party sources are pruned first.
+        bash "$GITHUB_WORKSPACE/scripts/ci/apt-get-update.sh"
+        npx playwright install-deps chromium
+        npx playwright install chromium
+    - name: Install the framework, the backend runtime and the plugin
+      working-directory: maven
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
+          -pl core,javase,css-compiler,codenameone-maven-plugin,backend,backend-test,cn1-app-kit/backend,cn1-app-kit/common,cn1-app-kit/lib \
+          -am install -DskipTests -Plocal-dev-javase \
+          -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+          -Dmaven.javadoc.skip=true
+      env:
+        JAVA_HOME: ${{ env.JDK_8_HOME }}
+        RETRY_ONLY_MATCHING: transient
+    - name: 'bastion: Run the hosted web app in a headless browser'
+      run: scripts/bastion/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+    - name: 'bastion: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bastion-web-e2e
+        path: scripts/bastion/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'bazaar: Run the hosted web app in a headless browser'
+      run: scripts/bazaar/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+    - name: 'bazaar: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: bazaar-web-e2e
+        path: scripts/bazaar/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'fieldline: Run the hosted web app in a headless browser'
+      run: scripts/fieldline/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+    - name: 'fieldline: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: fieldline-web-e2e
+        path: scripts/fieldline/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'parley: Run the hosted web app in a headless browser'
+      run: scripts/parley/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+    - name: 'parley: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: parley-web-e2e
+        path: scripts/parley/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'pulse: Run the hosted web app in a headless browser'
+      run: scripts/pulse/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+    - name: 'pulse: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: pulse-web-e2e
+        path: scripts/pulse/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'reel: Run the hosted web app in a headless browser'
+      run: scripts/reel/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+    - name: 'reel: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: reel-web-e2e
+        path: scripts/reel/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'savor: Run the hosted web app in a headless browser'
+      run: scripts/savor/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+    - name: 'savor: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: savor-web-e2e
+        path: scripts/savor/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'slate: Run the hosted web app in a headless browser'
+      run: scripts/slate/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+    - name: 'slate: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: slate-web-e2e
+        path: scripts/slate/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'wayline: Run the hosted web app in a headless browser'
+      run: scripts/wayline/run-web-e2e.sh
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+    - name: 'wayline: Upload the screenshots and the logs'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: wayline-web-e2e
+        path: scripts/wayline/target/web-e2e/**
+        if-no-files-found: warn
+        retention-days: 14
+  android:
+    name: Android build
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.android == 'true' }}
+    timeout-minutes: 360
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Set TMPDIR
+      run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+    - name: Cache codenameone-tools
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/codenameone-tools
+        key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-cn1-tools-
+    - name: Cache Maven repository
+      uses: actions/cache@v5
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-samples-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-samples-
+          ${{ runner.os }}-m2-
+    - name: Cache Gradle
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          ~/.codenameone/gradle8
+        key: ${{ runner.os }}-gradle-g8-samples-${{ hashFiles('Ports/Android/build.gradle*') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-samples-
+          ${{ runner.os }}-gradle-
+    - name: Setup workspace
+      run: ./scripts/setup-workspace.sh -q -DskipTests
+    - name: Build Android port
+      run: ./scripts/build-android-port.sh -q -DskipTests
+    - name: 'bastion: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+      env:
+        CN1_APP_DIR: scripts/bastion
+    - name: 'bazaar: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+      env:
+        CN1_APP_DIR: scripts/bazaar
+    - name: 'dash: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+      env:
+        CN1_APP_DIR: scripts/dash
+    - name: 'fieldline: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+      env:
+        CN1_APP_DIR: scripts/fieldline
+    - name: 'papercut: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+      env:
+        CN1_APP_DIR: scripts/papercut
+    - name: 'parley: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+      env:
+        CN1_APP_DIR: scripts/parley
+    - name: 'pulse: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+      env:
+        CN1_APP_DIR: scripts/pulse
+    - name: 'reel: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+      env:
+        CN1_APP_DIR: scripts/reel
+    - name: 'savor: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+      env:
+        CN1_APP_DIR: scripts/savor
+    - name: 'skirmish: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+      env:
+        CN1_APP_DIR: scripts/skirmish
+    - name: 'slate: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+      env:
+        CN1_APP_DIR: scripts/slate
+    - name: 'splat: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+      env:
+        CN1_APP_DIR: scripts/splat
+    - name: 'wayline: Build the Android application'
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        ./scripts/build-android-app.sh -q -DskipTests
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+      env:
+        CN1_APP_DIR: scripts/wayline
+  build-ios-port:
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.ios == 'true' && github.event_name != 'schedule' }}
+    uses: ./.github/workflows/_build-ios-port.yml
+  ios-a:
+    name: iOS build (simulator) (a)
+    runs-on: xcode-27
+    needs:
+    - golden-plan
+    - select
+    - build-ios-port
+    if: ${{ !cancelled() && needs.build-ios-port.result == 'success' }}
+    timeout-minutes: 350
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Cache CocoaPods and user gems
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/.gem
+          ~/Library/Caches/CocoaPods
+          ~/.cocoapods/repos
+        key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-v1-
+    - name: Ensure CocoaPods tooling
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        set -euo pipefail
+        GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+        export PATH="$GEM_USER_DIR/bin:$PATH"
+        if ! command -v pod >/dev/null 2>&1; then
+          gem install cocoapods xcodeproj --no-document --user-install
+        fi
+        pod --version
+    - name: Compute setup-workspace hash
+      id: setup_hash
+      run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+    - name: Set TMPDIR
+      run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+    - name: Cache codenameone-tools
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/codenameone-tools
+        key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+        restore-keys: |
+          ${{ runner.os }}-cn1-tools-
+    - name: Cache Maven repository
+      uses: actions/cache@v5
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+    - name: Restore cn1-binaries cache
+      uses: actions/cache@v5
+      with:
+        path: ../cn1-binaries
+        key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+        restore-keys: |
+          cn1-binaries-${{ runner.os }}-
+    - name: Download built CN1 + iOS port bundle
+      uses: actions/download-artifact@v4
+      with:
+        name: cn1-built-bundle
+        path: ${{ runner.temp }}
+    - name: Restore built CN1 + iOS port tree
+      run: |
+        set -euo pipefail
+        tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+    - name: Install XcodeGen
+      run: brew install xcodegen
+    - name: 'bastion: Generate the Xcode project'
+      id: build-ios-app-bastion
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+      env:
+        CN1_APP_DIR: scripts/bastion
+    - name: 'bastion: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-bastion.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-bastion.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/bastion-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bastion ') }}
+      env:
+        CN1_APP_DIR: scripts/bastion
+    - name: 'dash: Generate the Xcode project'
+      id: build-ios-app-dash
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+      env:
+        CN1_APP_DIR: scripts/dash
+    - name: 'dash: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-dash.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-dash.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/dash-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+        # embedded watch app included, whose watch-only icon then has nothing to
+        # compile for. The destination picks each target's own SDK.
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+      env:
+        CN1_APP_DIR: scripts/dash
+    - name: 'papercut: Generate the Xcode project'
+      id: build-ios-app-papercut
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+      env:
+        CN1_APP_DIR: scripts/papercut
+    - name: 'papercut: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-papercut.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-papercut.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/papercut-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+        # embedded watch app included, whose watch-only icon then has nothing to
+        # compile for. The destination picks each target's own SDK.
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' papercut ') }}
+      env:
+        CN1_APP_DIR: scripts/papercut
+    - name: 'pulse: Generate the Xcode project'
+      id: build-ios-app-pulse
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+      env:
+        CN1_APP_DIR: scripts/pulse
+    - name: 'pulse: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-pulse.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-pulse.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/pulse-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+        # embedded watch app included, whose watch-only icon then has nothing to
+        # compile for. The destination picks each target's own SDK.
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' pulse ') }}
+      env:
+        CN1_APP_DIR: scripts/pulse
+    - name: 'savor: Generate the Xcode project'
+      id: build-ios-app-savor
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+      env:
+        CN1_APP_DIR: scripts/savor
+    - name: 'savor: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-savor.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-savor.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/savor-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' savor ') }}
+      env:
+        CN1_APP_DIR: scripts/savor
+    - name: 'slate: Generate the Xcode project'
+      id: build-ios-app-slate
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+      env:
+        CN1_APP_DIR: scripts/slate
+    - name: 'slate: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-slate.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-slate.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/slate-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+        # embedded watch app included, whose watch-only icon then has nothing to
+        # compile for. The destination picks each target's own SDK.
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' slate ') }}
+      env:
+        CN1_APP_DIR: scripts/slate
+    - name: 'wayline: Generate the Xcode project'
+      id: build-ios-app-wayline
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+      env:
+        CN1_APP_DIR: scripts/wayline
+    - name: 'wayline: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-wayline.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-wayline.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/wayline-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' wayline ') }}
+      env:
+        CN1_APP_DIR: scripts/wayline
+  ios-b:
+    name: iOS build (simulator) (b)
+    runs-on: xcode-27
+    needs:
+    - golden-plan
+    - select
+    - build-ios-port
+    if: ${{ !cancelled() && needs.build-ios-port.result == 'success' }}
+    timeout-minutes: 300
+    steps:
+    - uses: actions/checkout@v6
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Cache CocoaPods and user gems
+      uses: actions/cache@v5
+      with:
+        path: |
+          ~/.gem
+          ~/Library/Caches/CocoaPods
+          ~/.cocoapods/repos
+        key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-v1-
+    - name: Ensure CocoaPods tooling
+      run: |
+        mkdir -p ~/.codenameone
+        cp maven/UpdateCodenameOne.jar ~/.codenameone/
+        set -euo pipefail
+        GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+        export PATH="$GEM_USER_DIR/bin:$PATH"
+        if ! command -v pod >/dev/null 2>&1; then
+          gem install cocoapods xcodeproj --no-document --user-install
+        fi
+        pod --version
+    - name: Compute setup-workspace hash
+      id: setup_hash
+      run: echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+    - name: Set TMPDIR
+      run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+    - name: Cache codenameone-tools
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/codenameone-tools
+        key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+        restore-keys: |
+          ${{ runner.os }}-cn1-tools-
+    - name: Cache Maven repository
+      uses: actions/cache@v5
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-
+    - name: Restore cn1-binaries cache
+      uses: actions/cache@v5
+      with:
+        path: ../cn1-binaries
+        key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+        restore-keys: |
+          cn1-binaries-${{ runner.os }}-
+    - name: Download built CN1 + iOS port bundle
+      uses: actions/download-artifact@v4
+      with:
+        name: cn1-built-bundle
+        path: ${{ runner.temp }}
+    - name: Restore built CN1 + iOS port tree
+      run: |
+        set -euo pipefail
+        tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
+    - name: Install XcodeGen
+      run: brew install xcodegen
+    - name: 'bazaar: Generate the Xcode project'
+      id: build-ios-app-bazaar
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+      env:
+        CN1_APP_DIR: scripts/bazaar
+    - name: 'bazaar: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-bazaar.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-bazaar.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/bazaar-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' bazaar ') }}
+      env:
+        CN1_APP_DIR: scripts/bazaar
+    - name: 'fieldline: Generate the Xcode project'
+      id: build-ios-app-fieldline
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+      env:
+        CN1_APP_DIR: scripts/fieldline
+    - name: 'fieldline: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-fieldline.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-fieldline.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/fieldline-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+        # embedded watch app included, whose watch-only icon then has nothing to
+        # compile for. The destination picks each target's own SDK.
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' fieldline ') }}
+      env:
+        CN1_APP_DIR: scripts/fieldline
+    - name: 'parley: Generate the Xcode project'
+      id: build-ios-app-parley
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+      env:
+        CN1_APP_DIR: scripts/parley
+    - name: 'parley: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-parley.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-parley.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/parley-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' parley ') }}
+      env:
+        CN1_APP_DIR: scripts/parley
+    - name: 'reel: Generate the Xcode project'
+      id: build-ios-app-reel
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+      env:
+        CN1_APP_DIR: scripts/reel
+    - name: 'reel: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-reel.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-reel.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/reel-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' reel ') }}
+      env:
+        CN1_APP_DIR: scripts/reel
+    - name: 'skirmish: Generate the Xcode project'
+      id: build-ios-app-skirmish
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+      env:
+        CN1_APP_DIR: scripts/skirmish
+    - name: 'skirmish: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-skirmish.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-skirmish.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/skirmish-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+      env:
+        CN1_APP_DIR: scripts/skirmish
+    - name: 'splat: Generate the Xcode project'
+      id: build-ios-app-splat
+      run: ./scripts/build-ios-app.sh -q -DskipTests
+      timeout-minutes: 25
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+      env:
+        CN1_APP_DIR: scripts/splat
+    - name: 'splat: Build the application for the simulator'
+      run: |
+        set -euo pipefail
+        WORKSPACE='${{ steps.build-ios-app-splat.outputs.workspace }}'
+        SCHEME='${{ steps.build-ios-app-splat.outputs.scheme }}'
+        DERIVED_DATA="${{ runner.temp }}/splat-dd"
+        rm -rf "$DERIVED_DATA"
+        # One architecture, the host's: the port's SIMD natives are NEON
+        # under __aarch64__, and a universal simulator build compiles an
+        # x86_64 slice that has no use here.
+        HOST_ARCH="$(uname -m)"
+        case "$HOST_ARCH" in
+          arm64|x86_64) BUILD_ARCH="$HOST_ARCH" ;;
+          *) BUILD_ARCH=arm64 ;;
+        esac
+        XCB_CONTAINER_FLAG="-workspace"
+        if [[ "$WORKSPACE" != *.xcworkspace ]]; then
+          XCB_CONTAINER_FLAG="-project"
+        fi
+        # No -sdk: it forces every target of the scheme onto the iPhone SDK, the
+        # embedded watch app included, whose watch-only icon then has nothing to
+        # compile for. The destination picks each target's own SDK.
+        xcodebuild "$XCB_CONTAINER_FLAG" "$WORKSPACE" -scheme "$SCHEME" \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -derivedDataPath "$DERIVED_DATA" \
+          ARCHS="$BUILD_ARCH" ONLY_ACTIVE_ARCH=YES \
+          EXCLUDED_ARCHS="armv7 armv7s" \
+          CODE_SIGNING_ALLOWED=NO build
+        APP_BUNDLE="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name "${SCHEME}.app" | head -n 1)"
+        if [ -z "$APP_BUNDLE" ]; then
+          echo "::error::no .app bundle under $DERIVED_DATA"
+          exit 1
+        fi
+      timeout-minutes: 20
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+      env:
+        CN1_APP_DIR: scripts/splat
+  app:
+    name: Engine and client tests
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.app == 'true' }}
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Install the framework and the plugin
+      working-directory: maven
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B \
+          -pl core,css-compiler,codenameone-maven-plugin,backend \
+          -am install -DskipTests -Plocal-dev-javase \
+          -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+          -Dmaven.javadoc.skip=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_8_HOME }}
+        RETRY_ONLY_MATCHING: transient
+    - name: 'brickyard: Starter templates match their generator'
+      run: |
+        python3 scripts/brickyard/tools/gen-templates.py
+        git diff --exit-code -- scripts/brickyard/shared/src/main/resources/com/codenameone/examples/brickyard/rbx/templates
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') }}
+    - name: 'brickyard: Test the engine and the client'
+      working-directory: scripts/brickyard
+      run: |
+        mvn -B -Dcodename1.platform=javase -pl common -am test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' brickyard ') }}
+  rules:
+    name: Rules tests (deterministic simulation)
+    runs-on: ubuntu-24.04
+    needs:
+    - golden-plan
+    - select
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.select.outputs.rules == 'true' }}
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up JDK 8
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '8'
+        cache: maven
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+    - name: Save JDK 8 Path
+      run: echo "JDK_8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Save JDK 17 Path
+      run: echo "JDK_17_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+    - name: Install the framework and the plugin
+      working-directory: maven
+      run: |
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B -pl core,backend,codenameone-maven-plugin,cn1-app-kit,cn1-app-kit/common,cn1-app-kit/backend,cn1-app-kit/lib \
+          -am install -DskipTests -Plocal-dev-javase \
+          -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
+          -Dmaven.javadoc.skip=true \
+          -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_8_HOME }}
+        RETRY_ONLY_MATCHING: transient
+    - name: 'dash: Run the simulation tests'
+      working-directory: scripts/dash
+      run: mvn -B -pl shared test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') }}
+    - name: 'dash: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' dash ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: dash-simulation-tests
+        path: scripts/dash/shared/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'skirmish: Run the simulation tests'
+      working-directory: scripts/skirmish
+      run: mvn -B -pl shared test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') }}
+    - name: 'skirmish: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' skirmish ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: skirmish-simulation-tests
+        path: scripts/skirmish/shared/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14
+    - name: 'splat: Run the simulation tests'
+      working-directory: scripts/splat
+      run: mvn -B -pl shared test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+      env:
+        JAVA_HOME: ${{ env.JDK_17_HOME }}
+        JDK_8_HOME: ${{ env.JDK_8_HOME }}
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') }}
+    - name: 'splat: Upload the test reports'
+      if: ${{ !cancelled() && contains(needs.select.outputs.samples, ' splat ') && (!cancelled()) }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: splat-simulation-tests
+        path: scripts/splat/shared/target/surefire-reports/**
+        if-no-files-found: warn
+        retention-days: 14

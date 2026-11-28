@@ -1506,6 +1506,12 @@ never failed there. They now run:
   only trace. Re-running a nightly by hand keeps `event: schedule`, so the
   watchdog judges the re-run.
 
+- **The sample applications are one workflow, `samples.yml`.** One job per
+  kind of check (template sync, server tests, each database, client end to
+  end, browser, Android, iOS in two shards), and each sample a step of it,
+  named `<sample>: ...`; its `select` job keeps every sample's old `paths`
+  filter. They were fourteen workflows of eight to ten jobs each. A new sample
+  goes in as steps of the existing jobs, not as a workflow of its own.
 - **The samples' nightly iOS builds are one workflow**,
   `samples-ios-nightly.yml`: the port built once, then two macOS shards build
   every sample, one step each (`scripts/ci/build-sample-ios-simulator.sh`).

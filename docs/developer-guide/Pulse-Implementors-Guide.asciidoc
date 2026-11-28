@@ -199,7 +199,7 @@ include::../demos/common/src/main/snippets/developer-guide/pulse.sh[tag=pulse-sh
 The server's tests run on in-memory SQLite, which accepts any value in any column.
 `sample-server-tests-on-database.sh` runs them against PostgreSQL or MySQL, where
 the ORM checks every mapping against its migration. CI runs both, in
-`.github/workflows/pulse.yml`.
+`.github/workflows/samples.yml`.
 
 === Making it yours
 

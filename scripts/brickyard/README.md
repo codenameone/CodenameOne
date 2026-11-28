@@ -112,7 +112,7 @@ mvn -Dcodename1.platform=backend -pl shared,backend test -Dmaven.repo.local=$PWD
 mvn -Dcodename1.platform=javase -pl common -am test -Dmaven.repo.local=$PWD/../../.m2-repo
 ```
 
-`.github/workflows/brickyard.yml` runs the server tests on the JVM and compiled by
+`.github/workflows/samples.yml` runs the server tests on the JVM and compiled by
 ParparVM, on SQLite, PostgreSQL and MySQL, and the engine's and the client's tests.
 
 ## Limits worth knowing

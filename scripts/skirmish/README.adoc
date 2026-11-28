@@ -88,7 +88,7 @@ mvn -pl shared,backend -Dcodename1.platform=backend test   # <2>
 <4> Generates a project from the Initializr template, under another name and
     package, and builds it.
 
-`.github/workflows/skirmish.yml` runs them, and builds the app for Android and
+`.github/workflows/samples.yml` runs them, and builds the app for Android and
 iOS.
 
 == The Initializr template

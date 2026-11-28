@@ -367,7 +367,7 @@ The slot engine's rules are tested one at a time, against the engine alone, and
 again end to end through the booking service. `run-e2e.sh` starts the server and
 drives the app in the simulator as a client, a provider and an owner.
 `sample-server-tests-on-database.sh` runs the server tests against PostgreSQL or
-MySQL. CI runs all them, in `.github/workflows/slate.yml`.
+MySQL. CI runs all them, in `.github/workflows/samples.yml`.
 
 === Making it yours
 

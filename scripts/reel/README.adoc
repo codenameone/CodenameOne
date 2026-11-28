@@ -166,7 +166,7 @@ mvn -pl shared,backend -Dcodename1.platform=backend test -Dcn1.backend.compiledT
     `npx playwright install chromium` in `scripts/`). Screenshots and logs go
     to `target/web-e2e`.
 
-`.github/workflows/reel.yml` runs all five, and builds the application for
+`.github/workflows/samples.yml` runs all five, and builds the application for
 Android and iOS through `scripts/build-android-app.sh` and
 `scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/reel`.
 

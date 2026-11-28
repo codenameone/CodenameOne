@@ -187,7 +187,7 @@ include::../demos/common/src/main/snippets/developer-guide/reel.sh[tag=reel-sh-t
 The server's tests run on the JVM and again compiled to a native binary, which
 is how the server ships. `run-e2e.sh` starts a server and drives the app through
 its screens in the simulator as each role; `run-web-e2e.sh` does the same for the
-browser build in a headless browser. `.github/workflows/reel.yml` runs them all,
+browser build in a headless browser. `.github/workflows/samples.yml` runs them all,
 the server tests on each database, and the Android and iOS builds.
 
 === Making it yours
