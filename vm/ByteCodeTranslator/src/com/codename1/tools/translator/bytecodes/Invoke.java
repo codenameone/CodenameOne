@@ -272,6 +272,15 @@ public class Invoke extends Instruction {
         if (bc == null) {
             return null;
         }
+        if (BytecodeMethod.isInterpHost() && !bc.isFinalClass()
+                && !BytecodeMethod.isInterpOpaqueClass(bc.getClsName())) {
+            // The same closed-world assumption resolveConcreteInvokeOwner refuses
+            // for an interp-host build: an interpreted subclass (or implementor)
+            // synthesized at runtime is an implementation this set cannot contain,
+            // and a direct call would bypass the vtable slot its override is
+            // patched into.
+            return null;
+        }
         java.util.List<ByteCodeClass> impls = opcode == Opcodes.INVOKEINTERFACE
                 ? Parser.resolveInterfaceTargets(bc, name, desc)
                 : Parser.resolveVirtualTargets(bc, name, desc);
@@ -329,6 +338,16 @@ public class Invoke extends Instruction {
 
     private String resolveConcreteInvokeOwner(ByteCodeClass ownerClass, boolean allowMissingMethodContext) {
         if (ownerClass == null || ownerClass.getConcreteClass() == null) {
+            return null;
+        }
+        if (BytecodeMethod.isInterpHost() && !ownerClass.isFinalClass()
+                && !BytecodeMethod.isInterpOpaqueClass(ownerClass.getClsName())) {
+            // "Exactly one concrete implementor" is a closed-world fact, and an
+            // interp-host build has no closed world -- an interpreted subclass
+            // synthesized at runtime is a second implementor the translator
+            // cannot see. Collapsing the call to the single known concrete
+            // owner would bypass the vtable the override is patched into.
+            // A genuinely final class is exempt; nothing can subclass it.
             return null;
         }
         String currentClass = getMethod() != null ? getMethod().getClsName() : null;

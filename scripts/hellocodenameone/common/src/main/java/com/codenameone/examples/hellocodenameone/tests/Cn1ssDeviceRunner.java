@@ -479,8 +479,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Chart2SankeyScreenshotTest(),
             new Chart2FunnelScreenshotTest(),
             new Chart2SparklinesScreenshotTest(),
-            // Disabled: its capture raced the hover repaint and the goldens never showed the tooltip.
-            // new Chart2SharedTooltipScreenshotTest(),
+            // Chart2SharedTooltipScreenshotTest is disabled: its capture raced the hover
+            // repaint and the goldens never showed the tooltip. It is out of
+            // port_status.json and has no goldens; restore all three together.
             new Chart2BrushScreenshotTest(),
             new Chart2FlameGraphScreenshotTest(),
             new Chart2LineStylesScreenshotTest(),
@@ -964,6 +965,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// The harness reads the suite's output from outside the process, so it can
     /// name the last announced test whatever state the app is in, and cannot
     /// perturb it. See lastStarted in CleanTargetLinuxIntegrationTest.
+
 
     private void runNextTest(int index) {
         int offset = prependedTest != null ? 1 : 0;

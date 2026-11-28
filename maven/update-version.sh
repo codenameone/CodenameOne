@@ -127,6 +127,15 @@ if [ -f "$settingsParent" ]; then
   perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$settingsParent"
 fi
 
+# Codename One Instant (scripts/cn1-device-runtime) pins the framework it runs
+# pushed programs on, and shows that version in the app: a desktop on another
+# version is warned before its program starts. The app keeps its own version.
+instantParent=../scripts/cn1-device-runtime/pom.xml
+if [ -f "$instantParent" ]; then
+  perl -pi -e "s{<cn1\.version>\Q$oldVersion\E</cn1\.version>}{<cn1.version>$version</cn1.version>}g" "$instantParent"
+  perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$instantParent"
+fi
+
 # GUI Builder editor is a standalone Maven-first desktop app distributed alongside
 # the plugin, matching Settings and Game Builder.
 for f in ../scripts/guibuilder/pom.xml \

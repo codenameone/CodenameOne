@@ -1,0 +1,15 @@
+{
+  "liveActivities": true,
+  "kinds": [
+    {
+      "id": "devruntime_status",
+      "name": "Status",
+      "description": "A pushed program's status, for trying the widget and live-activity APIs on a device"
+    },
+    {
+      "id": "devruntime_progress",
+      "name": "Progress",
+      "description": "A pushed program's progress, for trying a second widget kind alongside the first"
+    }
+  ]
+}

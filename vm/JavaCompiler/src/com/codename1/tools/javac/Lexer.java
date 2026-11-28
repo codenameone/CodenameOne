@@ -619,6 +619,22 @@ final class Lexer {
             v += Character.digit(frac.charAt(k), 16) * scale;
             scale /= 16;
         }
-        return v * Math.pow(2, exp);
+        return scaleByPowerOfTwo(v, exp);
+    }
+
+    /// `v * 2^exp`. Not `Math.pow`, which a Codename One device does not have:
+    /// this compiler runs on the device too (the device runtime's IDE), where
+    /// the bytecode compliance check rejects it. Each step is exact until the
+    /// result leaves the normal range, as multiplying by `Math.pow(2, exp)` is.
+    static double scaleByPowerOfTwo(double v, int exp) {
+        while (exp > 0 && v != 0 && !Double.isInfinite(v)) {
+            v *= 2;
+            exp--;
+        }
+        while (exp < 0 && v != 0) {
+            v *= 0.5;
+            exp++;
+        }
+        return v;
     }
 }

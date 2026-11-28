@@ -1,0 +1,21 @@
+This is an educational Java editor (guideline 2.5.2). Users write Java in the
+app; it is compiled on the device and run in an interpreter. Every program that
+runs is source the user can read and edit in the app. The app downloads no code
+from any server.
+
+No computer is needed to review it:
+1. The editor opens on the Hello project. Tap Run (top right).
+2. The program's screen appears with a "Slow interpreted mode" label. Long-press it to stop the program.
+3. Change the text in the source and tap Run again.
+4. Tap the title (iPhone) or the sidebar (iPad) for projects, new files,
+   and About and help, which shows the version and build.
+
+Optional: the computer icon (top left) is for developers who send their own
+project from their own computer on the same Wi-Fi with the Codename One Maven
+plugin. A one-time code shown on the computer must be typed on the device
+first. A received program's source is shown under "View and edit source", and
+"Edit" saves it as a project in the editor.
+
+Device permission prompts (camera, location, contacts, ...) appear only when a
+program the user wrote calls that API. In-app purchase and social sign-in calls
+are simulated: nothing is charged and no account is used.

@@ -207,6 +207,16 @@
 // points below get their real bodies. See cn1_realtime_impl.h.
 //#define CN1_REALTIME
 
+// Uncommented by the translator (driven by the cn1.interpHost system property)
+// when building the CN1 device runtime host app -- the app that loads and
+// interprets bytecode bundles pushed from a developer's machine. Implies
+// CN1_ON_DEVICE_DEBUG, whose invoke thunks, field tables and symbol table the
+// interpreter binds against; adds constructor thunks and the vtable layout rows
+// that runtime clazz synthesis needs. An interp-host build is also translated
+// with the optimizer off and dead code elimination disabled, so it is much
+// larger and slower than a normal app build. Never set for a shipping app.
+//#define CN1_INTERP_HOST
+
 #ifdef DEBUG_GC_ALLOCATIONS
 #define DEBUG_GC_VARIABLES int line; int className;
 #define DEBUG_GC_INIT 0, 0,
@@ -431,6 +441,8 @@ struct JavaObjectPrototype {
 // longer referenced, and goes.
 extern struct clazz* cn1ClazzById[];
 extern const int cn1ClazzByIdCount;
+// Interp-host builds only: the first of the indices kept free for run-time descriptors.
+extern const int cn1ClazzByIdFirstDynamic;
 extern void cn1ClazzRegister(uint16_t index, struct clazz* c);
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
 static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c);
@@ -1064,6 +1076,18 @@ static inline JAVA_LONG cn1SaturateToLong(JAVA_DOUBLE cn1__d) {
 #define PUSH_FLOAT(value) { JAVA_FLOAT pFlo = value; (*SP).type = CN1_TYPE_FLOAT; \
     (*SP).data.f = pFlo; \
     SP++; }
+
+// The POP_MANY_AND_PUSH_* macros below use MAX. On iOS/macOS it arrives via
+// Foundation (NSObjCRuntime.h); a plain C target has no such definition, and
+// the omission went unnoticed for years because the only callers are bytecode
+// shapes that dead code elimination removed before they reached the compiler.
+// An interp-host build keeps everything, so they now get emitted for real.
+#ifndef MAX
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 #define POP_MANY_AND_PUSH_OBJ(value, offset) {  \
     JAVA_OBJECT pObj = value; SP[-offset].type = CN1_TYPE_INVALID; \

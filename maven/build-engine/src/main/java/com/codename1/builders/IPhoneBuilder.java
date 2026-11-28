@@ -1785,6 +1785,14 @@ public class IPhoneBuilder extends Executor {
         minDeploymentTargets += ","+target;
     }
     
+    /// The deployment target of an extension or clip embedded in the app: the
+    /// later of the feature's own minimum and the application's target. An
+    /// embedded target below its container's is never useful (it cannot run
+    /// where the app does not), and below the SDK's floor Xcode fails the build.
+    private String embeddedDeploymentTarget(BuildRequest request, String featureMinimum) {
+        return maxVersionString(featureMinimum + "," + getDeploymentTarget(request));
+    }
+
     private String getDeploymentTarget(BuildRequest request){
         StringBuilder sb = new StringBuilder();
         sb.append(minDeploymentTargets);
@@ -2766,6 +2774,7 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("Failed to scan for database usage", ex);
         }
 
+        setPermissionScanExcludes(request.getArg("ios.featureScanExclude", null));
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 // iOS has no OS-relaunch delivery, but it does have cold
@@ -7003,6 +7012,13 @@ public class IPhoneBuilder extends Executor {
             boolean isReleaseBuild = !request.getArg("ios.buildType", "debug").equals("debug");
             String onDeviceDebug = !isReleaseBuild
                     && Boolean.valueOf(request.getArg("ios.onDeviceDebug", "false")) ? "true" : "false";
+            // The device runtime host app -- the one that interprets bytecode
+            // bundles pushed from a developer's machine. Unlike onDeviceDebug
+            // this is NOT forced off for release builds: the host app ships to
+            // the App Store, and the interpreter is the product. It is opt-in
+            // per project and no ordinary app sets it.
+            String interpHost =
+                    Boolean.valueOf(request.getArg("ios.interpHost", "false")) ? "true" : "false";
 
             if (enableGalleryMultiselect && photoLibraryUsage) {
                 addMinDeploymentTarget("8.0");
@@ -7033,6 +7049,7 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.cryptoKernels=" + usesCryptoKernels);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
+                parparCmd.add("-Dcn1.interpHost=" + interpHost);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 // The UNION of every enabled product's list, in ONE argument. These used to be
                 // mutually exclusive branches on the claim that the Mac list already covered the
@@ -13403,7 +13420,8 @@ public class IPhoneBuilder extends Executor {
         sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
                 + "vpn_target = xcproj.new_target(:app_extension, '" + name
                 + "', :ios, '"
-                + IOSVpnTunnelExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
+                + embeddedDeploymentTarget(request,
+                        IOSVpnTunnelExtensionBuilder.DEPLOYMENT_TARGET) + "')\n"
                 + "vpn_target.add_system_framework('NetworkExtension')\n"
                 + "vpn_group = xcproj.new_group('" + name + "')\n");
         appendFilesToXcodeProjGroup(sb, new File(distDir, name), "vpn_group",
@@ -13736,8 +13754,12 @@ public class IPhoneBuilder extends Executor {
         buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
         buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
         buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
+        // The later of the clip's own floor and the application's. The
+        // constant is a minimum, not a value: written as-is it put the clip
+        // at 14.0 inside an app the SDK holds at 15.0 or above, and Xcode 27
+        // refuses any iOS target below 15.0 outright.
         buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
-                InviteAppClipBuilder.DEPLOYMENT_TARGET);
+                embeddedDeploymentTarget(request, InviteAppClipBuilder.DEPLOYMENT_TARGET));
         // The HOST's families, through the same helper every other embedded
         // target here uses. Hard-coding iPhone was wrong twice over: App Clips
         // do run on iPad, and an ios.project_type=ipad build has an iPad-only

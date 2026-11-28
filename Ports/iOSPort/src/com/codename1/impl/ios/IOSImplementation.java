@@ -293,6 +293,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         // would never fire. It is idempotent, it costs one main-thread hop, and
         // it compiles to nothing on an SDK without the hinge API.
         nativeInstance.startHingeMonitoring();
+        // Only an interp-host build carries the invoke thunks and symbol table
+        // the linker needs; on an ordinary build this leaves the registry empty
+        // and the device runtime reports itself unavailable.
+        if(InterpIOSLinker.isAvailable()) {
+            com.codename1.impl.interp.InterpPlatform.register(new InterpIOSLinker());
+        }
     }
     
     @Override
@@ -5462,6 +5468,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public InputStream getResourceAsStream(Class cls, String resource) {
+        // A resource pushed by the device runtime wins over the app's own,
+        // so a pushed program shows its own theme rather than the host's.
+        InputStream local = localResource(resource);
+        if (local != null) {
+            return local;
+        }
         // Flatten resources
         int lastSlash = resource.lastIndexOf("/");
         if ( lastSlash != -1 ){

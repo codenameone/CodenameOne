@@ -1,0 +1,23 @@
+Write, run and change Java user interfaces right on your iPhone or iPad.
+
+Codename One Instant is a Java editor and runtime for learning and
+prototyping Codename One applications. Type Java in the editor, tap Run, and
+the app compiles it on the device in a fraction of a second and shows the
+result. Long-press the "Slow interpreted mode" label and you are back in the editor to change it.
+
+- A code editor with syntax highlighting, error markers and code completion
+- Compile errors listed under the editor; tap one to jump to its line
+- Several projects, each with as many source files as you need
+- A tablet layout with a file and project sidebar on iPad
+
+Developers who already have a Codename One project on their computer can also
+send it to the device over their own Wi-Fi with the Codename One Maven plugin
+and see it run at once. Pairing is explicit: the computer shows a six digit
+code that you type on the device. The source of everything that runs is shown
+on the device and can be opened in the editor, changed and run again.
+
+The app downloads no code from anywhere. It runs only programs you write in
+the editor or send from a computer you paired yourself. It collects no data.
+
+Interpreted code is slower than a compiled build, so this is for learning,
+prototyping and developing user interfaces, not for measuring performance.

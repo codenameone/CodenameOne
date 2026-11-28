@@ -92,6 +92,14 @@ public final class Type {
         return new Type(METHOD, methodDescriptor);
     }
 
+    public static String getMethodDescriptor(Type returnType, Type... argumentTypes) {
+        StringBuilder b = new StringBuilder("(");
+        for (Type a : argumentTypes) {
+            b.append(a.getDescriptor());
+        }
+        return b.append(')').append(returnType.getDescriptor()).toString();
+    }
+
     public static Type[] getArgumentTypes(String methodDescriptor) {
         List<Type> args = new ArrayList<Type>();
         int i = 1;

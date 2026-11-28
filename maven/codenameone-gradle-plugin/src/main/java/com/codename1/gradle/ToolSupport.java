@@ -59,6 +59,32 @@ final class ToolSupport {
     private ToolSupport() {
     }
 
+    /// The device push tasks. The tool jar is a detached configuration: its
+    /// file collection resolves when the task runs, never at configuration.
+    private static void registerPush(Project project, SourceSet main, String name, boolean stop,
+                                     String description) {
+        org.gradle.api.artifacts.Configuration tool = project.getConfigurations().detachedConfiguration(
+                project.getDependencies().create(
+                        PluginInfo.GROUP + ":codenameone-parparvm:" + PluginInfo.version()));
+        tool.setTransitive(false);
+        project.getTasks().register(name, com.codename1.gradle.tasks.PushToDeviceTask.class, t -> {
+            t.setGroup(AppSupport.GROUP);
+            t.setDescription(description);
+            t.getStop().set(stop);
+            t.getFrameworkVersion().set(PluginInfo.version());
+            t.getToolClasspath().from(tool);
+            t.getPort().set(project.getProviders().gradleProperty("cn1.push.port"));
+            t.getDevice().set(project.getProviders().gradleProperty("cn1.push.device"));
+            t.getLan().set(project.getProviders().gradleProperty("cn1.push.lan"));
+            if (!stop) {
+                t.dependsOn(main.getClassesTaskName());
+                t.getClassDirs().from(main.getOutput().getClassesDirs());
+                t.getSourceDirs().from(project.provider(() -> main.getAllJava().getSrcDirs()));
+                t.getMainClass().set(project.getProviders().gradleProperty("cn1.push.main"));
+            }
+        });
+    }
+
     static void register(Project project, ProjectLayout layout, SourceSet main, CodenameOneExtension ext,
                          Provider<Map<String, String>> userProperties) {
         // Evaluated when the task runs, after the build script has had its say
@@ -77,6 +103,10 @@ final class ToolSupport {
             t.dependsOn(AppSupport.LINUX_LOCAL_BUILD_TASK);
             t.setFollowLogsByDefault(true);
         });
+        registerPush(project, main, "cn1Push", false,
+                "Runs the compiled app in Codename One Instant on a device (-Pcn1.push.lan for Wi-Fi).");
+        registerPush(project, main, "cn1PushStop", true,
+                "Stops the program Codename One Instant is running on a device.");
         project.getTasks().register("cn1DeviceLogs", com.codename1.gradle.tasks.DeviceLogsTask.class, t -> {
             t.setGroup(AppSupport.GROUP);
             t.setDescription("Follows the log of the app's service on a device.");
