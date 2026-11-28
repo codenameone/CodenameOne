@@ -53,7 +53,34 @@ root, probe, project = map(pathlib.Path, sys.argv[1:4])
 props = root / 'maven/cn1-admob/common'
 pod = re.search(r'^codename1.arg.ios.pods=(.+)$', (props / 'codenameone_library_required.properties').read_text(), re.M).group(1)
 name, version = pod.split(' ', 1)
-(project / 'Podfile').write_text("platform :ios, '14.0'\ntarget 'AdMobLinkProbe' do\n  use_frameworks!\n  pod '%s', '%s'\nend\n" % (name, version))
+# The probe's own minimum is 14.0, raised to the SDK's floor the way the builder
+# raises an app (Xcode 27's iOS SDK accepts nothing below 15.0). Pods keep their
+# podspec's target (Google-Mobile-Ads-SDK says 12.0), so post_install lifts any
+# pod below the app's target up to it, as the builder's Podfile does.
+import subprocess
+def _ver(v):
+    return tuple(int(x) if x.isdigit() else 0 for x in v.split('.'))
+target = '14.0'
+try:
+    sdk = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
+    floor = json.loads((pathlib.Path(sdk) / 'SDKSettings.json').read_text())['SupportedTargets']['iphoneos']['MinimumDeploymentTarget']
+    if _ver(floor) > _ver(target):
+        print('AdMob probe: iOS SDK floor %s is above %s; using %s' % (floor, target, floor))
+        target = floor
+except Exception as e:
+    print('AdMob probe: could not read the iOS SDK floor (%s); using %s' % (e, target))
+(project / 'Podfile').write_text(
+    "platform :ios, '%s'\ntarget 'AdMobLinkProbe' do\n  use_frameworks!\n  pod '%s', '%s'\nend\n"
+    "post_install do |installer|\n"
+    "  installer.pods_project.targets.each do |t|\n"
+    "    t.build_configurations.each do |config|\n"
+    "      cur = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']\n"
+    "      if cur.nil? || Gem::Version.new(cur) < Gem::Version.new('%s')\n"
+    "        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '%s'\n"
+    "      end\n"
+    "    end\n"
+    "  end\n"
+    "end\n" % (target, name, version, target, target))
 data = json.loads((probe / 'project.json').read_text())
 objects = data['objects']
 # A successful link alone is insufficient: other frameworks may supply C++
@@ -86,7 +113,7 @@ for obj in objects.values():
         settings = obj['buildSettings']
         settings.pop('INFOPLIST_FILE', None)
         settings.update({'CLANG_ENABLE_MODULES': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
-                         'GENERATE_INFOPLIST_FILE': 'YES', 'IPHONEOS_DEPLOYMENT_TARGET': '14.0',
+                         'GENERATE_INFOPLIST_FILE': 'YES', 'IPHONEOS_DEPLOYMENT_TARGET': target,
                          'PRODUCT_BUNDLE_IDENTIFIER': 'com.codenameone.test.AdMobLinkProbe',
                          'GCC_PREFIX_HEADER': 'Prefix.pch', 'GCC_PRECOMPILE_PREFIX_HEADER': 'NO',
                          'HEADER_SEARCH_PATHS': ['$(inherited)', '$(SRCROOT)'],
