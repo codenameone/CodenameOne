@@ -241,7 +241,16 @@ class TooltipInWindowTest extends UITestBase {
             DisplayTest.flushEdt();
 
             // Pumped well past the show delay: without the cancel this opens a tooltip.
-            for (int i = 0; i < 300 && mgr.shown == 0; i++) {
+            // Bounded by the clock, not by a pass count. Every pass sleeps and flushes, and
+            // the old fixed 300 passes were ~760ms on an idle machine but over the 5s
+            // FormTest budget on a loaded CI runner, where each sleep and frame wait
+            // stretches -- the test timed out while working exactly as intended. The timer
+            // fires on the first animation pass after its 1ms delay, so 100ms of clock past
+            // the cancel (and a minimum number of passes, for a clock that barely moves)
+            // is still far beyond what an uncancelled timer needs to open the tooltip.
+            long pumpUntil = System.currentTimeMillis() + 100;
+            for (int i = 0; mgr.shown == 0
+                    && (i < 10 || System.currentTimeMillis() < pumpUntil); i++) {
                 w.repaintAnimations();
                 DisplayTest.flushEdt();
                 try {

@@ -193,10 +193,10 @@ class SecureKeyboardTest extends UITestBase {
 
     @Test
     void showBeforeLayoutWaitsForTheFormAndDocksAtTheBottom() {
-        Form f = new Form("t", BoxLayout.y());
+        final Form f = new Form("t", BoxLayout.y());
         TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
         f.add(tf);
-        SecureKeyboard kb = SecureKeyboard.install(tf);
+        final SecureKeyboard kb = SecureKeyboard.install(tf);
         // An instant show. A form an earlier test in this JVM left current can carry a
         // transition out, which ends on the clock while every flush below takes no time at all:
         // the bounded retries were all spent before the form had a size, and the test failed
@@ -212,9 +212,22 @@ class SecureKeyboardTest extends UITestBase {
         // here, which is the case under test.
         f.setSize(new Dimension(Display.getInstance().getDisplayWidth(),
                 Display.getInstance().getDisplayHeight()));
-        f.show();
-        // Straight after show(), as a show listener would: nothing is laid out yet.
-        kb.show();
+        // Both calls on the EDT, in one serial call, so nothing is laid out when the keyboard
+        // asks. This used to call f.show() and then kb.show() from the test thread: show()
+        // queues setCurrent on the EDT, so the EDT could be laying the form out while the test
+        // thread ran kb.show() -- seeing the content already sized, building and showing the
+        // dialog off the EDT, racing the EDT's own work on the same form and fields. That lost
+        // the keyboard's dialog about one run in three under CPU load (kbParent set, yet
+        // isShowing() false) while passing alone. Codename One UI is single threaded; the test
+        // now is too. The keyboard asks first, finds no size and defers; the form's show is
+        // then laid out synchronously by setCurrent, and the deferred retry finds it sized.
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                kb.show();
+                f.show();
+            }
+        });
         // The show is retried a serial call at a time (up to 50) until the form has a size, and
         // when layout lands depends on the host: one flush is not enough on a slower runner.
         for (int i = 0; i < 50 && !kb.isShowing(); i++) {
