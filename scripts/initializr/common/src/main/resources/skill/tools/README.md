@@ -223,6 +223,22 @@ derives every platform size from `common/icon.png` (`icon.png` in a Gradle proje
 `--adaptive DIR` also writes Android adaptive-icon layers. Open the PNG and look at it, and show
 it to the user with the app's screenshots: one bold glyph, no words, high contrast.
 
+### `StoreAudit.java`
+
+Audits a project against the App Store and Google Play review rules in `references/store-review.md` before an upload. It reads the build hints and scans the sources, needs no Codename One jars, and touches the network only with `--network`.
+
+```bash
+java tools/StoreAudit.java --checklist submission-checklist.md
+# Uses: camera, microphone, accounts, ugc, push
+# 1 BLOCKER, 1 HIGH, 2 NOTE
+# [BLOCKER] PURPOSE-MISSING  common/src/main/java/.../ChatForm.java:619
+#   The app uses the microphone but sets no ios.NSMicrophoneUsageDescription build hint.
+#   fix: Add codename1.arg.ios.NSMicrophoneUsageDescription=<what this app does with it ...>
+java tools/StoreAudit.java --network --url https://example.com/privacy --url https://example.com/support
+```
+
+It reports BLOCKER / HIGH / NOTE findings with file and line, then a MANUAL list of console answers and listing items that depend on what the app uses. `--checklist` writes both as a Markdown checklist. Exits 1 while a BLOCKER remains (`--strict`: or a HIGH), 2 when no project is found.
+
 ### `StoreScreenshots.java`
 
 Turns screenshots of the running app into images at the exact sizes the App Store and Google Play
