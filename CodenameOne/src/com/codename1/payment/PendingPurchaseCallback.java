@@ -25,10 +25,10 @@ package com.codename1.payment;
 /// Callback interface that the main class may implement to be notified of pending purchases.
 /// Pending purchases are purchases that have been completed, and a payment callback from
 /// the native platform has been received, but the state of the purchase is "pending".  This
-/// occurs if the user has opted to pay with cash, for example on Android.  When the payment
-/// is completed, the app will call the `PurchaseCallback#itemPurchased(String)` callback.
-///
-/// Currently only supported on Android.
+/// occurs if the user has opted to pay with cash on Android, or on iOS and macOS (StoreKit 2)
+/// when the purchase waits for Ask to Buy approval or Strong Customer Authentication.  When the
+/// payment completes, the `PurchaseCallback#itemPurchased(String)` callback is called, possibly
+/// on a later launch of the app.  A declined request calls nothing further.
 public interface PendingPurchaseCallback extends PurchaseCallback {
     void itemPurchasePending(String sku);
 }

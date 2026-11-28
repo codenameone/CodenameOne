@@ -560,6 +560,9 @@ public class MacOSNativeBuilder extends Executor {
                 throw new BuildException("Failed to enable in-app purchase in "
                         + "CodenameOne_GLViewController.h", ex);
             }
+            if (StoreKit2Injector.enabled(request, true)) {
+                StoreKit2Injector.injectApple(this, nativeSources);
+            }
         }
         log("In-app purchase " + (purchaseEnabled ? "enabled" : "disabled"));
 

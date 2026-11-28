@@ -58,6 +58,36 @@ static NSString * const CN1IAPTestCommerceKey = @"CN1IAPTestCommerceResult";
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
+// One line per purchase API callback, receipt and product listing, in order.
+static NSString * const CN1IAPTestEventsKey = @"CN1IAPTestEvents";
+// Commands the hosted XCTest queues for the Java side, oldest first.
+static NSString * const CN1IAPTestCommandsKey = @"CN1IAPTestCommands";
+
+-(void)recordEvent:(NSString*)event {
+    @synchronized ([self class]) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSArray *existing = [defaults arrayForKey:CN1IAPTestEventsKey];
+        NSMutableArray *updated = existing ? [NSMutableArray arrayWithArray:existing] : [NSMutableArray array];
+        [updated addObject:(event != nil ? event : @"<null>")];
+        [defaults setObject:updated forKey:CN1IAPTestEventsKey];
+        [defaults synchronize];
+    }
+}
+
+-(NSString*)takeCommand {
+    @synchronized ([self class]) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        NSArray *queued = [defaults arrayForKey:CN1IAPTestCommandsKey];
+        if (queued.count == 0) {
+            return nil;
+        }
+        NSString *first = [NSString stringWithString:[queued objectAtIndex:0]];
+        [defaults setObject:[queued subarrayWithRange:NSMakeRange(1, queued.count - 1)] forKey:CN1IAPTestCommandsKey];
+        [defaults synchronize];
+        return first;
+    }
+}
+
 -(BOOL)isSupported {
     return YES;
 }

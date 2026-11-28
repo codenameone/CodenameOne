@@ -52,6 +52,7 @@
 static NSString * const kProductId = @"com.codenameone.hello.pro";
 static NSString * const kSinkKey = @"CN1IAPTestSubmittedReceipts";
 static NSString * const kCommerceKey = @"CN1IAPTestCommerceResult";
+static NSString * const kEventsKey = @"CN1IAPTestEvents";
 
 @interface PurchaseStoreKitTests : XCTestCase
 @end
@@ -67,6 +68,7 @@ static NSString * const kCommerceKey = @"CN1IAPTestCommerceResult";
     self.continueAfterFailure = NO;
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kSinkKey];
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCommerceKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kEventsKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
@@ -131,6 +133,33 @@ static NSString * const kCommerceKey = @"CN1IAPTestCommerceResult";
             @"Recorded submissions: '%@'. This means the StoreKit purchase did not "
             @"flow through the CN1 observer into the receipt-sync engine and the "
             @"installed ReceiptStore.", [self recordedSubmissions]);
+
+        // Which StoreKit delivered it. CI builds the app twice: with StoreKit
+        // 1 (the default) and with ios.storeKit2=true, and says which through
+        // CN1_IAP_STOREKIT (TEST_RUNNER_CN1_IAP_STOREKIT on the xcodebuild
+        // command line). The receipt's order data tells them apart: a signed
+        // transaction (three dot-separated parts) under StoreKit 2, the app
+        // receipt under StoreKit 1. Without this a build that silently fell
+        // back to StoreKit 1 would pass the StoreKit 2 leg.
+        NSString *mode = [[[NSProcessInfo processInfo] environment] objectForKey:@"CN1_IAP_STOREKIT"];
+        if (mode.length > 0) {
+            BOOL bridged = NSClassFromString(@"CN1StoreKit2") != nil;
+            XCTAssertEqual(bridged, [mode isEqualToString:@"2"],
+                @"CN1_IAP_STOREKIT=%@ but the StoreKit 2 bridge is %@ the app", mode,
+                bridged ? @"in" : @"missing from");
+            NSString *receiptEvent = nil;
+            for (NSString *e in [[NSUserDefaults standardUserDefaults] arrayForKey:kEventsKey]) {
+                if ([e hasPrefix:@"receipt "]) {
+                    receiptEvent = e;
+                    break;
+                }
+            }
+            XCTAssertNotNil(receiptEvent, @"the receipt store recorded no receipt event");
+            NSString *expected = [mode isEqualToString:@"2"]
+                ? [NSString stringWithFormat:@" jws:%@:", kProductId] : @" other";
+            XCTAssertTrue([receiptEvent rangeOfString:expected].location != NSNotFound,
+                @"StoreKit %@ receipt has the wrong order data: %@", mode, receiptEvent);
+        }
 
         // Once the purchase synchronized, the app refreshes CommerceManager,
         // asks it for the entitlement (store-direct: a local build has no

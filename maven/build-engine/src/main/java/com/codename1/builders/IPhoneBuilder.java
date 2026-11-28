@@ -4865,7 +4865,13 @@ public class IPhoneBuilder extends Executor {
             if (usesPurchaseAPI) {
                 File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
                 replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_STOREKIT", "#define CN1_USE_STOREKIT");
-
+                // StoreKit 2's Swift bridge, beside the port natives so the
+                // translator adds it to the app target (as with the system
+                // LLM bridge). CN1StoreKit.m uses it where the OS has StoreKit 2.
+                // Only with ios.storeKit2=true; otherwise StoreKit 1 everywhere.
+                if (StoreKit2Injector.enabled(request, false)) {
+                    StoreKit2Injector.injectApple(this, buildinRes);
+                }
             }
             if (usesAppReview) {
                 File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");

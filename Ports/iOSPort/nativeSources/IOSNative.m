@@ -13954,6 +13954,33 @@ NSObject *paymentDiscountInstance = nil;
 void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT sku) {
 #ifdef CN1_USE_STOREKIT
     NSString *nsSku = toNSString(CN1_THREAD_STATE_PASS_ARG sku);
+#if !TARGET_OS_WATCH
+    // StoreKit 2 (CN1StoreKit.m) when it is the StoreKit of this run. The
+    // outcome is an event ZoozPurchase drains, never a payment queue callback.
+    id<CN1StoreKit2Bridge> sk2 = CN1StoreKit2BridgeInstance();
+    if (sk2 != nil) {
+        NSString *offerJson = nil;
+        if ([nsSku hasPrefix:@"{"] && [nsSku hasSuffix:@"}"]) {
+            NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:[nsSku dataUsingEncoding:NSUTF8StringEncoding]
+                                                                 options:0 error:nil];
+            if (![dict isKindOfClass:[NSDictionary class]] || ![dict[@"sku"] isKindOfClass:[NSString class]]) {
+                JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG @"Malformed purchase request"));
+                throwException(threadStateData, ex);
+                return;
+            }
+            nsSku = dict[@"sku"];
+            id promo = dict[@"promotionalOffer"];
+            // dataWithJSONObject raises on anything but a dictionary or array.
+            if (promo != nil && [NSJSONSerialization isValidJSONObject:promo]) {
+                NSData *promoData = [NSJSONSerialization dataWithJSONObject:promo options:0 error:nil];
+                offerJson = promoData == nil ? nil : [[[NSString alloc] initWithData:promoData encoding:NSUTF8StringEncoding] autorelease];
+            }
+        }
+        [sk2 purchase:nsSku offerJson:offerJson];
+        return;
+    }
+#endif
     paymentDiscountInstance = nil;
     if ([nsSku hasPrefix:@"{"] && [nsSku hasSuffix:@"}"]) {
         NSError *error = nil;
@@ -14028,12 +14055,25 @@ void com_codename1_impl_ios_IOSNative_purchase___java_lang_String(CN1_THREAD_STA
 
 void com_codename1_impl_ios_IOSNative_restorePurchases__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef CN1_USE_STOREKIT
+#if !TARGET_OS_WATCH
+    id<CN1StoreKit2Bridge> sk2 = CN1StoreKit2BridgeInstance();
+    if (sk2 != nil) {
+        [sk2 restore];
+        return;
+    }
+#endif
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
 #endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #ifdef CN1_USE_STOREKIT
+#if !TARGET_OS_WATCH
+    id<CN1StoreKit2Bridge> sk2 = CN1StoreKit2BridgeInstance();
+    if (sk2 != nil) {
+        return [sk2 canMakePayments] ? JAVA_TRUE : JAVA_FALSE;
+    }
+#endif
     return (JAVA_BOOLEAN)[SKPaymentQueue canMakePayments];
 #else
     return JAVA_FALSE;

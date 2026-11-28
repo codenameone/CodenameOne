@@ -4549,7 +4549,8 @@ METALView* lastFoundRenderingView;
         [[self renderingView] presentFramebuffer];
     }
 #ifdef CN1_USE_STOREKIT
-    [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+    // StoreKit 2 when the OS has it, otherwise the StoreKit 1 queue (CN1StoreKit.m).
+    CN1StoreKitInstallObserver();
 #endif
 #endif
 }

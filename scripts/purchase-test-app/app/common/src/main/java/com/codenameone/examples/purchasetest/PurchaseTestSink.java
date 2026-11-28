@@ -43,4 +43,18 @@ public interface PurchaseTestSink extends NativeInterface {
     void recordCommerceResult(String result);
 
     void reset();
+
+    /**
+     * Records one line of what the purchase API told the app (a callback, a
+     * receipt, a product listing). The iOS implementation appends it to a list
+     * the hosted XCTest reads back.
+     */
+    void recordEvent(String event);
+
+    /**
+     * The next command the hosted XCTest queued for the app ("purchase:SKU",
+     * "products:A,B", "restore", "resetState"), or null. This is how the test
+     * drives the Java purchase API, which it cannot call itself.
+     */
+    String takeCommand();
 }

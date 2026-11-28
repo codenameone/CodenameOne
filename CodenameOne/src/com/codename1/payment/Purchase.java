@@ -99,18 +99,7 @@ public abstract class Purchase {
     ///
     /// For internal implementation use only.
     public static void postReceipt(String storeCode, String sku, String transactionId, long datePurchased, String orderData) {
-
-        Receipt r = new Receipt();
-        r.setSku(sku);
-        r.setTransactionId(transactionId);
-        r.setOrderData(orderData);
-        r.setStoreCode(storeCode);
-        if (datePurchased > 0) {
-            r.setPurchaseDate(new Date(datePurchased));
-        } else {
-            r.setPurchaseDate(new Date());
-        }
-        Purchase.getInAppPurchase().postReceipt(r);
+        Purchase.getInAppPurchase().postReceipt(newReceipt(storeCode, sku, transactionId, datePurchased, orderData));
 
         // Analytics auto-instrumentation: every successful native purchase
         // routes a receipt through here, so this is the canonical completion
@@ -123,6 +112,33 @@ public abstract class Purchase {
         CommerceManager.addPurchaseContext(sku, params, true);
         Analytics.autoEvent("purchase", "commerce", params);
 
+    }
+
+    /// Posts the receipt of a purchase a store restore reported: one made
+    /// earlier, on this device or another. It is stored and synchronized like
+    /// any receipt, so a receipt store learns of it, but it is not a purchase
+    /// and records no purchase analytics. A transaction already posted is
+    /// dropped by its transaction id.
+    ///
+    /// #### Deprecated
+    ///
+    /// For internal implementation use only.
+    public static void postRestoredReceipt(String storeCode, String sku, String transactionId, long datePurchased, String orderData) {
+        Purchase.getInAppPurchase().postReceipt(newReceipt(storeCode, sku, transactionId, datePurchased, orderData));
+    }
+
+    private static Receipt newReceipt(String storeCode, String sku, String transactionId, long datePurchased, String orderData) {
+        Receipt r = new Receipt();
+        r.setSku(sku);
+        r.setTransactionId(transactionId);
+        r.setOrderData(orderData);
+        r.setStoreCode(storeCode);
+        if (datePurchased > 0) {
+            r.setPurchaseDate(new Date(datePurchased));
+        } else {
+            r.setPurchaseDate(new Date());
+        }
+        return r;
     }
 
     /// Returns the native OS purchase implementation if applicable, if unavailable this

@@ -1,0 +1,433 @@
+// Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// This code is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License version 2 only, as
+// published by the Free Software Foundation.  Codename One designates this
+// particular file as subject to the "Classpath" exception as provided
+// by Oracle in the LICENSE file that accompanied this code.
+//
+// This code is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+// version 2 for more details (a copy is included in the LICENSE file that
+// accompanied this code).
+//
+// You should have received a copy of the GNU General Public License version
+// 2 along with this work; if not, write to the Free Software Foundation,
+// Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+//
+// Please contact Codename One through http://www.codenameone.com/ if you
+// need additional information or have any questions.
+
+// StoreKit 2 for com.codename1.payment.Purchase. The builder copies this file
+// into the app target only for an app that uses com.codename1.payment;
+// CN1StoreKit.m finds the class with NSClassFromString and, on an OS that has
+// StoreKit 2, uses it instead of the StoreKit 1 payment queue.
+//
+// The bridge never calls into Java. Everything StoreKit reports becomes an
+// event (a JSON object) on a queue that a Java thread drains through
+// nextEvent, the same pull model CN1SystemLanguageModel uses. That keeps
+// ParparVM's thread state off Swift's cooperative executor entirely.
+//
+// The rules this file follows, each a known way StoreKit integrations lose
+// or duplicate purchases:
+// - Transaction.updates is observed from launch (start, called by the app
+//   delegate), and Transaction.unfinished is drained at launch too: updates
+//   alone does not reliably re-emit what an earlier run left unfinished.
+// - A transaction is finished only after Java acknowledges it (finish), which
+//   Java does after the receipt is in its persistent pending queue. Finishing
+//   first would lose a purchase to a crash between the two.
+// - An unverified transaction grants nothing and is never finished, so StoreKit
+//   offers it again (Apple's sample does the same; one can later verify).
+// - Delivery is idempotent. The same transaction arrives from the purchase
+//   result, from updates and from unfinished, and is reported once per state
+//   (a refund is the same id again, revoked, and is reported). Finished ones
+//   are remembered across launches, so a finished transaction StoreKit
+//   redelivers anyway is finished again silently, not granted twice.
+// - Products are matched by id, never by position: Product.products returns
+//   them in any order and leaves out ids the store does not know.
+// - Only one of StoreKit 1 and 2 is ever active in a run. Apple does not
+//   support observing one and purchasing through the other.
+
+// - Not on watchOS: the watch target is translated from the same sources and
+//   may take this file, but the port never drove StoreKit there (CN1StoreKit.m
+//   compiles to nothing on the watch), and Transaction needs watchOS 8.
+#if !os(watchOS)
+import Foundation
+import StoreKit
+#if canImport(UIKit)
+import UIKit
+#endif
+
+@objc(CN1StoreKit2)
+final class CN1StoreKit2: NSObject {
+    private static let finishedKey = "CN1StoreKit2FinishedTransactions"
+    // Bounded so UserDefaults does not grow for ever. A finished transaction
+    // is not delivered again by StoreKit (only unfinished ones and new states
+    // of one are), so forgetting the oldest costs nothing in practice; were
+    // one to come back, Purchase's processed transaction ids still keep its
+    // receipt from being stored twice.
+    private static let finishedLimit = 500
+
+    private let lock = NSLock()
+    private let signal = DispatchSemaphore(value: 0)
+    private var events: [String] = []
+    /// Verified transactions reported to Java and not yet finished, by id.
+    /// Typed Any because a stored property cannot carry an availability.
+    private var unfinished: [String: Any] = [:]
+    /// Transactions reported in this run (finishKey), so a second source
+    /// reporting the same state does not report it again.
+    private var reported = Set<String>()
+    /// Transactions finished in this or an earlier run (finishKey), oldest first.
+    private var finished: [String] = []
+    private var finishedSet = Set<String>()
+    private var started = false
+
+    override init() {
+        super.init()
+        let stored = UserDefaults.standard.stringArray(forKey: CN1StoreKit2.finishedKey) ?? []
+        finished = stored
+        finishedSet = Set(stored)
+    }
+
+    @objc func isSupported() -> Bool {
+        if #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) {
+            return true
+        }
+        return false
+    }
+
+    // MARK: lifecycle
+
+    /// Starts listening. Idempotent; called once at launch.
+    @objc func start() {
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) else {
+            return
+        }
+        lock.lock()
+        if started {
+            lock.unlock()
+            return
+        }
+        started = true
+        lock.unlock()
+        Task.detached(priority: .utility) { [weak self] in
+            for await result in Transaction.updates {
+                self?.handle(result, requestedSku: nil)
+            }
+        }
+        Task.detached(priority: .utility) { [weak self] in
+            for await result in Transaction.unfinished {
+                self?.handle(result, requestedSku: nil)
+            }
+        }
+    }
+
+    // MARK: Java side
+
+    /// The next event as JSON, or nil when none arrives within the timeout.
+    @objc func nextEvent(_ timeoutMs: Int) -> String? {
+        let deadline = DispatchTime.now() + .milliseconds(max(0, timeoutMs))
+        if signal.wait(timeout: deadline) == .timedOut {
+            return nil
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        return events.isEmpty ? nil : events.removeFirst()
+    }
+
+    /// Finishes a transaction Java has stored. Unknown ids are ignored.
+    @objc func finish(_ transactionId: String) {
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) else {
+            return
+        }
+        lock.lock()
+        let states = (unfinished.removeValue(forKey: transactionId) as? [Any] ?? []).compactMap { $0 as? Transaction }
+        for s in states {
+            rememberFinished(CN1StoreKit2.finishKey(s))
+        }
+        let t = states.last
+        lock.unlock()
+        if let t = t {
+            Task.detached { await t.finish() }
+        }
+    }
+
+    @objc func canMakePayments() -> Bool {
+        if #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) {
+            return AppStore.canMakePayments
+        }
+        return false
+    }
+
+    /// Product details as JSON: {"products":[{...}]} or {"error":"..."}.
+    /// Blocks the calling (Java) thread; never call it on the main thread.
+    @objc func fetchProducts(_ skus: [String], timeoutMs: Int) -> String {
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) else {
+            return CN1StoreKit2.json(["error": "StoreKit 2 is not available"])
+        }
+        let done = DispatchSemaphore(value: 0)
+        let box = ResultBox()
+        Task.detached {
+            do {
+                let products = try await Product.products(for: Set(skus))
+                var out: [[String: Any]] = []
+                for p in products {
+                    out.append([
+                        "sku": p.id,
+                        "displayName": p.displayName,
+                        "description": p.description,
+                        "localizedPrice": p.displayPrice
+                    ])
+                }
+                box.set(CN1StoreKit2.json(["products": out]))
+            } catch {
+                box.set(CN1StoreKit2.json(["error": error.localizedDescription]))
+            }
+            done.signal()
+        }
+        if done.wait(timeout: .now() + .milliseconds(max(1, timeoutMs))) == .timedOut {
+            return CN1StoreKit2.json(["error": "The App Store did not answer in time"])
+        }
+        return box.get() ?? CN1StoreKit2.json(["error": "No answer from the App Store"])
+    }
+
+    /// Starts a purchase; the outcome arrives as events. offerJson is the
+    /// ApplePromotionalOffer the Java side serialized, or nil.
+    // No appAccountToken is set: the Purchase API has no user id to give it,
+    // and adding one is an API change. A server binds a purchase to its user
+    // by who presents the receipt, as with StoreKit 1.
+    @objc func purchase(_ sku: String, offerJson: String?) {
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) else {
+            enqueue(["type": "purchaseError", "sku": sku, "error": "StoreKit 2 is not available"])
+            return
+        }
+        Task.detached { [weak self] in
+            await self?.runPurchase(sku, offerJson: offerJson)
+        }
+    }
+
+    /// Restores: syncs with the App Store, then reports every current
+    /// entitlement. AppStore.sync asks the user to sign in, which is why this
+    /// runs only when the app asks for a restore and never at launch.
+    @objc func restore() {
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, *) else {
+            enqueue(["type": "restoreError", "error": "StoreKit 2 is not available"])
+            return
+        }
+        Task.detached { [weak self] in
+            guard let self = self else {
+                return
+            }
+            do {
+                try await AppStore.sync()
+            } catch {
+                self.enqueue(["type": "restoreError", "error": error.localizedDescription])
+                return
+            }
+            for await result in Transaction.currentEntitlements {
+                guard case .verified(let t) = result else {
+                    continue
+                }
+                if t.revocationDate != nil {
+                    continue
+                }
+                var e = self.describe(t, jws: result.jwsRepresentation)
+                e["type"] = "restored"
+                self.enqueue(e)
+            }
+            self.enqueue(["type": "restoreComplete"])
+        }
+    }
+
+    // MARK: internals
+
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, *)
+    private func runPurchase(_ sku: String, offerJson: String?) async {
+        do {
+            let products = try await Product.products(for: [sku])
+            guard let product = products.first(where: { $0.id == sku }) else {
+                enqueue(["type": "purchaseError", "sku": sku,
+                         "error": "The store did not return this product"])
+                return
+            }
+            var options = Set<Product.PurchaseOption>()
+            if let offerJson = offerJson {
+                guard let offer = CN1StoreKit2.promotionalOffer(offerJson) else {
+                    enqueue(["type": "purchaseError", "sku": sku,
+                             "error": "The promotional offer is malformed"])
+                    return
+                }
+                options.insert(offer)
+            }
+            let result = try await purchaseWithUI(product, options: options)
+            switch result {
+            case .success(let verification):
+                if case .unverified(_, let err) = verification {
+                    enqueue(["type": "purchaseError", "sku": sku,
+                             "error": "The App Store transaction failed verification: \(err)"])
+                    return
+                }
+                handle(verification, requestedSku: sku)
+            case .userCancelled:
+                enqueue(["type": "cancelled", "sku": sku])
+            case .pending:
+                // Ask to Buy or Strong Customer Authentication. The approved
+                // transaction arrives later through Transaction.updates.
+                enqueue(["type": "pending", "sku": sku])
+            @unknown default:
+                enqueue(["type": "pending", "sku": sku])
+            }
+        } catch {
+            enqueue(["type": "purchaseError", "sku": sku, "error": error.localizedDescription])
+        }
+    }
+
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, *)
+    private func purchaseWithUI(_ product: Product,
+                                options: Set<Product.PurchaseOption>) async throws -> Product.PurchaseResult {
+#if os(iOS) && !targetEnvironment(macCatalyst) && compiler(>=5.9)
+        // From iOS 17 the sheet is anchored to a scene; without one a
+        // multi-window app can show it on the wrong window or not at all.
+        if #available(iOS 17.0, *) {
+            let scene: UIScene? = await MainActor.run {
+                let scenes = UIApplication.shared.connectedScenes
+                return scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+            }
+            if let scene = scene {
+                return try await product.purchase(confirmIn: scene, options: options)
+            }
+        }
+#endif
+        return try await product.purchase(options: options)
+    }
+
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, *)
+    private func handle(_ result: VerificationResult<Transaction>, requestedSku: String?) {
+        switch result {
+        case .unverified(let t, let err):
+            // Granted nothing and left unfinished on purpose; see the header.
+            NSLog("CN1StoreKit2: unverified transaction %@ for %@: %@",
+                  String(t.id), t.productID, String(describing: err))
+        case .verified(let t):
+            let id = String(t.id)
+            let key = CN1StoreKit2.finishKey(t)
+            lock.lock()
+            if finishedSet.contains(key) {
+                lock.unlock()
+                // Finished before and redelivered anyway: finish again, report nothing.
+                Task.detached { await t.finish() }
+                return
+            }
+            if reported.contains(key) {
+                lock.unlock()
+                return
+            }
+            reported.insert(key)
+            // Every state of the transaction delivered before Java finished
+            // it: a purchase and its refund share the id, and finishing must
+            // remember both keys or the later state is reported again.
+            unfinished[id] = ((unfinished[id] as? [Any]) ?? []) + [t]
+            lock.unlock()
+            var e = describe(t, jws: result.jwsRepresentation)
+            if t.revocationDate != nil {
+                e["type"] = "refunded"
+            } else if t.isUpgraded {
+                e["type"] = "superseded"
+            } else if let exp = t.expirationDate, exp < Date() {
+                e["type"] = "superseded"
+            } else {
+                e["type"] = "purchased"
+            }
+            enqueue(e)
+        }
+    }
+
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, *)
+    private func describe(_ t: Transaction, jws: String) -> [String: Any] {
+        return [
+            "sku": t.productID,
+            "transactionId": String(t.id),
+            "originalTransactionId": String(t.originalID),
+            "date": Int64(t.purchaseDate.timeIntervalSince1970 * 1000),
+            "jws": jws
+        ]
+    }
+
+    /// What a reported or finished transaction is remembered by: its id and
+    /// the state it was in. A refund or an upgrade is the SAME transaction id
+    /// delivered again with revocationDate or isUpgraded set, so keying on the
+    /// id alone would swallow it. The purchase date is there because StoreKit's
+    /// local testing restarts its ids when its transactions are cleared, and a
+    /// remembered id would then hide a new purchase.
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, *)
+    private static func finishKey(_ t: Transaction) -> String {
+        var key = "\(t.id)@\(Int64(t.purchaseDate.timeIntervalSince1970 * 1000))"
+        if t.revocationDate != nil {
+            key += ":revoked"
+        } else if t.isUpgraded {
+            key += ":upgraded"
+        }
+        return key
+    }
+
+    /// Must be called with the lock held.
+    private func rememberFinished(_ id: String) {
+        if finishedSet.contains(id) {
+            return
+        }
+        finished.append(id)
+        finishedSet.insert(id)
+        if finished.count > CN1StoreKit2.finishedLimit {
+            let drop = finished.count - CN1StoreKit2.finishedLimit
+            for old in finished.prefix(drop) {
+                finishedSet.remove(old)
+            }
+            finished.removeFirst(drop)
+        }
+        UserDefaults.standard.set(finished, forKey: CN1StoreKit2.finishedKey)
+    }
+
+    private func enqueue(_ event: [String: Any]) {
+        let s = CN1StoreKit2.json(event)
+        lock.lock()
+        events.append(s)
+        lock.unlock()
+        signal.signal()
+    }
+
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, *)
+    private static func promotionalOffer(_ json: String) -> Product.PurchaseOption? {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let offerId = obj["offerIdentifier"] as? String,
+              let keyId = obj["keyIdentifier"] as? String,
+              let nonceStr = obj["nonce"] as? String,
+              let nonce = UUID(uuidString: nonceStr),
+              let sigStr = obj["signature"] as? String,
+              let signature = Data(base64Encoded: sigStr),
+              let ts = obj["timestamp"] as? NSNumber else {
+            return nil
+        }
+        // StoreKit 1 took the signature as its base64 text; StoreKit 2 takes
+        // the decoded bytes. The timestamp is milliseconds in both.
+        return .promotionalOffer(offerID: offerId, keyID: keyId, nonce: nonce,
+                                 signature: signature, timestamp: ts.intValue)
+    }
+
+    private static func json(_ obj: [String: Any]) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: obj),
+              let s = String(data: data, encoding: .utf8) else {
+            return "{\"type\":\"error\"}"
+        }
+        return s
+    }
+
+    private final class ResultBox {
+        private let lock = NSLock()
+        private var value: String?
+        func set(_ v: String) { lock.lock(); value = v; lock.unlock() }
+        func get() -> String? { lock.lock(); defer { lock.unlock() }; return value }
+    }
+}
+#endif

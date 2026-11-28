@@ -14209,6 +14209,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(main instanceof RestoreCallback) {
             restoreCallback = (RestoreCallback)main;
         }
+        ZoozPurchase.startStoreKit2Events();
         if (main instanceof LocalNotificationCallback) {
             setLocalNotificationCallback((LocalNotificationCallback) main);
         }
@@ -15573,6 +15574,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
     }
     
+    /// Ask to Buy or Strong Customer Authentication: the purchase waits for
+    /// approval and its transaction arrives later through itemPurchased.
+    /// Reported to a PendingPurchaseCallback, as Android reports a cash
+    /// payment, so an app can stop showing its "buying" state.
+    static void itemPurchasePending(final String sku) {
+        safeCallSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (purchaseCallback instanceof com.codename1.payment.PendingPurchaseCallback) {
+                    ((com.codename1.payment.PendingPurchaseCallback) purchaseCallback).itemPurchasePending(sku);
+                }
+            }
+        });
+    }
+
     static void itemRestored(final String sku) {
         safeCallSerially(new Runnable() {
             @Override

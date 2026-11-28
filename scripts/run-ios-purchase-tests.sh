@@ -50,13 +50,22 @@ ri_log "Injecting native StoreKitTest purchase tests into project at $PROJECT_DI
 "$REPO_ROOT/scripts/ios/purchase-tests/install-native-purchase-tests.sh" "$PROJECT_DIR"
 "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$APP_SCHEME"
 "$REPO_ROOT/scripts/ios/create-shared-scheme.py" "$PROJECT_DIR" "$TEST_SCHEME"
+"$REPO_ROOT/scripts/ios/purchase-tests/attach-storekit-config.py" "$PROJECT_DIR" \
+  "$PROJECT_DIR/NativePurchaseTests/Products.storekit"
 
 ri_log "Discovering simulator destination for test scheme $TEST_SCHEME"
+# CN1_IAP_SIMULATOR_ID pins a simulator. Locally that keeps the run off a
+# device another session is driving: StoreKitTest on a shared simulator fails
+# with SKInternalErrorDomain Code=3 before the app is involved.
+if [ -n "${CN1_IAP_SIMULATOR_ID:-}" ]; then
+  DESTINATION="platform=iOS Simulator,id=${CN1_IAP_SIMULATOR_ID}"
+else
 DESTINATION="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TEST_SCHEME" -showdestinations 2>/dev/null \
   | sed -n 's/.*{ platform:iOS Simulator,.*id:\([^,}]*\).*/\1/p' \
   | grep -v "placeholder" \
   | head -n 1 \
   | sed 's#^#platform=iOS Simulator,id=#' || true)"
+fi
 
 if [ -z "$DESTINATION" ]; then
   ri_log "No concrete iOS Simulator destination from -showdestinations; querying simctl"
@@ -109,13 +118,27 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/xcode-purchase-tests.log"
 
-ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION)"
+# Which StoreKit the app was built with: 1 (the default) or 2 (a build with
+# ios.storeKit2=true). PurchaseStoreKitTests runs on both and checks the
+# receipt it sees came from that StoreKit; PurchaseStoreKit2Tests drives the
+# StoreKit 2 lifecycle and runs only on 2. The test process reads the value
+# as CN1_IAP_STOREKIT: xcodebuild hands TEST_RUNNER_-prefixed variables to it.
+CN1_IAP_STOREKIT="${CN1_IAP_STOREKIT:-1}"
+case "$CN1_IAP_STOREKIT" in
+  1) ONLY_TESTING=(-only-testing:"${TEST_SCHEME}/PurchaseStoreKitTests") ;;
+  2) ONLY_TESTING=(-only-testing:"${TEST_SCHEME}/PurchaseStoreKitTests"
+                   -only-testing:"${TEST_SCHEME}/PurchaseStoreKit2Tests") ;;
+  *) ri_log "CN1_IAP_STOREKIT must be 1 or 2, not '$CN1_IAP_STOREKIT'" >&2; exit 2 ;;
+esac
+export TEST_RUNNER_CN1_IAP_STOREKIT="$CN1_IAP_STOREKIT"
+
+ri_log "Running xcodebuild test (scheme=$TEST_SCHEME, destination=$DESTINATION, StoreKit $CN1_IAP_STOREKIT)"
 set +e
 xcodebuild \
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" \
   -scheme "$TEST_SCHEME" \
   -destination "$DESTINATION" \
-  -only-testing:"${TEST_SCHEME}/PurchaseStoreKitTests" \
+  "${ONLY_TESTING[@]}" \
   test | tee "$TEST_LOG"
 RC=${PIPESTATUS[0]}
 set -e

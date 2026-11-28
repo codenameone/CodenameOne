@@ -54,6 +54,15 @@ public class PurchaseTestSinkImpl {
         synchronized (SUBMITTED) { SUBMITTED.clear(); }
     }
 
+    public void recordEvent(String event) {
+        System.out.println("CN1SS:IAP:EVENT " + event);
+    }
+
+    public String takeCommand() {
+        // The command channel is driven by the iOS XCTest only.
+        return null;
+    }
+
     public boolean isSupported() {
         return true;
     }

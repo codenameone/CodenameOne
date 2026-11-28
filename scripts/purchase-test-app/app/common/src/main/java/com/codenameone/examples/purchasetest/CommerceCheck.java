@@ -40,17 +40,27 @@ import com.codename1.ui.layouts.BorderLayout;
  * to a CN1SS:IAP:COMMERCE log line.
  */
 final class CommerceCheck {
-    private static boolean started;
+    /**
+     * The products already checked. The XCTest suites share one app process
+     * and buy the same products, so the resetState command between them
+     * clears this ({@link #reset}); otherwise a check the StoreKit 2 suite
+     * used up left the StoreKit 1 suite waiting for one forever.
+     */
+    private static final java.util.Set<String> started = new java.util.HashSet<String>();
 
     private CommerceCheck() {
     }
 
+    /** Forgets every check made, for the resetState test command. */
+    static void reset() {
+        started.clear();
+    }
+
     /** Called on the EDT, from the receipt synchronization callback. */
     static void run(final PurchaseTestSink sink, final String sku) {
-        if (started) {
+        if (!started.add(sku == null ? "" : sku)) {
             return;
         }
-        started = true;
         // refresh() is a blocking call by contract, so it runs off the EDT.
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {

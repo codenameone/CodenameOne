@@ -27,8 +27,12 @@ import com.codename1.payment.*;
 import com.codename1.processing.Result;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+import com.codename1.io.JSONParser;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.ByteArrayInputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -96,6 +100,9 @@ class ZoozPurchase extends Purchase implements Runnable {
     }
 
     public synchronized Product[] getProducts(String[] skus) {
+        if (nativeInstance.storeKit2Active()) {
+            return getProductsStoreKit2(skus);
+        }
         int numSkus = skus.length;
         final Product[] p = new Product[numSkus];
         for(int iter = 0; iter < numSkus; iter++) {
@@ -122,6 +129,172 @@ class ZoozPurchase extends Purchase implements Runnable {
             return null;
         }
         return p;
+    }
+
+    /// StoreKit 2 product lookup. The answer is matched to the request by sku,
+    /// never by position: the store answers in any order and leaves out skus
+    /// it does not know (the StoreKit 1 path above fills by position, which
+    /// is why a missing product there shifts every later one). A sku the
+    /// store did not return keeps a `Product` with only its sku set.
+    private Product[] getProductsStoreKit2(final String[] skus) {
+        final String[] answer = new String[1];
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                answer[0] = nativeInstance.storeKit2FetchProducts(skus);
+            }
+        });
+        Map<String, Object> m = parseJson(answer[0]);
+        if (m == null || m.get("error") != null) {
+            Log.e(new IOException("Failed to fetch products: "
+                    + (m == null ? "no answer" : m.get("error"))));
+            return null;
+        }
+        Map<String, Map<String, Object>> bySku = new HashMap<String, Map<String, Object>>();
+        Object list = m.get("products");
+        if (list instanceof List) {
+            for (Object o : (List) list) {
+                if (o instanceof Map) {
+                    Map<String, Object> pm = (Map<String, Object>) o;
+                    Object sku = pm.get("sku");
+                    if (sku instanceof String) {
+                        bySku.put((String) sku, pm);
+                    }
+                }
+            }
+        }
+        Product[] out = new Product[skus.length];
+        for (int i = 0; i < skus.length; i++) {
+            Product p = new Product();
+            p.setSku(skus[i]);
+            Map<String, Object> pm = bySku.get(skus[i]);
+            if (pm != null) {
+                p.setDisplayName(str(pm.get("displayName")));
+                p.setDescription(str(pm.get("description")));
+                p.setLocalizedPrice(str(pm.get("localizedPrice")));
+            }
+            out[i] = p;
+        }
+        return out;
+    }
+
+    private static String str(Object o) {
+        return o instanceof String ? (String) o : null;
+    }
+
+    private static Map<String, Object> parseJson(String json) {
+        if (json == null) {
+            return null;
+        }
+        try {
+            JSONParser parser = new JSONParser();
+            return parser.parseJSON(new InputStreamReader(
+                    new ByteArrayInputStream(json.getBytes("UTF-8")), "UTF-8"));
+        } catch (IOException ex) {
+            Log.e(ex);
+            return null;
+        }
+    }
+
+    private static boolean storeKit2EventsStarted;
+
+    /// Starts draining StoreKit 2's events, once, when this run uses StoreKit 2.
+    /// Called from `IOSImplementation.setMainClass`, after the purchase and
+    /// restore callbacks are known, so a transaction StoreKit delivers at
+    /// launch (an unfinished one, an approved Ask to Buy, a renewal) reaches the
+    /// app's callback rather than nothing.
+    static void startStoreKit2Events() {
+        if (storeKit2EventsStarted || !IOSImplementation.nativeInstance.storeKit2Active()) {
+            return;
+        }
+        storeKit2EventsStarted = true;
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (!Display.isInitialized()) {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException ex) {
+                        // keep waiting
+                    }
+                }
+                while (true) {
+                    String e = IOSImplementation.nativeInstance.storeKit2NextEvent(1000);
+                    if (e == null) {
+                        continue;
+                    }
+                    final Map<String, Object> event = parseJson(e);
+                    if (event == null) {
+                        continue;
+                    }
+                    CN.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            dispatchStoreKit2Event(event);
+                        }
+                    });
+                }
+            }
+        }, "StoreKit2");
+        t.start();
+    }
+
+    /// Runs on the EDT. A transaction is acknowledged (and StoreKit finishes
+    /// it) only after its receipt is in `Purchase`'s persistent pending queue,
+    /// which `postReceipt` writes synchronously when called on the EDT. A crash
+    /// before that leaves the transaction unfinished, and StoreKit delivers it
+    /// again on the next launch; the pending queue drops a transaction id it
+    /// already holds, so a redelivery is never stored twice.
+    static void dispatchStoreKit2Event(Map<String, Object> event) {
+        String type = str(event.get("type"));
+        String sku = str(event.get("sku"));
+        String transactionId = str(event.get("transactionId"));
+        if (type == null) {
+            return;
+        }
+        if ("purchased".equals(type)) {
+            Purchase.postReceipt(Receipt.STORE_CODE_ITUNES, sku, transactionId,
+                    date(event.get("date")), str(event.get("jws")));
+            IOSImplementation.itemPurchased(sku);
+            IOSImplementation.nativeInstance.storeKit2Finish(transactionId);
+        } else if ("superseded".equals(type)) {
+            // Upgraded within its group, or already expired when delivered --
+            // an app not opened for months drains its old renewals this way.
+            // The receipt store still learns of it, but it is not a purchase:
+            // no analytics event, and no CommerceManager purchase context is
+            // spent on it.
+            Purchase.postRestoredReceipt(Receipt.STORE_CODE_ITUNES, sku, transactionId,
+                    date(event.get("date")), str(event.get("jws")));
+            IOSImplementation.nativeInstance.storeKit2Finish(transactionId);
+        } else if ("refunded".equals(type)) {
+            IOSImplementation.itemRefunded(sku);
+            IOSImplementation.nativeInstance.storeKit2Finish(transactionId);
+        } else if ("restored".equals(type)) {
+            // Posted so a receipt store (and CommerceManager) learns of
+            // purchases made on another device or before a reinstall, which is
+            // what restore is for. Not a purchase for analytics.
+            Purchase.postRestoredReceipt(Receipt.STORE_CODE_ITUNES, sku, transactionId,
+                    date(event.get("date")), str(event.get("jws")));
+            IOSImplementation.itemRestored(sku);
+        } else if ("restoreComplete".equals(type)) {
+            IOSImplementation.restoreRequestComplete();
+        } else if ("restoreError".equals(type)) {
+            IOSImplementation.restoreRequestError(str(event.get("error")));
+        } else if ("purchaseError".equals(type)) {
+            IOSImplementation.itemPurchaseError(sku, str(event.get("error")));
+        } else if ("cancelled".equals(type)) {
+            // As on StoreKit 1, a purchase the user cancels reports nothing.
+            Log.p("Purchase of " + sku + " cancelled by the user");
+        } else if ("pending".equals(type)) {
+            // Ask to Buy / Strong Customer Authentication. The approved
+            // transaction arrives later as a "purchased" event.
+            Log.p("Purchase of " + sku + " is pending approval");
+            IOSImplementation.itemPurchasePending(sku);
+        }
+    }
+
+    private static long date(Object o) {
+        return o instanceof Number ? ((Number) o).longValue() : 0L;
     }
 
     public boolean wasPurchased(String sku) {
