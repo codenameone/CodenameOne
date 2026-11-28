@@ -5861,6 +5861,10 @@ public final class HttpServer {
         /// answer before it lets go of a borrow, and "is there anything left to
         /// read" is NOT the same question -- see the comment there.
         boolean parsedFromBuffer;
+        /// The array readRequestOnce began parsing a head out of, and where in it,
+        /// for as long as that parse is under way; null otherwise. See readRequest.
+        byte[] headRaw;
+        int headStart;
         /// The last zero-copy read did not fill the buffer, so the socket is very
         /// likely empty: a virtual thread waits for the poller before reading again
         /// rather than spending a recv to learn EAGAIN. See fill().
@@ -8544,6 +8548,60 @@ public final class HttpServer {
     /// Reads one request. Null when the peer closed; ProtocolException when what
     /// arrived is not a request this server will act on.
     private Request readRequest(Conn conn) throws IOException {
+        // A HEAD PARSED OUT OF A BUFFER THAT WAS PRIVATISED UNDER IT IS PARSED AGAIN.
+        //
+        // The head is parsed in place out of the host's shared __thread read
+        // buffer, through a LOCAL copy of conn.buffer. A virtual thread can lose its
+        // host in the middle of that scan without reading anything: every String the
+        // parse builds (internTarget, internHost, asciiString) and every slice table
+        // it grows is an allocation, and an allocation can wait out a collection or
+        // the allocation pacer by yielding to the other virtual threads on this
+        // host. advance() then privatises the buffer -- conn.buffer becomes an owned
+        // copy taken before anyone else ran, and liveRequest is re-pointed -- but
+        // during the head scan liveRequest is still the PREVIOUS request (or null),
+        // and nothing can re-point a parser's local. The next connection resumed on
+        // the host reads into the shared storage, and the rest of this head is
+        // scanned out of that client's bytes, inside this head's bounds: the CI
+        // failure was a pipelined pair answered 400 "duplicate Host header", two
+        // Host lines with no request line between them.
+        //
+        // Detected rather than prevented, so the read stays zero-copy: the parse
+        // remembers which array it started on, and if conn.buffer is no longer that
+        // array when it finishes -- or when it throws, since the corrupted bytes are
+        // what makes it throw -- it rewinds and starts again from the owned copy,
+        // which holds this request's bytes at the same offsets. One retry at most:
+        // an owned buffer is never privatised again.
+        while (true) {
+            try {
+                return readRequestOnce(conn);
+            } catch (IOException err) {
+                if (!rewindPrivatisedHead(conn)) {
+                    throw err;
+                }
+            } catch (RuntimeException err) {
+                // The shared array's length is set per read, so a slice of the
+                // original head can run past the end of another client's shorter one.
+                if (!rewindPrivatisedHead(conn)) {
+                    throw err;
+                }
+            }
+        }
+    }
+
+    /// True, with the connection rewound to the start of its head, when the head
+    /// parse that just stopped was reading a buffer advance() has since
+    /// privatised. See readRequest.
+    private static boolean rewindPrivatisedHead(Conn conn) {
+        byte[] started = conn.headRaw;
+        conn.headRaw = null;
+        if (started == null || started == conn.buffer) { //NOPMD CompareObjectsWithEquals - identity: is this still the very array the head was parsed from
+            return false;
+        }
+        conn.pos = conn.headStart;
+        return true;
+    }
+
+    private Request readRequestOnce(Conn conn) throws IOException {
         // Cleared before the header block is read and raised once it has been
         // parsed, so fill() can tell "start of a request" from "midway through
         // one" -- which an empty buffer alone cannot say.
@@ -8589,6 +8647,8 @@ public final class HttpServer {
         byte[] raw = conn.buffer;
         int blockStart = conn.pos;
         int blockEnd = headerEnd;
+        conn.headRaw = raw;
+        conn.headStart = blockStart;
         conn.pos = headerEnd + 4;
 
         int lineEnd = indexOfCrLfWithin(raw, blockStart, blockEnd);
@@ -8918,6 +8978,13 @@ public final class HttpServer {
         String contentLength = contentLengthAt < 0 ? null : "set";
         int declaredLength = contentLengthAt < 0 ? -1
                 : sliceToInt(raw, slices[contentLengthAt + 2], slices[contentLengthAt + 3]);
+        // The last read of the head through `raw`, and the last point before
+        // anything irreversible (a 100 Continue, a body read): if the buffer was
+        // privatised during the scan, readRequest parses it again. See there.
+        if (raw != conn.buffer) { //NOPMD CompareObjectsWithEquals - identity: was the borrowed array swapped for a private copy mid-parse
+            throw new IllegalStateException("head buffer privatised mid-parse");
+        }
+        conn.headRaw = null;
 
         if (chunked && contentLength != null) {
             // Both framings in one request is precisely how a request is smuggled
