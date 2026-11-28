@@ -441,6 +441,8 @@ struct JavaObjectPrototype {
 // longer referenced, and goes.
 extern struct clazz* cn1ClazzById[];
 extern const int cn1ClazzByIdCount;
+// Interp-host builds only: the first of the indices kept free for run-time descriptors.
+extern const int cn1ClazzByIdFirstDynamic;
 extern void cn1ClazzRegister(uint16_t index, struct clazz* c);
 static inline __attribute__((always_inline)) uint16_t cn1ClazzIndexOf(const struct clazz* c);
 static inline __attribute__((always_inline)) void cn1ObjSetClass(struct JavaObjectPrototype* o, const struct clazz* c);

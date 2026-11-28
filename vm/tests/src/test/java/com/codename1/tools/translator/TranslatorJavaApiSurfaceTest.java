@@ -97,7 +97,8 @@ class TranslatorJavaApiSurfaceTest {
         }
         assertTrue(!stubbed.isEmpty(), "no stubs found under " + stubs);
         Set<String> jvmOnly = new HashSet<String>(Arrays.asList(
-                "CastSemanticsVerifier.java", "NativeSignatureVerifierCli.java"));
+                "CastSemanticsVerifier.java", "NativeSignatureVerifierCli.java",
+                "DevicePush.java", "InterpBundleFiles.java"));
         List<Path> sources = new ArrayList<Path>();
         for (Path p : javaFiles(translatorSrc)) {
             String name = p.getFileName().toString();

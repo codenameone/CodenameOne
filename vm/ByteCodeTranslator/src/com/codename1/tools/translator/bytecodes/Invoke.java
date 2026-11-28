@@ -272,6 +272,15 @@ public class Invoke extends Instruction {
         if (bc == null) {
             return null;
         }
+        if (BytecodeMethod.isInterpHost() && !bc.isFinalClass()
+                && !BytecodeMethod.isInterpOpaqueClass(bc.getClsName())) {
+            // The same closed-world assumption resolveConcreteInvokeOwner refuses
+            // for an interp-host build: an interpreted subclass (or implementor)
+            // synthesized at runtime is an implementation this set cannot contain,
+            // and a direct call would bypass the vtable slot its override is
+            // patched into.
+            return null;
+        }
         java.util.List<ByteCodeClass> impls = opcode == Opcodes.INVOKEINTERFACE
                 ? Parser.resolveInterfaceTargets(bc, name, desc)
                 : Parser.resolveVirtualTargets(bc, name, desc);

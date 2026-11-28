@@ -47,7 +47,7 @@ include::../demos/common/src/main/snippets/developer-guide/device-runtime.sh[tag
 
 These are goals of the Codename One Maven plugin, and tasks of its Gradle plugin (`cn1Push`, `cn1PushStop`), so they work the same way on every operating system. The first time, the command prints a six-digit code; type it on the device and press *Pair*. After that, the computer is remembered and later sends start the program at once.
 
-image::img/device-runtime-pushed.png[A program sent from the computer, with its interpreted mode label,scaledwidth=30%]
+image::img/device-runtime-pushed.png["A program sent from the computer, with its interpreted mode label",scaledwidth=30%]
 
 A running program carries a *Slow interpreted mode* label: it runs in an interpreter, so its speed says nothing about the same code built for the device. A received program can be stopped three ways: a long press on that label, *Stop the program* on the pairing screen, or `mvn cn1:push-stop` (Gradle: `cn1PushStop`) from the computer. *View and edit source* shows everything that runs, and *Edit* saves the received program as a project in the editor, where you can change it and run it again.
 

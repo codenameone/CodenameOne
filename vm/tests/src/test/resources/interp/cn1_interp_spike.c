@@ -130,6 +130,12 @@ JAVA_VOID Main_installInterpSubclass___int_int(CODENAME_ONE_THREAD_STATE, JAVA_I
      * instance would look like a false positive. */
     synth->cn1ClazzRegistered = 0;
     CN1_CLAZZ_REGISTER(synth);
+    /* Objects name their class by a 16-bit index into cn1ClazzById, not by
+     * address. The copy carries the parent's index, which would resolve every
+     * instance back to the parent -- so it takes one of the indices an
+     * interp-host build keeps free for exactly this. */
+    synth->cn1HeaderIndex = (uint16_t)cn1ClazzByIdFirstDynamic;
+    cn1ClazzRegister(synth->cn1HeaderIndex, synth);
 
     interpClazz = synth;
     (void)threadStateData;

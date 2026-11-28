@@ -182,6 +182,14 @@ public class Parser extends ClassVisitor {
         if (CN1_TAGGABLE_CLASSES.contains(clsName)) {
             return false;
         }
+        // "No subclass" is a closed-world fact an interp-host build does not have: a
+        // descriptor synthesized at run time for an interpreted subclass has its own
+        // header index, so comparing the index against this class's would answer
+        // false for an object that IS an instance. A final class stays a leaf.
+        if (BytecodeMethod.isInterpHost() && !c.isFinalClass()
+                && !BytecodeMethod.isInterpOpaqueClass(c.getClsName())) {
+            return false;
+        }
         cn1EnsureSubclassIndex();
         java.util.List<ByteCodeClass> subs = cn1SubclassIndex.get(clsName);
         if (subs == null) {
@@ -1470,7 +1478,13 @@ public class Parser extends ClassVisitor {
         // constants), the String twins and the tagged boxes' proxies (the same), and the
         // primitive arrays, whose descriptors name no element class and so pin nothing.
         // Sized for every index, so a stamp can fill any of them.
-        bldM.append("\n\nstruct clazz* cn1ClazzById[").append(maxId + 1).append("] = {\n    [0] = 0");
+        // An interp-host build keeps a block of indices past the last class for
+        // descriptors synthesized at run time (an interpreted subclass gets a copy of
+        // its parent's clazz with its own vtable). A copy that kept the parent's index
+        // would round-trip through the 16-bit object header back to the PARENT, and
+        // every virtual call on it would dispatch through the parent's vtable.
+        int dynamicIndices = BytecodeMethod.isInterpHost() ? 1024 : 0;
+        bldM.append("\n\nstruct clazz* cn1ClazzById[").append(maxId + 1 + dynamicIndices).append("] = {\n    [0] = 0");
         String[] alwaysPresent = {"java_lang_Class", "java_lang_Object", "java_lang_String",
                 "java_lang_Integer", "java_lang_Long", "java_lang_Double", "java_lang_Float",
                 "java_lang_Character", "java_lang_Short"};
@@ -1491,7 +1505,10 @@ public class Parser extends ClassVisitor {
         bldM.append(",\n    [cn1_array_start_offset + 1] = &ClazzClazz");
         bldM.append(",\n    [cn1_header_index_java_lang_String_i8] = &class__java_lang_String_i8");
         bldM.append(",\n    [cn1_header_index_java_lang_String_i16] = &class__java_lang_String_i16");
-        bldM.append("};\nconst int cn1ClazzByIdCount = ").append(maxId + 1).append(";\n");
+        bldM.append("};\nconst int cn1ClazzByIdCount = ").append(maxId + 1 + dynamicIndices).append(";\n");
+        if (dynamicIndices > 0) {
+            bldM.append("const int cn1ClazzByIdFirstDynamic = ").append(maxId + 1).append(";\n");
+        }
 
         bldM.append("\n\nstruct clazz* classesList[] = {");
         first = true;
