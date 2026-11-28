@@ -1,113 +1,6 @@
 name: Build Hugo Website
 
 on:
-  pull_request:
-    paths:
-      - 'docs/website/**'
-      - 'docs/developer-guide/**'
-      - 'scripts/cn1playground/**'
-      - 'scripts/initializr/**'
-      # The /agents/ kit: create-app scripts and the bootstrap skill (build_agent_kit.py).
-      - 'scripts/agent-kit/**'
-      - 'scripts/website/**'
-      - 'scripts/skindesigner/**'
-      # The Initializr/playground/skindesigner JS bundles are built from
-      # JavaScriptPort sources and the ParparVM translator at workflow
-      # time, so a change in either also needs to redeploy the website.
-      # Without these paths a JS-port bug fix (e.g. dialog rendering
-      # in be3bc6dcd) sits in the branch with no Cloudflare preview
-      # refresh until an unrelated docs change happens to trigger
-      # the workflow.
-      - 'Ports/JavaScriptPort/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'vm/JavaAPI/**'
-      - 'CodenameOne/src/**'
-      # The other root build_javadocs.sh generates from, and the other one
-      # check-guide-links.py indexes. Without it, deleting a linked CLDC type
-      # merges unvalidated and the next scheduled build is where it surfaces.
-      - 'Ports/CLDC11/src/**'
-      # The developer guide this site renders includes a build hint table that is
-      # generated rather than committed, so a change to the catalog or to the
-      # renderer changes the published page without touching docs/. The
-      # annotations it is also rendered from are covered by CodenameOne/src/**
-      # above. Same gap codex reported on developer-guide-docs.yml; this is the
-      # other workflow that renders the table.
-      - 'maven/build-hint-catalog/**'
-      - 'maven/build-hint-tools/**'
-      - 'scripts/gen-build-hint-table.sh'
-      # The Hugo build embeds JavaDocs produced by this script, so a change
-      # to how the docs are generated must redeploy the website too.
-      - '.github/scripts/build_javadocs.sh'
-      # The doclet that renders the API pages themselves. It is outside the
-      # maven reactor and built only by this workflow, so nothing else would
-      # catch a change to it.
-      - 'maven/javadoc-hugo-doclet/**'
-      # The backend API reference is generated from the server runtime, so a
-      # change there changes published pages just as CodenameOne/src does.
-      - 'vm/backend/src/**'
-      - 'vm/backend/impl/**'
-      - 'vm/backend/shared-sources.sh'
-      - 'vm/backend/package-docs/**'
-      # build.sh renders the Port Status JDK 25 table with this script's `summary`, so a
-      # change to its output shape must go through the Hugo build and validate_port_status.
-      # The baseline DATA (vm/selfhost/perf-baseline/**) is left out on purpose: a row
-      # changes numbers, not shape, and the nightly fold dispatches a rebuild for it.
-      - 'vm/selfhost/perf_baseline.py'
-      - '.github/workflows/website-docs.yml'
-  push:
-    branches: [main, master]
-    paths:
-      - 'docs/website/**'
-      - 'docs/developer-guide/**'
-      - 'scripts/cn1playground/**'
-      - 'scripts/initializr/**'
-      # The /agents/ kit: create-app scripts and the bootstrap skill (build_agent_kit.py).
-      - 'scripts/agent-kit/**'
-      # The developer guide's Wayline chapters include the sample's sources by
-      # tag, so a merged change there changes the published guide. Not on pull
-      # requests: developer-guide-docs.yml already renders the guide for those.
-      - 'scripts/wayline/**'
-      - 'scripts/savor/**'
-      - 'scripts/bazaar/**'
-      - 'scripts/bastion/**'
-      - 'scripts/pulse/**'
-      - 'scripts/slate/**'
-      - 'scripts/fieldline/**'
-      - 'scripts/splat/**'
-      - 'scripts/skirmish/**'
-      - 'scripts/papercut/**'
-      - 'scripts/dash/**'
-      - 'scripts/parley/**'
-      - 'scripts/hellocodenameone/common/src/main/kmp/**'
-      - 'scripts/website/**'
-      - 'scripts/skindesigner/**'
-      - 'Ports/JavaScriptPort/**'
-      - 'vm/ByteCodeTranslator/**'
-      - 'vm/JavaAPI/**'
-      - 'CodenameOne/src/**'
-      # The other root build_javadocs.sh generates from, and the other one
-      # check-guide-links.py indexes. Without it, deleting a linked CLDC type
-      # merges unvalidated and the next scheduled build is where it surfaces.
-      - 'Ports/CLDC11/src/**'
-      # As above: the build hint table is generated, not committed.
-      - 'maven/build-hint-catalog/**'
-      - 'maven/build-hint-tools/**'
-      - 'scripts/gen-build-hint-table.sh'
-      # The Hugo build embeds JavaDocs produced by this script, so a change
-      # to how the docs are generated must redeploy the website too.
-      - '.github/scripts/build_javadocs.sh'
-      # The doclet that renders the API pages themselves. It is outside the
-      # maven reactor and built only by this workflow, so nothing else would
-      # catch a change to it.
-      - 'maven/javadoc-hugo-doclet/**'
-      # As above: the backend API reference is generated from these.
-      - 'vm/backend/src/**'
-      - 'vm/backend/impl/**'
-      - 'vm/backend/shared-sources.sh'
-      - 'vm/backend/package-docs/**'
-      # As above: the JDK 25 table's renderer.
-      - 'vm/selfhost/perf_baseline.py'
-      - '.github/workflows/website-docs.yml'
   workflow_dispatch:
     inputs:
       deploy_production:
@@ -123,6 +16,10 @@ on:
   schedule:
     - cron: '15 0 * * *'
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 permissions:
   contents: read
   pull-requests: write
@@ -130,21 +27,11 @@ permissions:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: website-docs-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   build:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     # A ceiling, because there was not one: this job hung in apt and ran for six
     # hours before GitHub's own limit stopped it.

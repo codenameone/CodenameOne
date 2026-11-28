@@ -13,6 +13,10 @@ on:
         description: "Also build the CN1SS test server and hand it over beside the bundle. For callers whose jobs run a screenshot suite."
         type: boolean
         default: false
+      mac_port:
+        description: "Also build the macOS port (scripts/build-mac-port.sh) on the same workspace and ship Ports/MacPort/nativeSources in the bundle. scripts-ios.yml's Apple job runs the macOS suite from this one bundle."
+        type: boolean
+        default: false
     outputs:
       cn1_built_cache_key:
         description: "Cache key the build job used for the cn1-built artifact bundle. Dependent jobs should reuse this exact key to avoid recomputing the hash and getting a spurious cache miss."
@@ -20,7 +24,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: xcode-27
     # 90, not 60: without the cn1-built cache this job is setup-workspace plus
     # the port build, and setup-workspace alone was measured at 27, 34 and 40+
     # minutes on three macOS runners in one night (2026-11-18). See the step
@@ -96,7 +100,18 @@ jobs:
               scripts/build-native-themes.sh \
               .github/workflows/_build-ios-port.yml \
               | shasum -a 256 | awk '{print $1}')
-          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+          HASH="${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}"
+          # With the macOS port in the bundle the key must also move with
+          # every file the AppKit build consumes -- all of Ports/MacPort, no
+          # extension list (the .metal shaders, .c natives and the
+          # shared-*.exclude manifests decide what is compiled) -- and the
+          # callers without it keep the key they always had.
+          if [ "${{ inputs.mac_port }}" = "true" ]; then
+            MAC_HASH=$( { find Ports/MacPort -type f -print0 | sort -z | xargs -0 shasum -a 256; \
+                shasum -a 256 scripts/build-mac-port.sh; } | shasum -a 256 | awk '{print $1}')
+            HASH="${HASH}-mac${MAC_HASH:0:16}"
+          fi
+          echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
 
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
@@ -132,7 +147,7 @@ jobs:
       - name: Compute cn1-built cache key
         id: cn1_built_key
         # Single source of truth for the cache key, exposed as a job output
-        # so dependent jobs (build-ios, build-ios-metal in scripts-ios.yml,
+        # so dependent jobs (the suite jobs in scripts-ios.yml,
         # the iOS-native and packaging workflows) restore the EXACT key this
         # job saved against. Computing the same hash again on each consumer
         # job has been observed to produce a different value on some runners
@@ -149,6 +164,7 @@ jobs:
             ~/.m2/repository/com/codenameone
             Themes
             Ports/iOSPort/nativeSources
+            Ports/MacPort/nativeSources
           key: ${{ steps.cn1_built_key.outputs.key }}
 
       - name: Setup workspace
@@ -175,6 +191,18 @@ jobs:
         run: ./scripts/build-ios-port.sh -q -DskipTests
         timeout-minutes: 40
 
+      - name: Verify native macOS font aliases with AppKit
+        if: ${{ inputs.mac_port }}
+        run: python3 scripts/test_mac_native_font.py
+
+      # The macOS port on the same workspace, so one job produces the bundle
+      # every Apple suite reads (it used to be _build-mac-port.yml, a second
+      # macOS runner doing setup-workspace again).
+      - name: Build macOS port
+        if: ${{ inputs.mac_port && steps.cn1_built.outputs.cache-hit != 'true' }}
+        run: ./scripts/build-mac-port.sh -q -Dtest=MacNativeFontModeTest -Dsurefire.failIfNoSpecifiedTests=false
+        timeout-minutes: 40
+
       - name: Report cache outcome
         run: |
           if [ "${{ steps.cn1_built.outputs.cache-hit }}" = "true" ]; then
@@ -192,7 +220,7 @@ jobs:
       # not evicted for the life of the run (and survive partial `--failed`
       # re-runs), so the handoff is reliable. tar relative to / so the home
       # (~/.m2) and workspace paths restore to identical absolute locations on
-      # the consumer (same macos-15 image -> same /Users/runner paths).
+      # the consumer (same xcode-27 image -> same /Users/runner paths).
       - name: Bundle built CN1 + iOS port artifacts
         run: |
           set -euo pipefail
@@ -205,10 +233,15 @@ jobs:
           # failed with "Workspace tools not found" even after the cn1-built
           # restore succeeded. Bundling it into the same artifact makes the
           # whole handoff eviction-proof.
+          MAC_SOURCES=""
+          if [ "${{ inputs.mac_port }}" = "true" ]; then
+            MAC_SOURCES="${GITHUB_WORKSPACE#/}/Ports/MacPort/nativeSources"
+          fi
           tar -C / -cf "$RUNNER_TEMP/cn1-built-bundle.tar" \
             "${HOME#/}/.m2/repository/com/codenameone" \
             "${GITHUB_WORKSPACE#/}/Themes" \
             "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources" \
+            ${MAC_SOURCES:+"$MAC_SOURCES"} \
             "${RUNNER_TEMP#/}/codenameone-tools"
           ls -la "$RUNNER_TEMP/cn1-built-bundle.tar"
 
@@ -219,7 +252,7 @@ jobs:
       # Every screenshot job used to build it for itself, at the top of its
       # test step: install the backend runtime, the build engine and the
       # plugin from this checkout, then compile the server. Measured, that was
-      # 3 to 3.6 minutes in each macos-15 job and 6.5 to 9.7 minutes on the
+      # 3 to 3.6 minutes in each macOS job and 6.5 to 9.7 minutes on the
       # Xcode 27 leg, whose runner is slower and whose 95 minute limit it was
       # spending -- five or six builds of the same classes per run. Built once
       # here it costs this job the 3.5 minutes one of them paid.

@@ -30,8 +30,8 @@ runner is allocated:
 
         // cn1ss-skip: macos, watchos
 
-    using port_status.json's port ids (ios-metal covers both iOS Metal
-    directories, ios-metal-27 the Xcode 27 one alone; windows-x64 and
+    using port_status.json's port ids (ios-metal and ios-metal-27 both
+    name the iOS Metal directory; windows-x64 and
     windows-arm64 share one). A test whose chain
     has a skip guard -- a "status=SKIPPED" line, a conditional
     shouldTakeScreenshot(), or an `if (...) { done(); return true; }` early
@@ -58,7 +58,6 @@ MANIFEST = os.path.join(ROOT, "docs/website/data/port_status.json")
 # port ids whose runs it holds. Keep in step with the SCREENSHOT_REF_DIR / REF
 # values in the screenshot workflows.
 DIR_PORTS = {
-    "scripts/ios/screenshots-metal": {"ios-metal"},
     "scripts/ios/screenshots-metal-27": {"ios-metal-27"},
     "scripts/ios/screenshots-tv": {"tvos"},
     "scripts/ios/screenshots-watch": {"watchos"},
@@ -70,14 +69,13 @@ DIR_PORTS = {
     "scripts/macos/screenshots": {"macos"},
 }
 PORTS = set().union(*DIR_PORTS.values())
-# A declaration naming ios-metal means both iOS Metal legs; name ios-metal-27
-# alone for a test only the Xcode 27 leg skips.
-ALIASES = {"ios-metal": {"ios-metal", "ios-metal-27"}}
+# The iOS Metal leg runs on Xcode 27 and its golden directory is keyed
+# ios-metal-27; a declaration naming ios-metal (the published port id) means it.
+ALIASES = {"ios-metal": {"ios-metal-27"}}
 # Not here on purpose: scripts/javase/screenshots belongs to the JavaSE
 # simulator's own integration run (simulator chrome, not this suite), and
 # scripts/wayline/screenshots to the Wayline sample.
 GOLDEN_DIRS = [
-    "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-metal-27",
     "scripts/ios/screenshots-tv",
     "scripts/ios/screenshots-watch",

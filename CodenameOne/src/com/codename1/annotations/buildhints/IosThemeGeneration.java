@@ -34,9 +34,7 @@ package com.codename1.annotations.buildhints;
 /// themeMode ignores it, because there is only one iOS 7 and one pre-flat look.
 public enum IosThemeGeneration {
     /// Say nothing, and let the build server apply its own default, which is
-    /// [#IOS26]. An application that never sets this keeps the theme it has.
-    /// New projects from the Initializr and the archetype set [#IOS27] in their
-    /// settings, so only older projects land here.
+    /// [#IOS27]. An application that wants the iOS 26 look sets [#IOS26].
     @HintUnset
     DEFAULT,
 

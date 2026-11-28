@@ -200,7 +200,7 @@ jobs:
     # are the scarce pool, and the Linux job above already holds every other
     # target to Maven/Gradle parity on the pull request.
     if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name != 'pull_request') }}
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
     env:
       CN1_GRADLE_REQUIRED: '1'

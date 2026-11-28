@@ -149,7 +149,7 @@ LEG_PORT_DIRS = {
     # Same sources, different COMPILER. The census is a per-toolchain ratchet --
     # a new warning kind fails it -- and Xcode 27's clang does not emit the same
     # set as Xcode 26's, so the iOS 27 leg cannot share ios-sim-debug's baseline.
-    # It tried: build-ios-metal-27 inherited that leg, failed the census on the
+    # It tried: the iOS 27 Metal suite inherited that leg, failed the census on the
     # difference, and stopped before running a single screenshot.
     "ios-sim-debug-xcode27": ["Ports/iOSPort/nativeSources"],
     "ios-device-release": ["Ports/iOSPort/nativeSources"],

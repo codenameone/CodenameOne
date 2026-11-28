@@ -126,7 +126,7 @@ jobs:
           dest="${RUNNER_TEMP}/perf-results"
           mkdir -p "${dest}"
           since="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)"
-          for wf in linux-build-run.yml parparvm-tests-windows.yml scripts-macos.yml; do
+          for wf in linux-build-run.yml scripts-ios.yml; do
             for run in $(gh run list --repo "${GITHUB_REPOSITORY}" --workflow "${wf}" \
                 --branch master --limit 30 --json databaseId,createdAt \
                 --jq ".[] | select(.createdAt >= \"${since}\") | .databaseId"); do

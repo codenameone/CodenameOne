@@ -171,7 +171,19 @@ final class InputValidationUITests: XCTestCase {
             // The browser page and its JS callback load asynchronously. Retry
             // the focus tap as well as typing in case the first tap preceded load.
             if step == "browserkeytype" {
-                center.tap()
+                // On the iOS 27 simulator a coordinate tap no longer gives the
+                // WKWebView's input first responder, and every typeKey below was
+                // dropped (CN1IV:TIMEOUT:browserkeytype on xcode-27 while the
+                // macos-15 nightly passed). The page's input is a real web
+                // accessibility element (aria-label below), so tap THAT when the
+                // tree exposes it; typeKey stays the hardware-key path #5740 is
+                // about. Fall back to the centre tap when it is not exposed.
+                let input = app.webViews.textFields["Browser keyboard input"].firstMatch
+                if input.exists {
+                    input.tap()
+                } else {
+                    center.tap()
+                }
             }
             for key in ["c", "n", "1"] {
                 if stopRequested(step, syncDir: syncDir) {

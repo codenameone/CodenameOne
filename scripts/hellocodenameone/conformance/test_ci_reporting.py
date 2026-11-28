@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 class ReportingTests(unittest.TestCase):
     def test_native_x64_artifacts_cannot_replace_shipping_evidence(self):
-        workflow = (ROOT / ".github/workflows/parparvm-tests-windows.yml").read_text()
+        workflow = (ROOT / ".github/workflows/linux-build-run.yml").read_text()
         x64 = workflow.split("  windows-port-screenshot-comment-x64:", 1)[1].split(
             "  windows-port-screenshot-comment-arm64:", 1)[0]
         artifacts = re.findall(r"uses: \./\.github/actions/upload-artifact-with-retry\s+with:\s+name: (\S+)", x64)
@@ -23,7 +23,7 @@ class ReportingTests(unittest.TestCase):
         self.assertNotIn("publish_port_status.sh", x64)
         manifest = json.loads((ROOT / "docs/website/data/port_status.json").read_text())
         port = next(port for port in manifest["ports"] if port["id"] == "windows-x64")
-        self.assertEqual("windows-cross-build-run.yml", port["workflow"])
+        self.assertEqual("linux-build-run.yml", port["workflow"])
 
     def run_gate(self, compare, artifacts, strict=True):
         env = dict(os.environ, CN1SS_PORT_ID="windows-x64",

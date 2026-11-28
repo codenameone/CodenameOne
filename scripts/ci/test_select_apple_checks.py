@@ -11,7 +11,7 @@ class AppleSelectionTest(unittest.TestCase):
     def test_packaging_only_does_not_expand_to_all_suites(self):
         for event in ['push', 'pull_request']:
             result = apple.select(['.github/workflows/ios-packaging.yml'], event)
-            self.assertEqual({'ios':'false', 'native':'false', 'packaging':'true', 'any':'true'}, result)
+            self.assertEqual({'ios':'false', 'native':'false', 'packaging':'true', 'macos':'false', 'fidelity':'false', 'any':'true'}, result)
 
     def test_no_native_runner_for_independent_cn1lib_or_core_unit_test(self):
         for event in ['push', 'pull_request']:
@@ -36,16 +36,16 @@ class AppleSelectionTest(unittest.TestCase):
             self.assertEqual('true', apple.select(['.github/workflows/' + name])[key])
 
     def test_packaging_ignores_baselines_its_smoke_never_reads(self):
-        # The packaging smoke compares against scripts/ios/screenshots-metal (the
+        # The packaging smoke compares against scripts/ios/screenshots-metal-27 (the
         # default reference dir, whose size is also its count floor), so that one
-        # still selects it. The 27, TV and watch baselines belong to other legs.
+        # still selects it. The TV and watch baselines belong to other legs.
         for event in ['push', 'pull_request']:
-            for path in ['scripts/ios/screenshots-metal-27/a.png', 'scripts/ios/screenshots-tv/a.png',
+            for path in ['scripts/ios/screenshots-tv/a.png',
                          'scripts/ios/screenshots-watch/a.png']:
                 result = apple.select([path], event)
                 self.assertEqual('false', result['packaging'], (path, event))
                 self.assertEqual('true', result['ios'], (path, event))
-            self.assertEqual('true', apple.select(['scripts/ios/screenshots-metal/a.png'], event)['packaging'])
+            self.assertEqual('true', apple.select(['scripts/ios/screenshots-metal-27/a.png'], event)['packaging'])
             self.assertEqual('true', apple.select(['scripts/ios/create-shared-scheme.py'], event)['packaging'])
 
     def test_globs_match_github_path_semantics(self):

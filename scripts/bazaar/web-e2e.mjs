@@ -261,6 +261,15 @@ async function storefrontExtras() {
     // page says so.
     await shop.goto(origin + '/s/' + store, { waitUntil: 'load' });
     await shop.locator('details[data-pick]:has(form[action="/lang"]) > summary').click();
+    // The page flips aria-expanded from the details element's toggle event,
+    // which the browser queues as a task after the click, so read it by
+    // waiting rather than the instant the click returns.
+    try {
+      await shop.locator('details[data-pick] > summary[aria-expanded=true]').first()
+        .waitFor({ state: 'attached', timeout: 5000 });
+    } catch (e) {
+      throw new Error('the language menu does not say it is open');
+    }
     if (await shop.locator('details[data-pick] > summary[aria-expanded=true]').count() !== 1) {
       throw new Error('the language menu does not say it is open');
     }

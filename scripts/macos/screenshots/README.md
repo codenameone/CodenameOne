@@ -1,14 +1,14 @@
 # macOS screenshot baselines
 
 Reference images for the native macOS (AppKit) build, target `mac-os-x-native`.
-The `build-macos` job in
-[`.github/workflows/scripts-macos.yml`](../../../.github/workflows/scripts-macos.yml)
+The macOS suite of the `apple` job in
+[`.github/workflows/scripts-ios.yml`](../../../.github/workflows/scripts-ios.yml)
 compares `scripts/hellocodenameone` output against these PNGs via
 [`scripts/run-macos-ui-tests.sh`](../../run-macos-ui-tests.sh).
 
 ## Adopting the first baseline
 
-1. Run the `build-macos` job and download the `macos-ui-tests` artifact.
+1. Run the `apple` job and download the `macos-ui-tests` artifact.
 2. Review every capture against the rules below.
 3. Commit the accepted PNGs in one commit that names the run that produced them.
 4. Run the suite a second time. It must be strict-green with zero differences.
@@ -17,7 +17,7 @@ compares `scripts/hellocodenameone` output against these PNGs via
 
 ## Review rules
 
-Open each new golden beside its counterpart in `../../ios/screenshots-metal/`
+Open each new golden beside its counterpart in `../../ios/screenshots-metal-27/`
 as a **review aid, never as a source**. Then:
 
 - **Layout differences are bugs.** A widget that is shifted, clipped, wrapped

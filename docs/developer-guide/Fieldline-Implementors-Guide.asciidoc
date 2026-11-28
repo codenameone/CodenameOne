@@ -398,7 +398,7 @@ sign-in to the technician's day, with the live channel open. It needs Node with
 Playwright. `check-template.sh` generates a project from the Initializr template
 under another name and package and builds it. The server's own tests run with
 `@BackendTest` on the `test` profile, which takes fewer search steps so a run stays
-quick. CI runs them in `.github/workflows/fieldline.yml`.
+quick. CI runs them in `.github/workflows/samples.yml`.
 
 === Making it yours
 

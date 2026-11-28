@@ -18,149 +18,19 @@ on:
         type: boolean
   schedule:
     - cron: '35 1 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - 'scripts/ci/retry.sh'
-      - '.github/workflows/scripts-javascript.yml'
-      - 'scripts/run-javascript-browser-tests.sh'
-      - 'scripts/run-javascript-screenshot-tests.sh'
-      - 'scripts/run-javascript-headless-browser.mjs'
-      - 'scripts/run-javascript-lifecycle-tests.mjs'
-      - 'scripts/test-javascript-surface-replay.mjs'
-      - 'scripts/test-javascript-weak-refs.mjs'
-      - 'scripts/test-javascript-dispatch-caches.mjs'
-      - 'scripts/test-javascript-native-stub-bindings.mjs'
-      - 'scripts/ci/tests/cn1ss-async-sink-test.sh'
-      - 'scripts/ci/tests/Cn1ssAsyncSinkTest.java'
-      - 'scripts/fidelity-app/common/src/main/java/com/codenameone/fidelity/Cn1ssAsyncSink.java'
-      - 'scripts/test-javascript-vault-bridge.mjs'
-      - 'scripts/test-javascript-composited-rendering.mjs'
-      - 'scripts/javascript/composited-app/**'
-      - 'vm/ByteCodeTranslator/src/javascript/browser_bridge.js'
-      - 'scripts/run-javascript-lifecycle-tests.sh'
-      - 'scripts/verify-javascript-lens-parity.mjs'
-      - 'scripts/build-javascript-port-hellocodenameone.sh'
-      - 'scripts/javascript_browser_harness.py'
-      - 'scripts/javascript/screenshots/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
-      - 'scripts/hellocodenameone/**'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/JavaScriptPort/**'
-      - 'vm/**'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-  push:
-    branches: [ master ]
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - 'scripts/ci/retry.sh'
-      - '.github/workflows/scripts-javascript.yml'
-      - 'scripts/run-javascript-browser-tests.sh'
-      - 'scripts/test-javascript-composited-rendering.mjs'
-      - 'scripts/javascript/composited-app/**'
-      - 'scripts/run-javascript-screenshot-tests.sh'
-      - 'scripts/run-javascript-headless-browser.mjs'
-      - 'scripts/run-javascript-lifecycle-tests.mjs'
-      - 'scripts/test-javascript-surface-replay.mjs'
-      - 'scripts/test-javascript-weak-refs.mjs'
-      - 'scripts/test-javascript-dispatch-caches.mjs'
-      - 'scripts/test-javascript-native-stub-bindings.mjs'
-      - 'scripts/ci/tests/cn1ss-async-sink-test.sh'
-      - 'scripts/ci/tests/Cn1ssAsyncSinkTest.java'
-      - 'scripts/fidelity-app/common/src/main/java/com/codenameone/fidelity/Cn1ssAsyncSink.java'
-      - 'scripts/run-javascript-lifecycle-tests.sh'
-      - 'scripts/verify-javascript-lens-parity.mjs'
-      - 'scripts/build-javascript-port-hellocodenameone.sh'
-      - 'scripts/javascript_browser_harness.py'
-      - 'scripts/javascript/screenshots/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
-      - 'scripts/hellocodenameone/**'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/JavaScriptPort/**'
-      - 'vm/**'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: scripts-javascript-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    needs: golden-plan
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.port_status_browser_evidence) }}
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   javascript-screenshots:
-    needs: [golden-plan, unity-gallery]
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.port_status_browser_evidence) }}
+    if: ${{ (!inputs.port_status_browser_evidence) }}
     permissions:
       contents: read
       pull-requests: write
@@ -361,11 +231,6 @@ jobs:
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
 
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
-
       - name: Enter golden capture mode
         uses: ./.github/actions/cn1ss-capture
         with:
@@ -479,8 +344,7 @@ jobs:
           if-no-files-found: ignore
 
   port-status-browser-evidence:
-    needs: golden-plan
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'workflow_dispatch' && inputs.port_status_browser_evidence) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.port_status_browser_evidence) }}
     permissions:
       actions: write
       contents: write

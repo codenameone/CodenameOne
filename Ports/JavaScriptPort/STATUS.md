@@ -151,7 +151,7 @@ ARTIFACTS_DIR=/tmp/js-verify \
 
 CI runs at 375×667 viewport with Playwright `deviceScaleFactor: 2` so the
 density picker lands on `DENSITY_VERY_HIGH` and screenshots come out 750×1334
-— phone-proportional to the iOS/Android baselines in `scripts/ios/screenshots-metal`
+— phone-proportional to the iOS/Android baselines in `scripts/ios/screenshots-metal-27`
 and `scripts/android/screenshots`.
 
 Screenshot baselines

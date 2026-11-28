@@ -15,133 +15,14 @@ on:
         type: string
   schedule:
   - cron: 15 1 * * *
-  pull_request:
-    paths:
-    # The application these jobs build compiles a Unity project, from an
-    # archive that unity-gallery-prebuilt.yml makes out of these.
-    - scripts/unity-compat-samples/gallery/**
-    - maven/cil-translator/**
-    - maven/unity-compat/**
-    - maven/build-engine/src/main/java/com/codename1/maven/Unity*
-    - maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*
-    - scripts/unity-gallery-prebuilt.sh
-    - .github/workflows/unity-gallery-prebuilt.yml
-    - .github/actions/unity-gallery-prebuilt/**
-    - .github/workflows/scripts-ios.yml
-    - .github/workflows/_build-ios-port.yml
-    - scripts/setup-workspace.sh
-    - scripts/build-ios-port.sh
-    - scripts/build-ios-app.sh
-    - scripts/check-ios-framework-links.py
-    - scripts/check-ios-sdk-deltas.py
-    - scripts/check-ios-private-api.py
-    - scripts/lib/xcode.sh
-    - scripts/run-ios-ui-tests.sh
-    - scripts/ci/boot-ios-simulator.sh
-    - scripts/run-watch-ui-tests.sh
-    - scripts/run-tv-ui-tests.sh
-    - scripts/run-ios-native-tests.sh
-    - scripts/ios/notification-tests/native-tests/**
-    - scripts/ios/notification-tests/install-native-notification-tests.sh
-    - scripts/ios/notification-tests/**
-    - scripts/hellocodenameone/**
-    - scripts/ios/tests/**
-    - scripts/ios/screenshots-metal/**
-    - scripts/ios/screenshots-metal-27/**
-    - scripts/ios/screenshots-watch/**
-    - scripts/ios/screenshots-tv/**
-    - scripts/templates/**
-    - CodenameOne/src/**
-    - Ports/iOSPort/**
-    - native-themes/ios-modern/**
-    - vm/**
-    - tests/**
-    - maven/**
-    - scripts/hellocodenameone/backend/**
-    - scripts/lib/cn1ss.sh
-    - .github/workflows/scripts-ios-native.yml
-    - scripts/ios/create-shared-scheme.py
-    - .github/workflows/ios-packaging.yml
-    - maven/codenameone-maven-plugin/**
-    - vm/ByteCodeTranslator/**
-    - scripts/run-ios-device-release-build.sh
-    - scripts/ios/**
-    - scripts/common/java/**
-    - '!**/*.md'
-    - '!maven/cn1-ai-*/**'
-    - '!maven/cn1-admob/**'
-    - '!maven/cn1-applovin/**'
-    - '!maven/cn1-unity-levelplay/**'
-    - .github/ci/apple-checks.json
-    - scripts/ci/select-apple-checks.py
-    - scripts/ci/select-cn1lib-checks.py
-  push:
-    branches:
-    - master
-    paths:
-    # The application these jobs build compiles a Unity project, from an
-    # archive that unity-gallery-prebuilt.yml makes out of these.
-    - scripts/unity-compat-samples/gallery/**
-    - maven/cil-translator/**
-    - maven/unity-compat/**
-    - maven/build-engine/src/main/java/com/codename1/maven/Unity*
-    - maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*
-    - scripts/unity-gallery-prebuilt.sh
-    - .github/workflows/unity-gallery-prebuilt.yml
-    - .github/actions/unity-gallery-prebuilt/**
-    - .github/workflows/scripts-ios.yml
-    - .github/workflows/_build-ios-port.yml
-    - scripts/setup-workspace.sh
-    - scripts/build-ios-port.sh
-    - scripts/build-ios-app.sh
-    - scripts/check-ios-framework-links.py
-    - scripts/check-ios-sdk-deltas.py
-    - scripts/check-ios-private-api.py
-    - scripts/lib/xcode.sh
-    - scripts/run-ios-ui-tests.sh
-    - scripts/ci/boot-ios-simulator.sh
-    - scripts/run-watch-ui-tests.sh
-    - scripts/run-tv-ui-tests.sh
-    - scripts/run-ios-native-tests.sh
-    - scripts/ios/notification-tests/native-tests/**
-    - scripts/ios/notification-tests/install-native-notification-tests.sh
-    - scripts/ios/notification-tests/**
-    - scripts/hellocodenameone/**
-    - scripts/ios/tests/**
-    - scripts/ios/screenshots-metal/**
-    - scripts/ios/screenshots-metal-27/**
-    - scripts/ios/screenshots-watch/**
-    - scripts/ios/screenshots-tv/**
-    - scripts/templates/**
-    - CodenameOne/src/**
-    - Ports/iOSPort/**
-    - native-themes/ios-modern/**
-    - vm/**
-    - tests/**
-    - maven/**
-    - scripts/hellocodenameone/backend/**
-    - scripts/lib/cn1ss.sh
-    - .github/workflows/scripts-ios-native.yml
-    - scripts/ios/create-shared-scheme.py
-    - .github/workflows/ios-packaging.yml
-    - maven/codenameone-maven-plugin/**
-    - vm/ByteCodeTranslator/**
-    - scripts/run-ios-device-release-build.sh
-    - scripts/ios/**
-    - scripts/common/java/**
-    - '!**/*.md'
-    - '!maven/cn1-ai-*/**'
-    - '!maven/cn1-admob/**'
-    - '!maven/cn1-applovin/**'
-    - '!maven/cn1-unity-levelplay/**'
-    - .github/ci/apple-checks.json
-    - scripts/ci/select-apple-checks.py
-    - scripts/ci/select-cn1lib-checks.py
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: scripts-ios-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -155,34 +36,18 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    needs: [golden-plan, select]
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.any == 'true') }}
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   select:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
       ios: ${{ steps.plan.outputs.ios }}
       native: ${{ steps.plan.outputs.native }}
       packaging: ${{ steps.plan.outputs.packaging }}
       any: ${{ steps.plan.outputs.any }}
-      metal: ${{ steps.legs.outputs.metal }}
       metal27: ${{ steps.legs.outputs.metal27 }}
       tv: ${{ steps.legs.outputs.tv }}
       watch: ${{ steps.legs.outputs.watch }}
+      macos: ${{ steps.legs.outputs.macos }}
+      fidelity: ${{ steps.plan.outputs.fidelity }}
     steps:
       - uses: actions/checkout@v6
       - name: Use Google's copy of Maven Central first
@@ -199,498 +64,70 @@ jobs:
         env:
           CAPTURE: ${{ inputs.cn1ss_capture || '' }}
           IOS: ${{ steps.plan.outputs.ios }}
+          MACOS: ${{ steps.plan.outputs.macos }}
         run: |
           set -euo pipefail
-          metal="$IOS" metal27="$IOS" tv="$IOS" watch="$IOS"
-          if [ -n "$CAPTURE" ] && [ "$IOS" = true ]; then
-            metal=false metal27=false tv=false watch=false
+          metal27="$IOS" tv="$IOS" watch="$IOS" macos="$MACOS"
+          if [ -n "$CAPTURE" ]; then
+            metal27=false tv=false watch=false macos=false
             for dir in $(python3 scripts/ci/cn1ss-golden-plan.py --pairs | cut -f2 | sort -u); do
               case "$dir" in
-                scripts/ios/screenshots-metal) metal=true ;;
                 scripts/ios/screenshots-metal-27) metal27=true ;;
                 scripts/ios/screenshots-tv) tv=true ;;
                 scripts/ios/screenshots-watch) watch=true ;;
+                scripts/macos/screenshots) macos=true ;;
               esac
             done
-            echo "Capture legs: metal=$metal metal27=$metal27 tv=$tv watch=$watch"
+            # The plan above still bounds a capture: a leg it skipped has
+            # nothing built for it.
+            [ "$IOS" = true ] || metal27=false tv=false watch=false
+            [ "$MACOS" = true ] || macos=false
+            echo "Capture legs: metal27=$metal27 tv=$tv watch=$watch macos=$macos"
           fi
           {
-            echo "metal=$metal"; echo "metal27=$metal27"; echo "tv=$tv"; echo "watch=$watch"
+            echo "metal27=$metal27"; echo "tv=$tv"; echo "watch=$watch"; echo "macos=$macos"
           } >> "$GITHUB_OUTPUT"
 
   build-port:
-    needs: [golden-plan, select]
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.any == 'true') }}
+    needs: [select]
+    if: ${{ (needs.select.outputs.any == 'true') }}
     uses: ./.github/workflows/_build-ios-port.yml
     with:
       # One test server for every suite job of the run; see the step there.
       test_server: true
+      # The macOS suite runs in the same Apple job, from the same bundle.
+      mac_port: true
 
-  build-ios-metal:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.metal == 'true') }}
-    # The iOS renderer job. Metal is the only iOS rendering backend -- the
-    # OpenGL ES 2 pipeline and the job that exercised it are gone -- so this
-    # runs on every pull request rather than only on the nightly schedule.
-    needs: [golden-plan, select, build-port, unity-gallery]
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    runs-on: macos-15
-    # The hello suite now also compiles the Android compatibility gallery, its runtime and the Kotlin stdlib; 75 left no margin.
-    # The Swing and JavaFX compatibility runtimes add about 22% more translated C: the Metal compile alone ran past 62 minutes.
-    timeout-minutes: 125
-    env:
-      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # The device runner reports logical test failures through CN1SS log
-      # markers, not through the build or the screenshot comparison. Make the
-      # normalized report authoritative so a failing or never-run compliance
-      # test cannot leave this workflow green and then be published from master.
-      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
-      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # Optional: when set, build-ios-app.sh writes it as a bundled resource so
-      # the GoogleWebMap screenshot test renders a live Google map; absent (e.g.
-      # fork PRs with no access to the secret) the test skips.
-      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Google's copy of Maven Central first
-        uses: ./.github/actions/maven-central-mirror
-
-      - name: Cache CocoaPods and user gems
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gem
-            ~/Library/Caches/CocoaPods
-            ~/.cocoapods/repos
-          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-v1-
-
-      - name: Ensure CocoaPods tooling
-        run: |
-          mkdir -p ~/.codenameone
-          cp maven/UpdateCodenameOne.jar ~/.codenameone/
-          set -euo pipefail
-          if ! command -v ruby >/dev/null; then
-            echo "ruby not found"; exit 1
-          fi
-          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
-          export PATH="$GEM_USER_DIR/bin:$PATH"
-          if ! command -v pod >/dev/null 2>&1; then
-            gem install cocoapods xcodeproj --no-document --user-install
-          fi
-          pod --version
-
-      - name: Compute setup-workspace hash
-        id: setup_hash
-        run: |
-          set -euo pipefail
-          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-
-      - name: Compute CN1 source hash
-        id: src_hash
-        run: |
-          set -euo pipefail
-          SRC_HASH=$(find CodenameOne/src Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
-              maven/codenameone-maven-plugin/src/main \
-              maven/build-engine/src/main \
-              maven/project-model/src/main \
-              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
-              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
-          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
-              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
-          SCRIPT_HASH=$(shasum -a 256 \
-              scripts/setup-workspace.sh \
-              scripts/build-ios-port.sh \
-              scripts/build-native-themes.sh \
-              .github/workflows/_build-ios-port.yml \
-              | shasum -a 256 | awk '{print $1}')
-          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
-
-      - name: Set TMPDIR
-        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache Maven repository
-        uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
-
-      - name: Restore cn1-binaries cache
-        uses: actions/cache@v5
-        with:
-          path: ../cn1-binaries
-          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            cn1-binaries-${{ runner.os }}-
-
-      - name: Download built CN1 + iOS port bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: cn1-built-bundle
-          path: ${{ runner.temp }}
-      - name: Restore built CN1 + iOS port tree
-        run: |
-          set -euo pipefail
-          # Replaces the evictable cn1-built cache restore with the artifact
-          # build-port handed off (not LRU-evicted, survives --failed re-runs).
-          # The tar was created relative to / so this restores
-          # ~/.m2/com/codenameone + Themes + Ports/iOSPort/nativeSources to
-          # their original absolute paths.
-          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
-          # The test server build-port built for the whole run, when it did.
-          # Without it the suite script builds its own, as it always has.
-          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
-            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
-          fi
-          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
-            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
-            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
-          else
-            echo "No prebuilt test server in the bundle; the suite builds its own."
-          fi
-
-      - name: Install Metal Toolchain
-        # Xcode 26+ requires the Metal Toolchain component to be downloaded
-        # explicitly before .metal files can compile. The runner's default
-        # xcodebuild is often an older Xcode whose -downloadComponent flag
-        # doesn't exist, so we point DEVELOPER_DIR at Xcode 26 first (same
-        # selection logic build-ios-app.sh uses). If the component is
-        # already cached on the runner image, xcodebuild exits quickly
-        # without re-downloading.
-        run: |
-          set -euo pipefail
-          # Same selection the build scripts use, so this cannot install the
-          # component into one Xcode and then build with another.
-          # shellcheck source=/dev/null
-          source scripts/lib/xcode.sh
-          cn1_select_xcode || exit 1
-          "$XCODEBUILD" -downloadComponent MetalToolchain
-        timeout-minutes: 10
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
-
-      - name: Enter golden capture mode
-        uses: ./.github/actions/cn1ss-capture
-        with:
-          tests: ${{ inputs.cn1ss_capture }}
-          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
-
-      - name: Build sample iOS app and compile workspace (Metal)
-        id: build-ios-app
-        run: ./scripts/build-ios-app.sh -q -DskipTests
-        timeout-minutes: 30
-
-      # Every framework the port's natives need must be one the project DECLARES.
-      # A framework that only reaches the link through an autolink hint -- a Swift
-      # file's `import SwiftUI`, a CocoaPods dependency, `@import` under the Metal
-      # build's CLANG_ENABLE_MODULES -- links this sample and no plain Objective-C
-      # application. That is how `_OBJC_CLASS_$_UTType` stayed undefined in every
-      # customer archive while this job was green for five days.
-      #
-      # Runs on the project the step above already generated, so it costs seconds
-      # and it never links a Swift object, a pod or an extension.
-      - name: Check the port links only frameworks the project declares (Metal)
-        run: |
-          set -euo pipefail
-          # Resolve against the SAME Xcode build-ios-app.sh used. This step used
-          # to shell out to the runner's ambient xcrun, so it answered "is this
-          # symbol declared?" against a different SDK than the one that produced
-          # the project it was checking.
-          # shellcheck source=/dev/null
-          source scripts/lib/xcode.sh
-          cn1_select_xcode || exit 1
-          scripts/check-ios-framework-links.py \
-            --developer-dir "$DEVELOPER_DIR" \
-            "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
-        timeout-minutes: 10
-
-      # App Store Connect rejects an upload that imports any SDK symbol no public header
-      # declares ("Validation failed (409) The app references non-public symbols"), and
-      # nothing else here can see one: a private symbol compiles and links like any other.
-      # Customer uploads were rejected for CommonCrypto's private AES-GCM calls while every
-      # job stayed green, because the calls sat behind a feature gate this sample never
-      # turns on. So this compiles EVERY port native with EVERY gate on, from pristine
-      # sources, and fails on any import that is exported but undeclared. The linked
-      # binary is checked the same way in ios-packaging.yml.
-      - name: Check the port references no private Apple API
-        run: |
-          set -euo pipefail
-          # shellcheck source=/dev/null
-          source scripts/lib/xcode.sh
-          cn1_select_xcode || exit 1
-          scripts/check-ios-private-api.py \
-            --developer-dir "$DEVELOPER_DIR" \
-            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
-        timeout-minutes: 15
-
-      # Apple can deprecate an API, or change a behaviour for anything LINKED
-      # against the new SDK, and nothing else here would notice: every other
-      # check compiles against one SDK and has nothing to compare it to. This one
-      # compiles the port twice, varying only -isysroot, so what it reports is
-      # caused by the SDK and not by the command line.
-      #
-      # It sweeps the renderer and on-device-debug configurations itself, from
-      # pristine port sources, so hosting it in this job costs one build.
-      #
-      # It is a no-op on a runner that carries a single Xcode, which is the case
-      # today -- and it starts working, without another edit, on the first image
-      # that ships two. That is deliberate: the alternative is remembering to add
-      # it at exactly the moment a toolchain moves, which is the moment nobody
-      # has spare attention.
-      - name: Compare the port against the next iOS SDK
-        run: |
-          set -euo pipefail
-          scripts/check-ios-sdk-deltas.py \
-            --skip-if-single-sdk \
-            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
-        timeout-minutes: 20
-
-      - name: Run iOS UI screenshot tests (Metal)
-        env:
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
-          # Golden set for the iOS simulator. See
-          # scripts/ios/screenshots-metal/README.md.
-          SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal
-          # Override the PR comment marker / preview path / title so this
-          # job posts its own comment instead of overwriting the GL job's
-          # comment (both jobs ran with the same default marker before, so
-          # whichever finished last clobbered the other's results).
-          CN1SS_COMMENT_MARKER: '<!-- CN1SS_IOS_METAL_COMMENT -->'
-          CN1SS_PREVIEW_SUBDIR: ios-metal
-          CN1SS_REPORT_TITLE: 'iOS Metal screenshot updates'
-          CN1SS_SUCCESS_MESSAGE: '✅ Native iOS Metal screenshot tests passed.'
-          CN1SS_COMMENT_LOG_PREFIX: '[run-ios-device-tests-metal]'
-          # Strict screenshot gating: fail on any pixel mismatch and on any
-          # missing screenshot. The Metal backend must produce the full
-          # baseline set; a test that hangs (e.g. the DialogTheme texture
-          # backdrop) drops every later capture and silently shrinks the
-          # suite from 122 to 107 - that now fails the job. No missing
-          # screenshots are tolerated. Enforced in scripts/lib/cn1ss.sh.
-          CN1SS_FAIL_ON_MISMATCH: '1'
-          # Enable Apple's Metal API Validation in the simulator. Catches
-          # render-pass / pipeline-state mismatches at the moment they
-          # happen (issue #5103: stencil pixel-format mismatch shipped in
-          # four consecutive 7.0.x releases because no test exercised the
-          # validation layer). assert mode crashes the app on the first
-          # validation error -- the missed CN1SS:SUITE:FINISHED marker
-          # then fails this step. run-ios-ui-tests.sh forwards both vars
-          # to the launched app via simctl --setenv.
-          MTL_DEBUG_LAYER: '1'
-          MTL_DEBUG_LAYER_ERROR_MODE: 'assert'
-          CN1SS_PORT_ID: ios-metal
-          # Count this build's compiler warnings and attribute each to whoever
-          # owns the code. This used to ride on the GL leg; that leg is gone, so
-          # it moves here -- and this is now the ONLY leg that runs the census,
-          # which means the baseline comparison and its injected-warning probe
-          # exist nowhere else. pr.yml only runs the parser self-test, which
-          # censuses nothing.
-          #
-          # This leg can host it for the same reason the old one could: it sets
-          # no CN1_IOS_DERIVED_DATA, so run-ios-ui-tests.sh wipes its derived
-          # data and compiles every translation unit from cold. An incremental
-          # build reports no warnings and is indistinguishable from a clean
-          # codebase, which is why the tool exits 2 rather than passing when the
-          # compile count falls short of the manifest.
-          CN1_WARNING_CENSUS: '1'
-          CN1_WARNING_LEG: ios-sim-debug
-          # build-ios-app.sh stages the manifest under the default artifacts dir,
-          # which is not the per-step one above.
-          CN1_WARNING_MANIFEST: ${{ github.workspace }}/artifacts/cn1-source-manifest.txt
-        run: |
-          set -euo pipefail
-          mkdir -p "${ARTIFACTS_DIR}"
-
-          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
-          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
-          echo "reference dir='${SCREENSHOT_REF_DIR}'"
-
-          ./scripts/run-ios-ui-tests.sh \
-            "${{ steps.build-ios-app.outputs.workspace }}" \
-            "" \
-            "${{ steps.build-ios-app.outputs.scheme }}"
-        # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
-        # DeviceRunner after 12 minutes without CN1SS progress. The Swing and
-        # JavaFX compatibility runtimes took the step past 76 minutes.
-        timeout-minutes: 110
-
-      - name: Upload iOS Metal port status
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: port-status-ios-metal
-          path: artifacts/ios-ui-tests-metal/port-status-ios-metal.json
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: The suite must have compared screenshots
-        # Runs in BOTH iOS Metal legs, and is the control that was missing.
-        #
-        # The screenshot step can be tolerated while a baseline set is being
-        # seeded -- there is nothing to compare against yet -- but "tolerated"
-        # kept turning into "produced nothing and said nothing". On the iOS 27
-        # leg that concealed three separate defects in a row: a warning census
-        # keyed to the wrong toolchain, a simulator destination that fell back to
-        # an iPad, and before those a reference directory that did not exist.
-        # Every one of them reported the job green with zero PNGs in the
-        # artifact, and each was only found by downloading that artifact by hand.
-        #
-        # A run that captures nothing is never a pass, whatever else is tolerated.
-        # Deliberately NOT expressed as a count against the reference directory:
-        # that guard exists inside run-ios-ui-tests.sh and is disabled by an empty
-        # reference set, which is exactly the situation a seeding run is in.
-        # Not in a capture (cn1ss_capture): it renders goldens nobody has, so
-        # there is no comparison report, and the capture artifact is the check.
-        if: ${{ (!cancelled()) && inputs.cn1ss_capture == '' }}
-        env:
-          # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
-          # screenshot step's own env block, and step env does not reach other
-          # steps. Without this the check reads an empty path, finds nothing and
-          # fails a leg that captured a full set -- which is exactly what it did
-          # on its first run, the same scope mistake as the warning leg above.
-          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal
-        #
-        # Counted from the COMPARISON REPORT, not from PNGs on disk. The runner
-        # keeps only the captures that failed comparison, so a run in which all
-        # 155 matched leaves zero PNGs behind -- indistinguishable, by file
-        # count, from a run that never started. That was this check's first
-        # version, and it failed the iOS 27 leg on the very run where every
-        # screenshot matched its baseline. The report exists only once the suite
-        # reached the screenshot stage, and lists every screenshot it compared.
-        run: |
-          set -euo pipefail
-          report="${ARTIFACTS_DIR}/screenshot-compare.json"
-          if [ ! -f "${report}" ]; then
-            echo "::error title=No screenshots::no comparison report at ${report}; the suite never reached the screenshot stage"
-            exit 1
-          fi
-          count=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1])).get("results") or []))' "${report}")
-          echo "screenshots compared: ${count}"
-          if [ "${count}" -eq 0 ]; then
-            echo "::error title=No screenshots::the suite compared 0 screenshots; the leg validated nothing"
-            exit 1
-          fi
-      - name: Publish Metal screenshot summary
-        # Surfaces run-ios-ui-tests.sh's comparison result in the job's
-        # GitHub Actions summary page so the Metal port status is visible
-        # at a glance without digging into the artifact zip. Always runs
-        # so a failed or cancelled tests step still reports whatever got
-        # captured. The Python helper lives in scripts/ci/ because
-        # embedding Python heredocs inside a YAML "run: |" block is
-        # fragile -- unindented Python breaks the block scalar.
-        if: ${{ !cancelled() }}
-        env:
-          COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal/screenshot-compare.json
-          COMMENT_MD: ${{ github.workspace }}/artifacts/ios-ui-tests-metal/screenshot-comment.md
-        run: |
-          set -eu
-          {
-            echo "## iOS Metal screenshot comparison"
-            echo
-            echo "Ran against \`scripts/hellocodenameone\` on the iOS simulator."
-            echo "Golden images: \`scripts/ios/screenshots-metal/\`."
-            echo
-            if [ -s "$COMPARE_JSON" ]; then
-              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
-            elif [ -s "$COMMENT_MD" ]; then
-              cat "$COMMENT_MD"
-            else
-              echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ -s "$COMPARE_JSON" ]; then
-            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
-            if [ -n "$NOTICE" ]; then
-              echo "::notice title=Metal screenshot comparison::${NOTICE}"
-            fi
-          fi
-
-      - name: Upload iOS Metal artifacts
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: ios-ui-tests-metal
-          path: |
-            artifacts/ios-ui-tests-metal
-            artifacts/*.log
-            artifacts/*-stats.txt
-            artifacts/vm_time.txt
-            artifacts/xcodebuild-list.txt
-            artifacts/cn1-source-manifest.txt
-            artifacts/ios-ui-tests-metal/native-warnings.json
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload golden capture
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cn1ss-capture-ios-metal
-          path: artifacts/cn1ss-capture
-          if-no-files-found: ignore
-
-
-  build-ios-metal-27:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') }}
-    # The SAME suite as build-ios-metal, on the Xcode 27 / iOS 27 hosted image and
-    # against its own baselines. A copy rather than a move: build-ios-metal keeps
-    # gating the toolchain we actually pin (CN1_XCODE_MAJOR=26), which is what
-    # applications are built with today, and this leg is what stops iOS 27
-    # breaking us in the gap before that pin moves.
-    #
-    # Everything below is deliberately identical to build-ios-metal except the
-    # runner, the toolchain pin, the theme generation, the baseline directory and
-    # the artifact/comment names. scripts/check-ios-metal-legs-match.py holds the
-    # two to that, because a copied 320-line job drifts otherwise.
-    #
-    # `xcode-27` is a PUBLIC PREVIEW image (actions/runner-images#14404) whose
-    # capacity is still being balanced, so read a queue here as the image rather
-    # than as a fault in the change under test.
-    needs: [golden-plan, select, build-port, unity-gallery]
+  apple:
+    name: Apple suites (iOS Metal, watchOS, tvOS, macOS, fidelity)
+    # ONE macOS runner for every Apple screenshot suite, on the one bundle
+    # build-port produced (iOS and macOS ports together). The suites run in
+    # sequence; each runs whatever an earlier one did (`!cancelled()` plus its
+    # own leg flag from `select`), and a suite's later steps need only its own
+    # build. Wall time grows; runners on the scarce `xcode-27` preview image
+    # (actions/runner-images#14404) drop from five to one.
+    if: ${{ needs.select.outputs.any == 'true' && needs.build-port.result == 'success' }}
+    needs: [select, build-port]
     permissions:
       contents: read
       pull-requests: write
       issues: write
     runs-on: xcode-27
-    # The hello suite now also compiles the Android compatibility gallery, its runtime and the Kotlin stdlib; 75 left no margin.
-    # The Swing and JavaFX compatibility runtimes add about 22% more translated C: the Metal compile alone ran past 62 minutes.
-    timeout-minutes: 125
+    # GitHub's ceiling for a hosted job. The suites' own step limits stop a
+    # hang in any one of them.
+    timeout-minutes: 360
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # The device runner reports logical test failures through CN1SS log
+      # The device runners report logical test failures through CN1SS log
       # markers, not through the build or the screenshot comparison. Make the
       # normalized report authoritative so a failing or never-run compliance
       # test cannot leave this workflow green and then be published from master.
       CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # Pin the toolchain rather than taking the image default: scripts/lib/
-      # xcode.sh resolves CN1_XCODE_MAJOR, and leaving it at 26 on an image that
-      # ships only Xcode 27 fails resolution outright instead of quietly using
-      # the wrong one.
-      CN1_XCODE_MAJOR: '27'
-      # The image carries 27.0, 27.1 and 27.2 side by side; the 27 baselines are
-      # measured on 27.1, so take exactly that rather than the newest.
-      CN1_XCODE_VERSION_PIN: '27.1'
-      # Build the sample against the iOS 27 theme generation. helloworld installs
-      # the modern theme itself (DualAppearanceBaseTest.pickModernThemeResource)
-      # and now asks the port which generation this build carries, so this hint is
-      # what makes the 27 baselines render the iOS 27 theme instead of scoring the
-      # iOS 26 one against iOS 27 goldens.
-      IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
       # Optional: when set, build-ios-app.sh writes it as a bundled resource so
       # the GoogleWebMap screenshot test renders a live Google map; absent (e.g.
       # fork PRs with no access to the secret) the test skips.
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-
     steps:
       - uses: actions/checkout@v6
 
@@ -773,6 +210,7 @@ jobs:
         with:
           name: cn1-built-bundle
           path: ${{ runner.temp }}
+
       - name: Restore built CN1 + iOS port tree
         run: |
           set -euo pipefail
@@ -794,28 +232,18 @@ jobs:
             echo "No prebuilt test server in the bundle; the suite builds its own."
           fi
 
+      # One install per Xcode this job builds with: the Metal suite takes
+      # exactly 27.1 (CN1_XCODE_VERSION_PIN), the others the default selection.
       - name: Install Metal Toolchain
-        # Xcode 26+ requires the Metal Toolchain component to be downloaded
-        # explicitly before .metal files can compile. The runner's default
-        # xcodebuild is often an older Xcode whose -downloadComponent flag
-        # doesn't exist, so we point DEVELOPER_DIR at Xcode 26 first (same
-        # selection logic build-ios-app.sh uses). If the component is
-        # already cached on the runner image, xcodebuild exits quickly
-        # without re-downloading.
         run: |
           set -euo pipefail
-          # Same selection the build scripts use, so this cannot install the
-          # component into one Xcode and then build with another.
           # shellcheck source=/dev/null
           source scripts/lib/xcode.sh
-          cn1_select_xcode || exit 1
-          "$XCODEBUILD" -downloadComponent MetalToolchain
-        timeout-minutes: 10
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
+          for pin in 27.1 ''; do
+            CN1_XCODE_VERSION_PIN="$pin" cn1_select_xcode || exit 1
+            "$XCODEBUILD" -downloadComponent MetalToolchain
+          done
+        timeout-minutes: 15
 
       - name: Enter golden capture mode
         uses: ./.github/actions/cn1ss-capture
@@ -823,8 +251,13 @@ jobs:
           tests: ${{ inputs.cn1ss_capture }}
           mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
 
+      # ---- iOS Metal (iOS 27) ----
       - name: Build sample iOS app and compile workspace (Metal)
-        id: build-ios-app
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') }}
+        env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
+        id: build-metal
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
@@ -838,6 +271,10 @@ jobs:
       # Runs on the project the step above already generated, so it costs seconds
       # and it never links a Swift object, a pod or an extension.
       - name: Check the port links only frameworks the project declares (Metal)
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') && steps.build-metal.outcome == 'success' }}
+        env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
         run: |
           set -euo pipefail
           # Resolve against the SAME Xcode build-ios-app.sh used. This step used
@@ -849,7 +286,7 @@ jobs:
           cn1_select_xcode || exit 1
           scripts/check-ios-framework-links.py \
             --developer-dir "$DEVELOPER_DIR" \
-            "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"
+            "$(dirname "${{ steps.build-metal.outputs.workspace }}")"
         timeout-minutes: 10
 
       # App Store Connect rejects an upload that imports any SDK symbol no public header
@@ -861,6 +298,10 @@ jobs:
       # sources, and fails on any import that is exported but undeclared. The linked
       # binary is checked the same way in ios-packaging.yml.
       - name: Check the port references no private Apple API
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') && steps.build-metal.outcome == 'success' }}
+        env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
         run: |
           set -euo pipefail
           # shellcheck source=/dev/null
@@ -868,7 +309,7 @@ jobs:
           cn1_select_xcode || exit 1
           scripts/check-ios-private-api.py \
             --developer-dir "$DEVELOPER_DIR" \
-            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+            --project-dir "$(dirname "${{ steps.build-metal.outputs.workspace }}")"/*-src
         timeout-minutes: 15
 
       # Apple can deprecate an API, or change a behaviour for anything LINKED
@@ -886,14 +327,19 @@ jobs:
       # it at exactly the moment a toolchain moves, which is the moment nobody
       # has spare attention.
       - name: Compare the port against the next iOS SDK
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') && steps.build-metal.outcome == 'success' }}
+        env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
         run: |
           set -euo pipefail
           scripts/check-ios-sdk-deltas.py \
             --skip-if-single-sdk \
-            --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+            --project-dir "$(dirname "${{ steps.build-metal.outputs.workspace }}")"/*-src
         timeout-minutes: 20
 
       - name: Boot an iPhone 16 on iOS 27
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') && steps.build-metal.outcome == 'success' }}
         id: sim27
         # run-ios-ui-tests.sh asks xcodebuild for a destination named "iPhone 16",
         # and -showdestinations lists only simulators that ALREADY EXIST. This
@@ -915,17 +361,23 @@ jobs:
         # installs. See the script for what the first boot was costing the
         # step after it.
         env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
           CN1_SIM_SHUTDOWN_AFTER_BOOT: '1'
         run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-metal27
+
       - name: Run iOS UI screenshot tests (Metal)
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') && steps.build-metal.outcome == 'success' }}
         env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
           # The simulator created by the step above. Without it the suite asks
           # xcodebuild for a destination named "iPhone 16", finds none on this
           # image, and silently captures on a fallback device.
           IOS_SIM_DESTINATION: 'platform=iOS Simulator,id=${{ steps.sim27.outputs.udid }}'
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27
           # Golden set for the iOS simulator. See
-          # scripts/ios/screenshots-metal/README.md.
+          # scripts/ios/screenshots-metal-27/README.md.
           SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-metal-27
           # Override the PR comment marker / preview path / title so this
           # job posts its own comment instead of overwriting the GL job's
@@ -976,27 +428,31 @@ jobs:
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
 
-          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
-          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          echo "workspace='${{ steps.build-metal.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-metal.outputs.scheme }}'"
           echo "reference dir='${SCREENSHOT_REF_DIR}'"
 
           ./scripts/run-ios-ui-tests.sh \
-            "${{ steps.build-ios-app.outputs.workspace }}" \
+            "${{ steps.build-metal.outputs.workspace }}" \
             "" \
-            "${{ steps.build-ios-app.outputs.scheme }}"
+            "${{ steps.build-metal.outputs.scheme }}"
         # Match the GL envelope; run-ios-ui-tests.sh still fails a stalled
         # DeviceRunner after 12 minutes without CN1SS progress. The Swing and
         # JavaFX compatibility runtimes took the step past 76 minutes.
         timeout-minutes: 110
 
-      # NO port-status upload here, deliberately. The published port report is
-      # keyed on the port id `ios-metal`, and there is only one iOS port -- this
-      # leg differs by TOOLCHAIN, not by port. A second upload under that id
-      # would publish whichever leg finished last, the same clobber the comment
-      # marker above already had to be split to avoid.
+      - name: Upload iOS Metal port status
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-ios-metal
+          path: artifacts/ios-ui-tests-metal-27/port-status-ios-metal.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: The suite must have compared screenshots
-        # Runs in BOTH iOS Metal legs, and is the control that was missing.
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') && inputs.cn1ss_capture == '' }}
+        # The control that was missing.
         #
         # The screenshot step can be tolerated while a baseline set is being
         # seeded -- there is nothing to compare against yet -- but "tolerated"
@@ -1013,8 +469,9 @@ jobs:
         # reference set, which is exactly the situation a seeding run is in.
         # Not in a capture (cn1ss_capture): it renders goldens nobody has, so
         # there is no comparison report, and the capture artifact is the check.
-        if: ${{ (!cancelled()) && inputs.cn1ss_capture == '' }}
         env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
           # Declared HERE rather than inherited: ARTIFACTS_DIR is set in the
           # screenshot step's own env block, and step env does not reach other
           # steps. Without this the check reads an empty path, finds nothing and
@@ -1042,7 +499,9 @@ jobs:
             echo "::error title=No screenshots::the suite compared 0 screenshots; the leg validated nothing"
             exit 1
           fi
+
       - name: Publish Metal screenshot summary
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') }}
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
         # GitHub Actions summary page so the Metal port status is visible
         # at a glance without digging into the artifact zip. Always runs
@@ -1050,8 +509,9 @@ jobs:
         # captured. The Python helper lives in scripts/ci/ because
         # embedding Python heredocs inside a YAML "run: |" block is
         # fragile -- unindented Python breaks the block scalar.
-        if: ${{ !cancelled() }}
         env:
+          CN1_XCODE_VERSION_PIN: '27.1'
+          IOS_DEPENDENCY_ARGS: '-Dcodename1.arg.ios.themeGeneration=27'
           COMPARE_JSON: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27/screenshot-compare.json
           COMMENT_MD: ${{ github.workspace }}/artifacts/ios-ui-tests-metal-27/screenshot-comment.md
         run: |
@@ -1060,7 +520,7 @@ jobs:
             echo "## iOS Metal screenshot comparison"
             echo
             echo "Ran against \`scripts/hellocodenameone\` on the iOS simulator."
-            echo "Golden images: \`scripts/ios/screenshots-metal/\`."
+            echo "Golden images: \`scripts/ios/screenshots-metal-27/\`."
             echo
             if [ -s "$COMPARE_JSON" ]; then
               python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
@@ -1078,7 +538,7 @@ jobs:
           fi
 
       - name: Upload iOS Metal artifacts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.metal27 == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: ios-ui-tests-metal-27
@@ -1093,140 +553,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload golden capture
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cn1ss-capture-ios-metal-27
-          path: artifacts/cn1ss-capture
-          if-no-files-found: ignore
-  build-ios-watch:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.watch == 'true') }}
-    # Native Apple Watch (watchOS) screenshot pipeline. The watch slice
-    # auto-enables from codename1.watchMain in the sample, so build-ios-app.sh
-    # generates the <Main>Watch target alongside the iOS app. This job renders
-    # the cn1ss suite on the watch simulator through the Core Graphics backend
-    # (no GL/Metal on watchOS), streams frames to the same cn1ss test server
-    # WS sink the iOS jobs use, and compares against scripts/ios/screenshots-watch.
-    # Isolated in its own job (like build-ios-metal) so the watch result is a
-    # distinct check and a regression there doesn't mask the iOS path.
-    needs: [golden-plan, select, build-port, unity-gallery]
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    runs-on: macos-15
-    timeout-minutes: 60
-    env:
-      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # The device runner reports logical test failures through CN1SS log
-      # markers, not through the build or the screenshot comparison. Make the
-      # normalized report authoritative so a failing or never-run compliance
-      # test cannot leave this workflow green and then be published from master.
-      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
-      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # Optional: when set, build-ios-app.sh writes it as a bundled resource so
-      # the GoogleWebMap screenshot test renders a live Google map; absent (e.g.
-      # fork PRs with no access to the secret) the test skips.
-      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Google's copy of Maven Central first
-        uses: ./.github/actions/maven-central-mirror
-
-      - name: Cache CocoaPods and user gems
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gem
-            ~/Library/Caches/CocoaPods
-            ~/.cocoapods/repos
-          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-v1-
-
-      - name: Ensure CocoaPods tooling
-        run: |
-          mkdir -p ~/.codenameone
-          cp maven/UpdateCodenameOne.jar ~/.codenameone/
-          set -euo pipefail
-          if ! command -v ruby >/dev/null; then
-            echo "ruby not found"; exit 1
-          fi
-          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
-          export PATH="$GEM_USER_DIR/bin:$PATH"
-          if ! command -v pod >/dev/null 2>&1; then
-            gem install cocoapods xcodeproj --no-document --user-install
-          fi
-          pod --version
-
-      - name: Compute setup-workspace hash
-        id: setup_hash
-        run: |
-          set -euo pipefail
-          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-
-      - name: Set TMPDIR
-        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache Maven repository
-        uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
-
-      - name: Restore cn1-binaries cache
-        uses: actions/cache@v5
-        with:
-          path: ../cn1-binaries
-          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            cn1-binaries-${{ runner.os }}-
-
-      - name: Download built CN1 + iOS port bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: cn1-built-bundle
-          path: ${{ runner.temp }}
-      - name: Restore built CN1 + iOS port tree
-        run: |
-          set -euo pipefail
-          # Replaces the evictable cn1-built cache restore with the artifact
-          # build-port handed off (not LRU-evicted, survives --failed re-runs).
-          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
-          # The test server build-port built for the whole run, when it did.
-          # Without it the suite script builds its own, as it always has.
-          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
-            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
-          fi
-          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
-            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
-            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
-          else
-            echo "No prebuilt test server in the bundle; the suite builds its own."
-          fi
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
-
-      - name: Enter golden capture mode
-        uses: ./.github/actions/cn1ss-capture
-        with:
-          tests: ${{ inputs.cn1ss_capture }}
-          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
-
-      - name: Build sample iOS app (generates the watch target)
-        id: build-ios-app
+      # The watch and tvOS suites build the same project (same env), so one
+      # build serves both.
+      # ---- watchOS + tvOS build ----
+      - name: Build sample iOS app (watchOS and tvOS targets)
+        if: ${{ !cancelled() && ((needs.select.outputs.watch == 'true') || (!inputs.watch_only && needs.select.outputs.tv == 'true')) }}
+        id: build-watchtv
         run: ./scripts/build-ios-app.sh -q -DskipTests
         timeout-minutes: 30
 
+      # ---- watchOS ----
       - name: Ensure watchOS simulator runtime
+        if: ${{ !cancelled() && (needs.select.outputs.watch == 'true') && steps.build-watchtv.outcome == 'success' }}
         run: |
           set -euo pipefail
           if ! xcrun simctl list runtimes available 2>/dev/null | grep -qi watchOS; then
@@ -1237,6 +575,7 @@ jobs:
           xcrun simctl list devices available 2>/dev/null | grep -i "Apple Watch" || true
 
       - name: Run watchOS UI screenshot tests
+        if: ${{ !cancelled() && (needs.select.outputs.watch == 'true') && steps.build-watchtv.outcome == 'success' }}
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/watch-ui-tests
           SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-watch
@@ -1252,15 +591,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
-          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
-          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          echo "workspace='${{ steps.build-watchtv.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-watchtv.outputs.scheme }}'"
           ./scripts/run-watch-ui-tests.sh \
-            "${{ steps.build-ios-app.outputs.workspace }}" \
-            "${{ steps.build-ios-app.outputs.scheme }}"
+            "${{ steps.build-watchtv.outputs.workspace }}" \
+            "${{ steps.build-watchtv.outputs.scheme }}"
         timeout-minutes: 90
 
       - name: Upload watchOS port status
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (needs.select.outputs.watch == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-watchos
@@ -1269,7 +608,7 @@ jobs:
           retention-days: 14
 
       - name: Upload watch artifacts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (needs.select.outputs.watch == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: watch-ui-tests
@@ -1282,142 +621,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload golden capture
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cn1ss-capture-ios-watch
-          path: artifacts/cn1ss-capture
-          if-no-files-found: ignore
-
-  build-ios-tv:
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && needs.select.outputs.tv == 'true') }}
-    # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
-    # from codename1.tvMain in the sample, so build-ios-app.sh generates the
-    # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
-    # entry and the Metal renderer (no OpenGL ES on tvOS); this job builds the TV
-    # target for the appletvsimulator, renders the cn1ss suite and streams frames
-    # to the same cn1ss test server the iOS/watch jobs use, comparing against
-    # scripts/ios/screenshots-tv.
-    #
-    # BLOCKING (a hard golden gate, like build-ios-watch): the tvOS slice
-    # compiles end-to-end and the golden set is seeded from a CI capture (see
-    # Ports/iOSPort/nativeSources/TVOS_PORT.md). A mismatch fails the job.
-    needs: [golden-plan, select, build-port, unity-gallery]
-    permissions:
-      contents: read
-      pull-requests: write
-      issues: write
-    runs-on: macos-15
-    # Measured: the sample build takes 15-22 min and the tvOS screenshot run
-    # 28-33 min on a hosted macos-15, so 60 left nothing for a slow runner and
-    # cancelled the suite mid-run on unrelated branches.
-    timeout-minutes: 90
-    env:
-      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-      # The device runner reports logical test failures through CN1SS log
-      # markers, not through the build or the screenshot comparison. Make the
-      # normalized report authoritative so a failing or never-run compliance
-      # test cannot leave this workflow green and then be published from master.
-      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
-      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Use Google's copy of Maven Central first
-        uses: ./.github/actions/maven-central-mirror
-
-      - name: Cache CocoaPods and user gems
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gem
-            ~/Library/Caches/CocoaPods
-            ~/.cocoapods/repos
-          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-v1-
-
-      - name: Ensure CocoaPods tooling
-        run: |
-          mkdir -p ~/.codenameone
-          cp maven/UpdateCodenameOne.jar ~/.codenameone/
-          set -euo pipefail
-          if ! command -v ruby >/dev/null; then
-            echo "ruby not found"; exit 1
-          fi
-          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
-          export PATH="$GEM_USER_DIR/bin:$PATH"
-          if ! command -v pod >/dev/null 2>&1; then
-            gem install cocoapods xcodeproj --no-document --user-install
-          fi
-          pod --version
-
-      - name: Compute setup-workspace hash
-        id: setup_hash
-        run: |
-          set -euo pipefail
-          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-
-      - name: Set TMPDIR
-        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
-
-      - name: Cache Maven repository
-        uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
-
-      - name: Restore cn1-binaries cache
-        uses: actions/cache@v5
-        with:
-          path: ../cn1-binaries
-          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
-          restore-keys: |
-            cn1-binaries-${{ runner.os }}-
-
-      - name: Download built CN1 + iOS port bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: cn1-built-bundle
-          path: ${{ runner.temp }}
-      - name: Restore built CN1 + iOS port tree
-        run: |
-          set -euo pipefail
-          # Replaces the evictable cn1-built cache restore with the artifact
-          # build-port handed off (not LRU-evicted, survives --failed re-runs).
-          tar -C / -xf "$RUNNER_TEMP/cn1-built-bundle.tar"
-          # The test server build-port built for the whole run, when it did.
-          # Without it the suite script builds its own, as it always has.
-          if [ -f "$RUNNER_TEMP/cn1ss-server.tar" ]; then
-            tar -C / -xf "$RUNNER_TEMP/cn1ss-server.tar"
-          fi
-          if [ -d "$RUNNER_TEMP/cn1ss-server/classes" ]; then
-            echo "CN1SS_SERVER_DIST=$RUNNER_TEMP/cn1ss-server" >> "$GITHUB_ENV"
-            echo "Using the prebuilt test server in $RUNNER_TEMP/cn1ss-server"
-          else
-            echo "No prebuilt test server in the bundle; the suite builds its own."
-          fi
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
-
-      - name: Enter golden capture mode
-        uses: ./.github/actions/cn1ss-capture
-        with:
-          tests: ${{ inputs.cn1ss_capture }}
-          mode: ${{ inputs.cn1ss_capture != '' && 'capture' || 'harvest' }}
-
-      - name: Build sample iOS app (generates the tvOS target)
-        id: build-ios-app
-        run: ./scripts/build-ios-app.sh -q -DskipTests
-        timeout-minutes: 30
-
+      # ---- tvOS ----
       # The tvOS half of the private-API gate, and the tvOS compile gate. A tvOS slice compiles
       # the port with whatever switches the iOS app turned on, and the iOS jobs compile it only
       # for iOS -- where every `#if TARGET_OS_TV` branch is preprocessed away -- so a feature
@@ -1427,6 +631,7 @@ jobs:
       # LocalAuthentication) and no job builds it. The tvOS app itself is binary-checked by
       # run-tv-ui-tests.sh after its build.
       - name: Check the port compiles for tvOS and references no private Apple API
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.tv == 'true') && steps.build-watchtv.outcome == 'success' }}
         run: |
           set -euo pipefail
           # shellcheck source=/dev/null
@@ -1435,11 +640,12 @@ jobs:
           for sdk in appletvos appletvsimulator; do
             scripts/check-ios-private-api.py \
               --developer-dir "$DEVELOPER_DIR" --sdk "$sdk" \
-              --project-dir "$(dirname "${{ steps.build-ios-app.outputs.workspace }}")"/*-src
+              --project-dir "$(dirname "${{ steps.build-watchtv.outputs.workspace }}")"/*-src
           done
         timeout-minutes: 20
 
       - name: Ensure tvOS simulator runtime
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.tv == 'true') && steps.build-watchtv.outcome == 'success' }}
         run: |
           set -euo pipefail
           if ! xcrun simctl list runtimes available 2>/dev/null | grep -qi tvOS; then
@@ -1450,6 +656,7 @@ jobs:
           xcrun simctl list devices available 2>/dev/null | grep -i "Apple TV" || true
 
       - name: Run tvOS UI screenshot tests
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.tv == 'true') && steps.build-watchtv.outcome == 'success' }}
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/tv-ui-tests
           SCREENSHOT_REF_DIR: ${{ github.workspace }}/scripts/ios/screenshots-tv
@@ -1464,15 +671,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
-          echo "workspace='${{ steps.build-ios-app.outputs.workspace }}'"
-          echo "scheme='${{ steps.build-ios-app.outputs.scheme }}'"
+          echo "workspace='${{ steps.build-watchtv.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-watchtv.outputs.scheme }}'"
           ./scripts/run-tv-ui-tests.sh \
-            "${{ steps.build-ios-app.outputs.workspace }}" \
-            "${{ steps.build-ios-app.outputs.scheme }}"
+            "${{ steps.build-watchtv.outputs.workspace }}" \
+            "${{ steps.build-watchtv.outputs.scheme }}"
         timeout-minutes: 45
 
       - name: Upload tvOS port status
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.tv == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: port-status-tvos
@@ -1481,7 +688,7 @@ jobs:
           retention-days: 14
 
       - name: Upload tv artifacts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.tv == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: tv-ui-tests
@@ -1494,30 +701,273 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      # ---- macOS (AppKit) ----
+      - name: Build sample macOS app and compile workspace
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') }}
+        id: build-macos-app
+        run: ./scripts/build-macos-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      # ParparVM against JDK 25 on this runner: the HelloCodenameOne classes the step
+      # above just built, the translator translating itself, and every Bench workload.
+      # Before the screenshot step, whose PR comment carries the table
+      # (CN1SS_EXTRA_MARKDOWN); the job's last step fails it on a regression. The
+      # workspace JDK 8 comes from setup-workspace's env.sh, exactly as the app build
+      # got it, and JDK 25 is fetched privately so no later step sees a different JDK.
+      - name: ParparVM vs JDK 25 (performance gate)
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') }}
+        # Names this pull request's overlay (perf-baseline/pr/<number>.json) in the
+        # comment. A workflow_dispatch run carries no pull request, so the gate asks gh.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          ENV_FILE="${TMPDIR%/}/codenameone-tools/tools/env.sh"
+          if [ -f "$ENV_FILE" ]; then . "$ENV_FILE"; fi
+          export JDK_8_HOME="$JAVA_HOME"
+          export PATH="${MAVEN_HOME:+$MAVEN_HOME/bin:}$PATH"
+          vm/selfhost/ci-perf-gate.sh run macos-arm64 artifacts/macos-ui-tests/perf
+
+      - name: Run macOS UI screenshot tests
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') && steps.build-macos-app.outcome == 'success' }}
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/macos-ui-tests
+          CN1SS_EXTRA_MARKDOWN: ${{ github.workspace }}/artifacts/macos-ui-tests/perf/perf-comment.md
+          # Strict screenshot gating: every expected frame must be captured and
+          # compared. Enforced centrally in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_ALLOWED_MISSING: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+
+          echo "workspace='${{ steps.build-macos-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-macos-app.outputs.scheme }}'"
+
+          ./scripts/run-macos-ui-tests.sh \
+            "${{ steps.build-macos-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-macos-app.outputs.scheme }}"
+        # The script's own suite budget is already 1500s (25m); add app
+        # launch + post-processing (compare 122 images, render report, post
+        # comment) and a slow runner tips just over the old 30m step cap and
+        # gets SIGKILLed mid-compare -- a flaky timeout, not a real mismatch.
+        # 45m lets the script's internal timeout govern gracefully instead.
+        timeout-minutes: 45
+
+      - name: Upload macOS port status
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-macos
+          path: artifacts/macos-ui-tests/port-status-macos.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Publish macOS screenshot summary
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') }}
+        # Surfaces run-macos-ui-tests.sh's comparison result in the
+        # job's GitHub Actions summary page so the Mac slice status is
+        # visible at a glance without digging into the artifact zip.
+        # Reuses the existing metal-screenshot-summary.py helper because
+        # the JSON schema is identical -- the summary text says "iOS
+        # Metal" so the wrapper here overrides the headline manually.
+        env:
+          COMPARE_JSON: ${{ github.workspace }}/artifacts/macos-ui-tests/screenshot-compare.json
+          COMMENT_MD: ${{ github.workspace }}/artifacts/macos-ui-tests/screenshot-comment.md
+        run: |
+          set -eu
+          {
+            echo "## macOS screenshot comparison"
+            echo
+            echo "Ran against \`scripts/hellocodenameone\` as a native macOS (AppKit) build."
+            echo "Golden images: \`scripts/macos/screenshots/\` (see the README there for the seeding workflow)."
+            echo
+            if [ -s "$COMPARE_JSON" ]; then
+              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
+            elif [ -s "$COMMENT_MD" ]; then
+              cat "$COMMENT_MD"
+            else
+              echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$COMPARE_JSON" ]; then
+            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
+            if [ -n "$NOTICE" ]; then
+              echo "::notice title=macOS screenshot comparison::${NOTICE}"
+            fi
+          fi
+
+      - name: Upload macOS artifacts
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-ui-tests
+          path: |
+            artifacts/macos-ui-tests
+            artifacts/*.log
+            artifacts/*-stats.txt
+            artifacts/vm_time.txt
+            artifacts/xcodebuild-list.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Read by perf-baseline.yml's nightly tighten job, which lowers a baseline once
+      # master has beaten it consistently, so a win cannot be given back unnoticed.
+      - name: Upload the performance gate results
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-results-macos-arm64
+          path: artifacts/macos-ui-tests/perf/perf-results.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail on a ParparVM performance regression
+        if: ${{ !cancelled() && (!inputs.watch_only && needs.select.outputs.macos == 'true') && inputs.cn1ss_capture == '' }}
+        # Not in a capture (cn1ss_capture): that run exists to render goldens,
+        # and a timing gate failing it only marks the capture red.
+        run: vm/selfhost/ci-perf-gate.sh verdict artifacts/macos-ui-tests/perf
+
+      # Last, because it regenerates the native themes in the workspace.
+      # ---- Native theme fidelity (iOS Modern 27, Metal) ----
+      - name: Regenerate native themes from CSS
+        if: ${{ !cancelled() && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.fidelity == 'true') }}
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'
+          CN1SS_FAIL_ON_TEST_PROBLEMS: '0'
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
+
+      - name: Build fidelity app (iOS, Metal)
+        if: ${{ !cancelled() && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.fidelity == 'true') }}
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'
+          CN1SS_FAIL_ON_TEST_PROBLEMS: '0'
+        id: fid-build
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-fidelity-app.sh ios -q -DskipTests
+
+      - name: Build simulator app
+        if: ${{ !cancelled() && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.fidelity == 'true') && steps.fid-build.outcome == 'success' }}
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'
+          CN1SS_FAIL_ON_TEST_PROBLEMS: '0'
+        id: fid-simapp
+        run: |
+          set -euo pipefail
+          # build-fidelity-app.sh -> build-ios-app.sh is pinned by
+          # scripts/lib/xcode.sh; this step used to compile that project with the
+          # runner's ambient xcodebuild instead, so the project was GENERATED by
+          # one Xcode and BUILT by another. Pin both ends to the same one.
+          # shellcheck source=/dev/null
+          source scripts/lib/xcode.sh
+          cn1_select_xcode || exit 1
+          WS="$(find scripts/fidelity-app/ios/target -name '*.xcworkspace' -maxdepth 3 | head -n1)"
+          PROJ_DIR="$(dirname "$WS")"
+          SCHEME="$(xcodebuild -workspace "$WS" -list 2>/dev/null | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')"
+          DD="$PROJ_DIR/dd"
+          # arm64-only: the xcode-27 runner is Apple Silicon and the x86_64
+          # simulator slice fails to build the ParparVM SIMD code (clang
+          # '_Builtin_intrinsics.arm.neon requires feature neon' module error).
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -sdk iphonesimulator \
+            -configuration Debug -derivedDataPath "$DD" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES VALID_ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO build
+          APP="$(find "$DD/Build/Products" -maxdepth 2 -name '*.app' -type d | head -n1)"
+          echo "app_path=$APP" >> "$GITHUB_OUTPUT"
+
+      - name: Boot simulator (runtime matching the golden set)
+        if: ${{ !cancelled() && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.fidelity == 'true') && steps.fid-build.outcome == 'success' }}
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'
+          CN1SS_FAIL_ON_TEST_PROBLEMS: '0'
+        id: fid-sim
+        # The golden set names the OS design generation it was captured on
+        # (ios-26-metal). The suite MUST run on a matching runtime: a different
+        # iOS generation renders different SF fonts/glyphs and produces phantom
+        # regressions. The helper fails loudly (78) if the runner lacks the
+        # runtime -- the fix is pinning a runner image/Xcode that ships it,
+        # never regenerating references on whatever the runner happens to have.
+        #
+        # It also puts every simctl call on a deadline. Inline, these four calls
+        # twice hung with no output at all and burned the job's entire 90-minute
+        # budget, ending as "cancelled" rather than as a failure; the script's
+        # header records the runs and why the one retry it does is allowed.
+        run: ./scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-fidelity27
+
+      - name: Run fidelity suite (simulator, Metal)
+        if: ${{ !cancelled() && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.fidelity == 'true') && steps.fid-build.outcome == 'success' }}
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          CN1SS_FIDELITY_GOLDEN_SET: 'ios-27-metal'
+          CN1SS_FAIL_ON_TEST_PROBLEMS: '0'
+        # The committed baseline is the ratchet floor: the gate fails the job
+        # on any regression. To re-anchor intentionally, run locally with
+        # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.
+        run: ./scripts/run-ios-fidelity-tests.sh "${{ steps.fid-simapp.outputs.app_path }}" "${{ steps.fid-sim.outputs.udid }}"
+
+      - name: Upload fidelity artifacts
+        if: ${{ !cancelled() && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.fidelity == 'true') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-fidelity-27
+          path: |
+            artifacts/ios-fidelity/**
+            scripts/fidelity-app/baseline/ios-27-metal-fidelity-baseline.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Every suite above ran whatever an earlier one did; any failed step has
+      # already failed the job. This lists which ones, in one place.
+      - name: Suite outcomes
+        if: ${{ !cancelled() }}
+        env:
+          STEPS: ${{ toJSON(steps) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          bad = [k for k, v in json.loads(os.environ['STEPS']).items() if v.get('outcome') == 'failure']
+          print('failed steps: ' + (', '.join(bad) if bad else 'none'))
+          PY
+
+      # One capture artifact for every suite of the job: each image is filed at
+      # its golden's repository path, so the legs cannot collide.
       - name: Upload golden capture
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: cn1ss-capture-ios-tv
+          name: cn1ss-capture-apple
           path: artifacts/cn1ss-capture
           if-no-files-found: ignore
 
   native:
-    needs: [golden-plan, select, build-port, unity-gallery]
+    needs: [select, build-port]
     # Not a screenshot suite: a golden capture skips it.
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.native == 'true') }}
+    if: ${{ (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.native == 'true') }}
     uses: ./.github/workflows/scripts-ios-native.yml
     with:
       port_prepared: true
-      unity_prepared: true
     secrets: inherit
 
   packaging:
-    needs: [golden-plan, select, build-port, unity-gallery]
+    needs: [select, build-port]
     # Not a screenshot suite: a golden capture skips it.
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.packaging == 'true') }}
+    if: ${{ (!inputs.watch_only && inputs.cn1ss_capture == '' && needs.select.outputs.packaging == 'true') }}
     uses: ./.github/workflows/ios-packaging.yml
     with:
       port_prepared: true
-      unity_prepared: true
     secrets: inherit

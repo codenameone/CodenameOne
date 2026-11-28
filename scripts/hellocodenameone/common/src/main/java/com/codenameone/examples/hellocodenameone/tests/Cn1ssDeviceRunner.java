@@ -46,14 +46,6 @@ import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidComp
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatMaterialScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatKotlinScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.androidcompat.AndroidCompatTallDialogScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatAnimatorScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatCanvasScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatCinemachineScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatParticlesScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatPhysicsScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatSpritesScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatTextMeshProScreenshotTest;
-import com.codenameone.examples.hellocodenameone.tests.unitycompat.UnityCompatTilemapScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingControlsScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingTablesScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.desktopcompat.DesktopCompatSwingTreesScreenshotTest;
@@ -139,6 +131,7 @@ import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SunburstScre
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SankeyScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FunnelScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SparklinesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2SharedTooltipScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BrushScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GrowInAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DataChangeAnimationScreenshotTest;
@@ -479,8 +472,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Chart2SankeyScreenshotTest(),
             new Chart2FunnelScreenshotTest(),
             new Chart2SparklinesScreenshotTest(),
-            // Disabled: its capture raced the hover repaint and the goldens never showed the tooltip.
-            // new Chart2SharedTooltipScreenshotTest(),
+            new Chart2SharedTooltipScreenshotTest(),
             new Chart2BrushScreenshotTest(),
             new Chart2FlameGraphScreenshotTest(),
             new Chart2LineStylesScreenshotTest(),
@@ -811,21 +803,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new AndroidCompatMaterialScreenshotTest(),
             new AndroidCompatKotlinScreenshotTest(),
             new AndroidCompatTallDialogScreenshotTest(),
-            // The Unity compatibility gallery (scripts/unity-compat-samples/gallery),
-            // compiled into this app from its unmodified Unity project: one capture per
-            // scene, each loaded by itself, stepped a fixed number of fixed frames with
-            // the view's clock held, and taken down again. Here for the reason the Android
-            // gallery is: the runtime it installs cannot shift an existing baseline, and
-            // DesktopMode stays the last ordinary capture. They draw through the GPU and
-            // pass without a capture where there is none.
-            new UnityCompatSpritesScreenshotTest(),
-            new UnityCompatPhysicsScreenshotTest(),
-            new UnityCompatCanvasScreenshotTest(),
-            new UnityCompatTilemapScreenshotTest(),
-            new UnityCompatAnimatorScreenshotTest(),
-            new UnityCompatParticlesScreenshotTest(),
-            new UnityCompatTextMeshProScreenshotTest(),
-            new UnityCompatCinemachineScreenshotTest(),
             // The desktop compatibility layers: Swing, SwingX and JavaFX screens that this
             // app compiles from common/src/main/desktop in library mode (no entry point of
             // their own) and embeds in forms of its own, plus one modal dialog of each

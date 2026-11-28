@@ -21,6 +21,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # Read from golden-capture.sh so the two lists cannot drift.
 mapfile -t WORKFLOWS < <(sed -n '/^WORKFLOWS=(/,/^)/{/^  /s/^  //p;}' "$HERE/golden-capture.sh")
+# A pull request's own runs of those workflows are reusable calls inside
+# ci.yml now, so its runs are where a normal PR run's capture artifacts are.
+# Listed here only: golden-capture.sh dispatches the members, never ci.yml.
+WORKFLOWS+=(ci.yml)
 
 log() { echo "[golden-harvest] $*" >&2; }
 

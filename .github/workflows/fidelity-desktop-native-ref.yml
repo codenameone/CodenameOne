@@ -132,7 +132,7 @@ jobs:
   macos-ref:
     if: ${{ inputs.targets == 'all' || inputs.targets == 'macos' }}
     name: macOS (AppKit)
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
       CN1SS_FIDELITY_GOLDEN_SET: macos-aqua

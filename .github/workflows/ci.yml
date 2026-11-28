@@ -1,0 +1,232 @@
+name: CI
+
+# The one workflow a pull request or a master push starts (the sample
+# applications, cn1libs and nightlies keep their own, path-scoped workflows).
+#
+#   precheck   golden-plan, source-gates and check-workflows, a few minutes on
+#              Linux. A missing golden, a missing package-info.java, a bad
+#              header, a broken workflow file: anything here fails the run
+#              before a single build starts, and NOTHING below runs.
+#   select     which member workflows the change touches, from each member's
+#              old `paths` filter (.github/ci/ci-members.json,
+#              scripts/ci/select-ci-members.py).
+#   members    the selected workflows, as reusable calls in this same run, so
+#              they share its artifacts instead of each rebuilding them.
+#
+# Before this, every member triggered on its own: about ninety workflows each
+# ran their own golden-plan copy and then their own builds, so one doomed
+# change kept macOS, Windows and Linux runners busy for hours.
+#
+# A missing golden is not a failure of the change: golden-plan goes red here,
+# and Golden capture (golden-capture.yml) records the goldens and pushes them,
+# which starts this workflow again.
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  golden-plan:
+    uses: ./.github/workflows/golden-plan.yml
+    permissions:
+      contents: read
+
+  source-gates:
+    uses: ./.github/workflows/source-gates.yml
+    permissions:
+      contents: read
+
+  check-workflows:
+    uses: ./.github/workflows/check-workflows.yml
+    permissions:
+      contents: read
+
+  select:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      scripts-ios: ${{ steps.select.outputs.scripts-ios }}
+      scripts-android: ${{ steps.select.outputs.scripts-android }}
+      scripts-javascript: ${{ steps.select.outputs.scripts-javascript }}
+      scripts-javase: ${{ steps.select.outputs.scripts-javase }}
+      linux-build-run: ${{ steps.select.outputs.linux-build-run }}
+      pr: ${{ steps.select.outputs.pr }}
+      javadocs: ${{ steps.select.outputs.javadocs }}
+      website-docs: ${{ steps.select.outputs.website-docs }}
+      developer-guide-docs: ${{ steps.select.outputs.developer-guide-docs }}
+      check-doc-snippets: ${{ steps.select.outputs.check-doc-snippets }}
+      cn1playground-language: ${{ steps.select.outputs.cn1playground-language }}
+      blog-prose: ${{ steps.select.outputs.blog-prose }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          # Commits and trees only: the selection reads names, never contents.
+          fetch-depth: 0
+          filter: blob:none
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+      - id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/select-ci-members.py --event "$EVENT" --base "$BASE" --head HEAD
+
+  scripts-ios:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-ios == 'true' }}
+    uses: ./.github/workflows/scripts-ios.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  scripts-android:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-android == 'true' }}
+    uses: ./.github/workflows/scripts-android.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  scripts-javascript:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-javascript == 'true' }}
+    uses: ./.github/workflows/scripts-javascript.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  scripts-javase:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.scripts-javase == 'true' }}
+    uses: ./.github/workflows/scripts-javase.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  linux-build-run:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.linux-build-run == 'true' }}
+    uses: ./.github/workflows/linux-build-run.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  pr:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.pr == 'true' }}
+    uses: ./.github/workflows/pr.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  # pr.yml's Java 8 leg builds the same javadocs (build_javadocs.sh) and uploads
+  # the same artifact name, which a second upload in one run may not reuse.
+  javadocs:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.javadocs == 'true' && needs.select.outputs.pr != 'true' }}
+    uses: ./.github/workflows/javadocs.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  website-docs:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.website-docs == 'true' }}
+    uses: ./.github/workflows/website-docs.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  developer-guide-docs:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.developer-guide-docs == 'true' }}
+    uses: ./.github/workflows/developer-guide-docs.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  check-doc-snippets:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.check-doc-snippets == 'true' }}
+    uses: ./.github/workflows/check-doc-snippets.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  cn1playground-language:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.cn1playground-language == 'true' }}
+    uses: ./.github/workflows/cn1playground-language.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read
+
+  blog-prose:
+    needs: [golden-plan, source-gates, check-workflows, select]
+    if: ${{ !cancelled() && needs.golden-plan.outputs.run == 'true' && needs.source-gates.result == 'success' && needs.check-workflows.result == 'success' && needs.select.outputs.blog-prose == 'true' }}
+    uses: ./.github/workflows/blog-prose.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+      packages: read

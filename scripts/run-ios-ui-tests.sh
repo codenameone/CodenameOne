@@ -182,7 +182,7 @@ if [[ "$WORKSPACE_PATH" == *.xcworkspace ]] && [[ "$SCHEME" != *" ("* ]]; then
 fi
 ri_log "Using scheme $SCHEME"
 
-# The golden-image directory defaults to scripts/ios/screenshots-metal, the
+# The golden-image directory defaults to scripts/ios/screenshots-metal-27, the
 # baseline for the iOS simulator. Callers can override via SCREENSHOT_REF_DIR
 # (absolute or relative to the repo root) so a variant suite can ship its own
 # golden set.
@@ -196,7 +196,7 @@ if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
   SCREENSHOT_REF_DIR="$(cd "$SCREENSHOT_REF_DIR" && pwd)"
   ri_log "Using screenshot reference dir from SCREENSHOT_REF_DIR: $SCREENSHOT_REF_DIR"
 else
-  SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots-metal"
+  SCREENSHOT_REF_DIR="$SCRIPT_DIR/ios/screenshots-metal-27"
 fi
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-ios-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-ios-tests")"
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"

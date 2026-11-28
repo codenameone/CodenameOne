@@ -11,7 +11,7 @@
 # the old look is retired.
 #
 # CONTRACT: capture on the same emulator profile the fidelity CI uses
-# (scripts-fidelity.yml: API 36, x86_64, google_apis, default 160dpi) so the
+# (scripts-android.yml: API 36, x86_64, google_apis, default 160dpi) so the
 # CN1-side renders and these references share pixel density and dp metrics.
 #
 # Usage: build-android-native-ref.sh [adb_serial]

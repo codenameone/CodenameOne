@@ -64,7 +64,7 @@ jobs:
     needs: [golden-plan, build-port]
     permissions:
       contents: read
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 35
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}

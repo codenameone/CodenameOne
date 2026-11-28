@@ -144,6 +144,19 @@ cn1ss_start_ws_server "$WS_RAW_DIR" || { rt_log "Failed to start the test server
 rt_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 
 xcrun simctl terminate "$TV_UDID" "$BUNDLE_ID" 2>/dev/null || true
+# The simulator booted before the build can be Shutdown by the time the build
+# ends: on the xcode-27 image it was, and install then failed with
+# "Unable to lookup in current state: Shutdown". Boot it again here, and fail
+# with the reason instead of on the install.
+for attempt in 1 2 3; do
+  if xcrun simctl list devices 2>/dev/null | grep "$TV_UDID" | grep -q "(Booted)"; then break; fi
+  rt_log "Simulator $TV_UDID is not booted (attempt $attempt); booting"
+  xcrun simctl boot "$TV_UDID" || true
+  xcrun simctl bootstatus "$TV_UDID" -b || true
+done
+if ! xcrun simctl list devices 2>/dev/null | grep "$TV_UDID" | grep -q "(Booted)"; then
+  rt_log "Simulator $TV_UDID would not boot"; xcrun simctl list devices | grep "$TV_UDID" >&2 || true; exit 7
+fi
 xcrun simctl install "$TV_UDID" "$APP_PATH"
 # Capture the app's stdout/stderr (the CN1SS:* suite markers and any native
 # exception / crash) so a no-screenshot run is diagnosable instead of silent.

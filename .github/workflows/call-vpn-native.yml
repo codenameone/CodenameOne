@@ -48,7 +48,7 @@ jobs:
     needs: golden-plan
     if: needs.golden-plan.outputs.run == 'true'
     name: Clang syntax check for the call and VPN natives
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6

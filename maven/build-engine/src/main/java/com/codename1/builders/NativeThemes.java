@@ -64,7 +64,7 @@ final class NativeThemes {
     /// or null for `custom`, which installs none.
     ///
     /// @param mode the theme mode written into the stub; null means the runtime default, "auto"
-    /// @param generation the iOS modern generation, "26" or "27"; null means 26
+    /// @param generation the iOS modern generation, "26" or "27"; null means 27
     /// @param mac true for the native macOS port, whose Aqua theme answers auto/aqua/native
     static String themeFor(String mode, String generation, boolean mac) {
         String m = mode == null ? "auto" : asciiLower(mode.trim());
@@ -75,7 +75,7 @@ final class NativeThemes {
             return "MacOSAquaTheme";
         }
         if ("modern".equals(m) || "liquid".equals(m)) {
-            return "27".equals(generation) ? "iOSModern27Theme" : "iOSModernTheme";
+            return "26".equals(generation) ? "iOSModernTheme" : "iOSModern27Theme";
         }
         if ("ios7".equals(m) || "flat".equals(m) || "auto".equals(m)) {
             return "iOS7Theme";

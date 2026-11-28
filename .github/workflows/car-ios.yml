@@ -37,21 +37,13 @@ jobs:
     permissions:
       contents: read
 
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   car-ios:
     if: needs.golden-plan.outputs.run == 'true'
-    needs: [golden-plan, unity-gallery]
+    needs: [golden-plan]
     name: Car CarPlay
     permissions:
       contents: read
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 75
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -95,10 +87,6 @@ jobs:
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build iOS port
         run: ./scripts/build-ios-port.sh -q -DskipTests
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample iOS app (car-enabled) and compile workspace
         id: build-ios-app

@@ -107,7 +107,7 @@ mvn -Dcodename1.platform=javase -Djava.awt.headless=true package   # <4>
     profile and then takes every screenshot in the user's guide, into
     `docs/developer-guide/img`.
 
-`.github/workflows/bastion.yml` runs all of them, and builds the application for
+`.github/workflows/samples.yml` runs all of them, and builds the application for
 Android and iOS through `scripts/build-android-app.sh` and
 `scripts/build-ios-app.sh` with `CN1_APP_DIR=scripts/bastion`.
 

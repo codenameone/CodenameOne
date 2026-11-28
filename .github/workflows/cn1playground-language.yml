@@ -4,40 +4,25 @@ on:
   # Nightly at 00:11 UTC on master (nightly-watchdog.yml opens an issue when it
   # fails), and on a pull request only when this workflow's own tree changes.
   # Shared code (core, ports, builders, backend) reaches it through the nightly.
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'scripts/cn1playground/**'
-      # Playground code is compiled by the in-tree compiler and, in the browser,
-      # translated by ParparVM and loaded into the running VM.
-      - 'vm/JavaCompiler/**'
-      - 'maven/javac/**'
-      - '.github/workflows/cn1playground-language.yml'
   workflow_dispatch:
   schedule:
     - cron: '11 0 * * *'
 
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 permissions:
   contents: read
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: cn1playground-language-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   language-smoke:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     name: Playground language smoke
     runs-on: ubuntu-24.04
 
@@ -81,8 +66,6 @@ jobs:
           xvfb-run -a bash tools/run-playground-smoke-tests.sh
 
   browser-e2e:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     name: Playground in the browser
     # The job has taken 24-58 minutes; see the browser step for why it has a limit.
     timeout-minutes: 90

@@ -37,7 +37,7 @@
 
 # The Xcode major the tree is validated against. Raising this is the one edit a
 # toolchain move needs; every script and workflow reads it from here.
-: "${CN1_XCODE_MAJOR:=26}"
+: "${CN1_XCODE_MAJOR:=27}"
 # Optional exact release within that major (e.g. 27.1). Unset, the newest
 # install of the major wins. Set it where an image carries several releases of
 # one major and the leg's baselines were measured on a particular one: the

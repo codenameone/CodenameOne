@@ -2,151 +2,10 @@ name: PR CI
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - master
-    # paths rather than paths-ignore, because this list both excludes and re-includes and only
-    # this form supports that: a "!" entry in paths-ignore is not a re-inclusion, so the entries
-    # for setup-workspace.sh and the database check scripts below never took effect there. The
-    # last matching pattern decides, so this reads as "everything, except these, except these".
-    paths:
-      - '**'
-      - '!.github/workflows/scripts-android.yml'
-      - '!.github/workflows/scripts-ios.yml'
-      - '!scripts/**'
-      - 'scripts/setup-workspace.sh'
-      # Run from this workflow and nowhere else, so ignoring the whole directory meant a change
-      # to one of them -- including one that breaks the check itself -- merged without it ever
-      # running.
-      - 'scripts/ci/db-cipher-interop.sh'
-      - 'scripts/ci/check-android-cipher-package-compiles.sh'
-      - 'scripts/ci/check-js-sqlite-wasm.sh'
-      # Every Maven step in this matrix runs through retry.sh, and the apt helpers gate the
-      # Linux legs, so a change to one of them that nothing exercises can merge and then break
-      # the matrix it was meant to protect.
-      - 'scripts/ci/retry.sh'
-      - 'scripts/ci/apt-get-update.sh'
-      - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci/tests/apt-get-update-test.sh'
-      # The native warning gate's parser self-test runs from this workflow and nowhere
-      # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
-      # change to the parser, its fixture or a baseline could merge without the one check
-      # that would have caught it ever running.
-      - 'scripts/check-native-warnings.py'
-      - 'scripts/check-native-warnings.sh'
-      - 'scripts/native-warnings/**'
-      # Same reason: the C++ linkage gate runs from this workflow and nowhere else, so
-      # ignoring scripts/** would let a change that weakens it merge unexercised.
-      - 'scripts/check-native-cpp-linkage.py'
-      # Same: the builder define-toggle lint runs from this workflow and nowhere else.
-      - 'scripts/check-builder-define-toggles.py'
-      - 'scripts/check-cast-semantics.sh'
-      - 'scripts/check-gpu-shaders.sh'
-      - 'scripts/gpu-shader-check/**'
-      - 'scripts/cast-semantics-baseline.txt'
-      # The build hint gates are run from this workflow and nowhere else, and one
-      # of them holds an empty baseline. Ignoring the whole directory meant a
-      # change that breaks a gate, or that adds a line to the baseline, could
-      # merge without the gate it weakens ever running.
-      - 'scripts/check-build-hint-catalog.sh'
-      - 'scripts/check-build-hint-catalog.py'
-      - 'scripts/build_hint_miner.py'
-      - 'scripts/build-hint-catalog-baseline.txt'
-      - 'scripts/build-hint-computed-sites.txt'
-      - 'scripts/gen-build-hint-annotations.sh'
-      # Same reasoning for the cn1lib native gates: they run from this workflow
-      # and nowhere else, and the stubs are the API surface their Android check
-      # compiles against, so excluding scripts/ wholesale would let a change to
-      # any of them merge without the gate it belongs to ever running.
-      - 'scripts/check-native-peer-returns.py'
-      - 'scripts/check-cn1lib-android-api.py'
-      - 'scripts/check-cn1lib-native-coverage.py'
-      - 'scripts/ci/select-cn1lib-checks.py'
-      - 'scripts/check-cn1lib-native-sources.py'
-      - 'scripts/cn1lib-api-check/**'
-      # The certificate wizard's own tests run in this workflow (see "Run Certificate Wizard
-      # tests"), so a change to the wizard alone has to trigger it.
-      - 'scripts/certificatewizard/**'
-      - '!docs/**'
-      - '!**/*.md'
-      - '!.github/workflows/developer-guide-docs.yml'
-      - '!.github/workflows/website-docs.yml'
-      - '!.github/workflows/initializr-cn1-version-pr.yml'
-      - '!CodenameOneDesigner/**'
-      - '!Ports/IOSPort/**'
-  push:
-    branches:
-      - master
-    # paths rather than paths-ignore, because this list both excludes and re-includes and only
-    # this form supports that: a "!" entry in paths-ignore is not a re-inclusion, so the entries
-    # for setup-workspace.sh and the database check scripts below never took effect there. The
-    # last matching pattern decides, so this reads as "everything, except these, except these".
-    paths:
-      - '**'
-      - '!.github/workflows/scripts-android.yml'
-      - '!.github/workflows/scripts-ios.yml'
-      - '!scripts/**'
-      - 'scripts/setup-workspace.sh'
-      # Run from this workflow and nowhere else, so ignoring the whole directory meant a change
-      # to one of them -- including one that breaks the check itself -- merged without it ever
-      # running.
-      - 'scripts/ci/db-cipher-interop.sh'
-      - 'scripts/ci/check-android-cipher-package-compiles.sh'
-      - 'scripts/ci/check-js-sqlite-wasm.sh'
-      # Every Maven step in this matrix runs through retry.sh, and the apt helpers gate the
-      # Linux legs, so a change to one of them that nothing exercises can merge and then break
-      # the matrix it was meant to protect.
-      - 'scripts/ci/retry.sh'
-      - 'scripts/ci/apt-get-update.sh'
-      - 'scripts/ci/apt-get-install.sh'
-      - 'scripts/ci/tests/apt-get-update-test.sh'
-      # The native warning gate's parser self-test runs from this workflow and nowhere
-      # else -- the legs that run the gate itself need a compiler. Ignoring these meant a
-      # change to the parser, its fixture or a baseline could merge without the one check
-      # that would have caught it ever running.
-      - 'scripts/check-native-warnings.py'
-      - 'scripts/check-native-warnings.sh'
-      - 'scripts/native-warnings/**'
-      # Same reason: the C++ linkage gate runs from this workflow and nowhere else, so
-      # ignoring scripts/** would let a change that weakens it merge unexercised.
-      - 'scripts/check-native-cpp-linkage.py'
-      # Same: the builder define-toggle lint runs from this workflow and nowhere else.
-      - 'scripts/check-builder-define-toggles.py'
-      - 'scripts/check-cast-semantics.sh'
-      - 'scripts/check-gpu-shaders.sh'
-      - 'scripts/gpu-shader-check/**'
-      - 'scripts/cast-semantics-baseline.txt'
-      # The build hint gates are run from this workflow and nowhere else, and one
-      # of them holds an empty baseline. Ignoring the whole directory meant a
-      # change that breaks a gate, or that adds a line to the baseline, could
-      # merge without the gate it weakens ever running.
-      - 'scripts/check-build-hint-catalog.sh'
-      - 'scripts/check-build-hint-catalog.py'
-      - 'scripts/build_hint_miner.py'
-      - 'scripts/build-hint-catalog-baseline.txt'
-      - 'scripts/build-hint-computed-sites.txt'
-      - 'scripts/gen-build-hint-annotations.sh'
-      # Same reasoning for the cn1lib native gates: they run from this workflow
-      # and nowhere else, and the stubs are the API surface their Android check
-      # compiles against, so excluding scripts/ wholesale would let a change to
-      # any of them merge without the gate it belongs to ever running.
-      - 'scripts/check-native-peer-returns.py'
-      - 'scripts/check-cn1lib-android-api.py'
-      - 'scripts/check-cn1lib-native-coverage.py'
-      - 'scripts/ci/select-cn1lib-checks.py'
-      - 'scripts/check-cn1lib-native-sources.py'
-      - 'scripts/cn1lib-api-check/**'
-      # The certificate wizard's own tests run in this workflow (see "Run Certificate Wizard
-      # tests"), so a change to the wizard alone has to trigger it.
-      - 'scripts/certificatewizard/**'
-      - '!docs/**'
-      - '!**/*.md'
-      - '!.github/workflows/developer-guide-docs.yml'
-      - '!.github/workflows/website-docs.yml'
-      - '!.github/workflows/initializr-cn1-version-pr.yml'
-      - '!CodenameOneDesigner/**'
-      - '!Ports/IOSPort/**'
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 permissions:
   contents: write
   pull-requests: write
@@ -173,21 +32,11 @@ env:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: pr-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   build-test:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
 
     runs-on: ubuntu-24.04
     # Java 8 also runs the full quality reports and packaging checks.
@@ -984,8 +833,8 @@ jobs:
     # "failed to resolve source metadata for docker.io/library/alpine:latest"
     # after three retries. A job-level condition skips setup entirely, so on a
     # pull request the image is never fetched.
-    if: ${{ needs.golden-plan.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
-    needs: [golden-plan, build-test]
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') }}
+    needs: [build-test]
     runs-on: ubuntu-24.04
     steps:
       - name: Download the distribution bundle

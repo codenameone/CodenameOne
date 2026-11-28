@@ -83,7 +83,7 @@ public class IPhoneBuilder extends Executor {
     /// generated stub. Package-private so WatchNativeBuilder and
     /// MacOSNativeBuilder emit the SAME value -- a phone and its watch resolving
     /// to different generations would be a skew nobody would think to look for.
-    String iosThemeGeneration = "26";
+    String iosThemeGeneration = "27";
 
 
     /// Where each entry-point stub lives once they have been separated, or null when there is one
@@ -2437,11 +2437,11 @@ public class IPhoneBuilder extends Executor {
         // design generation the modern theme targets.
         //
         // An unrecognised value is a build error rather than a silent fallback.
-        // Falling back would ship the 26 look to someone who asked for 27 and
+        // Falling back would ship the default look to someone who asked for another and
         // say nothing, and a theme is exactly the kind of thing nobody notices
         // is wrong until it is in front of users -- the same failure the
         // nativeTheme comment above records for iosMode.
-        iosThemeGeneration = request.getArg("ios.themeGeneration", "26").trim();
+        iosThemeGeneration = request.getArg("ios.themeGeneration", "27").trim();
         if (!"26".equals(iosThemeGeneration) && !"27".equals(iosThemeGeneration)) {
             throw new BuildException("ios.themeGeneration must be 26 or 27, got '"
                     + iosThemeGeneration + "'");
@@ -13697,6 +13697,20 @@ public class IPhoneBuilder extends Executor {
                 "true".equals(request.getArg("ios.invite.appClip", "true"));
     }
 
+    /// The App Clip's deployment target: its own iOS 14 minimum, raised to the SDK's floor.
+    ///
+    /// The clip is a separate target with a fixed target of its own, so the floor the app
+    /// target gets through addMinDeploymentTarget never reached it: on Xcode 27, whose iOS
+    /// floor is 15.0, every project with the invite clip failed in target CN1InviteClip
+    /// while the app target built. On an older Xcode the floor is below 14.0 (or unknown)
+    /// and the clip is unchanged.
+    ///
+    /// @param sdkFloor the SDK's minimum iOS deployment target, or null when unknown
+    /// @return the deployment target to write for the clip
+    static String inviteAppClipDeploymentTarget(String sdkFloor) {
+        return AppleSdkFloor.raiseTo(InviteAppClipBuilder.DEPLOYMENT_TARGET, sdkFloor);
+    }
+
     /// Emits the App Clip target into the schemes ruby.
     ///
     /// Modelled on [#appendMatterExtensionTarget], with one structural
@@ -13736,8 +13750,13 @@ public class IPhoneBuilder extends Executor {
         buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
         buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
         buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
-        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
-                InviteAppClipBuilder.DEPLOYMENT_TARGET);
+        String clipDeploymentTarget = inviteAppClipDeploymentTarget(sdkDeploymentFloor);
+        if (!InviteAppClipBuilder.DEPLOYMENT_TARGET.equals(clipDeploymentTarget)) {
+            log("App Clip " + name + " asks for iOS " + InviteAppClipBuilder.DEPLOYMENT_TARGET
+                    + ", but this Xcode's iOS SDK accepts nothing below " + sdkDeploymentFloor
+                    + "; building the clip against " + clipDeploymentTarget + " instead.");
+        }
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", clipDeploymentTarget);
         // The HOST's families, through the same helper every other embedded
         // target here uses. Hard-coding iPhone was wrong twice over: App Clips
         // do run on iPad, and an ios.project_type=ipad build has an iPad-only
@@ -13805,7 +13824,7 @@ public class IPhoneBuilder extends Executor {
         // integration.
         sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
                 + "clip_target = xcproj.new_target(:application, '" + name + "', :ios, '"
-                + InviteAppClipBuilder.DEPLOYMENT_TARGET + "')\n"
+                + clipDeploymentTarget + "')\n"
                 + "clip_target.product_type = '" + InviteAppClipBuilder.PRODUCT_TYPE + "'\n"
                 + "clip_target.add_system_framework('UIKit')\n"
                 // SKOverlay is the install affordance, and it is what carries

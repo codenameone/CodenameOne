@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render the Metal screenshot-comparison summary for a GitHub Actions job.
 
-Called from .github/workflows/scripts-ios.yml's build-ios-metal job.
+Called from .github/workflows/scripts-ios.yml's apple job (iOS Metal and macOS suites).
 Reads the screenshot-compare.json produced by scripts/run-ios-ui-tests.sh
 and emits either:
 

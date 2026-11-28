@@ -120,9 +120,9 @@ its own on JDK 17 (it compiles at release 17), then enforces the result in
 `unity-compat` (the Unity compatibility translator and runtime) are held to the
 same script with SpotBugs, PMD and Checkstyle all three, but in
 `.github/workflows/unity-compat.yml`: they build only with the .NET SDK, and
-the Java 8 leg must not need one. That workflow's `paths` name both modules,
-the core's `pmd.xml` and `checkstyle.xml` and the report script, so a change to
-any of them cannot skip it.
+the Java 8 leg must not need one. That workflow is nightly; on a pull request
+it runs only when the Unity tree itself changes, so a change to the core's
+`pmd.xml`, `checkstyle.xml` or the report script is judged there overnight.
 
 - **SpotBugs is a zero-findings gate.** *Any* finding of *any* pattern in *any*
   of those projects fails the build, and a project that produces no SpotBugs
@@ -472,7 +472,7 @@ shared `SqlAccess` is the pattern -- never a second copy. A marked class may onl
 on the JDK subset the backend compiles against and on other marked classes, and
 `package-info.java` cannot be marked (javac would emit a `package-info.class`).
 A class marked outside the current packages also needs its path added to
-`parparvm-tests.yml`'s `paths`, which cannot read the marker.
+the `linux-build-run` entry's `paths` in `.github/ci/ci-members.json`, which cannot read the marker.
 
 ### Two API references: client and backend
 
@@ -749,7 +749,7 @@ of them on by default in a customer build**:
   `CN1_NATIVE_VERIFY` or `-Dparparvm.nativeVerify` says `strict` or `warn`. Making
   the old soft failure hard would change the outcome of app builds that succeed
   today, so our CI opts in (`CN1_NATIVE_VERIFY: strict` at workflow level in
-  `pr.yml`, `parparvm-tests.yml` and `parparvm-tests-windows.yml`, inherited by
+  `pr.yml` and `linux-build-run.yml`, inherited by
   every forked translation) and nobody else has to. The `nativeVerify` build hint
   turns it on for a single build. With the check on, the per-symbol opt-out for a
   native that lives in a prebuilt `.a`/`.framework` is
@@ -1135,67 +1135,17 @@ Traps that have already cost a fix:
   application build never restores anything: its generated project turns the
   implicit framework reference off and names the three assemblies by path.
 
-#### The screenshot suite's Unity gallery is prebuilt, once, on Linux
+#### Unity is tested nightly, not on every pull request
 
-`scripts/hellocodenameone` compiles `scripts/unity-compat-samples/gallery`
-(`compile-unity` in `common/pom.xml`) for the `UnityCompat*` screenshot tests,
-so every job that builds the application would need the .NET SDK and both
-Unity modules. None has them. One Linux job per workflow run does:
+`unity-compat.yml` runs every night (`cron: '11 0 * * *'`) and on a pull
+request only when the Unity tree changes: the two modules, their integration
+scripts, the Unity goals of the build tools and `scripts/unity-compat-samples`.
+`scripts/hellocodenameone` does **not** compile the Unity gallery and has no
+`UnityCompat*` screenshot tests: that made every device suite depend on a
+.NET build, and a Unity failure stopped iOS, Android, JavaScript and the native
+suites alike. Do not add Unity back to the screenshot app or to a `ci.yml`
+member; the gallery is still built and run by `unity-compat-test.sh`.
 
-- **`.github/workflows/unity-gallery-prebuilt.yml`** (reusable) builds the
-  plugin and the two modules, runs the application's common module to
-  `generate-sources`, and uploads what `scripts/unity-gallery-prebuilt.sh pack`
-  writes as the artifact `unity-gallery-prebuilt`: the `codenameone-unity-compat`
-  and `codenameone-cil-translator` artifacts plus `common/target/unity` and
-  `common/target/generated-sources/unity`. The archive is cached on a hash of
-  everything that can change a byte of it, so most runs only upload it again.
-- **`.github/actions/unity-gallery-prebuilt`** downloads and unpacks it.
-  `compile-unity` then finds a matching content digest and never starts
-  `dotnet`.
-
-Traps:
-
-- **A new job that builds the application must use both**: a job that
-  `uses:` the workflow, `needs:` on it, and the action after everything that
-  fills the local Maven repository and before the first build of the
-  application. Without them the job fails in `compile-unity` with ".NET SDK,
-  which was not found", naming the gallery directory.
-- **A consumer must not build the Unity jars itself**, or install them from
-  anywhere else. The digest covers every class of the runtime, the references
-  and the translator, so output is good only with the archive's own jars. When
-  they differ the failure adds "does not match these sources or jars" -- that,
-  not a missing SDK, is the thing to fix. `state.txt` records a digest per
-  part under the whole one, and the message names the part that differs and,
-  within it, the first entry: read that before guessing.
-- **The translator's class path is its runtime scope and nothing more**
-  (`CompileUnityMojo.resolve`). Maven's legacy resolver also hands back a
-  pom's test-scoped dependencies unless it is filtered; that once put the
-  consumer's own `codenameone-core` jar into the digest, which a Linux job
-  rebuilds byte for byte and a Windows one does not, so every Windows consumer
-  refused an archive that was good.
-- **A hand-assembled translation takes the application's libraries from
-  `common/target/translation-libs`**, which the application's own pom stages
-  from its runtime class path in `process-classes`. The native Linux and
-  Windows translations (`vm/tests`, `helloSuiteLibraryClasses`) and the
-  JavaScript build script read it; a list of class directories per workflow
-  is how the Unity runtime was missing from three of them.
-- **The artifact name is fixed, so the workflow is called once per run.** A
-  workflow that is itself called (`scripts-ios-native.yml`, `ios-packaging.yml`)
-  takes `unity_prepared` and skips its own call
-  when `scripts-ios.yml` already made one.
-- **Anything new that determines the archive goes into the cache key** in the
-  reusable workflow. A stale cached archive is not refused downstream -- it is
-  self-consistent -- it is simply used.
-- **Every PR-gating workflow that builds the application lists the gallery, both
-  modules, the script, the workflow and the action in its `paths`**, and
-  `.github/ci/apple-checks.json` lists them for the four Apple suites.
-  A nightly suite (see *Nightly CI*) lists only its own tree and is exempt.
-- **`unpack` after `mvn clean` on the application, never before**: the output
-  lives under `common/target`.
-- `unity-compat.yml`'s `unity-gallery-consumer` job is the end-to-end test:
-  it unpacks into a job that built neither module, builds the common module
-  with an SDK setting that names nothing, and then checks that a stale
-  `state.txt` is refused by name.
 ### Desktop compatibility: Swing and JavaFX apps as Codename One apps
 
 A desktop project's `src/main` dropped into `common/src/main/desktop` (or
@@ -1442,6 +1392,40 @@ target's upload (`.github/workflows/kmp-compat.yml`). `scripts/kmp-bench` runs
 the same Compose source against Compose Multiplatform on an iOS simulator; see
 its README for the numbers and what they do not show.
 
+### Pull request CI is one workflow: `ci.yml`
+
+A pull request or master push starts `ci.yml` ("CI") and the path-scoped
+workflows of the samples, cn1libs and feature trees; nothing else.
+
+- **Precheck first.** `golden-plan.yml`, `source-gates.yml` and
+  `check-workflows.yml` run in parallel on Linux in a few minutes. Every other
+  job of the run `needs:` all three, so a missing golden, a missing
+  `package-info.java`, a header, a workflow lint error or a broken gate test
+  ends the run before any build starts. A cheap check that keeps failing PRs
+  late belongs in `source-gates.yml`.
+- **The heavy workflows are members**, called from `ci.yml` as reusable
+  workflows: `pr`, the `scripts-*` device suites, the ParparVM, Linux and
+  Windows native suites and the docs workflows. They have no `pull_request` or
+  `push` trigger of their own; their old `paths` filters are in
+  `.github/ci/ci-members.json` and `scripts/ci/select-ci-members.py` applies
+  them (`test_select_ci_members.py`). A new heavy workflow is a member: an entry
+  there and a job in `ci.yml`. They keep `workflow_dispatch` and their
+  schedules, so golden capture and the nightlies dispatch them as before.
+- **One build per platform family, then the tests.** `scripts-ios.yml` builds
+  the iOS and Mac ports once (`_build-ios-port.yml`, `mac_port: true`) and runs
+  Metal, watchOS, tvOS, macOS and iOS fidelity as steps of ONE `xcode-27` job:
+  every suite runs even after an earlier one fails, and the job fails at the
+  end. `linux-build-run.yml` holds every native ParparVM suite (Linux, Windows
+  cross and native, the ParparVM JVM tests) behind one `prepare-suite`
+  producer, and Android fidelity runs inside `scripts-android.yml`. Do not split
+  a suite back out into its own workflow or runner; the `xcode-27` image is
+  scarce and every extra job is another wait.
+- **One run shares its artifacts.** Inside a member `github.workflow` is `CI`, so each member's concurrency group
+  starts with its own file name; keep that on a new one.
+- **Check names are `CI / <member> / <job>`.** Branch protection and anything
+  that looks a PR run up by workflow name must use them; `golden-harvest.sh`
+  lists `ci.yml` beside the members for that reason.
+
 ### Screenshot goldens: capture, harvest, and how to watch them
 
 A PR that adds or changes a hellocodenameone screenshot test needs a golden per
@@ -1522,6 +1506,12 @@ never failed there. They now run:
   only trace. Re-running a nightly by hand keeps `event: schedule`, so the
   watchdog judges the re-run.
 
+- **The sample applications are one workflow, `samples.yml`.** One job per
+  kind of check (template sync, server tests, each database, client end to
+  end, browser, Android, iOS in two shards), and each sample a step of it,
+  named `<sample>: ...`; its `select` job keeps every sample's old `paths`
+  filter. They were fourteen workflows of eight to ten jobs each. A new sample
+  goes in as steps of the existing jobs, not as a workflow of its own.
 - **The samples' nightly iOS builds are one workflow**,
   `samples-ios-nightly.yml`: the port built once, then two macOS shards build
   every sample, one step each (`scripts/ci/build-sample-ios-simulator.sh`).

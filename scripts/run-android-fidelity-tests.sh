@@ -168,7 +168,7 @@ PYEOF
 if [ -n "$SIZE_MISMATCHES" ]; then
   rf_log "FATAL: CN1 tile canvas differs from the committed golden -- the render"
   rf_log "environment violates the golden contract (480x800 @ 160dpi; see the"
-  rf_log "wm size/density override in scripts-fidelity.yml):"
+  rf_log "wm size/density override in scripts-android.yml):"
   printf '%s\n' "$SIZE_MISMATCHES" | while IFS= read -r line; do rf_log "  $line"; done
   exit 13
 fi

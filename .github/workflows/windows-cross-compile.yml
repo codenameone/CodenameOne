@@ -5,7 +5,7 @@
 # pre-check that the port + a real Form app translate and *link* into a Windows
 # binary. It is compile-and-link only (Direct2D/DirectWrite need a real Windows
 # GPU stack to run), so there is no run/screenshot step; the authoritative
-# run/render gate stays on the Windows runners (parparvm-tests-windows.yml).
+# run/render gate stays on the Windows runners (linux-build-run.yml).
 name: Windows cross-compile (Linux)
 
 on:

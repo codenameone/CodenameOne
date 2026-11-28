@@ -14,166 +14,19 @@ name: Test Android build scripts
         type: string
   schedule:
     - cron: '5 1 * * *'
-  pull_request:
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/scripts-android.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/ci/retry.sh'
-      - 'scripts/build-android-port.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/verify-android-app-compile-sdk.sh'
-      - 'scripts/check-android-api-removals.py'
-      - 'scripts/android/newest-platform-package.sh'
-      - 'scripts/run-android-instrumentation-tests.sh'
-      - 'scripts/generate-android-coverage-report.sh'
-      - 'scripts/android/lib/**/*.java'
-      - 'scripts/android/tests/**/*.java'
-      - 'scripts/device-runner-app/**/*.java'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/android/screenshots/**'
-      - '!scripts/android/screenshots/**/*.md'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/Android/**'
-      - '!Ports/Android/**/*.md'
-      - 'native-themes/android-material/**'
-      - '!native-themes/android-material/**/*.md'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/ci/tests/cn1ss-selfcheck-test.sh'
-  push:
-    branches:
-      - master
-    paths:
-      # The application these jobs build compiles a Unity project, from an
-      # archive that unity-gallery-prebuilt.yml makes out of these.
-      - 'scripts/unity-compat-samples/gallery/**'
-      - 'maven/cil-translator/**'
-      - 'maven/unity-compat/**'
-      - 'maven/compose-compat/**'
-      - 'maven/rive-runtime/**'
-      - 'maven/rive-schema-gen/**'
-      - 'maven/build-engine/src/main/java/com/codename1/maven/Unity*'
-      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/*Unity*'
-      - 'scripts/unity-gallery-prebuilt.sh'
-      - '.github/workflows/unity-gallery-prebuilt.yml'
-      - '.github/actions/unity-gallery-prebuilt/**'
-      - '.github/workflows/scripts-android.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/ci/retry.sh'
-      - 'scripts/build-android-port.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/verify-android-app-compile-sdk.sh'
-      - 'scripts/check-android-api-removals.py'
-      - 'scripts/android/newest-platform-package.sh'
-      - 'scripts/run-android-instrumentation-tests.sh'
-      - 'scripts/generate-android-coverage-report.sh'
-      - 'scripts/android/lib/**/*.java'
-      - 'scripts/android/tests/**/*.java'
-      - 'scripts/device-runner-app/**/*.java'
-      - 'scripts/hellocodenameone/**'
-      - 'scripts/android/screenshots/**'
-      - '!scripts/android/screenshots/**/*.md'
-      - 'scripts/templates/**'
-      - '!scripts/templates/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/Android/**'
-      - '!Ports/Android/**/*.md'
-      - 'native-themes/android-material/**'
-      - '!native-themes/android-material/**/*.md'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - 'tests/**'
-      - '!tests/**/*.md'
-      - '!docs/**'
-      # The screenshot transport is now a Codename One backend application, so the
-      # two files that are ONLY exercised here have to trigger this leg: the
-      # server itself and the script that launches it.
-      #
-      # Deliberately NOT the rest of vm/backend. The websocket protocol code is
-      # covered by maven/backend's unit tests, by vm/tests against the translated
-      # binary, and by the Autobahn conformance job -- all of which already
-      # trigger on vm/**. Fanning every backend change out to the macOS and
-      # emulator legs as well would buy nothing and cost a great deal: a change to
-      # the ORM, the database layer or the HTTP parser cannot reach this
-      # transport.
-      - 'scripts/hellocodenameone/backend/**'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/ci/tests/cn1ss-selfcheck-test.sh'
-
-# The token in secrets.CN1SS_GH_TOKEN was generated on
-# Oct 16th 2025. If in Oct 2026 builds start failing, it
-# means the token needs to be regenerated:
-#	1.	Go to https://github.com/settings/tokens -> "Developer settings" -> "Personal access tokens".
-#	2.	Choose Fine-grained token (recommended).
-#	3.	Grant:
-#	*	Repository access -> select Codename One
-#	*	Permissions:
-#	*	Contents -> Read and Write
-#	*	Pull requests -> Read and Write
-#	*	Issues -> Read and Write
-#	4.	Copy the generated token
-#   5. Go to https://github.com/codenameone/CodenameOne/settings/secrets/actions
-#     and edit the CN1SS_GH_TOKEN to use the new token
-
+  # Pull requests and master pushes reach this workflow through ci.yml,
+  # after its precheck; the paths that used to trigger it are in
+  # .github/ci/ci-members.json.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: scripts-android-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # First, so a PR whose new screenshot tests have no goldens yet runs nothing
-  # here; Golden capture (golden-capture.yml) records them instead.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    with:
-      capture: ${{ inputs.cn1ss_capture || '' }}
-
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the jobs below as an artifact; none of them installs
-  # the .NET SDK or builds the Unity modules.
-  unity-gallery:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   build-android:
-    if: needs.golden-plan.outputs.run == 'true'
     name: Build Android ${{ matrix.name }}
-    needs: [golden-plan, unity-gallery]
     strategy:
       fail-fast: false
       # A golden capture runs the Default leg alone. All three legs share
@@ -202,7 +55,8 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # 60 for the build and suite, plus the fidelity run on the default leg.
+    timeout-minutes: 90
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -338,10 +192,6 @@ jobs:
           # tried and is wrong here, because -Pcompile-android reads its jars
           # from maven/target/cn1-binaries, which this job never stages.
           python3 scripts/check-android-api-removals.py --require-all
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Enter golden capture mode
         uses: ./.github/actions/cn1ss-capture
@@ -378,6 +228,59 @@ jobs:
       - name: Rebuild the generated app at API 37
         if: matrix.id == 'default'
         run: ./scripts/verify-android-app-compile-sdk.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}" 37
+      # Native theme fidelity (Material 3), on the default leg's port build:
+      # it used to be scripts-fidelity.yml's own job, which set up the
+      # workspace and built the Android port a second time. The fidelity app
+      # renders each component as the CN1 widget AND the native widget in this
+      # same emulator and diffs the two; the committed baseline is the ratchet
+      # floor (re-anchor locally with FIDELITY_UPDATE_BASELINE=1). Not in a
+      # golden capture, and after the screenshot suite so it cannot change what
+      # that suite rendered.
+      - name: Regenerate native themes from CSS (fidelity)
+        if: ${{ !cancelled() && matrix.id == 'default' && inputs.cn1ss_capture == '' }}
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
+      - name: Build fidelity app (Android)
+        id: fidelity_build
+        if: ${{ !cancelled() && matrix.id == 'default' && inputs.cn1ss_capture == '' }}
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-fidelity-app.sh android -q -DskipTests
+      - name: Run fidelity suite (emulator)
+        if: ${{ !cancelled() && steps.fidelity_build.outcome == 'success' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_FIDELITY_EPSILON: '2.0'
+          # CI renders differ subtly from a developer machine: re-seed the
+          # per-environment native goldens here; the ratchet gates the
+          # CN1-vs-native SCORE against the committed baseline, which is
+          # portable because both sides are rendered in this emulator.
+          FIDELITY_UPDATE_GOLDENS: '1'
+        with:
+          # Part of the android-m3 golden-set contract: the committed native
+          # references (scripts/build-android-native-ref.sh) are captured on
+          # this API level AND a 480x800 @ 160dpi screen. The wm override is
+          # load-bearing: the default AVD screen (320x640) is narrower than the
+          # 60mm tile (377px at 160dpi) and clamped every CN1 tile.
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 2048M
+          script: adb shell wm size 480x800 && adb shell wm density 160 && ./scripts/run-android-fidelity-tests.sh "${{ steps.fidelity_build.outputs.gradle_project_dir }}"
+      - name: Upload fidelity artifacts
+        if: ${{ !cancelled() && steps.fidelity_build.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-fidelity
+          path: |
+            artifacts/android-fidelity/**
+            scripts/fidelity-app/baseline/android-m3-fidelity-baseline.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload Android port status
         if: ${{ !cancelled() && matrix.id == 'default' }}
         uses: actions/upload-artifact@v7

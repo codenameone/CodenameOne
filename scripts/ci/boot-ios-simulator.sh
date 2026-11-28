@@ -4,7 +4,7 @@ set -uo pipefail
 # Boot a simulator for a CI job, with every simctl call on a deadline.
 #
 # Usage: scripts/ci/boot-ios-simulator.sh <runtime-regex> <device-type> <name>
-#   e.g. scripts/ci/boot-ios-simulator.sh 'iOS-26[0-9-]*' 'iPhone 16' iPhone16-fidelity
+#   e.g. scripts/ci/boot-ios-simulator.sh 'iOS-27[0-9-]*' 'iPhone 16' iPhone16-fidelity
 #
 # Writes the UDID to stdout (and to GITHUB_OUTPUT as udid=... when set); every
 # log line goes to stderr, so `UDID="$(boot-ios-simulator.sh ...)"` is safe.

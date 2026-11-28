@@ -252,7 +252,7 @@ The project is in `scripts/brickyard`. Its README has the exact commands: instal
 framework, the engine and the backend runtime from the repository root with JDK 8,
 then run `mvn -Dcodename1.platform=backend -pl shared,backend test` for the server and
 `mvn -Dcodename1.platform=javase -pl common -am test` for the client, both with JDK 17.
-`.github/workflows/brickyard.yml` runs the same steps: the engine tests, the server
+`.github/workflows/samples.yml` runs the same steps: the engine tests, the server
 tests on SQLite, PostgreSQL and MySQL, and the client tests.
 
 [[brickyard-reskin]]

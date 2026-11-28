@@ -163,6 +163,19 @@ cn1ss_start_ws_server "$WS_RAW_DIR" || { rw_log "Failed to start the test server
 rw_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 
 xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true
+# The simulator booted before the build can be Shutdown by the time the build
+# ends: on the xcode-27 image it was, and install then failed with
+# "Unable to lookup in current state: Shutdown". Boot it again here, and fail
+# with the reason instead of on the install.
+for attempt in 1 2 3; do
+  if xcrun simctl list devices 2>/dev/null | grep "$WATCH_UDID" | grep -q "(Booted)"; then break; fi
+  rw_log "Simulator $WATCH_UDID is not booted (attempt $attempt); booting"
+  xcrun simctl boot "$WATCH_UDID" || true
+  xcrun simctl bootstatus "$WATCH_UDID" -b || true
+done
+if ! xcrun simctl list devices 2>/dev/null | grep "$WATCH_UDID" | grep -q "(Booted)"; then
+  rw_log "Simulator $WATCH_UDID would not boot"; xcrun simctl list devices | grep "$WATCH_UDID" >&2 || true; exit 7
+fi
 WATCH_LOG_START="$(/bin/date -u '+%Y-%m-%d %H:%M:%S %z')"
 xcrun simctl install "$WATCH_UDID" "$APP_PATH"
 # Stream the app's os_log/NSLog output into the artifacts so suite-side failures

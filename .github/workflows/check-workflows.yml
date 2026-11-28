@@ -19,31 +19,17 @@ permissions:
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      - master
-  push:
-    branches:
-      - master
-
+  # Pull requests and master pushes run this as part of ci.yml's precheck,
+  # which every other job of that run waits on.
+  workflow_call:
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
   # event names keep a manual/scheduled run from cancelling a push or PR run.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: check-workflows-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # The gate every PR workflow waits on: a PR missing a golden is known to
-  # fail as a whole, so nothing here runs until Golden capture
-  # (golden-capture.yml) has committed them.
-  golden-plan:
-    uses: ./.github/workflows/golden-plan.yml
-    permissions:
-      contents: read
-
   check-workflows:
-    needs: golden-plan
-    if: needs.golden-plan.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -72,16 +58,9 @@ jobs:
         run: |
           python3 scripts/ci/test_select_cn1lib_checks.py
           python3 scripts/ci/test_select_apple_checks.py
+          python3 scripts/ci/test_select_ci_members.py
           python3 scripts/ci/test_cn1ss_golden_plan.py
           node --test scripts/ci/test-cancel-stale-pr-runs.js
-
-      # Same reasoning one level up: build-ios-metal-27 and fidelity-ios-metal-27
-      # are COPIES of the jobs beside them, and a copy nobody checks drifts. Both
-      # legs of a pair stay green while diverging, because each passes on its own
-      # terms and nothing compares them. Also unfiltered by paths -- a pair can
-      # drift through an edit to either side.
-      - name: Duplicated CI legs must stay identical
-        run: scripts/check-duplicated-ci-legs.py
 
       # This workflow is unfiltered, so changes to the spec, its validator, or any
       # native reference table are checked before they reach master.

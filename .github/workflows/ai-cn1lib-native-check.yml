@@ -57,16 +57,17 @@ jobs:
     # library. Keep both ARC modes and both AdMob link destinations.
     needs: [golden-plan, select]
     if: ${{ needs.golden-plan.outputs.run == 'true' && (needs.select.outputs.libraries != '') }}
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
       - name: Use Google's copy of Maven Central first
         uses: ./.github/actions/maven-central-mirror
-      - name: Select Xcode 16
+      # The xcode-27 image carries Xcode 27 only; take the newest installed.
+      - name: Select Xcode
         run: |
           set -euo pipefail
-          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          XCODE_PATH=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
           test -n "$XCODE_PATH"
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version

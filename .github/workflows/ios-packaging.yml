@@ -8,11 +8,6 @@ on:
       port_prepared:
         type: boolean
         default: false
-      # True when the caller already ran unity-gallery-prebuilt.yml in this run:
-      # its artifact has a fixed name and cannot be uploaded twice.
-      unity_prepared:
-        type: boolean
-        default: false
 
 concurrency:
   # Only the latest revision needs validation. PR numbers keep forks isolated;
@@ -31,12 +26,6 @@ env:
   CN1_CULL_TRAP: '1'
 
 jobs:
-  # The application has a Unity project in it. One Linux job compiles it and
-  # hands the result to the job below as an artifact, unless the caller did.
-  unity-gallery:
-    if: ${{ !inputs.unity_prepared }}
-    uses: ./.github/workflows/unity-gallery-prebuilt.yml
-
   build-port:
     if: ${{ !inputs.port_prepared }}
     uses: ./.github/workflows/_build-ios-port.yml
@@ -44,11 +33,11 @@ jobs:
       test_server: true
 
   packaging:
-    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') && (inputs.unity_prepared || needs.unity-gallery.result == 'success') }}
-    needs: [build-port, unity-gallery]
+    if: ${{ !cancelled() && (inputs.port_prepared || needs.build-port.result == 'success') }}
+    needs: [build-port]
     permissions:
       contents: read
-    runs-on: macos-15
+    runs-on: xcode-27
     # This job runs device Release and simulator UI builds in sequence. The
     # numbers below are from when a third build, for the notification tests,
     # followed them; it is gone (see the end of the job) and the limit has been
@@ -179,11 +168,6 @@ jobs:
           else
             echo "No prebuilt test server in the bundle; the suite builds its own."
           fi
-
-      # After everything that fills the local Maven repository and before the
-      # application is built; this job has no .NET SDK (see the action).
-      - name: Unpack the Unity gallery prebuilt
-        uses: ./.github/actions/unity-gallery-prebuilt
 
       - name: Build sample iOS app
         id: build_ios_app
