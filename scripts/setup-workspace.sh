@@ -345,7 +345,18 @@ mvn_retry() {
         return 0
       fi
     else
-      if "$MAVEN_HOME/bin/mvn" -U "$@"; then
+      # A retry also drops -T. "Could not acquire lock(s)" under -T 1C is the
+      # reactor's own threads contending for the in-JVM named locks, not another
+      # process: car-android failed all four parallel attempts that way, 300s lock
+      # wait included, on a run whose code had nothing to do with it. Serially there
+      # is nobody to contend with; it is slower, and only paid after a failure.
+      local args=() skip=0 a
+      for a in "$@"; do
+        if [ "$skip" = 1 ]; then skip=0; continue; fi
+        if [ "$a" = "-T" ]; then skip=1; continue; fi
+        args+=("$a")
+      done
+      if "$MAVEN_HOME/bin/mvn" -U "${args[@]}"; then
         return 0
       fi
     fi
