@@ -1193,7 +1193,7 @@ class CleanTargetIntegrationTest {
 
     /**
      * The classes of every library the hellocodenameone application depends on and
-     * ships -- the mock ad provider, the Unity compatibility runtime -- as its common
+     * ships -- the mock ad provider -- as its common
      * module unpacks them ({@code stage-translation-libs} in its pom). None of them is
      * compiled into {@code common/target/classes}, so the directory is a translator
      * source root of its own: without it the translator cannot emit a class the
@@ -1212,10 +1212,9 @@ class CleanTargetIntegrationTest {
                         + " (scripts/hellocodenameone/common/target/translation-libs)");
         // Built is not enough: an archive of the application's classes that left this
         // directory out unpacks to the same failure this method exists to prevent, far
-        // from its cause. Both are libraries the suite cannot run without.
+        // from its cause. The suite cannot run without it.
         for (String required : new String[] {
-                "com/codename1/ads/mock/MockAdProvider.class",
-                "com/codename1/unitycompat/unityengine/UnityRuntime.class" }) {
+                "com/codename1/ads/mock/MockAdProvider.class" }) {
             assertTrue(Files.exists(libraryClasses.resolve(required)),
                     "the application's libraries are incomplete: " + libraryClasses + " has no " + required);
         }
