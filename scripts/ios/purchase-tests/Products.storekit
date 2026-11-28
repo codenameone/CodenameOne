@@ -1,8 +1,6 @@
 {
   "identifier" : "CN1E2E0001-0000-0000-0000-000000000001",
-  "nonRenewingSubscriptions" : [
-
-  ],
+  "nonRenewingSubscriptions" : [],
   "products" : [
     {
       "displayPrice" : "0.99",
@@ -18,18 +16,59 @@
       "productID" : "com.codenameone.hello.pro",
       "referenceName" : "CN1 Test Pro",
       "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "CN1E2E0001-0000-0000-0000-0000000000A2",
+      "localizations" : [
+        {
+          "description" : "Codename One e2e lifetime unlock",
+          "displayName" : "CN1 Test Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.codenameone.hello.lifetime",
+      "referenceName" : "CN1 Test Lifetime",
+      "type" : "NonConsumable"
     }
   ],
   "settings" : {
     "_failTransactionsEnabled" : false,
     "_locale" : "en_US",
     "_storefront" : "USA",
-    "_storeKitErrors" : [
-
-    ]
+    "_storeKitErrors" : []
   },
   "subscriptionGroups" : [
-
+    {
+      "id" : "CN1E2E01",
+      "localizations" : [],
+      "name" : "CN1 Test Group",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "CN1E2E0001-0000-0000-0000-0000000000A3",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Codename One e2e monthly",
+              "displayName" : "CN1 Test Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.codenameone.hello.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "CN1 Test Monthly",
+          "subscriptionGroupID" : "CN1E2E01",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        }
+      ]
+    }
   ],
   "version" : {
     "major" : 3,

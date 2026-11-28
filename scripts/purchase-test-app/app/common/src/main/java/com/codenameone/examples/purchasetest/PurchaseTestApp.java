@@ -22,8 +22,14 @@
  */
 package com.codenameone.examples.purchasetest;
 
+import com.codename1.io.Storage;
+import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
+import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.RestoreCallback;
 import com.codename1.system.Lifecycle;
+import com.codename1.system.NativeLookup;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
@@ -42,7 +48,9 @@ import com.codename1.annotations.buildhints.*;
 @Android(licenseKey = "CN1TESTPLACEHOLDERKEYNOTFORPRODUCTIONxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxIDAQAB", useAndroidX = Toggle.ON)
 @Ios(applicationQueriesSchemes = {"cydia"}, newStorageLocation = Toggle.ON)
 @IosPrivacy(cameraUsageDescription = "Used by the CI smoke test to verify the com.codename1.camera native bridge compiles. The app never opens a camera session.")
-public class PurchaseTestApp extends Lifecycle {
+public class PurchaseTestApp extends Lifecycle implements PurchaseCallback, RestoreCallback {
+    private PurchaseTestSink events;
+
     @Override
     public void init(Object context) {
         super.init(context);
@@ -63,5 +71,82 @@ public class PurchaseTestApp extends Lifecycle {
         Form hi = new Form("Purchase Test", BoxLayout.y());
         hi.add(new Label("IAP e2e test app"));
         hi.show();
+        PurchaseTestSink s = NativeLookup.create(PurchaseTestSink.class);
+        events = (s != null && s.isSupported()) ? s : null;
+        if (events != null) {
+            // The hosted XCTest drives the purchase API through this channel
+            // (PurchaseStoreKit2Tests); nothing is queued on other platforms.
+            // Not a UITimer: that is bound to this form, and CommerceCheck
+            // shows a paywall after the first purchase, which stopped every
+            // later command from being taken.
+            new java.util.Timer().schedule(new java.util.TimerTask() {
+                public void run() {
+                    final String c = events.takeCommand();
+                    if (c != null) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                runCommand(c);
+                            }
+                        });
+                    }
+                }
+            }, 200, 200);
+        }
     }
+
+    private void event(String e) {
+        System.out.println("CN1SS:IAP:EVENT " + e);
+        if (events != null) {
+            events.recordEvent(e);
+        }
+    }
+
+    private void runCommand(String c) {
+        event("command " + c);
+        Purchase p = Purchase.getInAppPurchase();
+        if (c.startsWith("purchase:")) {
+            p.purchase(c.substring("purchase:".length()));
+        } else if (c.startsWith("subscribe:")) {
+            p.subscribe(c.substring("subscribe:".length()));
+        } else if (c.equals("restore")) {
+            p.restore();
+        } else if (c.equals("canMakePayments")) {
+            event("canMakePayments " + p.isManagedPaymentSupported());
+        } else if (c.startsWith("products:")) {
+            String[] skus = com.codename1.util.StringUtil.tokenize(c.substring("products:".length()), ',')
+                    .toArray(new String[0]);
+            Product[] products = p.getProducts(skus);
+            if (products == null) {
+                event("products null");
+                return;
+            }
+            StringBuilder sb = new StringBuilder("products");
+            for (Product pr : products) {
+                sb.append(';').append(pr.getSku()).append('|').append(pr.getDisplayName())
+                        .append('|').append(pr.getLocalizedPrice());
+            }
+            event(sb.toString());
+        } else if (c.equals("resetState")) {
+            // The receipt queue dedupes by transaction id, and StoreKit's local
+            // testing restarts its ids when the test clears its transactions.
+            String[] files = {"PendingPurchases.dat", "ProcessedPurchases.dat",
+                "CN1SubscriptionsData.dat", "CN1SubscriptionsDataRefreshTime.dat", "CN1PurchasedItemList.dat"};
+            for (String f : files) {
+                Storage.getInstance().deleteStorageFile(f);
+            }
+            CommerceCheck.reset();
+            event("stateReset");
+        }
+    }
+
+    public void itemPurchased(String sku) { event("itemPurchased " + sku); }
+    public void itemPurchaseError(String sku, String errorMessage) { event("itemPurchaseError " + sku + " " + errorMessage); }
+    public void itemRefunded(String sku) { event("itemRefunded " + sku); }
+    public void subscriptionStarted(String sku) { event("subscriptionStarted " + sku); }
+    public void subscriptionCanceled(String sku) { event("subscriptionCanceled " + sku); }
+    public void paymentFailed(String paymentCode, String failureReason) { event("paymentFailed " + paymentCode); }
+    public void paymentSucceeded(String paymentCode, double amount, String currency) { event("paymentSucceeded " + paymentCode); }
+    public void itemRestored(String sku) { event("itemRestored " + sku); }
+    public void restoreRequestComplete() { event("restoreRequestComplete"); }
+    public void restoreRequestError(String message) { event("restoreRequestError " + message); }
 }

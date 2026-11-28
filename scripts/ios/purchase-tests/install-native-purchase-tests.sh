@@ -97,6 +97,10 @@ test_target.build_configurations.each do |config|
   config.build_settings['TEST_HOST'] = host_path
   config.build_settings['BUNDLE_LOADER'] = host_path
   config.build_settings['INFOPLIST_FILE'] = plist_rel
+  # PurchaseStoreKit2Tests is Swift (it reads Transaction.unfinished, which
+  # StoreKit 2 offers to Swift only).
+  config.build_settings['SWIFT_VERSION'] ||= '5.0'
+  config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
 end
 
 group = project.main_group.find_subpath('NativePurchaseTests', true)
@@ -131,5 +135,6 @@ framework_group = project.frameworks_group || project.main_group['Frameworks'] |
 end
 
 project.save
+
 puts "[install-native-purchase-tests] Installed #{source_files.length} test source file(s) + #{storekit_name} into #{test_target.name}"
 RUBY

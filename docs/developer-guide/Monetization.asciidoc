@@ -127,6 +127,57 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Apple generates the signature and timestamp from your App Store Connect server notifications endpoint; Codename One passes them to the native StoreKit APIs. For one-time products you can call `purchase(sku, offer)` instead of `subscribe(...)`.
 
+[[storekit-2]]
+==== StoreKit 2 on iOS and macOS
+
+Apple has two in-app purchase APIs: the original StoreKit, now called StoreKit 1, and StoreKit 2, which has no Objective-C interface. A build that uses `com.codename1.payment` links StoreKit 2 and uses it on iOS and tvOS 15 and macOS 12 or newer. Older systems run StoreKit 1. One API serves the whole run; the two are never mixed. Your code doesn't change: `Purchase`, `PurchaseCallback`, `RestoreCallback`, `ReceiptStore` and Commerce behave the same on both.
+
+What StoreKit 2 changes for an app is the transaction lifecycle, and Codename One handles it for you:
+
+* Every transaction is checked against Apple's signature on the device. One that fails the check reports `itemPurchaseError` and grants nothing.
+* A transaction is finished only after the receipt store accepts its receipt, so a purchase that was paid for but not yet recorded is offered again on the next launch instead of being lost.
+* Purchases that happen outside the app -- a renewal, an Ask to Buy approval, an offer code redeemed in the App Store -- arrive while the app runs and on the next launch, through the same callbacks.
+* An Ask to Buy request reports nothing and grants nothing while it waits; `itemPurchased` arrives once a parent approves it, even if the app was closed meanwhile.
+* A refund or a revoked Family Sharing purchase reports `itemRefunded`, so the app can withdraw what it granted.
+* `restore()` reports what the account currently owns. A refunded or expired purchase isn't restored.
+* Promotional offers (`purchase(sku, offer)` and `subscribe(sku, offer)`) are passed to StoreKit 2 as purchase options; the `ApplePromotionalOffer` payload is the same.
+
+===== The order data a server receives
+
+The one visible difference is `Receipt.getOrderData()`, which is what the receipt store sends to your server:
+
+[cols="1,2,2",options="header"]
+|===
+| | StoreKit 1 | StoreKit 2
+| Order data | The base64 app receipt | The signed transaction: a JWS whose payload is the transaction (`transactionId`, `originalTransactionId`, `productId`, `purchaseDate`, `expiresDate`, `revocationDate`)
+| Verified with | Apple's `verifyReceipt` endpoint and the shared secret | The certificate chain in the JWS header, which leads to Apple Root CA - G3, or the App Store Server API
+| Transaction id | Read from the receipt | The JWS payload's `transactionId`, equal to `Receipt.getTransactionId()`
+|===
+
+A server can tell the two apart without asking the device: a JWS is three base64url segments separated by dots, and an app receipt has no dots.
+
+Commerce (<<Commerce,the Commerce chapter>>) accepts both, verifies the JWS signature, and with App Store Server API credentials asks Apple about the transaction itself. Nothing needs to change for an app that uses it.
+
+===== Migrating a server that uses verifyReceipt
+
+Apple deprecated `verifyReceipt`, and it can't read a signed transaction: it answers status 21002. A server that posts the order data there -- including the CN1-IAP-Validator library described below -- has two options:
+
+. *Move the server to the signed transaction (recommended).* Verify the JWS the way Apple's https://github.com/apple/app-store-server-library-java[App Store Server Library] does: the header's `alg` is `ES256`, the `x5c` chain leads to Apple Root CA - G3, and the leaf certificate signed the token. Or look the transaction up by its id with the https://developer.apple.com/documentation/appstoreserverapi/get-transaction-info[App Store Server API]. Both work for every product type, including non-consumables, which have no subscription status to query.
+. *Keep StoreKit 1 for now.* Set the build hint below, and the app uses StoreKit 1 everywhere and sends the app receipt as before:
+
+[source,properties]
+----
+codename1.arg.ios.storeKit2=false
+----
+
+`macos.storeKit2` does the same for a native Mac build; without it a Mac build follows `ios.storeKit2`. The hint is a way to migrate on your own schedule, not a destination: Apple adds new purchase features to StoreKit 2 only.
+
+===== Testing with StoreKit configuration files
+
+Xcode's local StoreKit testing works with both APIs. Add a `.storekit` configuration file to the scheme of the generated Xcode project (*Edit Scheme > Run > Options > StoreKit Configuration*) and purchases run against it with no App Store Connect setup. Transactions from that store are signed by a certificate Xcode generates, so a server that verifies the signature against Apple's root -- Commerce among them -- treats them as unverified. That's expected.
+
+In an XCTest, attach the configuration to the scheme as well as creating an `SKTestSession`. StoreKit 2 settles on its environment when the app first calls it, at launch, before a test runs: without the scheme setting it picks the sandbox and returns no products.
+
 ==== Restoring purchases and managing subscriptions
 
 Both Apple and Google provide built-in user interfaces for restoring past purchases and managing subscription billing preferences. Codename One exposes these entry points so you can surface the native flows without reimplementing them yourself.
@@ -464,6 +515,8 @@ That method finds all the receipts in the database that haven't been validated i
 NOTE: This example only checks receipts from the iTunes and Play stores because those are the only stores that support auto-renewing subscriptions in Codename One.
 
 ==== The CN1-IAP-Validator library
+
+IMPORTANT: The library validates with Apple's deprecated `verifyReceipt` endpoint, which reads the app receipt that StoreKit 1 sends. Under StoreKit 2 the order data is a signed transaction instead; see <<storekit-2>> for the build hint that keeps StoreKit 1 and for moving the server off `verifyReceipt`.
 
 For this tutorial, the example uses a purpose-built library to handle receipt validation in a way that hides as much of the complexity as possible. It supports both Google Play receipts and iTunes receipts.
 

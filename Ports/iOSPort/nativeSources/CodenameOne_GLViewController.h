@@ -804,4 +804,21 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 #if defined(CN1_USE_STOREKIT) && !TARGET_OS_WATCH
 @interface CodenameOne_GLViewController (CN1StoreKit) <SKProductsRequestDelegate, SKPaymentTransactionObserver>
 @end
+// CN1StoreKit.m. Starts StoreKit 2's listener when the OS has it and the Swift
+// bridge is linked, otherwise adds the StoreKit 1 observer. Called at launch.
+extern void CN1StoreKitInstallObserver(void);
+// The Swift CN1StoreKit2 class (a builder resource), as CN1StoreKit.m and
+// IOSNative.m call it. Keep in step with CN1StoreKit2.swifts.
+@protocol CN1StoreKit2Bridge <NSObject>
+- (BOOL)isSupported;
+- (void)start;
+- (NSString *)nextEvent:(NSInteger)timeoutMs;
+- (void)finish:(NSString *)transactionId;
+- (BOOL)canMakePayments;
+- (NSString *)fetchProducts:(NSArray *)skus timeoutMs:(NSInteger)timeoutMs;
+- (void)purchase:(NSString *)sku offerJson:(NSString *)offerJson;
+- (void)restore;
+@end
+// The bridge when this run uses StoreKit 2, otherwise nil.
+extern id<CN1StoreKit2Bridge> CN1StoreKit2BridgeInstance(void);
 #endif

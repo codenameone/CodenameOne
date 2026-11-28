@@ -291,6 +291,10 @@ public @interface Mac {
     /// hand.
     Toggle sourceOnly() default Toggle.DEFAULT;
 
+    /// macOS builds. In-app purchase through StoreKit 2 (macOS 12), on by
+    /// default. Falls back to `ios.storeKit2`, which describes the choice.
+    Toggle storeKit2() default Toggle.DEFAULT;
+
     /// macOS builds. Apple Developer Team ID (alphanumeric). Falls back to
     /// `ios.release.teamId` -> `ios.teamId` -> `ios.debug.teamId` since most apps
     /// share a single Apple Developer Team for iOS and Mac.

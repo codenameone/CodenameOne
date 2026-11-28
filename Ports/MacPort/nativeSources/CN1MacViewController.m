@@ -311,7 +311,8 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 /// the define this is empty and names nothing from StoreKit.
 void CN1MacInstallStoreKitObserver(void) {
 #ifdef CN1_USE_STOREKIT
-    [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
+    // StoreKit 2 when the OS has it, otherwise the StoreKit 1 queue (CN1StoreKit.m).
+    CN1StoreKitInstallObserver();
 #endif
 }
 

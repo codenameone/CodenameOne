@@ -1060,6 +1060,15 @@ public class IOSNative {
     native void purchase(String sku);
     native boolean canMakePayments();
     native void restorePurchases();
+
+    // StoreKit 2 (CN1StoreKit.m over the Swift CN1StoreKit2 bridge). Active only
+    // when the app uses com.codename1.payment and the OS has StoreKit 2; then
+    // purchase, restorePurchases and canMakePayments route there too, and the
+    // outcomes arrive as JSON events ZoozPurchase drains.
+    native boolean storeKit2Active();
+    native String storeKit2NextEvent(int timeoutMs);
+    native void storeKit2Finish(String transactionId);
+    native String storeKit2FetchProducts(String[] skus);
     native void zoozPurchase(double amount, String currency, String appKey, boolean sandbox, String invoiceNumber);
 
     native void setLocale(String localeStr);

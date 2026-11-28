@@ -54,6 +54,8 @@ public class RecordingReceiptStore implements ReceiptStore {
     public void submitReceipt(Receipt receipt, SuccessCallback<Boolean> callback) {
         if (receipt != null && sink != null) {
             sink.recordSubmittedReceipt(receipt.getTransactionId());
+            sink.recordEvent("receipt " + receipt.getSku() + " " + receipt.getTransactionId()
+                    + " " + orderDataKind(receipt));
         }
         System.out.println("CN1SS:IAP:SUBMITTED "
                 + (receipt == null ? "null" : receipt.getTransactionId()));
@@ -79,6 +81,33 @@ public class RecordingReceiptStore implements ReceiptStore {
      * store-direct entitlement signal (Purchase.isSubscribed) is computed
      * from, so without it no purchase could ever read as entitled here.
      */
+    /// "jws:<productId>" when the order data is a StoreKit 2 signed
+    /// transaction (three base64url parts whose payload names the product),
+    /// "null" when there is none, "other" for anything else (a StoreKit 1 app
+    /// receipt). This is what the commerce service's Apple path decodes.
+    static String orderDataKind(Receipt r) {
+        String d = r.getOrderData();
+        if (d == null) {
+            return "null";
+        }
+        java.util.List<String> parts = com.codename1.util.StringUtil.tokenize(d, '.');
+        if (parts.size() != 3) {
+            return "other";
+        }
+        try {
+            String b = parts.get(1).replace('-', '+').replace('_', '/');
+            while (b.length() % 4 != 0) {
+                b += "=";
+            }
+            String payload = new String(com.codename1.util.Base64.decode(b.getBytes("UTF-8")), "UTF-8");
+            java.util.Map<String, Object> m = new com.codename1.io.JSONParser().parseJSON(
+                    new java.io.InputStreamReader(new java.io.ByteArrayInputStream(payload.getBytes("UTF-8")), "UTF-8"));
+            return "jws:" + m.get("productId") + ":" + m.get("originalTransactionId");
+        } catch (Exception e) {
+            return "other";
+        }
+    }
+
     public void fetchReceipts(SuccessCallback<Receipt[]> callback) {
         Receipt[] out = new Receipt[submitted.size()];
         for (int i = 0; i < out.length; i++) {

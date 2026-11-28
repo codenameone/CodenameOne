@@ -30,6 +30,11 @@ import java.util.Map;
 /// production endpoint, and to the sandbox when production answers 21007
 /// (a TestFlight or development receipt).
 ///
+/// It needs the app receipt, so the app builds with `ios.storeKit2=false`
+/// (see `common/codenameone_settings.properties`): under StoreKit 2 the
+/// receipt's order data is a signed transaction, which this endpoint does
+/// not read.
+///
 /// The receipt is good for a transaction when Apple answers status 0, the
 /// receipt is this app's (`bundle_id`), and it lists that transaction for
 /// that product without a cancellation. The answer is Apple's

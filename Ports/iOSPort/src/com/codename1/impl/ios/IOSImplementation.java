@@ -14209,6 +14209,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(main instanceof RestoreCallback) {
             restoreCallback = (RestoreCallback)main;
         }
+        ZoozPurchase.startStoreKit2Events();
         if (main instanceof LocalNotificationCallback) {
             setLocalNotificationCallback((LocalNotificationCallback) main);
         }
