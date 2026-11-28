@@ -27,6 +27,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.chart.Chart;
+import com.codename1.ui.chart.ChartContext;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.hellocodenameone.tests.AbstractAnimationScreenshotTest;
@@ -97,13 +98,25 @@ abstract class AbstractChart2GridAnimationScreenshotTest extends AbstractAnimati
         long[] hashes = new long[charts.length];
         for (int i = 0; i < charts.length; i++) {
             hashes[i] = cellHash(rgb, width, height, charts[i]);
-            if (lastHashes != null && hashes[i] == lastHashes[i]) {
+            if (lastHashes != null && hashes[i] == lastHashes[i] && hasRoomToMove(charts[i])) {
                 failAfterCapture("the chart \"" + charts[i].getTitle() + "\" did not move between frames F"
                         + frameIndex + " and F" + (frameIndex + 1) + ": it jumps instead of animating");
             }
         }
         lastHashes = hashes;
     }
+
+    /// Whether the chart's plot is big enough that a step of the animation must change a pixel.
+    /// On the watch (208x248) a grid cell is a few pixels tall: the title and legend take all of
+    /// it, the plot is zero or a pixel or two high, and there is nothing drawn to move -- the
+    /// check then failed four grids on every run while the charts were animating correctly.
+    /// A chart with a real plot is still held to moving, on every platform.
+    private static boolean hasRoomToMove(Chart c) {
+        ChartContext ctx = c.getLastContext();
+        return ctx == null || (ctx.getPlotWidth() >= MIN_PLOT_SIDE && ctx.getPlotHeight() >= MIN_PLOT_SIDE);
+    }
+
+    private static final int MIN_PLOT_SIDE = 8;
 
     private static long cellHash(int[] rgb, int width, int height, Chart c) {
         int x0 = Math.max(0, c.getAbsoluteX());

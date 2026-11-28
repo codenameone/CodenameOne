@@ -253,6 +253,16 @@ done
 
 sleep 3
 
+# The navigation mode the suite ended in. The AOSP leg has twice been confirmed in
+# gesture navigation right before the suite and still captured every dark screenshot
+# with the 3-button bar's scrim over its bottom 48px, with nothing in logcat saying
+# when it changed. Recorded here so the next occurrence says whether the mode had
+# reverted by the end, or the app drew the scrim with gesture navigation still on.
+if [ -n "${CN1SS_EMULATOR_SETUP:-}" ]; then
+  ra_log "Navigation after the suite: navigation_mode=$("$ADB_BIN" shell settings get secure navigation_mode 2>/dev/null | tr -d '\r');" \
+    "overlays: $("$ADB_BIN" shell cmd overlay list 2>/dev/null | tr -d '\r' | grep -i 'navbar' | tr -s ' \n' ' ')"
+fi
+
 if [ "${CN1SS_SKIP_COVERAGE:-0}" = "1" ]; then
   ra_log "Skipping coverage report generation (CN1SS_SKIP_COVERAGE=1)"
 else

@@ -60,6 +60,34 @@ import java.io.DataInputStream;
 import java.util.regex.Pattern;
 
 public class IPhoneBuilder extends Executor {
+    /// The phone-only orientation list in ByteCodeTranslator's template-Info.plist,
+    /// byte for byte. It leaves out upside-down: an iPhone that allows it turns
+    /// the interface over whenever the device reports PortraitUpsideDown, and a
+    /// foldable phone can report that while being opened. Must stay in sync
+    /// with the template; IPhoneBuilderOrientationTemplateTest holds it.
+    /// Whether the template's phone-only orientation list stays in the plist.
+    /// An iPhone reads UISupportedInterfaceOrientations~iphone instead of the
+    /// base array, so the default goes whenever the developer states their own
+    /// orientations: through the ios.interface_orientation hint, or by injecting
+    /// either the base array (an iPhone would otherwise ignore it) or a ~iphone
+    /// array (the key would otherwise appear twice).
+    static boolean keepsPhoneOrientationDefault(String orientationHint, String plistInject) {
+        if (orientationHint != null) {
+            return false;
+        }
+        String live = plistWithoutComments(plistInject == null ? "" : plistInject);
+        return plistKeyNamed(live, "UISupportedInterfaceOrientations", 0) < 0
+                && plistKeyNamed(live, "UISupportedInterfaceOrientations~iphone", 0) < 0;
+    }
+
+    static final String IPHONE_DEFAULT_ORIENTATIONS =
+            "\t<key>UISupportedInterfaceOrientations~iphone</key>\n"
+            + "\t<array>\n"
+            + "\t\t<string>UIInterfaceOrientationPortrait</string>\n"
+            + "\t\t<string>UIInterfaceOrientationLandscapeLeft</string>\n"
+            + "\t\t<string>UIInterfaceOrientationLandscapeRight</string>\n"
+            + "\t</array>\n";
+
     /// The application's own library jars, listed right after its sources are
     /// unzipped -- before any port archive lands beside them -- for native-theme pruning.
     private java.util.List<java.io.File> appLibraryJars = new java.util.ArrayList<java.io.File>();
@@ -7222,6 +7250,10 @@ public class IPhoneBuilder extends Executor {
             stopwatch.split("ParparVM Execution");
             try {
                 String orientations = request.getArg("ios.interface_orientation", null);
+                if (!keepsPhoneOrientationDefault(orientations, request.getArg("ios.plistInject", ""))) {
+                    File plist = new File(tmpFile, "dist/" + request.getMainClass() + "-src/" + request.getMainClass() + "-Info.plist");
+                    replaceInFile(plist, IPHONE_DEFAULT_ORIENTATIONS, "");
+                }
                 if (orientations != null && orientations.split(":").length < 4) {
                     orientations = orientations.toLowerCase();
                     File infoPlist = new File(tmpFile, "dist/" + request.getMainClass() + "-src/" + request.getMainClass() + "-Info.plist");

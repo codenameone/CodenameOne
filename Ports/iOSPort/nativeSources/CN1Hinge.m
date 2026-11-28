@@ -177,8 +177,8 @@ static CGFloat cn1HingeScale(UIView *view) {
 /// The two kinds sound interchangeable -- an occlusion region is display the
 /// application cannot draw into, a division region is a seam that splits it --
 /// and the first cut here read both, preferring occlusion on the reasoning that
-/// a hinge which eats pixels is an occlusion. Running it on an iPhone Duo
-/// (iOS 27.1) said otherwise:
+/// a hinge which eats pixels is an occlusion. Running it on the iPhone Duo
+/// simulator (iOS 27.1; this has never run on a real device) said otherwise:
 ///
 ///     bounds = x=1199 y=88 width=111 height=111
 ///

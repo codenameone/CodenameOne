@@ -1,0 +1,104 @@
+{
+ "pr": 6347,
+ "rebaseline": {
+  "windows-x64@amd64-family-25-model-1-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.584,
+      "time": 1.221,
+      "tolerance": {
+       "memory": 0.45,
+       "time": 0.45
+      }
+     },
+     "memory": 0.584,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources since the row was set (ab3505beb1). The fixed-workload translator benchmark is unchanged on every platform while hello rose everywhere (linux-x64 0.92->1.20, macos 0.96->1.11); measured over 19 windows-x64 runs across master and five branches.",
+     "runs": 6,
+     "time": 1.784,
+     "tolerance": {
+      "memory": 0.45
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-25-model-17-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.816,
+      "time": 1.375,
+      "tolerance": {
+       "memory": 0.4,
+       "time": 0.5
+      }
+     },
+     "memory": 0.816,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources since the row was set (ab3505beb1). The fixed-workload translator benchmark is unchanged on every platform while hello rose everywhere (linux-x64 0.92->1.20, macos 0.96->1.11); measured over 19 windows-x64 runs across master and five branches.",
+     "runs": 7,
+     "time": 1.891,
+     "tolerance": {
+      "memory": 0.4
+     }
+    }
+   }
+  },
+  "windows-x64@amd64-family-26-model-2-authenticamd": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.684,
+      "time": 1.41,
+      "tolerance": {
+       "memory": 0.35,
+       "time": 0.5
+      }
+     },
+     "memory": 0.684,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources since the row was set (ab3505beb1). The fixed-workload translator benchmark is unchanged on every platform while hello rose everywhere (linux-x64 0.92->1.20, macos 0.96->1.11); measured over 19 windows-x64 runs across master and five branches.",
+     "runs": 6,
+     "time": 2.147,
+     "tolerance": {
+      "memory": 0.35
+     }
+    }
+   }
+  },
+  "windows-x64@intel64-family-6-model-173-genuineintel": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.517,
+      "time": 1.212,
+      "tolerance": {
+       "memory": 0.2,
+       "time": 0.5
+      }
+     },
+     "memory": 0.702,
+     "reason": "Intel model 173 row was set from ONE run (runs: 1, ab3505beb1), before the workload grew. hello translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources; its +50% here matches the AMD rows' +38..+52% over 21 runs. translator's 0.677 was a single-run outlier: every other windows-x64 CPU measures 0.74..0.92 and sits at or under its own baseline, and 0.84 is inside that band.",
+     "runs": 1,
+     "time": 1.819,
+     "tolerance": {
+      "time": 0.5
+     }
+    }
+   },
+   "translator": {
+    "all": {
+     "from": {
+      "memory": 0.549,
+      "time": 0.677,
+      "tolerance": {
+       "time": 0.2
+      }
+     },
+     "memory": 0.549,
+     "reason": "Intel model 173 row was set from ONE run (runs: 1, ab3505beb1), before the workload grew. hello translates the hello app plus core, which grew from 268 to 377 app and 2235 to 2952 core sources; its +50% here matches the AMD rows' +38..+52% over 21 runs. translator's 0.677 was a single-run outlier: every other windows-x64 CPU measures 0.74..0.92 and sits at or under its own baseline, and 0.84 is inside that band.",
+     "runs": 1,
+     "time": 0.844
+    }
+   }
+  }
+ }
+}

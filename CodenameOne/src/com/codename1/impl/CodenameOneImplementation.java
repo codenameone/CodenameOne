@@ -7347,6 +7347,18 @@ public abstract class CodenameOneImplementation {
         return com.codename1.ui.DevicePosture.FOLD_ORIENTATION_NONE;
     }
 
+    /// True if this is a foldable that is currently open, flat or half opened. The default derives
+    /// it from `#isFoldable()` and `#getDevicePosture()`; a port whose foldability check can block
+    /// overrides it with a non-blocking answer, because `#isTablet()` may consult it.
+    public boolean isOpenFoldable() {
+        if (!isFoldable()) {
+            return false;
+        }
+        int posture = getDevicePosture();
+        return posture == com.codename1.ui.DevicePosture.POSTURE_FLAT
+                || posture == com.codename1.ui.DevicePosture.POSTURE_HALF_OPENED;
+    }
+
     /// True if the fold currently separates the display into two distinct logical areas.
     public boolean isPostureSeparating() {
         return false;
