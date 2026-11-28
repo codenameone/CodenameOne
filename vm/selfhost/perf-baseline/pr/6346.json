@@ -1,0 +1,25 @@
+{
+ "pr": 6346,
+ "rebaseline": {
+  "linux-arm64@neoverse-n2": {
+   "hello": {
+    "all": {
+     "from": {
+      "memory": 0.66,
+      "time": 1.021,
+      "tolerance": {
+       "memory": 0.4
+      }
+     },
+     "memory": 0.938,
+     "reason": "Workload growth, not a VM regression: the hello benchmark translates the hello app plus core, and core has grown since the neoverse-n2 row was set. Unrelated branches on the same runner already read 0.83x-0.90x RAM against this 0.66x row (runs 46084857354, 46105099103), while the x64 leg of this same run reads 0.93x against 0.96x.",
+     "runs": 1,
+     "time": 1.021,
+     "tolerance": {
+      "memory": 0.4
+     }
+    }
+   }
+  }
+ }
+}

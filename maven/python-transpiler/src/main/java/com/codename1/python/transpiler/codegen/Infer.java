@@ -7139,6 +7139,36 @@ final class Infer {
     /// the emitters, which read types after the walk.
     final Map<Name, Ty> narrowedAt = new IdentityHashMap<Name, Ty>();
 
+    /// Records what a typed walk found at read `n` of a narrowed name:
+    /// `t`, or null where this walk did not narrow it. The typed body is
+    /// emitted once for every walk of it, so the read is narrowed to the
+    /// join of every walk's type there -- a walk without the narrowing
+    /// joins the name's plain type, which leaves no class to cast to. Kept
+    /// as the last narrowing seen, it outlived its evidence: sqlalchemy's
+    /// `Session.get(entity, ident)` narrowed `obj` by `isinstance(obj,
+    /// entity)` while the first caller's class was all `entity` held; the
+    /// parameter then widened, and the typed body still returned `obj` cast
+    /// to that class -- a ClassCastException for the next caller's entity.
+    /// The join only widens, so the walk still settles.
+    private void narrowedRead(Name n, Ty t, Fn fn, Scope sc) {
+        Ty was = narrowedAt.get(n);
+        if (t == null && was == null) {
+            return;
+        }
+        Ty here = t;
+        if (here == null) {
+            boolean g = guessSeen;
+            here = nameType(n.id, fn, sc);
+            guessSeen = g;
+        }
+        Ty j = was == null ? here : Ty.join(was, here);
+        if (!j.equals(was)) {
+            narrowedAt.put(n, j);
+            p.changed = true;
+        }
+    }
+
+
     /// For `isinstance(x, K)` (or, with `negated`, `not isinstance(x, K)`)
     /// on a plain local x of this function: x and what it is when the
     /// test holds (fails, when negated). K must be compiled classes, or a
@@ -9099,9 +9129,12 @@ final class Infer {
                 return Ty.OBJECT;
             }
             Ty nt = narrowedAt.get(e);
-            if (fn != null && sc == fn.def.scope && narrowing.containsKey(nk(sc, ((Name) e).id))) { //NOPMD CompareObjectsWithEquals - identity is meant
+            if (fn != null && sc == fn.def.scope && !p.done) { //NOPMD CompareObjectsWithEquals - identity is meant
+                // What this walk knows here, not what an earlier one did.
                 nt = narrowing.get(nk(sc, ((Name) e).id));
-                narrowedAt.put((Name) e, nt);
+                if (!shadow) {
+                    narrowedRead((Name) e, nt, fn, sc);
+                }
             }
             if (nt != null) {
                 // Still typed as the local is, so its stores stay joined;

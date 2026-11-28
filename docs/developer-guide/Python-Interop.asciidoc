@@ -328,7 +328,7 @@ any package, however deep, without an edit to the package.
 |===
 
 A module that's left out can still be imported, and so can a name from it.
-That matters because a package usually imports all of its modules as it
+That matters because a package usually imports every one of its modules as it
 loads. The error comes at the first use: calling something the module would
 have held, reading an attribute of it, or deriving a class from it raises
 `RuntimeError`, naming the module and the line that removed it. Use this

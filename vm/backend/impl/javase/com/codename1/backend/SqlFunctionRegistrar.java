@@ -41,11 +41,9 @@ interface SqlFunctionRegistrar {
         }
 
         private static SqlFunctionRegistrar find() {
-            for (SqlFunctionRegistrar r : java.util.ServiceLoader.load(SqlFunctionRegistrar.class,
-                    SqlFunctionRegistrar.class.getClassLoader())) {
-                return r;
-            }
-            return null;
+            java.util.Iterator<SqlFunctionRegistrar> it = java.util.ServiceLoader.load(SqlFunctionRegistrar.class,
+                    SqlFunctionRegistrar.class.getClassLoader()).iterator();
+            return it.hasNext() ? it.next() : null;
         }
     }
 }

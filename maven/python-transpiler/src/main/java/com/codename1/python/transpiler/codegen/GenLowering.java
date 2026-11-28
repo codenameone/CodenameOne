@@ -46,6 +46,7 @@ import com.codename1.python.transpiler.ast.Node.WithItem;
 import com.codename1.python.transpiler.ast.Node.Yield;
 import com.codename1.python.transpiler.ast.Scope;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,18 @@ final class GenLowering {
     private final Linearize lin;
     private final StringBuilder fields = new StringBuilder(); //NOPMD AvoidStringBufferField - the generator's output
     private final StringBuilder out = new StringBuilder(); //NOPMD AvoidStringBufferField - the generator's output
+    /// The lines of `out` this lowering did not write as states and jumps:
+    /// everything the emitter writes for a plain statement, and what follows
+    /// a newline inside one `line`. Either can hold a nested generator's
+    /// body (a `def` or `lambda` inside this generator), which has its own
+    /// states and was threaded already; threading it again with this
+    /// generator's map retargets its jumps to numbers from the wrong switch
+    /// -- a nested `async def` after a loop jumped to a state it does not
+    /// have and threw IllegalStateException. The emitter never writes one of
+    /// this generator's numbered jumps, so nothing of ours is skipped.
+    private final BitSet foreign = new BitSet();
+    private int lineCount;
+    private int scanned;
     private final List<Integer> handlerOf = new ArrayList<Integer>();
     private final List<Loop> loops = new ArrayList<Loop>();
     private final List<Fin> fins = new ArrayList<Fin>();
@@ -175,7 +188,7 @@ final class GenLowering {
         }
         r.append("                d$: while (true) {\n");
         r.append("                        switch (pc) {\n");
-        r.append(threadJumps(out.toString()));
+        r.append(threadJumps(out.toString(), foreign));
         r.append("                            }\n");
         r.append("                            default:\n");
         r.append("                                throw new IllegalStateException();\n");
@@ -216,13 +229,20 @@ final class GenLowering {
     /// element). Every state is kept: resumption and the handlers enter
     /// states by number, and a state no jump names any more is just never
     /// entered that way.
-    static String threadJumps(String out) {
+    static String threadJumps(String out, BitSet foreign) {
         String[] lines = out.split("\n", -1);
         Map<Integer, Integer> forward = new HashMap<Integer, Integer>();
         int state = -1;
         int target = -1;
         int body = 0;
-        for (String l : lines) {
+        for (int li = 0; li < lines.length; li++) {
+            String l = lines[li];
+            if (foreign.get(li)) {
+                // Not a jump of ours, but it is in the state's body.
+                body++;
+                target = -1;
+                continue;
+            }
             if (l.startsWith(CASE) && l.endsWith(": {")) {
                 if (state >= 0 && body == 1 && target >= 0) {
                     forward.put(Integer.valueOf(state), Integer.valueOf(target));
@@ -246,6 +266,13 @@ final class GenLowering {
         StringBuilder r = new StringBuilder(out.length());
         for (int i = 0; i < lines.length; i++) {
             String l = lines[i];
+            if (foreign.get(i)) {
+                r.append(l);
+                if (i < lines.length - 1) {
+                    r.append('\n');
+                }
+                continue;
+            }
             if (l.trim().startsWith("if (!(true)) ")) {
                 continue;
             }
@@ -293,10 +320,32 @@ final class GenLowering {
     }
 
     private void line(String code) {
+        int first = sync();
         for (int i = 0; i < IND + 2; i++) {
             out.append("    ");
         }
         out.append(code).append('\n');
+        // The first line is this generator's own text; what follows a
+        // newline inside one statement is a nested body.
+        int end = sync();
+        if (end - first > 1) {
+            foreign.set(first + 1, end);
+        }
+    }
+
+    /// The number of complete lines in `out` so far.
+    private int sync() {
+        for (int n = out.length(); scanned < n; scanned++) {
+            if (out.charAt(scanned) == '\n') {
+                lineCount++;
+            }
+        }
+        return lineCount;
+    }
+
+    /// Marks the lines the emitter wrote since `from` (a `sync()`).
+    private void emitted(int from) {
+        foreign.set(from, sync());
     }
 
     private static String goTo(int s) {
@@ -389,11 +438,15 @@ final class GenLowering {
                 // yield in it (bs4's ElementFilter.filter): it went through
                 // Builtins.nextOrStop and the inner generator's setjmp.
                 Call c = (Call) ((Assign) s).value;
+                int emittedFrom = sync();
                 em.store(((Assign) s).targets.get(0), "nextOrStopFlat(" + em.expr(c.args.get(0)) + ", "
                         + em.expr(c.args.get(1)) + ")", out, IND + 2);
+                emitted(emittedFrom);
                 return;
             }
+            int emittedFrom = sync();
             em.stmt(s, out, IND + 2);
+            emitted(emittedFrom);
             return;
         }
         List<Stmt> rep = lin.stmt(s);
@@ -427,12 +480,16 @@ final class GenLowering {
                 r = result(a.value);
             }
             if (a.targets.size() == 1) {
+                int emittedFrom = sync();
                 em.store(a.targets.get(0), r, out, IND + 2);
+                emitted(emittedFrom);
             } else {
                 String t = em.fresh("s");
                 line("final Object " + t + " = " + r + ";");
                 for (Expr x : a.targets) {
+                    int emittedFrom = sync();
                     em.store(x, t, out, IND + 2);
+                    emitted(emittedFrom);
                 }
             }
         } else if (s instanceof Return) {
@@ -624,7 +681,9 @@ final class GenLowering {
             line("final Object " + x + " = " + (flat() ? "nextFlat(" + it + ")" : it + ".next()") + ";");
             line("if (" + x + " == null) " + goTo(els));
         }
+        int emittedFrom = sync();
         em.store(f.target, x, out, IND + 2);
+        emitted(emittedFrom);
         loops.add(new Loop(end, top, fins.size()));
         block(f.body);
         loops.remove(loops.size() - 1);
@@ -723,7 +782,9 @@ final class GenLowering {
                 ExceptHandler h = t.handlers.get(i);
                 begin(bodies.get(i).intValue());
                 if (h.name != null) {
+                    int emittedFrom = sync();
                     em.storeName(h.name, e + ".value", out, IND + 2);
+                    emitted(emittedFrom);
                 }
                 em.handlers().add(e);
                 block(h.body);
@@ -776,7 +837,9 @@ final class GenLowering {
         if (item.vars != null) {
             String ev = em.fresh("en");
             line("final Object " + ev + " = " + entered + ";");
+            int emittedFrom = sync();
             em.store(item.vars, ev, out, IND + 2);
+            emitted(emittedFrom);
         } else {
             line("noop(" + entered + ");");
         }
