@@ -135,8 +135,21 @@ body.cn1-skindesigner-dark .cn1-skindesigner-loader {
   100% { transform: translateX(300%); }
 }
 
+/* The designer fills the viewport, so the page around it must never scroll. A wheel
+   or trackpad delta the app inside the iframe does not consume chains to this
+   document, and body overflow alone does not stop the viewport when the theme gives
+   <html> an overflow of its own -- so both are locked, and overscroll chaining with
+   them. */
+html.cn1-skindesigner-page-html,
 body.cn1-skindesigner-page-body {
   overflow: hidden;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+.cn1-skindesigner-shell,
+.cn1-skindesigner-frame {
+  overscroll-behavior: contain;
 }
 
 body.cn1-skindesigner-page-body .main {
@@ -195,6 +208,7 @@ body.cn1-skindesigner-page-body .main {
   }
 
   body.classList.add("cn1-skindesigner-page-body");
+  root.classList.add("cn1-skindesigner-page-html");
   syncHeight();
   syncTheme();
   window.addEventListener("resize", syncHeight);
