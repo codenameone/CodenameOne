@@ -78,7 +78,12 @@ def registered_tests() -> list[str]:
     end = source.find("\n    };", start)
     if end < 0:
         raise ContractError(f"Unable to find the end of DEFAULT_TEST_CLASSES in {RUNNER}")
-    names = re.findall(r"\bnew\s+([A-Za-z0-9_]+)\s*\(", source[start:end])
+    # Comments are stripped first: a test disabled by commenting out its
+    # `new X()` line runs nowhere, and counting it as registered made the
+    # manifest keep its entry -- which every port then reported as not-run,
+    # failing the strict gate (Chart2SharedTooltipScreenshotTest).
+    body = re.sub(r"/\*.*?\*/|//[^\n]*", "", source[start:end], flags=re.S)
+    names = re.findall(r"\bnew\s+([A-Za-z0-9_]+)\s*\(", body)
 
     # KotlinUiTest is installed through the public addTest() hook before the
     # default array. Find every statically named addTest call so that this path
